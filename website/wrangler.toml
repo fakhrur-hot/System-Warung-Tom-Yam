@@ -1,0 +1,7 @@
+# Cloudflare Pages config for the website.
+# First café deployment: "Tani Tom Yam" → https://tani-tom-yam.pages.dev
+# ⚠️ Do NOT rename `name` once QR table cards are printed — the *.pages.dev URL is baked
+# into the physical cards.
+name = "tani-tom-yam"
+compatibility_date = "2024-07-19"
+pages_build_output_dir = "dist"

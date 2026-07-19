@@ -4,7 +4,9 @@ keystore.properties
 *.jks
 *.keystore
 .env
-.env.*
+.env.local
+.env.*.local
+# .env.example templates ARE committed (they hold placeholders only)
 
 # ── Android / Gradle ───────────────────────────────────────────────────
 *.apk
