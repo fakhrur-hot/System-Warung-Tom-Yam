@@ -1,5 +1,7 @@
 # Cloudflare Pages config for the website.
-# First café deployment: "Tani Tom Yam" → https://tani-tom-yam.pages.dev
+# This value is DEPLOYMENT-SPECIFIC. It targets the example café "Tani Tom Yam"
+# (the first/reference instance of the System Warung Tom Yam product) →
+# https://tani-tom-yam.pages.dev. Another café changes this to its own project name.
 # ⚠️ Do NOT rename `name` once QR table cards are printed — the *.pages.dev URL is baked
 # into the physical cards.
 name = "tani-tom-yam"

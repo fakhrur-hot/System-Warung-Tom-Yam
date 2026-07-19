@@ -1,11 +1,14 @@
-# Deployment & Secrets — Tani Tom Yam (first café)
+# Deployment & Secrets — example café "Tani Tom Yam"
 
-How to wire the newly-created **Supabase** and **Cloudflare** accounts to this repo.
-No real secret values live in git — this file uses placeholders. Paste the actual values
-(from your local credential files) into the destinations below.
+How to wire the **Supabase** and **Cloudflare** accounts to this repo. No real secret values
+live in git — this file uses placeholders. Paste the actual values (from your local
+credential files) into the destinations below.
 
-> Product: **System Warung Tom Yam** · This deployment / first café: **Tani Tom Yam**
-> Public URL (baked into QR cards): `https://tani-tom-yam.pages.dev`
+> **Product:** System Warung Tom Yam (this repo, reusable by any café).
+> **This deployment:** the **example café "Tani Tom Yam"** — the first, reference instance
+> used to build and demo the product. Public URL (baked into QR cards):
+> `https://tani-tom-yam.pages.dev`, backed by Supabase project `jxxzdmbvazxfbhkittlm`.
+> A different café repeats these same steps with **its own** Pages + Supabase project.
 
 ## Where each credential goes
 

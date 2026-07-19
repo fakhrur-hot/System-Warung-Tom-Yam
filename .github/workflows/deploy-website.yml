@@ -37,4 +37,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: website
+          # Deployment-specific: the example café "Tani Tom Yam". Change per café.
           command: pages deploy dist --project-name=tani-tom-yam
