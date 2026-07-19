@@ -1,0 +1,6 @@
+# Copy to wrangler.toml (git-ignored) for your café's Cloudflare Pages deployment.
+# `name` is DEPLOYMENT-SPECIFIC — it becomes <name>.pages.dev, which is printed on the
+# table QR cards. Pick the final name before the first deploy and never rename it after.
+name = "your-cafe-project-name"
+compatibility_date = "2024-07-19"
+pages_build_output_dir = "dist"

@@ -8,6 +8,10 @@ keystore.properties
 .env.*.local
 # .env.example templates ARE committed (they hold placeholders only)
 
+# ── Deployment-specific (per-café) — keep the product repo generic ─────
+# The actual café's Cloudflare Pages config is local-only; commit only the .example.
+website/wrangler.toml
+
 # ── Android / Gradle ───────────────────────────────────────────────────
 *.apk
 *.aab

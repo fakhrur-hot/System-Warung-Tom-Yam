@@ -37,5 +37,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: website
-          # Deployment-specific: the example café "Tani Tom Yam". Change per café.
-          command: pages deploy dist --project-name=tani-tom-yam
+          # Deployment-specific: set the repo variable CLOUDFLARE_PROJECT_NAME to your
+          # café's Cloudflare Pages project name (kept out of git so the repo stays generic).
+          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PROJECT_NAME }}

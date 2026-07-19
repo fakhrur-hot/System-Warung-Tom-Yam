@@ -16,12 +16,11 @@
 
 - **System Warung Tom Yam** — *this repository*: the reusable POS product. One codebase
   (website + single dual-role APK + backend schema) that any café can deploy for itself.
-- **Tani Tom Yam** — the **example café**: the first, reference deployment of this product,
-  used to build and demonstrate it. Its public URL is `https://tani-tom-yam.pages.dev` and it
-  has its own Supabase project. Deployment-specific names/URLs in this repo (e.g. in
-  `website/wrangler.toml` and the deploy workflow) point at this example café; another café
-  would get its own Cloudflare Pages project and Supabase project by repeating the steps in
-  [`DEPLOYMENT.md`](DEPLOYMENT.md).
+- **Per café** — each café is a separate **deployment** with its own Cloudflare Pages
+  project (`<name>.pages.dev`, baked into its QR cards) and its own Supabase project. Those
+  café-specific values are **kept out of git** — they live in git-ignored local files
+  (`website/.env.local`, `website/wrangler.toml`) and GitHub repo variables/secrets, so the
+  committed repo stays a clean, generic product. See [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ---
 

@@ -1,14 +1,13 @@
-# Deployment & Secrets — example café "Tani Tom Yam"
+# Deployment & Secrets
 
-How to wire the **Supabase** and **Cloudflare** accounts to this repo. No real secret values
-live in git — this file uses placeholders. Paste the actual values (from your local
-credential files) into the destinations below.
+How to wire a café's **Supabase** and **Cloudflare** accounts to this repo. No real values
+live in git — this file uses placeholders, and each café's specifics stay in git-ignored
+local files (`website/.env.local`, `website/wrangler.toml`) and repo variables/secrets.
 
-> **Product:** System Warung Tom Yam (this repo, reusable by any café).
-> **This deployment:** the **example café "Tani Tom Yam"** — the first, reference instance
-> used to build and demo the product. Public URL (baked into QR cards):
-> `https://tani-tom-yam.pages.dev`, backed by Supabase project `jxxzdmbvazxfbhkittlm`.
-> A different café repeats these same steps with **its own** Pages + Supabase project.
+> **Product:** System Warung Tom Yam (this repo, reusable by any café). **Per deployment:**
+> each café gets **its own** Cloudflare Pages project (`<name>.pages.dev`, baked into its QR
+> cards) and **its own** Supabase project. Those café-specific names/refs are intentionally
+> **not committed** — set them in the local files and secrets below.
 
 ## Where each credential goes
 
@@ -36,21 +35,21 @@ openssl rand -hex 32                             # value for ROTATING_KEY_SECRET
 Find your **project URL/ref** in Supabase → Project Settings → Data API
 (`https://<ref>.supabase.co`). Put it everywhere marked `REPLACE_WITH_PROJECT_REF`.
 
-## 2. Supabase project (example café ref: `jxxzdmbvazxfbhkittlm`)
+## 2. Supabase project
 
 **a. Enable extensions** — Dashboard → Database → Extensions → enable `pg_cron` + `pgcrypto`.
 
-**b. Apply the schema** — pick ONE:
+**b. Apply the schema** — pick ONE (`<ref>` = your Supabase project ref):
 
 - *Supabase CLI* (blessed path):
   ```bash
-  supabase login && supabase link --project-ref jxxzdmbvazxfbhkittlm && supabase db push
+  supabase login && supabase link --project-ref <ref> && supabase db push
   ```
 - *No CLI — built-in runner* (needs only your DB password):
   ```bash
   cd supabase && npm install
   # connection string (URI, with password) from Settings → Database → Connection string
-  DATABASE_URL="postgresql://postgres:<PASSWORD>@db.jxxzdmbvazxfbhkittlm.supabase.co:5432/postgres" npm run migrate
+  DATABASE_URL="postgresql://postgres:<PASSWORD>@db.<ref>.supabase.co:5432/postgres" npm run migrate
   ```
 - *Dashboard* — paste `supabase/migrations/0001_initial_schema.sql` into the SQL editor and run.
 
@@ -63,26 +62,31 @@ supabase secrets set BREVO_API_KEY=xkeysib-xxxx
 ```
 
 **d. Storage + Auth** — create the public `logos` bucket; enable Email auth with
-confirmation; set Site/Redirect URL to `https://tani-tom-yam.pages.dev`.
+confirmation; set Site/Redirect URL to your café's `https://<pages-project>.pages.dev`.
 
 ## 3. Cloudflare Pages (auto-deploy on push to main)
 
-The `Deploy Website` workflow builds and deploys `website/dist` to the Pages project
-**`tani-tom-yam`**. Add these **GitHub → Settings → Secrets and variables → Actions**:
+The `Deploy Website` workflow builds `website/dist` and deploys it to the Pages project
+named by the repo **variable** `CLOUDFLARE_PROJECT_NAME`. Under
+**GitHub → Settings → Secrets and variables → Actions** add:
 
-| Secret | Value (example café) |
+**Variables** tab — one:
+
+| Variable | Value |
+|---|---|
+| `CLOUDFLARE_PROJECT_NAME` | your café's Cloudflare Pages project name (→ `<name>.pages.dev`) |
+
+**Secrets** tab — four (the two `VITE_*` are client-safe but kept here for convenience):
+
+| Secret | Value |
 |---|---|
 | `CLOUDFLARE_API_TOKEN` | your Cloudflare API token (`cfat_…`) |
 | `CLOUDFLARE_ACCOUNT_ID` | your Cloudflare account ID |
-| `VITE_SUPABASE_URL` | `https://jxxzdmbvazxfbhkittlm.supabase.co` |
+| `VITE_SUPABASE_URL` | `https://<ref>.supabase.co` |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | the `sb_publishable_…` value in `website/.env.local` |
 
-The two `VITE_*` values are client-safe (they ship in the browser bundle); the two
-`CLOUDFLARE_*` values are genuine secrets.
-
-First deploy also happens on the next push touching `website/**`, or run the workflow
-manually (Actions → Deploy Website → Run workflow). Create the Pages project named
-`tani-tom-yam` first (dashboard or `wrangler pages project create tani-tom-yam`).
+Create the Pages project first (`wrangler pages project create <name>` or the dashboard),
+then push to `website/**` or run the workflow manually.
 
 ## 4. Secret hygiene
 
