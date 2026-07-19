@@ -9,8 +9,11 @@ This folder holds the schema migration and (later) the Edge Functions. Provision
 1. Create a free project at https://supabase.com (region closest to the café).
 2. Install the CLI: `npm i -g supabase` (or use the SQL editor for step 4).
 3. In the dashboard → **Database → Extensions**, enable **`pg_cron`** and **`pgcrypto`**.
-4. Apply the schema:
+4. Apply the schema (pick one):
    - CLI: `supabase link --project-ref <ref>` then `supabase db push`
+   - No CLI: `npm install` here, then
+     `DATABASE_URL="postgresql://postgres:<PASSWORD>@db.<ref>.supabase.co:5432/postgres" npm run migrate`
+     (runs `apply-migration.mjs`)
    - or paste `migrations/0001_initial_schema.sql` into the SQL editor and run it.
 5. **Auth**: enable Email provider; turn on "Confirm email". Set Site URL + Redirect URL to
    your Cloudflare Pages domain (`https://<project>.pages.dev`).

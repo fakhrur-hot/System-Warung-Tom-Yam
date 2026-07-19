@@ -1,0 +1,13 @@
+{
+  "name": "warung-tom-yam-supabase",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Schema migration runner for the Supabase backend.",
+  "scripts": {
+    "migrate": "node apply-migration.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.12.0"
+  }
+}

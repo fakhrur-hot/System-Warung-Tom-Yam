@@ -36,27 +36,49 @@ openssl rand -hex 32                             # value for ROTATING_KEY_SECRET
 Find your **project URL/ref** in Supabase → Project Settings → Data API
 (`https://<ref>.supabase.co`). Put it everywhere marked `REPLACE_WITH_PROJECT_REF`.
 
-## 2. Supabase project
+## 2. Supabase project (example café ref: `jxxzdmbvazxfbhkittlm`)
 
-Follow `supabase/README.md`, then set the Edge Function secrets (server-side only):
+**a. Enable extensions** — Dashboard → Database → Extensions → enable `pg_cron` + `pgcrypto`.
+
+**b. Apply the schema** — pick ONE:
+
+- *Supabase CLI* (blessed path):
+  ```bash
+  supabase login && supabase link --project-ref jxxzdmbvazxfbhkittlm && supabase db push
+  ```
+- *No CLI — built-in runner* (needs only your DB password):
+  ```bash
+  cd supabase && npm install
+  # connection string (URI, with password) from Settings → Database → Connection string
+  DATABASE_URL="postgresql://postgres:<PASSWORD>@db.jxxzdmbvazxfbhkittlm.supabase.co:5432/postgres" npm run migrate
+  ```
+- *Dashboard* — paste `supabase/migrations/0001_initial_schema.sql` into the SQL editor and run.
+
+**c. Set Edge Function secrets** (server-side only — use the secret key from *this* project):
 
 ```bash
 supabase secrets set SUPABASE_SECRET_KEY=sb_secret_xxxx
-supabase secrets set ROTATING_KEY_SECRET=<openssl rand -hex 32>
+supabase secrets set ROTATING_KEY_SECRET=$(openssl rand -hex 32)
 supabase secrets set BREVO_API_KEY=xkeysib-xxxx
 ```
+
+**d. Storage + Auth** — create the public `logos` bucket; enable Email auth with
+confirmation; set Site/Redirect URL to `https://tani-tom-yam.pages.dev`.
 
 ## 3. Cloudflare Pages (auto-deploy on push to main)
 
 The `Deploy Website` workflow builds and deploys `website/dist` to the Pages project
 **`tani-tom-yam`**. Add these **GitHub → Settings → Secrets and variables → Actions**:
 
-| Secret | Value |
+| Secret | Value (example café) |
 |---|---|
 | `CLOUDFLARE_API_TOKEN` | your Cloudflare API token (`cfat_…`) |
 | `CLOUDFLARE_ACCOUNT_ID` | your Cloudflare account ID |
-| `VITE_SUPABASE_URL` | `https://<ref>.supabase.co` |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | your `sb_publishable_…` key |
+| `VITE_SUPABASE_URL` | `https://jxxzdmbvazxfbhkittlm.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | the `sb_publishable_…` value in `website/.env.local` |
+
+The two `VITE_*` values are client-safe (they ship in the browser bundle); the two
+`CLOUDFLARE_*` values are genuine secrets.
 
 First deploy also happens on the next push touching `website/**`, or run the workflow
 manually (Actions → Deploy Website → Run workflow). Create the Pages project named
