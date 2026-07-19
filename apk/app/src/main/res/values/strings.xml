@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English is the base/source language (see specs REQ-9). values-ms holds Malay. -->
+<resources>
+    <string name="app_name">Warung Tom Yam</string>
+    <string name="placeholder_subtitle">POS — setup coming soon</string>
+</resources>

@@ -1,0 +1,13 @@
+{
+  "comingSoon": "Coming soon",
+  "tableLabel": "Table {{table}}",
+  "noTable": "Scan a table QR code to order.",
+  "menu": "Menu",
+  "cart": "Cart",
+  "submitOrder": "Submit order",
+  "orderReceived": "Order received",
+  "preparing": "Preparing",
+  "ready": "Ready",
+  "tableOccupied": "This table is occupied",
+  "cancel": "Cancel"
+}

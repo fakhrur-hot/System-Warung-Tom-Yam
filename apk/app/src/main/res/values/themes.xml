@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base activity theme. Compose supplies the real Material3 theming at runtime;
+         this framework theme just gives the window a sane starting point. -->
+    <style name="Theme.WarungTomYam" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

@@ -1,0 +1,13 @@
+{
+  "comingSoon": "Akan datang",
+  "tableLabel": "Meja {{table}}",
+  "noTable": "Imbas kod QR meja untuk membuat pesanan.",
+  "menu": "Menu",
+  "cart": "Troli",
+  "submitOrder": "Hantar pesanan",
+  "orderReceived": "Pesanan diterima",
+  "preparing": "Sedang disediakan",
+  "ready": "Siap",
+  "tableOccupied": "Meja ini sedang digunakan",
+  "cancel": "Batal"
+}

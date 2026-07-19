@@ -1,0 +1,13 @@
+{
+  "comingSoon": "即将推出",
+  "tableLabel": "桌号 {{table}}",
+  "noTable": "扫描桌上的二维码即可点餐。",
+  "menu": "菜单",
+  "cart": "购物车",
+  "submitOrder": "提交订单",
+  "orderReceived": "已收到订单",
+  "preparing": "准备中",
+  "ready": "已完成",
+  "tableOccupied": "此桌已被占用",
+  "cancel": "取消"
+}

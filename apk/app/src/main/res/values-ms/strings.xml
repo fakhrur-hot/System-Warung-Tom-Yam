@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Malay (Bahasa Melayu). Dictionary-generated from the English base; overridable. -->
+<resources>
+    <string name="app_name">Warung Tom Yam</string>
+    <string name="placeholder_subtitle">POS — persediaan akan datang</string>
+</resources>

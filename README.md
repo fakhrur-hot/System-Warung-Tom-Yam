@@ -93,18 +93,30 @@ on the website) becomes the POS; the rest join as ordering staff.
 > `*.pages.dev` URL is baked into the physical cards. This is the deliberate trade-off for
 > not buying a domain.
 
-## Repository layout (planned monorepo)
+## Repository layout
 
 ```
 /
-├── website/     React + Vite + Tailwind (customer page + superadmin dashboard)
+├── website/     React + Vite + Tailwind SPA (customer page + superadmin dashboard)
 ├── apk/         Android — Kotlin, Jetpack Compose, Hilt, Room (single dual-role binary)
+├── supabase/    Postgres schema migration + backend provisioning notes
 ├── shared/      API contract (endpoints, Realtime channels, enums)
-└── specs/       requirements.md · designs.md · tasks.md · this README
+├── spikes/      Phase 0 de-risk harnesses (Bluetooth printing, background/latency)
+├── specs/       requirements.md · designs.md · tasks.md
+└── .github/     CI (website + APK) and signed-release workflows
 ```
 
-*(This README currently lives in `specs/` alongside the design docs; it moves to the
-monorepo root when the project is scaffolded — see Implementation Plan, Task 4.)*
+## Project status
+
+**Phase 0 + Phase 1 done** (scaffold + foundations):
+
+- ✅ API contract (`shared/api-contract.md`)
+- ✅ Supabase schema migration + RLS + seeds + purge (`supabase/`)
+- ✅ Website skeleton — **builds** (`npm run build`), 4-language selector, English base
+- ✅ Android skeleton — Compose + Hilt + Room, **debug APK builds** (`./gradlew assembleDebug`)
+- ✅ CI + signed-release GitHub Actions
+- ⏳ Phase 0 spikes (`spikes/`) are ready to run — they need the café's printer / real phones
+- ⏳ Provisioning Supabase + Cloudflare Pages needs your accounts (see `supabase/README.md`)
 
 ## Getting started (build the APK)
 
