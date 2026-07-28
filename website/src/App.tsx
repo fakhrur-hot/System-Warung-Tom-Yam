@@ -206,7 +206,7 @@ export default function App() {
 
         // Step 1: Check table session
         const { data: sessionData, error: sessionError } = await supabase.functions.invoke(
-          `tables/${tableId}/session`,
+          `tables-session/${tableId}`,
           {
             method: 'GET',
             headers: { 'x-browser-id': browserId },
@@ -336,7 +336,7 @@ export default function App() {
 
       // Re-fetch session to get the full order with snapshots
       const { data: sessionData } = await supabase.functions.invoke(
-        `tables/${tableId}/session`,
+        `tables-session/${tableId}`,
         {
           method: 'GET',
           headers: { 'x-browser-id': browserId },
