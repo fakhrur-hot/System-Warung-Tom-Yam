@@ -117,6 +117,10 @@ export default function App() {
   const [holdRemaining, setHoldRemaining] = useState<number | null>(null)
   // Admin-entered table name (from Table Management) — shown to customers instead of the id.
   const [tableName, setTableName] = useState<string | null>(null)
+  // When set, the menu is being shown to ADD a round to this existing order (session 2+),
+  // so submit appends via orders-items instead of creating a new order.
+  const [amendOrderId, setAmendOrderId] = useState<string | null>(null)
+  const [isAddingMore, setIsAddingMore] = useState(false)
   const pendingOrderRef = useRef<Array<{ menuItemId: string; quantity: number; note: string }>>([])
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabase>['channel']> | null>(null)
 
@@ -294,52 +298,46 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdRemaining])
 
-  // Actual submission (runs after the hold elapses).
+  // Actual submission (runs after the hold elapses). Two modes:
+  // - new order (amendOrderId null): POST /orders
+  // - add a round to the existing order (amendOrderId set): POST /orders-items → session N+1
   const submitHeldOrder = async () => {
     const items = pendingOrderRef.current
     if (!tableId || items.length === 0) return
     setIsSubmitting(true)
 
+    const mapped = items.map((item) => ({
+      menuItemId: item.menuItemId,
+      quantity: item.quantity,
+      note: item.note || undefined,
+    }))
+
     try {
       const supabase = getSupabase()
-      const { data, error } = await supabase.functions.invoke('orders', {
-        body: {
-          tableId,
-          browserId,
-          items: items.map((item) => ({
-            menuItemId: item.menuItemId,
-            quantity: item.quantity,
-            note: item.note || undefined,
-          })),
-        },
-        headers: { 'x-browser-id': browserId },
-      })
 
-      if (error) {
-        setView({ type: 'error', message: error.message || t('error') })
-        return
+      if (amendOrderId) {
+        // Append a new session to the customer's own order.
+        const { error } = await supabase.functions.invoke(`orders-items?orderId=${amendOrderId}`, {
+          body: { items: mapped },
+          headers: { 'x-browser-id': browserId },
+        })
+        if (error) {
+          setView({ type: 'error', message: error.message || t('error') })
+          return
+        }
+        setAmendOrderId(null)
+      } else {
+        const { error } = await supabase.functions.invoke('orders', {
+          body: { tableId, browserId, items: mapped },
+          headers: { 'x-browser-id': browserId },
+        })
+        if (error) {
+          setView({ type: 'error', message: error.message || t('error') })
+          return
+        }
       }
 
-      // On success show status view and subscribe to realtime. createdAt is a client-side
-      // approximation (the create response doesn't include it) — fine here since this
-      // object is only shown for the brief moment before the session re-fetch below
-      // replaces it with the server's real createdAt, and the cancel-window check has
-      // generous slack either way.
-      const order: Order = {
-        id: data.orderId,
-        status: data.status || 'RECEIVED',
-        total: data.total,
-        items: items.map((item, i) => ({
-          id: `temp-${i}`,
-          nameSnapshot: item.menuItemId,
-          unitPriceSnapshot: 0,
-          quantity: item.quantity,
-          note: item.note || undefined,
-        })),
-        createdAt: new Date().toISOString(),
-      }
-
-      // Re-fetch session to get the full order with snapshots
+      // Re-fetch session to get the full order with all sessions + snapshots.
       const { data: sessionData } = await supabase.functions.invoke(
         `tables-session/${tableId}`,
         {
@@ -352,14 +350,53 @@ export default function App() {
         setView({ type: 'status', order: sessionData.order })
         subscribeToOrder(sessionData.order.id)
       } else {
-        setView({ type: 'status', order })
-        subscribeToOrder(order.id)
+        setView({ type: 'error', message: t('error') })
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : t('error')
       setView({ type: 'error', message })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  // From the status view: fetch the menu again and show it in "add a round" mode.
+  const handleAddMore = async () => {
+    if (view.type !== 'status') return
+    const orderId = view.order.id
+    setIsAddingMore(true)
+    try {
+      const supabase = getSupabase()
+      const { data: menuData, error } = await supabase.functions.invoke('menu', { method: 'GET' })
+      if (error || !menuData || menuData.configured === false) {
+        setView({ type: 'error', message: error?.message || t('error') })
+        return
+      }
+      setAmendOrderId(orderId)
+      setView({ type: 'menu', menu: menuData })
+    } catch (err: unknown) {
+      setView({ type: 'error', message: err instanceof Error ? err.message : t('error') })
+    } finally {
+      setIsAddingMore(false)
+    }
+  }
+
+  // Abandon adding a round and return to the order status.
+  const handleBackToStatus = async () => {
+    setAmendOrderId(null)
+    if (!tableId) return
+    try {
+      const supabase = getSupabase()
+      const { data: sessionData } = await supabase.functions.invoke(`tables-session/${tableId}`, {
+        method: 'GET',
+        headers: { 'x-browser-id': browserId },
+      })
+      if (sessionData?.order) {
+        setView({ type: 'status', order: sessionData.order })
+        subscribeToOrder(sessionData.order.id)
+      }
+    } catch {
+      window.location.reload()
     }
   }
 
@@ -454,6 +491,17 @@ export default function App() {
         const orderedCategories = deriveCategories(view.menu)
         return (
           <>
+            {amendOrderId && (
+              <div className="mx-3 mt-3 flex items-center justify-between rounded-xl bg-emerald-100 px-4 py-3 text-emerald-900">
+                <span className="font-semibold">{t('addingToOrder')}</span>
+                <button
+                  onClick={handleBackToStatus}
+                  className="text-sm font-medium text-emerald-700 underline"
+                >
+                  {t('backToOrder')}
+                </button>
+              </div>
+            )}
             {todaysSpecial.trim() && (
               <div className="mx-3 mt-3 rounded-xl bg-amber-100 px-4 py-3 text-amber-900">
                 <span className="mr-1" aria-hidden="true">⭐</span>
@@ -477,6 +525,8 @@ export default function App() {
             onCancel={handleCancelOrder}
             isCancelling={isCancelling}
             onDone={handleDone}
+            onAddMore={handleAddMore}
+            isAddingMore={isAddingMore}
           />
         )
     }

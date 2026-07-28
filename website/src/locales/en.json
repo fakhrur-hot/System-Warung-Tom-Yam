@@ -43,9 +43,12 @@
   "holdCancelBtn": "Cancel",
   "holdHint": "You can still cancel before it's sent.",
   "yourOrders": "Your Orders",
-  "addMoreItems": "Add More Items",
+  "addMoreItems": "Add more items",
   "yourCart": "Your Cart",
   "cartEmpty": "Your cart is empty",
   "expandOrder": "View order details",
-  "collapseOrder": "Hide order details"
+  "collapseOrder": "Hide order details",
+  "sessionLabel": "Session {{n}}",
+  "addingToOrder": "Adding to your order",
+  "backToOrder": "Back to order"
 }

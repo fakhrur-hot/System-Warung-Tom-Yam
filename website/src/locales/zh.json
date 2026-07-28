@@ -43,9 +43,12 @@
   "holdCancelBtn": "取消",
   "holdHint": "送出前您仍可取消。",
   "yourOrders": "您的订单",
-  "addMoreItems": "再加点",
+  "addMoreItems": "添加更多菜品",
   "yourCart": "您的购物车",
   "cartEmpty": "购物车是空的",
   "expandOrder": "查看订单详情",
-  "collapseOrder": "隐藏订单详情"
+  "collapseOrder": "隐藏订单详情",
+  "sessionLabel": "第 {{n}} 轮",
+  "addingToOrder": "正在添加到您的订单",
+  "backToOrder": "返回订单"
 }

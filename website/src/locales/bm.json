@@ -43,9 +43,12 @@
   "holdCancelBtn": "Batal",
   "holdHint": "Anda masih boleh batal sebelum ia dihantar.",
   "yourOrders": "Pesanan Anda",
-  "addMoreItems": "Tambah Lagi",
+  "addMoreItems": "Tambah lagi item",
   "yourCart": "Troli Anda",
   "cartEmpty": "Troli anda kosong",
   "expandOrder": "Lihat butiran pesanan",
-  "collapseOrder": "Sembunyikan butiran pesanan"
+  "collapseOrder": "Sembunyikan butiran pesanan",
+  "sessionLabel": "Sesi {{n}}",
+  "addingToOrder": "Menambah pada pesanan anda",
+  "backToOrder": "Kembali ke pesanan"
 }

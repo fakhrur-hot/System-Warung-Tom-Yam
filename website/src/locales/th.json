@@ -43,9 +43,12 @@
   "holdCancelBtn": "ยกเลิก",
   "holdHint": "คุณยังยกเลิกได้ก่อนส่ง",
   "yourOrders": "ออเดอร์ของคุณ",
-  "addMoreItems": "เพิ่มอีก",
+  "addMoreItems": "เพิ่มรายการ",
   "yourCart": "ตะกร้าของคุณ",
   "cartEmpty": "ตะกร้าของคุณว่างเปล่า",
   "expandOrder": "ดูรายละเอียดคำสั่งซื้อ",
-  "collapseOrder": "ซ่อนรายละเอียดคำสั่งซื้อ"
+  "collapseOrder": "ซ่อนรายละเอียดคำสั่งซื้อ",
+  "sessionLabel": "รอบที่ {{n}}",
+  "addingToOrder": "กำลังเพิ่มในออร์เดอร์ของคุณ",
+  "backToOrder": "กลับไปที่ออร์เดอร์"
 }

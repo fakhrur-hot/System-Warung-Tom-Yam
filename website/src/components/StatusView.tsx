@@ -9,6 +9,7 @@ interface OrderItem {
   unitPriceSnapshot: number
   quantity: number
   note?: string
+  sessionNumber?: number
 }
 
 interface Order {
@@ -36,6 +37,8 @@ interface StatusViewProps {
   onCancel: () => void
   isCancelling: boolean
   onDone: () => void
+  onAddMore: () => void
+  isAddingMore: boolean
 }
 
 const STATUS_STEPS: OrderStatus[] = ['RECEIVED', 'SENT_TO_KITCHEN', 'PREPARING', 'READY', 'COMPLETED']
@@ -49,7 +52,7 @@ const STATUS_KEYS: Record<OrderStatus, string> = {
   CANCELLED: 'cancelled',
 }
 
-export default function StatusView({ order, onCancel, isCancelling, onDone }: StatusViewProps) {
+export default function StatusView({ order, onCancel, isCancelling, onDone, onAddMore, isAddingMore }: StatusViewProps) {
   const { t, i18n: _i18n } = useTranslation()
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [cancelWindowRemainingMs, setCancelWindowRemainingMs] = useState(() =>
@@ -144,31 +147,59 @@ export default function StatusView({ order, onCancel, isCancelling, onDone }: St
         </div>
       </div>
 
-      {/* Order items */}
+      {/* Order items — grouped by session (each round the customer added while waiting) */}
       <div className="mb-6 rounded-xl border border-emerald-100 bg-white p-4">
         <h3 className="mb-3 text-sm font-semibold text-emerald-700">{t('yourOrder')}</h3>
-        <div className="space-y-2">
-          {order.items.map((item) => (
-            <div key={item.id} className="flex items-center justify-between text-sm">
-              <div>
-                <span className="text-emerald-900">{item.nameSnapshot}</span>
-                <span className="ml-1 text-emerald-500">×{item.quantity}</span>
-                {item.note && (
-                  <p className="text-xs text-emerald-400 italic">{item.note}</p>
-                )}
+        {(() => {
+          const sessions = Array.from(
+            new Set(order.items.map((i) => i.sessionNumber ?? 1)),
+          ).sort((a, b) => a - b)
+          const multi = sessions.length > 1
+          return sessions.map((session) => (
+            <div key={session} className="mb-3 last:mb-0">
+              {multi && (
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-500">
+                  {t('sessionLabel', { n: session })}
+                </p>
+              )}
+              <div className="space-y-2">
+                {order.items
+                  .filter((i) => (i.sessionNumber ?? 1) === session)
+                  .map((item) => (
+                    <div key={item.id} className="flex items-center justify-between text-sm">
+                      <div>
+                        <span className="text-emerald-900">{item.nameSnapshot}</span>
+                        <span className="ml-1 text-emerald-500">×{item.quantity}</span>
+                        {item.note && (
+                          <p className="text-xs text-emerald-400 italic">{item.note}</p>
+                        )}
+                      </div>
+                      <span className="font-medium text-emerald-700">
+                        RM {(item.unitPriceSnapshot * item.quantity).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
               </div>
-              <span className="font-medium text-emerald-700">
-                RM {(item.unitPriceSnapshot * item.quantity).toFixed(2)}
-              </span>
             </div>
-          ))}
-        </div>
+          ))
+        })()}
         <div className="mt-3 border-t border-emerald-100 pt-3">
           <div className="flex justify-between font-bold text-emerald-900">
             <span>{t('total')}</span>
             <span>RM {order.total.toFixed(2)}</span>
           </div>
         </div>
+      </div>
+
+      {/* Add more items — start another round on the same table while waiting */}
+      <div className="mb-6 text-center">
+        <button
+          onClick={onAddMore}
+          disabled={isAddingMore}
+          className="min-h-[44px] w-full rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {isAddingMore ? '…' : `+ ${t('addMoreItems')}`}
+        </button>
       </div>
 
       {/* Cancel button - only within the short grace window after placing */}

@@ -43,9 +43,12 @@
   "holdCancelBtn": "ரத்து",
   "holdHint": "அனுப்பப்படுவதற்கு முன் நீங்கள் ரத்து செய்யலாம்.",
   "yourOrders": "உங்கள் ஆர்டர்கள்",
-  "addMoreItems": "மேலும் சேர்",
+  "addMoreItems": "மேலும் உணவுகளைச் சேர்",
   "yourCart": "உங்கள் வண்டி",
   "cartEmpty": "உங்கள் வண்டி காலியாக உள்ளது",
   "expandOrder": "ஆர்டர் விவரங்களைக் காண்க",
-  "collapseOrder": "ஆர்டர் விவரங்களை மறை"
+  "collapseOrder": "ஆர்டர் விவரங்களை மறை",
+  "sessionLabel": "அமர்வு {{n}}",
+  "addingToOrder": "உங்கள் ஆர்டரில் சேர்க்கிறது",
+  "backToOrder": "ஆர்டருக்குத் திரும்பு"
 }
