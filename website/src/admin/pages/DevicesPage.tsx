@@ -4,7 +4,7 @@ import { getSupabase } from '../../lib/supabase'
 interface Device {
   id: string
   label: string
-  role: 'ADMIN' | 'ORDERING'
+  role: 'ADMIN' | 'ADMIN_SECONDARY' | 'ORDERING'
   status: 'PENDING' | 'APPROVED' | 'REVOKED'
   lastSeenAt: string | null
   isCheckedIn: boolean
@@ -83,7 +83,14 @@ export default function DevicesPage() {
 
   const getRoleBadgeClasses = (role: string) => {
     if (role === 'ADMIN') return 'bg-purple-100 text-purple-700'
+    if (role === 'ADMIN_SECONDARY') return 'bg-indigo-100 text-indigo-700'
     return 'bg-blue-100 text-blue-700'
+  }
+
+  const getRoleLabel = (role: string) => {
+    if (role === 'ADMIN') return 'Main Admin'
+    if (role === 'ADMIN_SECONDARY') return 'Secondary Admin'
+    return role
   }
 
   const getStatusBadge = (device: Device) => {
@@ -177,7 +184,7 @@ export default function DevicesPage() {
                       )}
                       <div className="mt-1 flex items-center gap-2">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getRoleBadgeClasses(device.role)}`}>
-                          {device.role}
+                          {getRoleLabel(device.role)}
                         </span>
                         {getStatusBadge(device)}
                         {device.isCheckedIn && (
