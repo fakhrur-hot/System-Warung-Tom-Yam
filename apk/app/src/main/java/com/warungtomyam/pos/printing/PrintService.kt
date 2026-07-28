@@ -1,0 +1,176 @@
+package com.warungtomyam.pos.printing
+
+import android.content.Context
+import com.warungtomyam.pos.data.SecureStorage
+import com.warungtomyam.pos.data.local.Order
+import com.warungtomyam.pos.data.local.OrderItem
+import com.warungtomyam.pos.data.local.PaperWidth
+import com.warungtomyam.pos.data.local.PrinterConfigDao
+import com.warungtomyam.pos.data.local.PrinterRole
+import com.warungtomyam.pos.data.local.SettingsDao
+import com.warungtomyam.pos.data.local.TableDao
+import com.warungtomyam.pos.printing.documents.KitchenSlipDocument
+import com.warungtomyam.pos.printing.documents.ReceiptDocument
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * High-level print service that generates formatted document payloads
+ * and dispatches them to the correct printer via [PrinterDispatcher].
+ *
+ * Resolves printer dimensions (charWidth/pixelWidth) from the target printer config
+ * and the print language from Room settings.
+ */
+@Singleton
+class PrintService @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val printerDispatcher: PrinterDispatcher,
+    private val printerConfigDao: PrinterConfigDao,
+    private val settingsDao: SettingsDao,
+    private val tableDao: TableDao,
+    private val secureStorage: SecureStorage
+) {
+
+    // A secondary-admin device has no local printer — all its slips/receipts are printed by
+    // the Main Admin (its orders reach it via the same broadcast/poll as staff orders). Guard
+    // every print entry point so a secondary admin never prints locally (and never spams
+    // "no printer configured" alerts).
+    private fun isPrinterHost(): Boolean =
+        secureStorage.getRole() != SecureStorage.Role.ADMIN_SECONDARY
+
+    /**
+     * Generate and dispatch kitchen slips to the kitchen printer.
+     * Produces one slip per category (food, beverages, etc.) so each station
+     * receives only its relevant items.
+     *
+     * @param tableId The table identifier (e.g. "T3")
+     * @param items All order items (only unsent ones will be printed)
+     * @param isAmendment True if items were previously sent (delta "ADDED" slip)
+     * @param sessionNumber Optional order-round number printed on the slip so the kitchen
+     *   can tell each session apart (a fresh order is session 1, each added round increments)
+     */
+    suspend fun printKitchenSlip(
+        tableId: String,
+        items: List<OrderItem>,
+        isAmendment: Boolean,
+        sessionNumber: Int? = null
+    ) {
+        if (!isPrinterHost()) return
+        val charWidth = resolveCharWidth(PrinterRole.KITCHEN_ONLY)
+        val printLanguage = resolvePrintLanguage()
+        val timezone = resolveTimezone()
+
+        val slipsByCategory = KitchenSlipDocument.generatePerCategory(
+            // Print the admin-entered table name (Table Management), not the internal id.
+            tableId = resolveTableName(tableId),
+            items = items,
+            isAmendment = isAmendment,
+            charWidth = charWidth,
+            printLanguage = printLanguage,
+            timezone = timezone,
+            sessionNumber = sessionNumber
+        )
+
+        for ((category, payload) in slipsByCategory) {
+            if (payload.isNotBlank()) {
+                printerDispatcher.dispatch(
+                    PrinterDispatcher.DOCUMENT_TYPE_KITCHEN_SLIP,
+                    payload,
+                    category
+                )
+            }
+        }
+    }
+
+    /**
+     * Generate and dispatch a receipt to the receipt printer.
+     *
+     * @param order The completed order
+     * @param items All order items (consolidated at snapshotted prices)
+     * @param paymentMethod "CASH" or "QR"
+     * @param cafeName The café branding name
+     */
+    suspend fun printReceipt(
+        order: Order,
+        items: List<OrderItem>,
+        paymentMethod: String,
+        cafeName: String
+    ) {
+        if (!isPrinterHost()) return
+        val (charWidth, pixelWidth) = resolveReceiptDimensions()
+        val printLanguage = resolvePrintLanguage()
+        val timezone = resolveTimezone()
+
+        val payload = ReceiptDocument.generate(
+            context = context,
+            order = order,
+            items = items,
+            paymentMethod = paymentMethod,
+            cafeName = cafeName,
+            charWidth = charWidth,
+            pixelWidth = pixelWidth,
+            printLanguage = printLanguage,
+            timezone = timezone,
+            // Print the admin-entered table name (Table Management), not the internal id.
+            tableName = resolveTableName(order.tableId)
+        )
+
+        if (payload.isNotBlank()) {
+            printerDispatcher.dispatch(
+                PrinterDispatcher.DOCUMENT_TYPE_RECEIPT,
+                payload
+            )
+        }
+    }
+
+    /**
+     * Resolve a table's admin-entered display name (Table Management "label") from its
+     * internal id. Falls back to the id itself if the table row is missing or unnamed, so
+     * a slip/receipt never prints blank.
+     */
+    private suspend fun resolveTableName(tableId: String): String {
+        val label = tableDao.getById(tableId)?.label?.trim()
+        return if (label.isNullOrBlank()) tableId else label
+    }
+
+    /**
+     * Resolve the character width for a given printer role.
+     * Falls back to BOTH role, then defaults to 80mm (48 chars).
+     */
+    private suspend fun resolveCharWidth(role: PrinterRole): Int {
+        val printers = printerConfigDao.getByRole(role).ifEmpty {
+            printerConfigDao.getByRole(PrinterRole.BOTH)
+        }
+        return printers.firstOrNull()?.paperWidth?.charWidth
+            ?: PaperWidth.EIGHTY_MM.charWidth
+    }
+
+    /**
+     * Resolve both char width and pixel width for receipt printing.
+     * Falls back to BOTH role, then defaults to 80mm dimensions.
+     */
+    private suspend fun resolveReceiptDimensions(): Pair<Int, Int> {
+        val printers = printerConfigDao.getByRole(PrinterRole.RECEIPT_ONLY).ifEmpty {
+            printerConfigDao.getByRole(PrinterRole.BOTH)
+        }
+        val paperWidth = printers.firstOrNull()?.paperWidth ?: PaperWidth.EIGHTY_MM
+        return paperWidth.charWidth to paperWidth.pixelWidth
+    }
+
+    /**
+     * Resolve print language from Room settings.
+     * Defaults to "EN" if settings not found.
+     */
+    private suspend fun resolvePrintLanguage(): String {
+        return settingsDao.get()?.printLanguage ?: "EN"
+    }
+
+    /**
+     * Resolve the café timezone from settings for timestamp rendering on slips/receipts.
+     * Falls back to the app default so kitchen slips and receipts always agree.
+     */
+    private suspend fun resolveTimezone(): String {
+        return settingsDao.get()?.timezone ?: "Asia/Kuala_Lumpur"
+    }
+}
