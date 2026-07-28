@@ -43,8 +43,10 @@ interface MenuItem {
   description?: Record<string, string>
 }
 
-// A category can arrive as a plain name (legacy) or as { name, sortOrder } (dynamic menu).
-type MenuCategory = string | { name: string; sortOrder: number }
+// A category can arrive as a plain name (legacy) or as { name, sortOrder } (dynamic
+// menu). `name` is the canonical id used to group items; `nameI18n` (optional) carries
+// the admin-entered display label per language.
+type MenuCategory = string | { name: string; sortOrder: number; nameI18n?: Record<string, string> }
 
 interface MenuData {
   configured: boolean
@@ -99,6 +101,19 @@ function deriveCategories(menu: MenuData): string[] {
   }
 
   return ['FOOD', 'BEVERAGES', 'SIDE_DISHES', 'OTHERS']
+}
+
+// Map of canonical category name → its per-language display labels (from the admin's
+// menu). Used to translate the category tabs/headers while grouping still keys off the
+// canonical name.
+function deriveCategoryLabels(menu: MenuData): Record<string, Record<string, string>> {
+  const map: Record<string, Record<string, string>> = {}
+  for (const c of menu.categories || []) {
+    if (typeof c === 'object' && c !== null && c.nameI18n) {
+      map[c.name] = c.nameI18n
+    }
+  }
+  return map
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
@@ -507,6 +522,7 @@ export default function App() {
 
       case 'menu': {
         const orderedCategories = deriveCategories(view.menu)
+        const categoryLabels = deriveCategoryLabels(view.menu)
         return (
           <>
             {amendOrderId && (
@@ -529,6 +545,7 @@ export default function App() {
             <MenuView
               items={view.menu.items || []}
               categories={orderedCategories}
+              categoryLabels={categoryLabels}
               onSubmitOrder={handleSubmitOrder}
               isSubmitting={isSubmitting}
             />

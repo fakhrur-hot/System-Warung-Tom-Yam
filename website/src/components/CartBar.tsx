@@ -20,6 +20,8 @@ interface CartBarProps {
   placedItems?: CartItemData[]
   // Ordered category names driving the group order (dynamic menu categories).
   categories?: string[]
+  // canonical category name → per-language display labels (admin-entered).
+  categoryLabels?: Record<string, Record<string, string>>
   onSubmit: () => void
   onUpdateQuantity: (id: string, delta: number) => void
   isSubmitting: boolean
@@ -50,11 +52,21 @@ export default function CartBar({
   cartItems,
   placedItems,
   categories,
+  categoryLabels,
   onSubmit,
   onUpdateQuantity,
   isSubmitting,
 }: CartBarProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language
+
+  // Localized category header: admin's per-language label first, then English, then
+  // the legacy hardcoded key, then the raw canonical name.
+  const categoryLabel = (cat: string): string => {
+    const labels = categoryLabels?.[cat]
+    if (labels && (labels[lang] || labels.en)) return labels[lang] || labels.en
+    return t(CATEGORY_LABELS[cat] || cat)
+  }
   const [isExpanded, setIsExpanded] = useState(false)
   const startYRef = useRef<number | null>(null)
 
@@ -95,7 +107,7 @@ export default function CartBar({
     return [...sortedCategories, ...extraCategories].map((cat) => (
       <div key={cat} className="mb-3">
         <h4 className="mb-1 text-xs font-bold uppercase tracking-wide text-emerald-700">
-          {t(CATEGORY_LABELS[cat] || cat)}
+          {categoryLabel(cat)}
         </h4>
         <div className="space-y-1">
           {groups[cat].map((item) => (
