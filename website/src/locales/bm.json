@@ -50,5 +50,12 @@
   "collapseOrder": "Sembunyikan butiran pesanan",
   "sessionLabel": "Sesi {{n}}",
   "addingToOrder": "Menambah pada pesanan anda",
-  "backToOrder": "Kembali ke pesanan"
+  "backToOrder": "Kembali ke pesanan",
+  "scanQrButton": "Imbas kod QR",
+  "scanQrTitle": "Imbas kod QR meja anda",
+  "scanQrHint": "Halakan kamera anda ke kod QR di meja anda",
+  "scanQrNotTable": "Itu tidak kelihatan seperti kod QR meja. Cuba lagi.",
+  "cameraDenied": "Kebenaran kamera diperlukan untuk mengimbas. Benarkannya dalam tetapan pelayar anda, kemudian cuba lagi.",
+  "cameraUnsupported": "Pelayar ini tidak dapat membuka kamera. Sila imbas kod QR menggunakan aplikasi kamera telefon anda.",
+  "closeScanner": "Tutup"
 }

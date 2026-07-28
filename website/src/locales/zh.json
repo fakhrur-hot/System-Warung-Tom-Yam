@@ -50,5 +50,12 @@
   "collapseOrder": "隐藏订单详情",
   "sessionLabel": "第 {{n}} 轮",
   "addingToOrder": "正在添加到您的订单",
-  "backToOrder": "返回订单"
+  "backToOrder": "返回订单",
+  "scanQrButton": "扫描二维码",
+  "scanQrTitle": "扫描您餐桌的二维码",
+  "scanQrHint": "将相机对准餐桌上的二维码",
+  "scanQrNotTable": "这看起来不是餐桌二维码，请重试。",
+  "cameraDenied": "扫描需要相机权限。请在浏览器设置中允许后重试。",
+  "cameraUnsupported": "此浏览器无法打开相机。请改用手机的相机应用扫描二维码。",
+  "closeScanner": "关闭"
 }

@@ -9,6 +9,7 @@ import OccupiedView from './components/OccupiedView'
 import MenuView from './components/MenuView'
 import StatusView from './components/StatusView'
 import ConfirmDialog from './components/ConfirmDialog'
+import QrScanner from './components/QrScanner'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,8 @@ export default function App() {
   // so submit appends via orders-items instead of creating a new order.
   const [amendOrderId, setAmendOrderId] = useState<string | null>(null)
   const [isAddingMore, setIsAddingMore] = useState(false)
+  // Whether the in-page camera QR scanner overlay is open.
+  const [scanning, setScanning] = useState(false)
   const pendingOrderRef = useRef<Array<{ menuItemId: string; quantity: number; note: string }>>([])
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabase>['channel']> | null>(null)
 
@@ -435,10 +438,18 @@ export default function App() {
     }
   }
 
-  // Reset to fresh menu after completed/cancelled
+  // After completed/cancelled, the "Scan QR code to order again" button opens the
+  // in-page camera scanner so the customer can scan their table QR again (matching
+  // what the button says) rather than silently reloading.
   const handleDone = () => {
-    // Reload the page to get a fresh session check
-    window.location.reload()
+    setScanning(true)
+  }
+
+  // A table QR was scanned — navigate to that table's ordering page. A full
+  // navigation (not just state) re-runs the session check cleanly for the new table.
+  const handleQrDetected = (scannedTableId: string) => {
+    setScanning(false)
+    window.location.href = `/order?table=${encodeURIComponent(scannedTableId)}`
   }
 
   // Retry after error
@@ -460,6 +471,13 @@ export default function App() {
             <div className="text-center">
               <span className="mb-4 block text-5xl" aria-hidden="true">📱</span>
               <p className="text-sm text-emerald-600">{t('noTable')}</p>
+              <button
+                onClick={() => setScanning(true)}
+                className="mt-5 inline-flex min-h-[44px] items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+              >
+                <span aria-hidden="true">📷</span>
+                {t('scanQrButton')}
+              </button>
             </div>
           </div>
         )
@@ -534,6 +552,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-emerald-50">
+      {scanning && <QrScanner onDetected={handleQrDetected} onClose={() => setScanning(false)} />}
       <Header
         cafeName={branding.configured ? branding.cafeName : undefined}
         logoUrl={branding.configured ? branding.logoUrl : undefined}

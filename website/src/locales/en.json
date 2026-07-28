@@ -50,5 +50,12 @@
   "collapseOrder": "Hide order details",
   "sessionLabel": "Session {{n}}",
   "addingToOrder": "Adding to your order",
-  "backToOrder": "Back to order"
+  "backToOrder": "Back to order",
+  "scanQrButton": "Scan QR code",
+  "scanQrTitle": "Scan your table's QR code",
+  "scanQrHint": "Point your camera at the QR code on your table",
+  "scanQrNotTable": "That doesn't look like a table QR code. Try again.",
+  "cameraDenied": "Camera permission is needed to scan. Allow it in your browser settings, then try again.",
+  "cameraUnsupported": "This browser can't open the camera. Please scan the QR code with your phone's camera app instead.",
+  "closeScanner": "Close"
 }
