@@ -8,6 +8,9 @@ interface CartItemData {
   price: number
   marketPrice?: boolean
   category: string
+  // Special instruction for this line, if any. Lines with a note are kept separate
+  // from plain units of the same dish.
+  note?: string
 }
 
 interface CartBarProps {
@@ -109,6 +112,11 @@ export default function CartBar({
                 <span className={`ml-2 text-xs ${editable ? 'text-emerald-600' : 'text-gray-400'}`}>
                   {item.marketPrice ? t('marketPrice') : `RM ${item.price.toFixed(2)}`}
                 </span>
+                {item.note && item.note.trim() && (
+                  <p className={`mt-0.5 text-xs italic ${editable ? 'text-emerald-500' : 'text-gray-400'}`}>
+                    {item.note}
+                  </p>
+                )}
               </div>
               {editable ? (
                 <div className="flex items-center gap-2">
