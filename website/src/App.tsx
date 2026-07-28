@@ -412,7 +412,7 @@ export default function App() {
 
     try {
       const supabase = getSupabase()
-      const { error } = await supabase.functions.invoke(`orders/${view.order.id}`, {
+      const { error } = await supabase.functions.invoke(`orders-cancel?orderId=${view.order.id}`, {
         method: 'DELETE',
         body: {
           reason: 'Customer cancelled',
