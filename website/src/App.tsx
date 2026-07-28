@@ -115,6 +115,8 @@ export default function App() {
   const [holdSeconds, setHoldSeconds] = useState(15)
   const [todaysSpecial, setTodaysSpecial] = useState('')
   const [holdRemaining, setHoldRemaining] = useState<number | null>(null)
+  // Admin-entered table name (from Table Management) — shown to customers instead of the id.
+  const [tableName, setTableName] = useState<string | null>(null)
   const pendingOrderRef = useRef<Array<{ menuItemId: string; quantity: number; note: string }>>([])
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabase>['channel']> | null>(null)
 
@@ -217,6 +219,9 @@ export default function App() {
           setView({ type: 'error', message: sessionError.message || t('error') })
           return
         }
+
+        // Prefer the admin-entered table name for display; fall back to the id.
+        setTableName((sessionData as { displayName?: string }).displayName ?? null)
 
         // Step 2: Branch based on session state
         if (sessionData.state === 'FREE') {
@@ -486,7 +491,7 @@ export default function App() {
       {tableId && view.type !== 'no-table' && (
         <div className="bg-emerald-50 py-2 text-center">
           <p className="text-xs font-medium uppercase tracking-widest text-emerald-600">
-            {t('tableLabel', { table: tableId })}
+            {t('tableLabel', { table: tableName ?? tableId })}
           </p>
         </div>
       )}
