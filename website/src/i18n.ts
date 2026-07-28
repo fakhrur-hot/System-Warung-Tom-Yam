@@ -5,10 +5,11 @@ import en from './locales/en.json'
 import bm from './locales/bm.json'
 import zh from './locales/zh.json'
 import ta from './locales/ta.json'
+import th from './locales/th.json'
 
-// English is the authored base. Malay / Mandarin / Tamil are dictionary-translated over it,
+// English is the authored base. Malay / Mandarin / Tamil / Thai are dictionary-translated over it,
 // with English fallback for any missing key (see specs REQ-9 / REQ-12 Gap A).
-export const SUPPORTED_LANGS = ['en', 'bm', 'zh', 'ta'] as const
+export const SUPPORTED_LANGS = ['en', 'bm', 'zh', 'ta', 'th'] as const
 export type Lang = (typeof SUPPORTED_LANGS)[number]
 
 const stored = localStorage.getItem('lang')
@@ -21,6 +22,7 @@ void i18n.use(initReactI18next).init({
     bm: { translation: bm },
     zh: { translation: zh },
     ta: { translation: ta },
+    th: { translation: th },
   },
   lng: initialLang,
   fallbackLng: 'en',

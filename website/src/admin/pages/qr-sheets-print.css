@@ -1,0 +1,165 @@
+/* ─── QR Sheet Print Styles ─────────────────────────────────────────────────
+   A4 portrait with 2×2 grid of A6 portrait cards per page.
+   Hairline cut guides between cards.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ─── Screen preview styles ─────────────────────────────────────────────── */
+@media screen {
+  .qr-print-sheet {
+    margin-top: 1.5rem;
+  }
+
+  .qr-a4-page {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+    margin: 0 auto;
+    background: white;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+    overflow: hidden;
+  }
+}
+
+/* ─── Print styles ──────────────────────────────────────────────────────── */
+@media print {
+  /* Hide all non-print UI */
+  .qr-no-print,
+  header,
+  nav,
+  [aria-label="Main navigation"],
+  [aria-label="Mobile navigation"] {
+    display: none !important;
+  }
+
+  /* Reset page margins */
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  .qr-print-sheet {
+    margin: 0;
+  }
+
+  .qr-a4-page {
+    position: relative;
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    padding: 0;
+    page-break-after: always;
+    overflow: hidden;
+  }
+}
+
+/* ─── Shared layout (screen + print) ───────────────────────────────────── */
+
+.qr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  width: 100%;
+  height: 100%;
+}
+
+.qr-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 105mm;
+  height: 148.5mm;
+  box-sizing: border-box;
+}
+
+.qr-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4mm;
+  text-align: center;
+  padding: 8mm;
+  width: 100%;
+  height: 100%;
+}
+
+.qr-card-empty {
+  width: 100%;
+  height: 100%;
+}
+
+.qr-cafe-name {
+  font-size: 16pt;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.qr-code-container {
+  width: 60mm;
+  height: 60mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-code-container svg {
+  width: 100%;
+  height: 100%;
+}
+
+.qr-table-label {
+  font-size: 24pt;
+  font-weight: 800;
+  color: #1a1a1a;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.qr-scan-text {
+  font-size: 10pt;
+  color: #666;
+  margin: 0;
+}
+
+/* ─── Cut guides (hairline) ─────────────────────────────────────────────── */
+
+.qr-cut-guide-vertical {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 100%;
+  border-left: 0.5px dashed #ccc;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.qr-cut-guide-horizontal {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 0;
+  border-top: 0.5px dashed #ccc;
+  pointer-events: none;
+  z-index: 10;
+}
+
+@media print {
+  .qr-cut-guide-vertical {
+    border-left: 0.25pt solid #999;
+  }
+
+  .qr-cut-guide-horizontal {
+    border-top: 0.25pt solid #999;
+  }
+}
