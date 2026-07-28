@@ -548,6 +548,14 @@ export default function App() {
       <main className="mx-auto max-w-md">
         {renderView()}
       </main>
+      {/* Studio credit — mirrors the printed receipt footer. Italic, tiny (matches the
+          order-flow step labels' text-[10px]). */}
+      <footer className="mx-auto max-w-md px-4 pb-6 pt-4 text-center">
+        <p className="text-[10px] italic leading-tight text-emerald-500">
+          Zero-Commitment POS by RAZStudio
+        </p>
+        <p className="text-[10px] italic leading-tight text-emerald-500">+60 11-32605406</p>
+      </footer>
       <ConfirmDialog
         open={showConfirm}
         onConfirm={handleConfirmOrder}
