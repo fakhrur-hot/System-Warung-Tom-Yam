@@ -201,32 +201,28 @@ object QrPdfGenerator {
             currentY += 16f
         }
 
-        // 3. QR code (170×170 pt, EC-H)
+        // 3. QR code (170×170 pt, EC-H) with the table number embedded in the centre.
         // Prefer the opaque QR token so the printed link isn't a guessable table id.
         val qrUrl = "${baseUrl.trimEnd('/')}/order?table=${qrToken ?: table.id}"
         val qrBitmap = generateQrBitmap(qrUrl, QR_SIZE_PT.toInt())
         if (qrBitmap != null) {
             val qrLeft = centerX - QR_SIZE_PT / 2f
+            val qrTop = currentY
             val qrPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             canvas.drawBitmap(
                 qrBitmap,
                 null,
-                android.graphics.RectF(qrLeft, currentY, qrLeft + QR_SIZE_PT, currentY + QR_SIZE_PT),
+                android.graphics.RectF(qrLeft, qrTop, qrLeft + QR_SIZE_PT, qrTop + QR_SIZE_PT),
                 qrPaint
             )
-            currentY += QR_SIZE_PT + 16f
             qrBitmap.recycle()
+            // Centre badge: a white square (its own quiet zone) with the table number in it.
+            // EC level H (~30% recovery) keeps the code scannable behind this small overlay.
+            drawCentreNumber(canvas, table.label, centerX, qrTop + QR_SIZE_PT / 2f)
+            currentY = qrTop + QR_SIZE_PT + 16f
         }
 
-        // 4. Table label (bold, ~24pt)
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            textSize = 24f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
-        }
-        currentY += labelPaint.textSize
-        canvas.drawText(table.label, centerX, currentY, labelPaint)
+        // 4. (Table number is now inside the QR — no separate label below.)
 
         // 5. Fixed dev-company footer, anchored to the bottom of each card (two centered lines).
         val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -237,6 +233,38 @@ object QrPdfGenerator {
         val cardBottom = offsetY + CARD_HEIGHT
         canvas.drawText(FOOTER_LINE1, centerX, cardBottom - 22f, footerPaint)
         canvas.drawText(FOOTER_LINE2, centerX, cardBottom - 12f, footerPaint)
+    }
+
+    /**
+     * Draw the table number centred inside the QR code, on its own white "quiet-zone" badge.
+     * The badge is ~30% of the QR side (≈9% of area), comfortably within EC-level-H's ~30%
+     * error-recovery budget, so the code still scans. Text auto-shrinks to fit longer labels.
+     */
+    private fun drawCentreNumber(canvas: Canvas, label: String, cx: Float, cy: Float) {
+        val badge = QR_SIZE_PT * 0.30f
+        val half = badge / 2f
+        val radius = badge * 0.15f
+        val rect = android.graphics.RectF(cx - half, cy - half, cx + half, cy + half)
+
+        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; style = Paint.Style.FILL }
+        val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK; style = Paint.Style.STROKE; strokeWidth = 1.5f
+        }
+        canvas.drawRoundRect(rect, radius, radius, fill)
+        canvas.drawRoundRect(rect, radius, radius, border)
+
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = badge * 0.6f
+        }
+        val maxW = badge * 0.8f
+        while (textPaint.measureText(label) > maxW && textPaint.textSize > 6f) {
+            textPaint.textSize -= 1f
+        }
+        val baseline = cy - (textPaint.descent() + textPaint.ascent()) / 2f
+        canvas.drawText(label, cx, baseline, textPaint)
     }
 
     /**
