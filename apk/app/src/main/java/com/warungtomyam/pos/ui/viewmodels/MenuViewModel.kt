@@ -153,6 +153,25 @@ class MenuViewModel @Inject constructor(
         _uiState.update { it.copy(selectedCategory = category) }
     }
 
+    /**
+     * Create a new (initially empty) category from Menu Management, persist it to the shared
+     * category store, select its tab, and re-publish the menu so it appears everywhere (admin,
+     * ordering staff, customer web). A duplicate name just selects the existing tab.
+     */
+    fun addCategory(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return
+        viewModelScope.launch {
+            if (_uiState.value.categories.any { it.equals(trimmed, ignoreCase = true) }) {
+                selectCategory(trimmed)
+                return@launch
+            }
+            ensureCategory(trimmed)
+            _uiState.update { it.copy(selectedCategory = trimmed) }
+            pushMenuToBackend()
+        }
+    }
+
     /** Persist a (possibly new) category name into the ordered store and refresh state. */
     private fun ensureCategory(category: String) {
         if (category.isBlank()) return

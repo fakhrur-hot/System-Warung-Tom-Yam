@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -113,6 +114,9 @@ fun MenuManagementScreen(
     var editingCategory by remember { mutableStateOf<String?>(null) }
     // Category reorder dialog (drag-free up/down); the new order propagates everywhere.
     var showReorder by remember { mutableStateOf(false) }
+    // Add-category dialog + its text field.
+    var showAddCategory by remember { mutableStateOf(false) }
+    var newCategoryName by remember { mutableStateOf("") }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
@@ -131,6 +135,10 @@ fun MenuManagementScreen(
                     }
                 },
                 actions = {
+                    // Add a new category (initially empty) — propagates to ordering + customer web.
+                    IconButton(onClick = { newCategoryName = ""; showAddCategory = true }) {
+                        Icon(Icons.Default.CreateNewFolder, contentDescription = strings.newCategoryLabel)
+                    }
                     // Reorder categories — the new order drives the tabs here, the ordering
                     // screens (admin/staff), and the customer web.
                     if (uiState.categories.size > 1) {
@@ -272,6 +280,34 @@ fun MenuManagementScreen(
             onSave = { labels, route ->
                 viewModel.saveCategory(cat, labels, route)
                 editingCategory = null
+            }
+        )
+    }
+
+    // Add a new category: enter a name → persisted, selected, and re-published everywhere.
+    if (showAddCategory) {
+        AlertDialog(
+            onDismissRequest = { showAddCategory = false },
+            title = { Text(strings.newCategoryLabel) },
+            text = {
+                OutlinedTextField(
+                    value = newCategoryName,
+                    onValueChange = { newCategoryName = it },
+                    label = { Text(strings.newCategoryLabel) },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.addCategory(newCategoryName)
+                        showAddCategory = false
+                    },
+                    enabled = newCategoryName.isNotBlank()
+                ) { Text(strings.addButton) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddCategory = false }) { Text(strings.commonCancel) }
             }
         )
     }
