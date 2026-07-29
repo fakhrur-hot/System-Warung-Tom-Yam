@@ -35,6 +35,19 @@ enum class AppLanguage(val buttonLabel: String, val displayName: String, val ser
         return localized.ifBlank { item.nameBm.ifBlank { item.nameEn } }
     }
 
+    /**
+     * Localize an order line's frozen [nameSnapshot] (which the backend bakes as the ENGLISH name
+     * plus any " (size)" suffix) into this language, using the live [item] from the current menu:
+     * swap the English base for the localized name, keeping the suffix. Falls back to the raw
+     * snapshot when the item was deleted or its English base no longer matches (menu renamed).
+     */
+    fun localizedSnapshotName(nameSnapshot: String, item: MenuItem?): String {
+        if (item == null || item.nameEn.isBlank() || !nameSnapshot.startsWith(item.nameEn)) {
+            return nameSnapshot.trim()
+        }
+        return menuName(item) + nameSnapshot.substring(item.nameEn.length)
+    }
+
     companion object {
         val DEFAULT = MY
 

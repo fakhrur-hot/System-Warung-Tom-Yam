@@ -277,7 +277,15 @@ fun OrderDetailSheet(
                                     modifier = Modifier.padding(start = 4.dp, bottom = 1.dp),
                                 )
                             }
-                            items(categoryItems, key = { it.id }) { item -> OrderItemRow(item) }
+                            items(categoryItems, key = { it.id }) { item ->
+                                OrderItemRow(
+                                    item = item,
+                                    displayName = language.localizedSnapshotName(
+                                        item.nameSnapshot,
+                                        menuItems.find { it.id == item.menuItemId }
+                                    )
+                                )
+                            }
                         }
 
                         // Per-session reprint — reprints ONLY this round's slip (marked
@@ -314,7 +322,15 @@ fun OrderDetailSheet(
                                 modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
                             )
                         }
-                        items(pendingItems, key = { "pending_${it.id}" }) { item -> OrderItemRow(item) }
+                        items(pendingItems, key = { "pending_${it.id}" }) { item ->
+                            OrderItemRow(
+                                item = item,
+                                displayName = language.localizedSnapshotName(
+                                    item.nameSnapshot,
+                                    menuItems.find { it.id == item.menuItemId }
+                                )
+                            )
+                        }
                         item {
                             OutlinedButton(
                                 onClick = { state.order?.id?.let { onConfirmSession(it, sessionNumber) } },
@@ -445,7 +461,7 @@ private fun categoryLabel(category: String, strings: UiStrings): String = when (
 }
 
 @Composable
-private fun OrderItemRow(item: OrderItem) {
+private fun OrderItemRow(item: OrderItem, displayName: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -455,7 +471,7 @@ private fun OrderItemRow(item: OrderItem) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "${item.quantity}× ${com.warungtomyam.pos.util.MenuName.display(item.nameSnapshot)}",
+                text = "${item.quantity}× $displayName",
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
                 maxLines = 1,

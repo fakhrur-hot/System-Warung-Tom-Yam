@@ -3,6 +3,7 @@ package com.warungtomyam.pos.printing
 import android.content.Context
 import com.warungtomyam.pos.data.SecureStorage
 import com.warungtomyam.pos.data.local.Order
+import com.warungtomyam.pos.data.local.MenuDao
 import com.warungtomyam.pos.data.local.OrderItem
 import com.warungtomyam.pos.data.local.PaperWidth
 import com.warungtomyam.pos.data.local.PrinterConfigDao
@@ -11,6 +12,7 @@ import com.warungtomyam.pos.data.local.SettingsDao
 import com.warungtomyam.pos.data.local.TableDao
 import com.warungtomyam.pos.printing.documents.KitchenSlipDocument
 import com.warungtomyam.pos.printing.documents.ReceiptDocument
+import com.warungtomyam.pos.ui.i18n.AppLanguage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,8 +33,24 @@ class PrintService @Inject constructor(
     private val tableDao: TableDao,
     private val secureStorage: SecureStorage,
     private val printSettingsStore: com.warungtomyam.pos.data.local.PrintSettingsStore,
-    private val menuCategoryStore: com.warungtomyam.pos.data.local.MenuCategoryStore
+    private val menuCategoryStore: com.warungtomyam.pos.data.local.MenuCategoryStore,
+    private val menuDao: MenuDao
 ) {
+
+    /**
+     * Re-localize each line's [OrderItem.nameSnapshot] into [printLanguage] using the live menu.
+     * The backend freezes the snapshot as the ENGLISH name (+ any " (size)" suffix), so we swap
+     * that English base for the localized name from the current menu (keyed by menuItemId),
+     * preserving the size suffix. Falls back to the raw snapshot for deleted/renamed items.
+     * Fixes kitchen slips + receipts always printing English regardless of the print language.
+     */
+    private suspend fun localizeItemNames(items: List<OrderItem>, printLanguage: String): List<OrderItem> {
+        val lang = AppLanguage.fromServerCode(printLanguage)
+        val menuById = menuDao.getAll().associateBy { it.id }
+        return items.map { oi ->
+            oi.copy(nameSnapshot = lang.localizedSnapshotName(oi.nameSnapshot, menuById[oi.menuItemId]))
+        }
+    }
 
     // A secondary-admin device has no local printer — all its slips/receipts are printed by
     // the Main Admin (its orders reach it via the same broadcast/poll as staff orders). Guard
@@ -67,12 +85,13 @@ class PrintService @Inject constructor(
         val timezone = settings?.timezone ?: "Asia/Kuala_Lumpur"
         val charWidth = resolveCharWidth(PrinterRole.KITCHEN_ONLY)
         val tableName = resolveTableName(tableId)
+        val localizedItems = localizeItemNames(items, printLanguage)
 
         // Group into two buckets (FOOD / BEVERAGE) → at most two slips per order, each
         // routed to the printer assigned to that bucket (categoryFilter holds the bucket).
         val slipsByBucket = KitchenSlipDocument.generateByRoute(
             tableId = tableName,
-            items = items,
+            items = localizedItems,
             isAmendment = isAmendment,
             charWidth = charWidth,
             printLanguage = printLanguage,
@@ -115,11 +134,12 @@ class PrintService @Inject constructor(
         val timezone = settings?.timezone ?: "Asia/Kuala_Lumpur"
         val (charWidth, pixelWidth) = resolveReceiptDimensions()
         val tableName = resolveTableName(order.tableId)
+        val localizedItems = localizeItemNames(items, printLanguage)
 
         val payload = ReceiptDocument.generate(
             context = context,
             order = order,
-            items = items,
+            items = localizedItems,
             paymentMethod = paymentMethod,
             cafeName = cafeName,
             charWidth = charWidth,
