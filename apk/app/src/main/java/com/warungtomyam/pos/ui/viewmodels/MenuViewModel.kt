@@ -216,6 +216,45 @@ class MenuViewModel @Inject constructor(
         _uiState.update { it.copy(selectedCategory = category) }
     }
 
+    /** Number of items whose PRIMARY category is [name] (they'd be permanently deleted with it). */
+    fun itemCountInCategory(name: String): Int = _uiState.value.items.count { it.category == name }
+
+    /**
+     * Delete a category. Items whose PRIMARY category is this one are permanently removed
+     * everywhere (including any other category where they were "also shown"). Items that merely
+     * listed it as an extra ("also shown") keep existing — only that tag is dropped. The category
+     * is removed from the shared store; if it was selected, selection moves to a remaining tab
+     * (avoids a ScrollableTabRow out-of-bounds when the tab count shrinks). Re-published after.
+     */
+    fun deleteCategory(name: String) {
+        viewModelScope.launch {
+            val all = menuDao.getAll()
+            // 1. Items owned by this category (primary) → gone entirely.
+            all.filter { it.category == name }.forEach { menuDao.deleteById(it.id) }
+            // 2. Items only "also shown" here → drop the extra tag, keep the item.
+            all.filter { it.category != name && it.extraCategories.split(",").map { s -> s.trim() }.contains(name) }
+                .forEach { item ->
+                    val newExtras = item.extraCategories.split(",").map { it.trim() }
+                        .filter { it.isNotBlank() && it != name }.joinToString(",")
+                    menuDao.upsertAll(listOf(item.copy(extraCategories = newExtras)))
+                }
+            // 3. Remove from the shared store (order + translations).
+            categoryStore.set(categoryStore.get().filter { it != name })
+            categoryStore.setTranslations(categoryStore.getTranslations().filterKeys { it != name })
+            // 4. Refresh + move selection off the deleted tab.
+            loadItems()
+            _uiState.update {
+                val remaining = it.categories.filter { c -> c != name }
+                it.copy(
+                    categoryOrder = categoryStore.get(),
+                    categoryTranslations = categoryStore.getTranslations(),
+                    selectedCategory = if (it.selectedCategory == name) (remaining.firstOrNull() ?: "") else it.selectedCategory
+                )
+            }
+            pushMenuToBackend()
+        }
+    }
+
     /**
      * Create a new (initially empty) category from Menu Management, persist it to the shared
      * category store, select its tab, and re-publish the menu so it appears everywhere (admin,

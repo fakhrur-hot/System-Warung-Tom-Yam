@@ -34,8 +34,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -73,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -123,6 +122,9 @@ fun MenuManagementScreen(
     var newCategoryName by remember { mutableStateOf("") }
     // Sort-items dialog (auto-sort + manual up/down within the selected category).
     var showSortItems by remember { mutableStateOf(false) }
+    // Long-press a category tab → action chooser (edit/delete); then a delete confirmation.
+    var longPressCategory by remember { mutableStateOf<String?>(null) }
+    var categoryToDelete by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
@@ -204,6 +206,11 @@ fun MenuManagementScreen(
                         Tab(
                             selected = index == selectedIndex,
                             onClick = { viewModel.selectCategory(category) },
+                            // Long-press opens an edit/delete chooser for this tab. onLongPress-only
+                            // detection doesn't consume normal taps, so tab selection still works.
+                            modifier = Modifier.pointerInput(category) {
+                                detectTapGestures(onLongPress = { longPressCategory = category })
+                            },
                             text = { Text(categoryTabLabel(category, strings)) }
                         )
                     }
@@ -323,6 +330,43 @@ fun MenuManagementScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showAddCategory = false }) { Text(strings.commonCancel) }
+            }
+        )
+    }
+
+    // Long-press a tab → choose Edit or Delete for that category.
+    longPressCategory?.let { cat ->
+        AlertDialog(
+            onDismissRequest = { longPressCategory = null },
+            title = { Text(categoryTabLabel(cat, strings)) },
+            confirmButton = {
+                TextButton(onClick = { editingCategory = cat; longPressCategory = null }) {
+                    Text(strings.commonEdit)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { categoryToDelete = cat; longPressCategory = null }) {
+                    Text(strings.commonDelete, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        )
+    }
+
+    // Delete confirmation — warns that owned items are removed everywhere (incl. "also shown").
+    categoryToDelete?.let { cat ->
+        val count = viewModel.itemCountInCategory(cat)
+        AlertDialog(
+            onDismissRequest = { categoryToDelete = null },
+            title = { Text(strings.deleteCategoryTitle) },
+            text = { Text(strings.deleteCategoryWarning.format(categoryTabLabel(cat, strings), count)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteCategory(cat)
+                    categoryToDelete = null
+                }) { Text(strings.commonDelete, color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { categoryToDelete = null }) { Text(strings.commonCancel) }
             }
         )
     }
