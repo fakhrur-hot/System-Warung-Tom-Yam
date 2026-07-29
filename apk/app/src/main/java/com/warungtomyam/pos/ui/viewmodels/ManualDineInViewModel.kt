@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.warungtomyam.pos.data.ApiClient
 import com.warungtomyam.pos.data.ApiResult
 import com.warungtomyam.pos.data.NewOrderItem
+import com.warungtomyam.pos.ui.i18n.AppLanguage
 import com.warungtomyam.pos.data.local.MenuDao
 import com.warungtomyam.pos.data.local.OrderDao
 import com.warungtomyam.pos.data.local.TableDao
@@ -45,6 +46,12 @@ class ManualDineInViewModel @Inject constructor(
     data class MenuItemDisplay(
         val id: String,
         val name: String,
+        // Per-language names so the New Dine-In list follows the app language (like Table View).
+        val nameEn: String = "",
+        val nameBm: String = "",
+        val nameZh: String = "",
+        val nameTa: String = "",
+        val nameTh: String = "",
         val price: Double,
         val category: String,
         /** All categories this item shows under (primary + "also show in" extras). */
@@ -57,7 +64,27 @@ class ManualDineInViewModel @Inject constructor(
         val priceOption1: Double? = null,
         val priceOption2: Double? = null,
         val priceOption3: Double? = null,
-    )
+    ) {
+        /** Name in the active app language, falling back to BM then EN when a translation is blank. */
+        fun localizedName(lang: AppLanguage): String {
+            val n = when (lang) {
+                AppLanguage.MY -> nameBm
+                AppLanguage.EN -> nameEn
+                AppLanguage.ZH -> nameZh
+                AppLanguage.TA -> nameTa
+                AppLanguage.TH -> nameTh
+            }
+            return n.ifBlank { nameBm.ifBlank { nameEn } }
+        }
+
+        /** True if [query] matches any language name (case-insensitive) — powers menu search. */
+        fun matches(query: String): Boolean {
+            val q = query.trim().lowercase()
+            if (q.isEmpty()) return true
+            return listOf(nameEn, nameBm, nameZh, nameTa, nameTh)
+                .any { it.lowercase().contains(q) }
+        }
+    }
 
     data class CartItem(
         val menuItemId: String,
@@ -146,6 +173,11 @@ class ManualDineInViewModel @Inject constructor(
                         MenuItemDisplay(
                             id = item.id,
                             name = item.nameEn,
+                            nameEn = item.nameEn,
+                            nameBm = item.nameBm,
+                            nameZh = item.nameZh,
+                            nameTa = item.nameTa,
+                            nameTh = item.nameTh,
                             price = item.price,
                             category = item.category,
                             categories = item.allCategories(),

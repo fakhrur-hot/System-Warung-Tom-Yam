@@ -64,6 +64,7 @@ import com.warungtomyam.pos.data.local.MenuCategory
 import com.warungtomyam.pos.ui.components.HoldCountdownOverlay
 import com.warungtomyam.pos.ui.i18n.LanguageViewModel
 import com.warungtomyam.pos.ui.i18n.UiStrings
+import com.warungtomyam.pos.ui.i18n.AppLanguage
 import com.warungtomyam.pos.ui.i18n.uiStrings
 import com.warungtomyam.pos.ui.viewmodels.ManualDineInViewModel
 
@@ -157,6 +158,7 @@ fun ManualDineInScreen(
                         menuItems = uiState.menuItems,
                         cartItems = uiState.cartItems,
                         strings = strings,
+                        language = language,
                         onAddItem = { itemId -> viewModel.addToCart(itemId) },
                         onRemoveItem = { itemId -> viewModel.removeFromCart(itemId) },
                         onSetNote = { itemId, note -> viewModel.setItemNote(itemId, note) },
@@ -171,6 +173,7 @@ fun ManualDineInScreen(
                         selectedTableLabel = uiState.selectedTableLabel,
                         isSubmitting = uiState.isSubmitting,
                         strings = strings,
+                        language = language,
                         onUpdateNote = { itemId, note -> viewModel.updateNote(itemId, note) },
                         onSubmit = { viewModel.submitOrder() }
                     )
@@ -257,6 +260,7 @@ private fun MenuItemsList(
     menuItems: List<ManualDineInViewModel.MenuItemDisplay>,
     cartItems: List<ManualDineInViewModel.CartItem>,
     strings: UiStrings,
+    language: AppLanguage,
     onAddItem: (String) -> Unit,
     onRemoveItem: (String) -> Unit,
     onSetNote: (String, String) -> Unit = { _, _ -> },
@@ -270,21 +274,35 @@ private fun MenuItemsList(
         return
     }
 
+    // Menu search — filters the list by any-language name match as you type.
+    var query by remember { mutableStateOf("") }
+    val visibleItems = menuItems.filter { it.matches(query) }
+
     // Group into separate category sections. Categories are dynamic (driven by the menu),
     // so custom preset categories like "SAYUR" appear in the order they occur in the menu.
     // An item appears under each of its allCategories() (primary + "also show in" extras),
     // so a dish tagged into a second category shows in both sections here too.
     val grouped = buildMap<String, MutableList<ManualDineInViewModel.MenuItemDisplay>> {
-        for (mi in menuItems) {
+        for (mi in visibleItems) {
             val cats = mi.categories.ifEmpty { listOf(mi.category) }
             for (cat in cats) getOrPut(cat.uppercase()) { mutableListOf() }.add(mi)
         }
     }
-    val orderedCategories = menuItems
+    val orderedCategories = visibleItems
         .flatMap { it.categories.ifEmpty { listOf(it.category) } }
         .map { it.uppercase() }.distinct()
         .filter { grouped[it]?.isNotEmpty() == true }
 
+    Column(modifier = Modifier.fillMaxSize()) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text(strings.searchMenu) },
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        )
     LazyColumn(
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -317,7 +335,7 @@ private fun MenuItemsList(
                             if (item.imageUrl.isNotBlank()) {
                                 AsyncImage(
                                     model = item.imageUrl,
-                                    contentDescription = item.name,
+                                    contentDescription = item.localizedName(language),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .padding(end = 12.dp)
@@ -328,7 +346,7 @@ private fun MenuItemsList(
 
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = item.name,
+                                    text = item.localizedName(language),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = FontWeight.Medium
                                 )
@@ -412,6 +430,7 @@ private fun MenuItemsList(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -421,6 +440,7 @@ private fun CartReview(
     selectedTableLabel: String,
     isSubmitting: Boolean,
     strings: UiStrings,
+    language: AppLanguage,
     onUpdateNote: (String, String) -> Unit,
     onSubmit: () -> Unit
 ) {
@@ -450,6 +470,7 @@ private fun CartReview(
                         item = cartItem,
                         menuItem = menuItem,
                         strings = strings,
+                        language = language,
                         onUpdateNote = { note -> onUpdateNote(cartItem.menuItemId, note) }
                     )
                 }
@@ -496,6 +517,7 @@ private fun CartItemRow(
     item: ManualDineInViewModel.CartItem,
     menuItem: ManualDineInViewModel.MenuItemDisplay,
     strings: UiStrings,
+    language: AppLanguage,
     onUpdateNote: (String) -> Unit
 ) {
     var noteText by remember(item.menuItemId, item.size) { mutableStateOf(item.note ?: "") }
@@ -508,7 +530,7 @@ private fun CartItemRow(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "${item.quantity}x ${menuItem.name}$sizeSuffix",
+                text = "${item.quantity}x ${menuItem.localizedName(language)}$sizeSuffix",
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
