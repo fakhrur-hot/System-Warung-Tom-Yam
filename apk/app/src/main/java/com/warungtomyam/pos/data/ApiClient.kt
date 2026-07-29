@@ -9,6 +9,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -61,6 +62,9 @@ class ApiClient @Inject constructor(
         .build()
 
     private fun adminBearerToken(): String? = secureStorage.getSessionToken()
+
+    /** Consume and discard a response body so OkHttp can reuse the connection. */
+    private fun Response.consumeBody(): String = use { body?.string() ?: "" }
 
     /**
      * Admin handshake: first-claim admin registration with rotating key.
@@ -276,6 +280,7 @@ class ApiClient @Inject constructor(
                     .build()
 
                 val response = client.newCall(request).execute()
+                response.consumeBody()
 
                 when (response.code) {
                     200 -> ApiResult.Success(Unit)
@@ -315,6 +320,7 @@ class ApiClient @Inject constructor(
                     .build()
 
                 val response = client.newCall(request).execute()
+                response.consumeBody() // ensure connection is reused
 
                 when (response.code) {
                     200 -> ApiResult.Success(Unit)
@@ -571,6 +577,7 @@ class ApiClient @Inject constructor(
                     .build()
 
                 val response = client.newCall(request).execute()
+                response.consumeBody()
 
                 when (response.code) {
                     200 -> ApiResult.Success(Unit)
@@ -976,6 +983,7 @@ class ApiClient @Inject constructor(
                     .build()
 
                 val response = client.newCall(request).execute()
+                response.consumeBody()
 
                 when (response.code) {
                     200 -> ApiResult.Success(Unit)
@@ -1203,6 +1211,7 @@ class ApiClient @Inject constructor(
                 .build()
 
             val response = client.newCall(request).execute()
+            response.consumeBody()
 
             when (response.code) {
                 200 -> ApiResult.Success(Unit)
@@ -1246,6 +1255,7 @@ class ApiClient @Inject constructor(
                 .build()
 
             val response = client.newCall(request).execute()
+            response.consumeBody()
 
             when (response.code) {
                 200 -> ApiResult.Success(Unit)
@@ -1493,6 +1503,7 @@ class ApiClient @Inject constructor(
                 .build()
 
             val response = client.newCall(request).execute()
+            response.consumeBody()
 
             when (response.code) {
                 200 -> ApiResult.Success(Unit)
@@ -1647,6 +1658,7 @@ class ApiClient @Inject constructor(
                 .build()
 
             val response = client.newCall(request).execute()
+            response.consumeBody()
 
             when (response.code) {
                 200 -> ApiResult.Success(Unit)
@@ -1689,6 +1701,13 @@ class ApiClient @Inject constructor(
                                 MenuItemDto(
                                     id = item.getString("id"),
                                     category = item.getString("category"),
+                                    // categories[] (if present) minus the primary → extraCategories.
+                                    extraCategories = item.optJSONArray("categories")?.let { arr ->
+                                        (0 until arr.length())
+                                            .map { arr.optString(it, "").trim() }
+                                            .filter { it.isNotBlank() && it != item.getString("category") }
+                                            .joinToString(",")
+                                    } ?: "",
                                     code = item.optString("code", ""),
                                     price = item.getDouble("price"),
                                     marketPrice = item.optBoolean("marketPrice", false),
@@ -1780,6 +1799,8 @@ data class MenuCategoryDto(
 data class MenuItemDto(
     val id: String,
     val category: String,
+    /** Comma-separated additional categories (beyond [category]) this item appears under. */
+    val extraCategories: String = "",
     val code: String = "",
     val price: Double,
     val marketPrice: Boolean = false,

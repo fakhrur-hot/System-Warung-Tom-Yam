@@ -59,15 +59,19 @@ class PrintService @Inject constructor(
         sessionNumber: Int? = null
     ) {
         if (!isPrinterHost()) return
+
+        // Batch all DB reads into a single pass — settings once, table name once,
+        // printer config once — instead of 4-5 separate round-trips.
+        val settings = settingsDao.get()
+        val printLanguage = settings?.printLanguage ?: "EN"
+        val timezone = settings?.timezone ?: "Asia/Kuala_Lumpur"
         val charWidth = resolveCharWidth(PrinterRole.KITCHEN_ONLY)
-        val printLanguage = resolvePrintLanguage()
-        val timezone = resolveTimezone()
+        val tableName = resolveTableName(tableId)
 
         // Group into two buckets (FOOD / BEVERAGE) → at most two slips per order, each
         // routed to the printer assigned to that bucket (categoryFilter holds the bucket).
         val slipsByBucket = KitchenSlipDocument.generateByRoute(
-            // Print the admin-entered table name (Table Management), not the internal id.
-            tableId = resolveTableName(tableId),
+            tableId = tableName,
             items = items,
             isAmendment = isAmendment,
             charWidth = charWidth,
@@ -104,9 +108,13 @@ class PrintService @Inject constructor(
         cafeName: String
     ) {
         if (!isPrinterHost()) return
+
+        // Batch all DB reads — settings once, receipt dimensions once, table name once.
+        val settings = settingsDao.get()
+        val printLanguage = settings?.printLanguage ?: "EN"
+        val timezone = settings?.timezone ?: "Asia/Kuala_Lumpur"
         val (charWidth, pixelWidth) = resolveReceiptDimensions()
-        val printLanguage = resolvePrintLanguage()
-        val timezone = resolveTimezone()
+        val tableName = resolveTableName(order.tableId)
 
         val payload = ReceiptDocument.generate(
             context = context,
@@ -118,8 +126,7 @@ class PrintService @Inject constructor(
             pixelWidth = pixelWidth,
             printLanguage = printLanguage,
             timezone = timezone,
-            // Print the admin-entered table name (Table Management), not the internal id.
-            tableName = resolveTableName(order.tableId)
+            tableName = tableName
         )
 
         if (payload.isNotBlank()) {
@@ -144,8 +151,7 @@ class PrintService @Inject constructor(
      * Resolve the character width for a given printer role.
      * Falls back to BOTH role, then defaults to 80mm (48 chars).
      */
-    private suspend fun resolveCharWidth(role: PrinterRole): Int {
-        val printers = printerConfigDao.getByRole(role).ifEmpty {
+    private suspend fun resolveCharWidth(role: PrinterRole): Int {        val printers = printerConfigDao.getByRole(role).ifEmpty {
             printerConfigDao.getByRole(PrinterRole.BOTH)
         }
         return printers.firstOrNull()?.paperWidth?.charWidth
@@ -154,7 +160,6 @@ class PrintService @Inject constructor(
 
     /**
      * Resolve both char width and pixel width for receipt printing.
-     * Falls back to BOTH role, then defaults to 80mm dimensions.
      */
     private suspend fun resolveReceiptDimensions(): Pair<Int, Int> {
         val printers = printerConfigDao.getByRole(PrinterRole.RECEIPT_ONLY).ifEmpty {
@@ -162,21 +167,5 @@ class PrintService @Inject constructor(
         }
         val paperWidth = printers.firstOrNull()?.paperWidth ?: PaperWidth.EIGHTY_MM
         return paperWidth.charWidth to paperWidth.pixelWidth
-    }
-
-    /**
-     * Resolve print language from Room settings.
-     * Defaults to "EN" if settings not found.
-     */
-    private suspend fun resolvePrintLanguage(): String {
-        return settingsDao.get()?.printLanguage ?: "EN"
-    }
-
-    /**
-     * Resolve the café timezone from settings for timestamp rendering on slips/receipts.
-     * Falls back to the app default so kitchen slips and receipts always agree.
-     */
-    private suspend fun resolveTimezone(): String {
-        return settingsDao.get()?.timezone ?: "Asia/Kuala_Lumpur"
     }
 }

@@ -338,6 +338,7 @@ class AdminSessionViewModel @Inject constructor(
     private fun MenuItemDto.toEntity() = MenuItem(
         id = id,
         category = category,
+        extraCategories = extraCategories,
         code = code,
         price = price,
         marketPrice = marketPrice,

@@ -42,7 +42,7 @@ data class MenuUiState(
         get() {
             val ordered = LinkedHashSet<String>()
             ordered.addAll(categoryOrder)
-            ordered.addAll(items.map { it.category }.filter { it.isNotBlank() })
+            ordered.addAll(items.flatMap { it.allCategories() }.filter { it.isNotBlank() })
             return if (ordered.isNotEmpty()) ordered.toList()
             else MenuCategory.entries.map { it.name }
         }
@@ -51,8 +51,13 @@ data class MenuUiState(
     val effectiveSelectedCategory: String
         get() = selectedCategory.ifBlank { categories.firstOrNull() ?: "" }
 
+    // An item appears under every category in its allCategories() (primary + extras).
     val itemsByCategory: Map<String, List<MenuItem>>
-        get() = items.groupBy { it.category }
+        get() = buildMap<String, MutableList<MenuItem>> {
+            for (item in items) {
+                for (cat in item.allCategories()) getOrPut(cat) { mutableListOf() }.add(item)
+            }
+        }
 
     val filteredItems: List<MenuItem>
         get() = itemsByCategory[effectiveSelectedCategory] ?: emptyList()
@@ -152,13 +157,16 @@ class MenuViewModel @Inject constructor(
         nameZh: String = "",
         nameTa: String = "",
         nameTh: String = "",
+        extraCategories: String = "",
         id: String = UUID.randomUUID().toString()
     ) {
         viewModelScope.launch {
             ensureCategory(category)
+            extraCategories.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { ensureCategory(it) }
             val newItem = MenuItem(
                 id = id,
                 category = category,
+                extraCategories = extraCategories,
                 code = code,
                 price = price,
                 marketPrice = marketPrice,
@@ -203,13 +211,16 @@ class MenuViewModel @Inject constructor(
         nameBm: String = "",
         nameZh: String = "",
         nameTa: String = "",
-        nameTh: String = ""
+        nameTh: String = "",
+        extraCategories: String = ""
     ) {
         viewModelScope.launch {
             ensureCategory(category)
+            extraCategories.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { ensureCategory(it) }
             val updatedItem = MenuItem(
                 id = id,
                 category = category,
+                extraCategories = extraCategories,
                 code = code,
                 price = price,
                 marketPrice = marketPrice,
@@ -312,6 +323,8 @@ class MenuViewModel @Inject constructor(
             return JSONObject().apply {
                 put("id", item.id)
                 put("category", item.category)
+                // Full category membership so an item shows on multiple category pages.
+                put("categories", JSONArray().apply { item.allCategories().forEach { put(it) } })
                 put("code", item.code)
                 put("price", item.price)
                 put("marketPrice", item.marketPrice)

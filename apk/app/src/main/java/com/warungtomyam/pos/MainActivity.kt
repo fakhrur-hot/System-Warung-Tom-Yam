@@ -7,25 +7,27 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
+import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
-import com.warungtomyam.pos.data.SecureStorage
 import com.warungtomyam.pos.ui.navigation.AppNavGraph
 import com.warungtomyam.pos.ui.navigation.DeepLinkInvite
-import com.warungtomyam.pos.ui.navigation.NavRoutes
+import com.warungtomyam.pos.ui.viewmodels.StartupViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    @Inject
-    lateinit var secureStorage: SecureStorage
+    private val startupViewModel: StartupViewModel by viewModels()
 
     // POST_NOTIFICATIONS runtime prompt (Android 13+). Without it, the persistent
     // foreground notification and live new-order alerts are silently suppressed.
@@ -45,49 +47,41 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Ask for notification permission up front so orders can alert live and the
-        // background service's status-bar notification is visible.
         ensureNotificationPermission()
 
         // Capture an invite token arriving via deep link (https://<host>/join?invite=TOKEN)
-        // so a fresh device lands straight in ordering-device onboarding with it pre-filled.
         val deepLinkInvite = intent?.data?.getQueryParameter("invite")?.takeIf { it.isNotBlank() }
         if (deepLinkInvite != null) {
             DeepLinkInvite.pendingToken = deepLinkInvite
         }
 
+        // Resolve start destination on IO thread (EncryptedSharedPreferences / Keystore reads).
+        startupViewModel.resolve(deepLinkInvite)
+
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    val navController = rememberNavController()
+                    val startupState by startupViewModel.state.collectAsState()
 
-                    // Determine start destination based on stored auth state.
-                    // If SecureStorage is corrupted (OEM KeyStore issue), isAuthenticated()
-                    // returns false and the user lands on role selection for re-auth.
-                    // A pending deep-link invite (and no existing session) jumps straight to
-                    // ordering-device onboarding.
-                    val startDestination = remember {
-                        when {
-                            deepLinkInvite != null && !secureStorage.isAuthenticated() ->
-                                NavRoutes.ORDERING_CONNECT
-                            secureStorage.isAuthenticated() -> {
-                                when (secureStorage.getRole()) {
-                                    // A secondary admin runs the same admin home as the main
-                                    // admin (the printer bits are gated inside it).
-                                    SecureStorage.Role.ADMIN,
-                                    SecureStorage.Role.ADMIN_SECONDARY -> NavRoutes.ADMIN_HOME
-                                    SecureStorage.Role.ORDERING -> NavRoutes.ORDERING_HOME
-                                    null -> NavRoutes.ROLE_SELECT
-                                }
+                    when (val s = startupState) {
+                        is StartupViewModel.State.Loading -> {
+                            // Show a centered spinner while Keystore reads complete
+                            // (typically <100ms, avoids any main-thread jank on cold boot).
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
                             }
-                            else -> NavRoutes.ROLE_SELECT
+                        }
+                        is StartupViewModel.State.Ready -> {
+                            val navController = rememberNavController()
+                            AppNavGraph(
+                                navController = navController,
+                                startDestination = s.startDestination
+                            )
                         }
                     }
-
-                    AppNavGraph(
-                        navController = navController,
-                        startDestination = startDestination
-                    )
                 }
             }
         }
