@@ -50,3 +50,8 @@
 # ── Suppress common benign warnings ──────────────────────────────────────────
 -dontwarn javax.annotation.**
 -dontwarn sun.misc.Unsafe
+
+# ── Tink / EncryptedSharedPreferences: ignore compile-only errorprone annotations ─────
+# Tink (via androidx.security.crypto) references these annotations, which are compile-time
+# only and absent at runtime. Safe to suppress — R8 flagged them as missing classes.
+-dontwarn com.google.errorprone.annotations.**
