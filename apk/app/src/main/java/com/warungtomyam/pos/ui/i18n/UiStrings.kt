@@ -496,6 +496,8 @@ data class UiStringsGroup8(
     val defaultLangCustomerLabel: String,
     val defaultLanguageHint: String,
     val printerLanguageLabel: String,
+    val takeoutSection: String,
+    val addTakeoutButton: String,
 )
 
 class UiStrings(
@@ -918,6 +920,8 @@ class UiStrings(
     val defaultLangCustomerLabel: String get() = g8.defaultLangCustomerLabel
     val defaultLanguageHint: String get() = g8.defaultLanguageHint
     val printerLanguageLabel: String get() = g8.printerLanguageLabel
+    val takeoutSection: String get() = g8.takeoutSection
+    val addTakeoutButton: String get() = g8.addTakeoutButton
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1347,6 +1351,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             defaultLangCustomerLabel = "Web Pelanggan",
             defaultLanguageHint = "Peranti dan pelawat baharu bermula dalam bahasa ini. Sesiapa yang menukar bahasa pada peranti sendiri akan mengekalkan pilihan mereka.",
             printerLanguageLabel = "Pencetak (slip & resit)",
+            takeoutSection = "Bawa Pulang (Tapaw)",
+            addTakeoutButton = "Tambah Tapaw",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -1775,6 +1781,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             defaultLangCustomerLabel = "Customer web",
             defaultLanguageHint = "New devices and visitors start in this language. Anyone who changes language on their own device keeps their choice.",
             printerLanguageLabel = "Printer (slips & receipt)",
+            takeoutSection = "Take-out (Tapaw)",
+            addTakeoutButton = "Add Tapaw",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2203,6 +2211,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             defaultLangCustomerLabel = "顾客网页",
             defaultLanguageHint = "新设备和访客以此语言开始。任何人在自己设备上更改语言后将保留其选择。",
             printerLanguageLabel = "打印机（厨房单和收据）",
+            takeoutSection = "外带 (Tapaw)",
+            addTakeoutButton = "添加 Tapaw",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -2631,6 +2641,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             defaultLangCustomerLabel = "வாடிக்கையாளர் வலை",
             defaultLanguageHint = "புதிய சாதனங்களும் பார்வையாளர்களும் இந்த மொழியில் தொடங்கும். தங்கள் சாதனத்தில் மொழியை மாற்றியவர்கள் தங்கள் தேர்வை வைத்திருப்பர்.",
             printerLanguageLabel = "அச்சுப்பொறி (சீட்டு & ரசீது)",
+            takeoutSection = "பார்சல் (Tapaw)",
+            addTakeoutButton = "Tapaw சேர்",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -3059,6 +3071,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             defaultLangCustomerLabel = "เว็บลูกค้า",
             defaultLanguageHint = "อุปกรณ์และผู้เยี่ยมชมใหม่จะเริ่มต้นด้วยภาษานี้ ผู้ที่เปลี่ยนภาษาบนอุปกรณ์ของตนเองจะคงตัวเลือกไว้",
             printerLanguageLabel = "เครื่องพิมพ์ (สลิป & ใบเสร็จ)",
+            takeoutSection = "ห่อกลับ (Tapaw)",
+            addTakeoutButton = "เพิ่ม Tapaw",
         ),
     )
 }

@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.warungtomyam.pos.data.local.isTakeout
 import com.warungtomyam.pos.ui.i18n.LanguageViewModel
 import com.warungtomyam.pos.ui.i18n.uiStrings
 import com.warungtomyam.pos.ui.viewmodels.TableViewViewModel
@@ -100,9 +101,35 @@ fun TableManagementScreen(
                 )
                 Button(
                     onClick = { viewModel.addTable() },
-                    enabled = state.tables.size < TableViewViewModel.MAX_TABLES
+                    enabled = state.tables.count { !it.isTakeout } < TableViewViewModel.MAX_TABLES
                 ) {
                     Text(strings.addButton)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Take-out (Tapaw) slots — additional to the dine-in cap, no printed QR card.
+            Text(
+                text = strings.takeoutSection,
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${state.tables.count { it.isTakeout }}/${TableViewViewModel.MAX_TAKEOUT}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(
+                    onClick = { viewModel.addTakeoutTable() },
+                    enabled = state.tables.count { it.isTakeout } < TableViewViewModel.MAX_TAKEOUT
+                ) {
+                    Text(strings.addTakeoutButton)
                 }
             }
 
@@ -120,7 +147,7 @@ fun TableManagementScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "${strings.currentTablesLabel} (${state.tables.size}/${TableViewViewModel.MAX_TABLES})",
+                text = "${strings.currentTablesLabel} (${state.tables.count { !it.isTakeout }}/${TableViewViewModel.MAX_TABLES})",
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(bottom = 8.dp)
             )

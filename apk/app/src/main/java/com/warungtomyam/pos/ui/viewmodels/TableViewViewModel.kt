@@ -15,8 +15,10 @@ import com.warungtomyam.pos.data.local.OrderItem
 import com.warungtomyam.pos.data.local.OrderStatus
 import com.warungtomyam.pos.data.local.SettingsDao
 import com.warungtomyam.pos.data.local.SystemSettings
+import com.warungtomyam.pos.data.local.TAKEOUT_PREFIX
 import com.warungtomyam.pos.data.local.Table
 import com.warungtomyam.pos.data.local.TableDao
+import com.warungtomyam.pos.data.local.isTakeout
 import com.warungtomyam.pos.printing.PrintService
 import com.warungtomyam.pos.ui.i18n.LanguageManager
 import com.warungtomyam.pos.ui.i18n.uiStrings
@@ -69,6 +71,8 @@ class TableViewViewModel @Inject constructor(
     companion object {
         const val MAX_TABLES = 30
         const val MAX_TABLE_NUMBER = 9999
+        // Take-out ("Tapaw") slots are additional to the dine-in cap (30 + 6 = 36 total).
+        const val MAX_TAKEOUT = 6
         // Fixed hold before an admin/staff order is actually sent — a brief mis-tap guard,
         // distinct from and shorter than the configurable customer hold.
         const val STAFF_ORDER_HOLD_SECONDS = 3
@@ -633,8 +637,10 @@ class TableViewViewModel @Inject constructor(
      */
     fun addTable() {
         viewModelScope.launch {
-            val count = tableDao.getCount()
-            if (count >= MAX_TABLES) {
+            val all = tableDao.getAll()
+            // Only dine-in tables count toward the dine-in cap; take-out (Tapaw) slots are separate.
+            val dineInCount = all.count { !it.isTakeout }
+            if (dineInCount >= MAX_TABLES) {
                 _tableManagement.value = _tableManagement.value.copy(
                     error = str().maxTablesReached.format(MAX_TABLES)
                 )
@@ -642,7 +648,8 @@ class TableViewViewModel @Inject constructor(
             }
 
             // Lowest unused number, so a deleted id (gap) is reclaimed before extending.
-            val used = tableDao.getAll().mapNotNull { it.id.removePrefix("T").toIntOrNull() }.toSet()
+            // Take-out ids ("TAPAW1") aren't numeric after removePrefix("T"), so they're ignored here.
+            val used = all.mapNotNull { it.id.removePrefix("T").toIntOrNull() }.toSet()
             var n = 1
             while (used.contains(n)) n++
             if (n > MAX_TABLE_NUMBER) {
@@ -655,7 +662,7 @@ class TableViewViewModel @Inject constructor(
             val id = "T" + n.toString().padStart(4, '0')
             val label = _tableManagement.value.newTableLabel.trim().ifEmpty { id }
 
-            tableDao.insert(Table(id = id, label = label, sortOrder = count))
+            tableDao.insert(Table(id = id, label = label, sortOrder = dineInCount))
             // nextTableNumber is now only a monotonic hint (generation uses the gap-fill above).
             val settings = settingsDao.get() ?: SystemSettings()
             if (settings.nextTableNumber <= n) {
@@ -668,6 +675,34 @@ class TableViewViewModel @Inject constructor(
                 newTableLabel = "",
                 error = null
             )
+            pushTablesToBackend(tables)
+        }
+    }
+
+    /**
+     * Add a take-out ("Tapaw") slot: ids TAPAW1..TAPAW6, labels "Tapaw 1".."Tapaw 6". These are
+     * additional to the [MAX_TABLES] dine-in cap (up to [MAX_TAKEOUT]), have no printed QR card,
+     * and reclaim the lowest free slot number after a deletion. Used for order-taking like tables.
+     */
+    fun addTakeoutTable() {
+        viewModelScope.launch {
+            val all = tableDao.getAll()
+            val takeout = all.filter { it.isTakeout }
+            if (takeout.size >= MAX_TAKEOUT) {
+                _tableManagement.value = _tableManagement.value.copy(
+                    error = str().maxTablesReached.format(MAX_TAKEOUT)
+                )
+                return@launch
+            }
+            // Lowest unused 1..MAX_TAKEOUT (reclaims a deleted slot before extending).
+            val used = takeout.mapNotNull { it.id.removePrefix(TAKEOUT_PREFIX).toIntOrNull() }.toSet()
+            var n = 1
+            while (used.contains(n)) n++
+            val id = "$TAKEOUT_PREFIX$n"
+            tableDao.insert(Table(id = id, label = "Tapaw $n", sortOrder = 1000 + n))
+
+            val tables = tableDao.getAll()
+            _tableManagement.value = _tableManagement.value.copy(tables = tables, error = null)
             pushTablesToBackend(tables)
         }
     }

@@ -10,6 +10,7 @@ import com.warungtomyam.pos.data.ApiClient
 import com.warungtomyam.pos.data.ApiResult
 import com.warungtomyam.pos.data.local.Table
 import com.warungtomyam.pos.data.local.TableDao
+import com.warungtomyam.pos.data.local.isTakeout
 import com.warungtomyam.pos.ui.i18n.LanguageManager
 import com.warungtomyam.pos.ui.i18n.uiStrings
 import com.warungtomyam.pos.ui.util.QrPdfGenerator
@@ -18,6 +19,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -36,8 +38,9 @@ class QrPdfViewModel @Inject constructor(
 
     private fun str() = uiStrings(languageManager.language.value)
 
-    /** All tables from Room (reactive). */
+    /** Dine-in tables from Room (reactive). Take-out (Tapaw) slots are excluded — they have no QR card. */
     val tables: StateFlow<List<Table>> = tableDao.getAllFlow()
+        .map { list -> list.filter { !it.isTakeout } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _uiState = MutableStateFlow(QrPdfUiState())
