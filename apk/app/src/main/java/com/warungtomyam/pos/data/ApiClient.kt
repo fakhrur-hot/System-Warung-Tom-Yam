@@ -1300,6 +1300,40 @@ class ApiClient @Inject constructor(
     }
 
     /**
+     * Fetch the map of table id → opaque QR token (for generating unguessable table QR
+     * codes). Public endpoint. Tables missing a token are simply omitted.
+     */
+    suspend fun getTableTokens(): ApiResult<Map<String, String>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("$BASE_URL/tables")
+                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .get()
+                .build()
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+            when (response.code) {
+                200 -> {
+                    val tablesArray = JSONObject(responseBody).optJSONArray("tables") ?: JSONArray()
+                    val map = mutableMapOf<String, String>()
+                    for (i in 0 until tablesArray.length()) {
+                        val t = tablesArray.getJSONObject(i)
+                        val id = t.optString("id", "")
+                        val token = t.optStringOrNull("qrToken")
+                        if (id.isNotBlank() && !token.isNullOrBlank()) map[id] = token
+                    }
+                    ApiResult.Success(map)
+                }
+                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+            }
+        } catch (e: IOException) {
+            ApiResult.NetworkError(e.message ?: "Network error")
+        } catch (e: Exception) {
+            ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+        }
+    }
+
+    /**
      * Push the full local table registry to the backend (admin bearer). Called after
      * every add/edit/delete in Manage Tables so orders/customer QR ordering — both of
      * which validate tableId against this backend registry — stay in sync with the

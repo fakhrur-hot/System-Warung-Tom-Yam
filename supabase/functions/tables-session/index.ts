@@ -25,17 +25,20 @@ serve(async (req) => {
   const browserId = req.headers.get("x-browser-id") || null;
   const supabase = getSupabaseClient();
 
-  // Validate table exists (and grab the admin-entered display name for the customer UI)
+  // Resolve the identifier — it may be the opaque QR token (new) or the raw table id
+  // (legacy QRs / admin). Grab the admin-entered display name for the customer UI.
   const { data: table, error: tableError } = await supabase
     .from("tables")
     .select("id, display_name")
-    .eq("id", tableId)
-    .single();
+    .or(`id.eq.${tableId},qr_token.eq.${tableId}`)
+    .limit(1)
+    .maybeSingle();
 
   if (tableError || !table) {
     return errorResponse(404, "UNKNOWN_TABLE", `Table '${tableId}' does not exist`);
   }
-  const displayName = table.display_name ?? tableId;
+  const realTableId = table.id;
+  const displayName = table.display_name ?? realTableId;
 
   // Café open/closed is derived from the most recent session event. Signing out WITH
   // closing posts a CLOSE row with closing=true — that (and only that) means the café is
@@ -50,11 +53,11 @@ serve(async (req) => {
     return jsonResponse({ state: "CLOSED", displayName });
   }
 
-  // Check for active order on this table
+  // Check for active order on this table (query by the resolved real id)
   const { data: activeOrder } = await supabase
     .from("orders")
     .select("*")
-    .eq("table_id", tableId)
+    .eq("table_id", realTableId)
     .not("status", "in", "(COMPLETED,CANCELLED)")
     .limit(1)
     .single();
