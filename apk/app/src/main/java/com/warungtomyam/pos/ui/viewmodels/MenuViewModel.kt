@@ -9,9 +9,6 @@ import com.warungtomyam.pos.data.local.MenuCategory
 import com.warungtomyam.pos.data.local.MenuCategoryStore
 import com.warungtomyam.pos.data.local.MenuDao
 import com.warungtomyam.pos.data.local.MenuItem
-import com.warungtomyam.pos.data.local.PrinterConfig
-import com.warungtomyam.pos.data.local.PrinterConfigDao
-import com.warungtomyam.pos.data.local.PrinterRole
 import com.warungtomyam.pos.ui.i18n.LanguageManager
 import com.warungtomyam.pos.ui.i18n.uiStrings
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,9 +32,7 @@ data class MenuUiState(
     val error: String? = null,
     val isSyncing: Boolean = false,
     /** Per-category display labels by language ("en".."th"), for the category editor. */
-    val categoryTranslations: Map<String, Map<String, String>> = emptyMap(),
-    /** Kitchen-capable printers (KITCHEN_ONLY or BOTH) available to route categories to. */
-    val kitchenPrinters: List<PrinterConfig> = emptyList()
+    val categoryTranslations: Map<String, Map<String, String>> = emptyMap()
 ) {
     /**
      * Dynamic ordered category names to render as tabs: persisted store order first, then any
@@ -68,7 +63,6 @@ class MenuViewModel @Inject constructor(
     private val menuDao: MenuDao,
     private val apiClient: ApiClient,
     private val categoryStore: MenuCategoryStore,
-    private val printerConfigDao: PrinterConfigDao,
     private val languageManager: LanguageManager
 ) : ViewModel() {
 
@@ -96,63 +90,24 @@ class MenuViewModel @Inject constructor(
                 _uiState.update { it.copy(error = str().msgFailed.format(e.message)) }
             }
         }
-        // Observe printers so the category editor's "Print to" picker stays current.
-        viewModelScope.launch {
-            printerConfigDao.getAllFlow().collect { printers ->
-                _uiState.update {
-                    it.copy(kitchenPrinters = printers.filter { p ->
-                        p.printerRole == PrinterRole.KITCHEN_ONLY || p.printerRole == PrinterRole.BOTH
-                    })
-                }
-            }
-        }
     }
 
-    /** Which kitchen printer currently prints [category] (by its categoryFilter), or null. */
-    fun printerIdForCategory(category: String): String? =
-        _uiState.value.kitchenPrinters.firstOrNull { p -> printerFilterHas(p.categoryFilter, category) }?.id
+    /** Current kitchen route for [category]: "FOOD" (default) or "BEVERAGE". */
+    fun routeForCategory(category: String): String = categoryStore.getCategoryRoute(category)
 
     /**
-     * Save a category's per-language labels and its printer assignment, then re-publish the
-     * menu so the customer web picks up the translations. [printerId] null = no specific
-     * printer (falls back to the catch-all kitchen printer at print time).
+     * Save a category's per-language labels and its kitchen route (Food/Beverage), then
+     * re-publish the menu so the customer web picks up the translations. The route drives
+     * which of the two kitchen slips this category's items print on.
      */
-    fun saveCategory(name: String, labels: Map<String, String>, printerId: String?) {
+    fun saveCategory(name: String, labels: Map<String, String>, route: String) {
         if (name.isBlank()) return
         viewModelScope.launch {
             categoryStore.setTranslation(name, labels)
-            assignCategoryToPrinter(name, printerId)
+            categoryStore.setCategoryRoute(name, route)
             _uiState.update { it.copy(categoryTranslations = categoryStore.getTranslations()) }
             pushMenuToBackend()
         }
-    }
-
-    /**
-     * Reverse-map a category onto printers' categoryFilter: strip [category] from every
-     * printer, then add it to the chosen one. A printer's filter is a comma-separated list
-     * of the categories it prints.
-     */
-    private suspend fun assignCategoryToPrinter(category: String, printerId: String?) {
-        val printers = printerConfigDao.getAll()
-        for (p in printers) {
-            val cats = p.categoryFilter?.split(",")
-                ?.map { it.trim() }
-                ?.filter { it.isNotBlank() }
-                ?.toMutableList()
-                ?: mutableListOf()
-            cats.removeAll { it.equals(category, ignoreCase = true) }
-            if (p.id == printerId) cats.add(category)
-            val newFilter = cats.distinct().takeIf { it.isNotEmpty() }?.joinToString(",")
-            if (newFilter != p.categoryFilter) {
-                printerConfigDao.update(p.copy(categoryFilter = newFilter))
-            }
-        }
-    }
-
-    private fun printerFilterHas(filter: String?, category: String): Boolean {
-        val f = filter?.trim().orEmpty()
-        if (f.isBlank()) return false
-        return f.split(",").map { it.trim() }.any { it.equals(category.trim(), ignoreCase = true) }
     }
 
     fun loadItems() {

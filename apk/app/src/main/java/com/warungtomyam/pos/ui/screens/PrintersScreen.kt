@@ -24,7 +24,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -227,6 +230,76 @@ fun PrintersScreen(
                         onTestPrint = { withBtPermissions { viewModel.testPrint(printer.id) } }
                     )
                 }
+            }
+
+            // Kitchen print routing (two buckets) + slip font size
+            item {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Text(
+                    text = "Kitchen Print Routing",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Every order prints up to two slips — Foods and Beverages. Choose which printer prints each (the same printer can do both). Tag each category as Food or Beverage in Menu Management.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                listOf("Foods" to "FOOD", "Beverages" to "BEVERAGE").forEach { (label, bucket) ->
+                    val currentId = viewModel.printerIdForBucket(bucket)
+                    var open by remember(bucket, printers) { mutableStateOf(false) }
+                    Text(label, style = MaterialTheme.typography.labelLarge)
+                    Box {
+                        OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(printers.firstOrNull { it.id == currentId }?.name ?: "Not assigned")
+                        }
+                        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Not assigned") },
+                                onClick = { viewModel.setBucketPrinter(bucket, null); open = false }
+                            )
+                            printers.forEach { p ->
+                                DropdownMenuItem(
+                                    text = { Text(p.name) },
+                                    onClick = { viewModel.setBucketPrinter(bucket, p.id); open = false }
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Text(
+                    text = "Kitchen Slip Font Size",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("S", "M", "L").forEach { size ->
+                        val selected = uiState.kitchenFontSize == size
+                        val label = com.warungtomyam.pos.data.local.KitchenFontSize.label(size)
+                        if (selected) {
+                            Button(onClick = { viewModel.updateKitchenFontSize(size) }, modifier = Modifier.weight(1f)) {
+                                Text(label, maxLines = 1)
+                            }
+                        } else {
+                            OutlinedButton(onClick = { viewModel.updateKitchenFontSize(size) }, modifier = Modifier.weight(1f)) {
+                                Text(label, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+                Text(
+                    text = "The special-instruction note prints one size smaller.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             // Scan section

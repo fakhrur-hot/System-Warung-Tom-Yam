@@ -137,7 +137,41 @@ fun AdminSettingsScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        bottomBar = {
+            // Sticky Save / Cancel — always visible so changes are never "lost" off-screen.
+            // Disabled until something changes (isDirty); shows a spinner while persisting.
+            val isAnyLoading = uiState.permissionsLoading || uiState.locationLoading || uiState.brandingLoading
+            androidx.compose.material3.Surface(tonalElevation = 3.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { viewModel.cancelAll() },
+                        enabled = uiState.isDirty && !isAnyLoading,
+                        modifier = Modifier.weight(1f)
+                    ) { Text(strings.commonCancel) }
+                    Button(
+                        onClick = { viewModel.saveAll() },
+                        enabled = uiState.isDirty && !isAnyLoading,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (isAnyLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(strings.commonSave)
+                    }
+                }
+            }
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -147,6 +181,64 @@ fun AdminSettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            // === Café Profile (identity — shown first) ===
+            SettingsSection(title = strings.cafeProfileSection) {
+                OutlinedTextField(
+                    value = uiState.cafeName,
+                    onValueChange = { viewModel.updateCafeName(it) },
+                    label = { Text(strings.cafeNameLabel) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Logo preview — a freshly-picked local image takes priority; otherwise
+                // fall back to whatever logo is already saved server-side, so the
+                // screen doesn't look like the logo was lost on a fresh install/relogin.
+                when {
+                    uiState.logoPreview != null -> {
+                        Image(
+                            bitmap = uiState.logoPreview!!.asImageBitmap(),
+                            contentDescription = "Logo preview",
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    uiState.existingLogoUrl != null -> {
+                        AsyncImage(
+                            model = uiState.existingLogoUrl,
+                            contentDescription = "Current logo",
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val hasLogo = uiState.logoPreview != null || uiState.existingLogoUrl != null
+                    Text(if (hasLogo) strings.changeLogoButton else strings.pickLogoButton)
+                }
+
+                if (uiState.brandingLoading) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                }
+
+                // Save Branding button removed — committed via the sticky Save/Cancel bar
+            }
+
+            HorizontalDivider()
+
             // === Staff Permissions ===
             SettingsSection(title = strings.staffPermissionsSection) {
                 Row(
@@ -251,100 +343,6 @@ fun AdminSettingsScreen(
             }
 
             HorizontalDivider()
-
-            // === Café Profile ===
-            SettingsSection(title = strings.cafeProfileSection) {
-                OutlinedTextField(
-                    value = uiState.cafeName,
-                    onValueChange = { viewModel.updateCafeName(it) },
-                    label = { Text(strings.cafeNameLabel) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Logo preview — a freshly-picked local image takes priority; otherwise
-                // fall back to whatever logo is already saved server-side, so the
-                // screen doesn't look like the logo was lost on a fresh install/relogin.
-                when {
-                    uiState.logoPreview != null -> {
-                        Image(
-                            bitmap = uiState.logoPreview!!.asImageBitmap(),
-                            contentDescription = "Logo preview",
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    uiState.existingLogoUrl != null -> {
-                        AsyncImage(
-                            model = uiState.existingLogoUrl,
-                            contentDescription = "Current logo",
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = { imagePickerLauncher.launch("image/*") },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    val hasLogo = uiState.logoPreview != null || uiState.existingLogoUrl != null
-                    Text(if (hasLogo) strings.changeLogoButton else strings.pickLogoButton)
-                }
-
-                if (uiState.brandingLoading) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                }
-
-                // Save Branding button removed — committed via the bottom Save/Cancel bar
-            }
-
-            HorizontalDivider()
-
-            // === Kitchen Slip ===
-            // Device-local menu-text size on printed kitchen slips (XS current … XXL largest).
-            SettingsSection(title = "Kitchen Slip") {
-                Text(
-                    text = "Menu text size on kitchen slips",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    listOf("XS", "S", "M", "L", "XL", "XXL").forEach { size ->
-                        val selected = uiState.kitchenFontSize == size
-                        if (selected) {
-                            Button(
-                                onClick = { viewModel.updateKitchenFontSize(size) },
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp)
-                            ) { Text(size, maxLines = 1) }
-                        } else {
-                            OutlinedButton(
-                                onClick = { viewModel.updateKitchenFontSize(size) },
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp)
-                            ) { Text(size, maxLines = 1) }
-                        }
-                    }
-                }
-                Text(
-                    text = "XS is the current size. S is the default. The special-instruction note prints one size smaller (up to L).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
 
             // === Customer Order ===
             // "Hold before kitchen" delay for customer-placed orders. The order waits this
@@ -518,43 +516,7 @@ fun AdminSettingsScreen(
 
             HorizontalDivider()
 
-            // === Bottom Save / Cancel bar ===
-            // Both buttons are disabled when nothing has changed (isDirty = false).
-            // A loading indicator appears while any section is being persisted.
-            val isAnyLoading = uiState.permissionsLoading ||
-                uiState.locationLoading ||
-                uiState.brandingLoading
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { viewModel.cancelAll() },
-                    enabled = uiState.isDirty && !isAnyLoading,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(strings.commonCancel)
-                }
-                Button(
-                    onClick = { viewModel.saveAll() },
-                    enabled = uiState.isDirty && !isAnyLoading,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    if (isAnyLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-                    Text(strings.commonSave)
-                }
-            }
-
-            HorizontalDivider()
-
-            // === Menu Preset (deep, not prominent) ===
+            // === Menu Preset (advanced — replaces the entire menu) ===
             SettingsSection(title = strings.menuPresetSection) {
                 OutlinedButton(
                     onClick = { showPresetConfirm = true },

@@ -32,9 +32,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CardDefaults
@@ -78,7 +77,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.warungtomyam.pos.data.local.MenuCategory
 import com.warungtomyam.pos.data.local.MenuItem
-import com.warungtomyam.pos.data.local.PrinterConfig
 import com.warungtomyam.pos.ui.i18n.LanguageViewModel
 import com.warungtomyam.pos.ui.i18n.UiStrings
 import com.warungtomyam.pos.ui.i18n.uiStrings
@@ -256,12 +254,11 @@ fun MenuManagementScreen(
         CategoryEditorDialog(
             category = cat,
             translations = uiState.categoryTranslations[cat] ?: emptyMap(),
-            kitchenPrinters = uiState.kitchenPrinters,
-            currentPrinterId = viewModel.printerIdForCategory(cat),
+            currentRoute = viewModel.routeForCategory(cat),
             strings = strings,
             onDismiss = { editingCategory = null },
-            onSave = { labels, printerId ->
-                viewModel.saveCategory(cat, labels, printerId)
+            onSave = { labels, route ->
+                viewModel.saveCategory(cat, labels, route)
                 editingCategory = null
             }
         )
@@ -303,21 +300,17 @@ private fun categoryTabLabel(name: String, strings: UiStrings): String = when (n
 private fun CategoryEditorDialog(
     category: String,
     translations: Map<String, String>,
-    kitchenPrinters: List<PrinterConfig>,
-    currentPrinterId: String?,
+    currentRoute: String,
     strings: UiStrings,
     onDismiss: () -> Unit,
-    onSave: (labels: Map<String, String>, printerId: String?) -> Unit,
+    onSave: (labels: Map<String, String>, route: String) -> Unit,
 ) {
     var en by remember { mutableStateOf(translations["en"] ?: "") }
     var bm by remember { mutableStateOf(translations["bm"] ?: "") }
     var zh by remember { mutableStateOf(translations["zh"] ?: "") }
     var ta by remember { mutableStateOf(translations["ta"] ?: "") }
     var th by remember { mutableStateOf(translations["th"] ?: "") }
-    var printerId by remember { mutableStateOf(currentPrinterId) }
-    var menuOpen by remember { mutableStateOf(false) }
-
-    val selectedPrinterName = kitchenPrinters.firstOrNull { it.id == printerId }?.name ?: "Default (catch-all)"
+    var route by remember { mutableStateOf(if (currentRoute == "BEVERAGE") "BEVERAGE" else "FOOD") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -335,31 +328,22 @@ private fun CategoryEditorDialog(
                 OutlinedTextField(th, { th = it }, label = { Text("ไทย") }, singleLine = true, modifier = Modifier.fillMaxWidth())
 
                 Spacer(Modifier.height(4.dp))
-                Text("Print kitchen slips to", style = MaterialTheme.typography.labelLarge)
-                Box {
-                    OutlinedButton(onClick = { menuOpen = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text(selectedPrinterName)
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Default (catch-all kitchen)") },
-                            onClick = { printerId = null; menuOpen = false }
-                        )
-                        kitchenPrinters.forEach { p ->
-                            DropdownMenuItem(
-                                text = { Text(p.name) },
-                                onClick = { printerId = p.id; menuOpen = false }
-                            )
+                Text("Kitchen slip route", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf("FOOD" to "Food", "BEVERAGE" to "Beverage").forEach { (value, label) ->
+                        if (route == value) {
+                            Button(onClick = { route = value }, modifier = Modifier.weight(1f)) { Text(label) }
+                        } else {
+                            OutlinedButton(onClick = { route = value }, modifier = Modifier.weight(1f)) { Text(label) }
                         }
                     }
                 }
-                if (kitchenPrinters.isEmpty()) {
-                    Text(
-                        "No kitchen printers yet — add them under Printers settings.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                val routeLabel = if (route == "BEVERAGE") "Beverage" else "Food"
+                Text(
+                    "This category's items print on the $routeLabel kitchen slip.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         },
         confirmButton = {
@@ -371,7 +355,7 @@ private fun CategoryEditorDialog(
                     if (ta.isNotBlank()) put("ta", ta.trim())
                     if (th.isNotBlank()) put("th", th.trim())
                 }
-                onSave(labels, printerId)
+                onSave(labels, route)
             }) { Text(strings.commonSave) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(strings.commonCancel) } }

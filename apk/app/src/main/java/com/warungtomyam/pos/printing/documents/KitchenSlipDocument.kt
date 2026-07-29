@@ -190,4 +190,69 @@ object KitchenSlipDocument {
 
         return result
     }
+
+    /**
+     * Generate kitchen slips grouped into at most TWO buckets — FOOD and BEVERAGE — so a
+     * single order prints one Food slip and one Beverage slip regardless of how many menu
+     * categories it spans. [routeOf] maps a category name to its bucket ("FOOD"/"BEVERAGE").
+     * Within a bucket the items are sub-grouped by their category for the kitchen's clarity.
+     * Returns a map of bucket → formatted slip; the caller routes each bucket to its printer.
+     */
+    fun generateByRoute(
+        tableId: String,
+        items: List<OrderItem>,
+        isAmendment: Boolean,
+        charWidth: Int,
+        printLanguage: String,
+        timezone: String,
+        sessionNumber: Int? = null,
+        menuFontSize: String = "M",
+        routeOf: (String) -> String
+    ): Map<String, String> {
+        if (items.isEmpty()) return emptyMap()
+
+        val menuSize = com.warungtomyam.pos.data.local.KitchenFontSize.menu(menuFontSize)
+        val noteSize = com.warungtomyam.pos.data.local.KitchenFontSize.note(menuFontSize)
+        val tableLabel = if (printLanguage == "BM") "Meja" else "Table"
+        val separator = "-".repeat(charWidth)
+        val timestamp = ZonedDateTime.now(zoneOf(timezone)).format(TIME_FORMAT)
+
+        val byBucket = items.groupBy { if (routeOf(it.categorySnapshot) == "BEVERAGE") "BEVERAGE" else "FOOD" }
+        val result = mutableMapOf<String, String>()
+
+        for ((bucket, bucketItems) in byBucket) {
+            val bucketLabel = when (bucket) {
+                "BEVERAGE" -> if (printLanguage == "BM") "MINUMAN" else "BEVERAGES"
+                else -> if (printLanguage == "BM") "MAKANAN" else "FOOD"
+            }
+
+            val sb = StringBuilder()
+            if (isAmendment) sb.appendLine("[C]<b>TAMBAHAN / ADDED</b>")
+            sb.appendLine("[C]<b><font size='big'>$tableLabel $tableId</font></b>")
+            appendSessionLine(sb, sessionNumber, printLanguage)
+            sb.appendLine("[C]<b><font size='tall'>[$bucketLabel]</font></b>")
+            sb.appendLine("[L]")
+            sb.appendLine("[L]$separator")
+
+            // Sub-group by category within the bucket for the kitchen's reference.
+            for ((category, catItems) in bucketItems.groupBy { it.categorySnapshot }) {
+                if (category.isNotBlank()) sb.appendLine("[L]<b>[$category]</b>")
+                for (item in catItems) {
+                    sb.appendLine("[L]<b><font size='$menuSize'>${item.quantity}x ${com.warungtomyam.pos.util.MenuName.display(item.nameSnapshot)}</font></b>")
+                    if (!item.note.isNullOrBlank()) {
+                        sb.appendLine("[L]<font size='$noteSize'>  Note: ${item.note}</font>")
+                    }
+                }
+            }
+
+            sb.appendLine("[L]$separator")
+            sb.appendLine("[L]$timestamp")
+            sb.appendLine("[L]")
+            sb.appendLine("[L]")
+
+            result[bucket] = sb.toString()
+        }
+
+        return result
+    }
 }

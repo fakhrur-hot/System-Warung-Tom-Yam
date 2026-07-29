@@ -278,13 +278,7 @@ fun AdminHomeScreen(
                             HorizontalDivider()
 
                             // --- Setup ---
-                            DropdownMenuItem(
-                                text = { Text(strings.generateQrTitle) },
-                                onClick = {
-                                    showOverflowMenu = false
-                                    onNavigateToQrPdf()
-                                }
-                            )
+                            // "Generate Table QR" moved into Café Management (under Tables).
                             DropdownMenuItem(
                                 text = { Text(strings.reportsTitle) },
                                 onClick = {
@@ -534,6 +528,7 @@ fun AdminHomeScreen(
             pending = pendingPrints,
             strings = strings,
             onPrint = { orderId, sessionNumber -> tableViewModel.confirmSession(orderId, sessionNumber) },
+            onClear = { orderId, sessionNumber -> tableViewModel.dismissPendingSession(orderId, sessionNumber) },
             onDismiss = { showPendingPrints = false }
         )
     }
@@ -629,6 +624,7 @@ private fun PendingKitchenPrintsDialog(
     pending: List<TableViewViewModel.PendingPrintGroup>,
     strings: com.warungtomyam.pos.ui.i18n.UiStrings,
     onPrint: (orderId: String, sessionNumber: Int) -> Unit,
+    onClear: (orderId: String, sessionNumber: Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     androidx.compose.material3.AlertDialog(
@@ -659,13 +655,24 @@ private fun PendingKitchenPrintsDialog(
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.primary
                                 )
-                                androidx.compose.material3.Button(
-                                    onClick = { onPrint(group.orderId, group.sessionNumber) },
+                                androidx.compose.foundation.layout.Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(top = 8.dp)
+                                        .padding(top = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(strings.printToKitchenButton)
+                                    androidx.compose.material3.OutlinedButton(
+                                        onClick = { onClear(group.orderId, group.sessionNumber) },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("Clear")
+                                    }
+                                    androidx.compose.material3.Button(
+                                        onClick = { onPrint(group.orderId, group.sessionNumber) },
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(strings.printToKitchenButton)
+                                    }
                                 }
                             }
                         }

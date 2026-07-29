@@ -26,42 +26,35 @@ class PrintSettingsStore @Inject constructor(
 
     private companion object {
         const val KEY_KITCHEN_FONT = "kitchen_font_size"
-        const val DEFAULT = "S"
+        const val DEFAULT = "M"
     }
 }
 
 /**
- * Maps the six user-facing size levels to DantSu ESC/POS `<font size='…'>` values, for both
- * the menu-item text and the (deliberately smaller) special-instruction note text.
- *
- * Menu text:  XS→normal  S→tall  M→big  L→big-2  XL→big-3  XXL→big-4
- * Note text:  keeps the smallest size up to M, then one level below the menu size but never
- *             larger than L — so menu L→note M, menu XL→note L, menu XXL→note L.
+ * Kitchen-slip menu-text size. Common 58mm thermal printers cap magnification at 2×, so we
+ * expose three reliable sizes that all render on such hardware:
+ *   S (Small)  = normal (1×1, the old default)
+ *   M (Medium) = tall   (2× height, same width — best for long names)
+ *   L (Large)  = big    (2×2, like the table-name header)
+ * The special-instruction note prints one step smaller than the menu text.
  */
 object KitchenFontSize {
-    val LEVELS = listOf("XS", "S", "M", "L", "XL", "XXL")
+    val LEVELS = listOf("S", "M", "L")
 
-    private val MENU = mapOf(
-        "XS" to "normal",
-        "S" to "tall",
-        "M" to "big",
-        "L" to "big-2",
-        "XL" to "big-3",
-        "XXL" to "big-4",
-    )
+    private val MENU = mapOf("S" to "normal", "M" to "tall", "L" to "big")
+    private val NOTE = mapOf("S" to "normal", "M" to "normal", "L" to "tall")
 
-    private val NOTE = mapOf(
-        "XS" to "normal",
-        "S" to "normal",
-        "M" to "normal",
-        "L" to "big",     // = M
-        "XL" to "big-2",  // = L
-        "XXL" to "big-2", // one below XXL is XL, capped at L
-    )
-
-    /** DantSu font size for the menu-item line at [level] (falls back to the S default). */
-    fun menu(level: String): String = MENU[level] ?: MENU["S"]!!
+    /** DantSu font size for the menu-item line at [level] (falls back to the M default). */
+    fun menu(level: String): String = MENU[level] ?: MENU["M"]!!
 
     /** DantSu font size for the note line at [level]. */
-    fun note(level: String): String = NOTE[level] ?: NOTE["S"]!!
+    fun note(level: String): String = NOTE[level] ?: NOTE["M"]!!
+
+    /** Human label for the size selector. */
+    fun label(level: String): String = when (level) {
+        "S" -> "Small"
+        "M" -> "Medium"
+        "L" -> "Large"
+        else -> level
+    }
 }

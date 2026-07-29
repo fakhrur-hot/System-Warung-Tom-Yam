@@ -30,7 +30,8 @@ class PrintService @Inject constructor(
     private val settingsDao: SettingsDao,
     private val tableDao: TableDao,
     private val secureStorage: SecureStorage,
-    private val printSettingsStore: com.warungtomyam.pos.data.local.PrintSettingsStore
+    private val printSettingsStore: com.warungtomyam.pos.data.local.PrintSettingsStore,
+    private val menuCategoryStore: com.warungtomyam.pos.data.local.MenuCategoryStore
 ) {
 
     // A secondary-admin device has no local printer — all its slips/receipts are printed by
@@ -62,7 +63,9 @@ class PrintService @Inject constructor(
         val printLanguage = resolvePrintLanguage()
         val timezone = resolveTimezone()
 
-        val slipsByCategory = KitchenSlipDocument.generatePerCategory(
+        // Group into two buckets (FOOD / BEVERAGE) → at most two slips per order, each
+        // routed to the printer assigned to that bucket (categoryFilter holds the bucket).
+        val slipsByBucket = KitchenSlipDocument.generateByRoute(
             // Print the admin-entered table name (Table Management), not the internal id.
             tableId = resolveTableName(tableId),
             items = items,
@@ -71,15 +74,16 @@ class PrintService @Inject constructor(
             printLanguage = printLanguage,
             timezone = timezone,
             sessionNumber = sessionNumber,
-            menuFontSize = printSettingsStore.getKitchenFontSize()
+            menuFontSize = printSettingsStore.getKitchenFontSize(),
+            routeOf = { category -> menuCategoryStore.getCategoryRoute(category) }
         )
 
-        for ((category, payload) in slipsByCategory) {
+        for ((bucket, payload) in slipsByBucket) {
             if (payload.isNotBlank()) {
                 printerDispatcher.dispatch(
                     PrinterDispatcher.DOCUMENT_TYPE_KITCHEN_SLIP,
                     payload,
-                    category
+                    bucket
                 )
             }
         }

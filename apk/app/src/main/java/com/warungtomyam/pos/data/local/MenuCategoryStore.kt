@@ -105,9 +105,45 @@ class MenuCategoryStore @Inject constructor(
         setTranslations(current)
     }
 
+    // ── Kitchen print route (bucket) per category ────────────────────────────
+    // Every category routes to one of two kitchen slips: "FOOD" (default) or "BEVERAGE".
+    // Each customer order then prints at most two slips, one per bucket.
+
+    private fun routes(): MutableMap<String, String> {
+        val raw = prefs.getString(KEY_ROUTES, null) ?: return mutableMapOf()
+        return try {
+            val obj = JSONObject(raw)
+            buildMap<String, String> {
+                for (name in obj.keys()) {
+                    val v = obj.optString(name, "")
+                    if (v == ROUTE_BEVERAGE || v == ROUTE_FOOD) put(name, v)
+                }
+            }.toMutableMap()
+        } catch (e: Exception) {
+            mutableMapOf()
+        }
+    }
+
+    /** The kitchen bucket for [name]: "FOOD" (default) or "BEVERAGE". */
+    fun getCategoryRoute(name: String): String = routes()[name] ?: ROUTE_FOOD
+
+    /** Assign [name] to a bucket. */
+    fun setCategoryRoute(name: String, route: String) {
+        if (name.isBlank()) return
+        val current = routes()
+        // Store BEVERAGE explicitly; FOOD is the default so we can drop it to stay compact.
+        if (route == ROUTE_BEVERAGE) current[name] = ROUTE_BEVERAGE else current.remove(name)
+        val obj = JSONObject()
+        for ((k, v) in current) obj.put(k, v)
+        prefs.edit().putString(KEY_ROUTES, obj.toString()).apply()
+    }
+
     private companion object {
         const val KEY_NAMES = "category_names"
         const val KEY_I18N = "category_i18n"
+        const val KEY_ROUTES = "category_routes"
+        const val ROUTE_FOOD = "FOOD"
+        const val ROUTE_BEVERAGE = "BEVERAGE"
         val LANGS = listOf("en", "bm", "zh", "ta", "th")
     }
 }

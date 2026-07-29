@@ -292,6 +292,9 @@ fun AppNavGraph(
                         ?.savedStateHandle
                         ?.set("openTableManagement", true)
                     navController.popBackStack()
+                },
+                onNavigateToQrPdf = {
+                    navController.navigate(NavRoutes.QR_PDF)
                 }
             )
         }
