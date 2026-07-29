@@ -206,4 +206,20 @@ class PrinterConnectionManager @Inject constructor(
             ecoDisconnectJobs.remove(mac)?.cancel()
         }
     }
+
+    /**
+     * Close ALL printer connections and stop all background Bluetooth activity (keep-alive
+     * heartbeat + pending eco-disconnects). Used on sign-out so a signed-out app holds no
+     * Bluetooth link and does no printer chatter. Connections re-open on demand on the next print.
+     */
+    fun disconnectAll() {
+        synchronized(lock) {
+            keepAliveJob?.cancel()
+            keepAliveJob = null
+            ecoDisconnectJobs.values.forEach { it.cancel() }
+            ecoDisconnectJobs.clear()
+            connections.values.forEach { try { it.disconnect() } catch (_: Exception) {} }
+            connections.clear()
+        }
+    }
 }

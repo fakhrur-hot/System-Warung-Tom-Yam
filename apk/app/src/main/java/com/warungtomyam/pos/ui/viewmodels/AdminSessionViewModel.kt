@@ -43,7 +43,8 @@ class AdminSessionViewModel @Inject constructor(
     private val sessionPrefs: SessionPrefs,
     @ApplicationContext private val context: Context,
     private val languageManager: LanguageManager,
-    private val secureStorage: com.warungtomyam.pos.data.SecureStorage
+    private val secureStorage: com.warungtomyam.pos.data.SecureStorage,
+    private val printerConnectionManager: com.warungtomyam.pos.printing.PrinterConnectionManager
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
@@ -167,17 +168,36 @@ class AdminSessionViewModel @Inject constructor(
      * closed, so the background listener must stay alive (persistent status-bar notification,
      * live new-order sound/print). Only [signOutWithClosing] fully tears the service down.
      */
+    /**
+     * Stop ALL background activity so a signed-out app is completely quiet, whether or not the
+     * process stays alive: the realtime foreground service (its WebSocket + catch-up poll = the
+     * app's network + new-order notifications + auto-print), the ordering foreground service, all
+     * Bluetooth printer connections + their keep-alive chatter, and any posted notifications.
+     * All of it resumes on sign-in (the home screen restarts the service; printers reconnect on
+     * the next print).
+     */
+    private fun quietBackground() {
+        com.warungtomyam.pos.realtime.RealtimeService.stop(context)
+        com.warungtomyam.pos.realtime.OrderingForegroundService.stop(context)
+        printerConnectionManager.disconnectAll()
+        androidx.core.app.NotificationManagerCompat.from(context).cancelAll()
+    }
+
     fun signOut() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            // Blocking CLOSE delivery. NOTE: RealtimeService is intentionally NOT stopped here.
+            // Blocking CLOSE delivery.
             val closeResult = withContext(Dispatchers.IO) {
                 apiClient.postSession("CLOSE")
             }
 
-            // Regardless of the CLOSE result, go to the lock screen (café must lock); the
-            // background service stays running so orders keep arriving while locked.
+            // A signed-out app must be fully quiet: stop the realtime service (WebSocket + poll →
+            // no network / notifications / auto-print), drop all Bluetooth printer links + chatter,
+            // and clear any notifications. Everything resumes on unlock (AdminHomeScreen restarts
+            // the service; printers reconnect on the next print).
+            quietBackground()
+
             when (closeResult) {
                 is ApiResult.Success,
                 is ApiResult.Error,
@@ -258,8 +278,8 @@ class AdminSessionViewModel @Inject constructor(
                 }
             }
 
-            // Step 4: Stop services and navigate
-            RealtimeService.stop(context)
+            // Step 4: Fully quiet the app (service + Bluetooth + notifications) and navigate.
+            quietBackground()
             _uiState.value = _uiState.value.copy(
                 isSessionOpen = false,
                 isLoading = false,
