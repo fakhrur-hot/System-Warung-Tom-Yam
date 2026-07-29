@@ -82,6 +82,9 @@ class AdminSettingsViewModel @Inject constructor(
         // Kitchen-slip menu-text size (device-local): XS/S/M/L/XL/XXL. Applied immediately.
         val kitchenFontSize: String = "S",
 
+        // Print the café logo as a header on customer receipts (device-local). Applied immediately.
+        val receiptLogo: Boolean = false,
+
         // Staff Permissions
         val staffCanSendKitchen: Boolean = false,
         val staffCanTakePayment: Boolean = false,
@@ -164,7 +167,12 @@ class AdminSettingsViewModel @Inject constructor(
                 printLanguage != savedSnapshot.printLanguage
     }
 
-    private val _uiState = MutableStateFlow(UiState(kitchenFontSize = printSettingsStore.getKitchenFontSize()))
+    private val _uiState = MutableStateFlow(
+        UiState(
+            kitchenFontSize = printSettingsStore.getKitchenFontSize(),
+            receiptLogo = printSettingsStore.getReceiptLogo()
+        )
+    )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     init {
@@ -178,6 +186,12 @@ class AdminSettingsViewModel @Inject constructor(
     fun updateKitchenFontSize(size: String) {
         printSettingsStore.setKitchenFontSize(size)
         _uiState.value = _uiState.value.copy(kitchenFontSize = size)
+    }
+
+    /** "Logo on receipt" is device-local — persist and apply immediately. */
+    fun updateReceiptLogo(enabled: Boolean) {
+        printSettingsStore.setReceiptLogo(enabled)
+        _uiState.value = _uiState.value.copy(receiptLogo = enabled)
     }
 
     /**

@@ -506,6 +506,7 @@ data class UiStringsGroup8(
     val autoSortItems: String,
     val deleteCategoryTitle: String,
     val deleteCategoryWarning: String,
+    val receiptLogoLabel: String,
 )
 
 class UiStrings(
@@ -938,6 +939,7 @@ class UiStrings(
     val autoSortItems: String get() = g8.autoSortItems
     val deleteCategoryTitle: String get() = g8.deleteCategoryTitle
     val deleteCategoryWarning: String get() = g8.deleteCategoryWarning
+    val receiptLogoLabel: String get() = g8.receiptLogoLabel
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1377,6 +1379,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             autoSortItems = "Auto-susun (nombor, kemudian A–Z)",
             deleteCategoryTitle = "Padam kategori?",
             deleteCategoryWarning = "Memadam \"%1\$s\" akan membuang %2\$d item di dalamnya secara kekal di semua tempat — termasuk di kategori lain yang turut memaparkannya. Tindakan ini tidak boleh dibatalkan.",
+            receiptLogoLabel = "Logo pada resit",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -1815,6 +1818,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             autoSortItems = "Auto-sort (number, then A–Z)",
             deleteCategoryTitle = "Delete category?",
             deleteCategoryWarning = "Deleting \"%1\$s\" permanently removes its %2\$d item(s) everywhere — including where they're also shown in other categories. This can't be undone.",
+            receiptLogoLabel = "Logo on receipt",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2253,6 +2257,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             autoSortItems = "自动排序（先数字后 A–Z）",
             deleteCategoryTitle = "删除类别？",
             deleteCategoryWarning = "删除 \"%1\$s\" 将永久删除其中的 %2\$d 个菜品（包括在其他类别中“同时显示”的）。此操作无法撤销。",
+            receiptLogoLabel = "收据上打印标志",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -2691,6 +2696,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             autoSortItems = "தானியங்கு வரிசை (எண், பின் A–Z)",
             deleteCategoryTitle = "வகையை நீக்கவா?",
             deleteCategoryWarning = "\"%1\$s\" ஐ நீக்கினால் அதிலுள்ள %2\$d உருப்படிகள் எல்லா இடங்களிலும் நிரந்தரமாக நீக்கப்படும் — மற்ற வகைகளில் காட்டப்படுபவை உட்பட. இதை மீட்டெடுக்க முடியாது.",
+            receiptLogoLabel = "ரசீதில் லோகோ",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -3129,6 +3135,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             autoSortItems = "จัดเรียงอัตโนมัติ (ตัวเลข แล้ว A–Z)",
             deleteCategoryTitle = "ลบหมวดหมู่?",
             deleteCategoryWarning = "การลบ \"%1\$s\" จะลบเมนู %2\$d รายการอย่างถาวรทุกที่ — รวมถึงที่แสดงในหมวดอื่นด้วย ไม่สามารถย้อนกลับได้",
+            receiptLogoLabel = "โลโก้บนใบเสร็จ",
         ),
     )
 }

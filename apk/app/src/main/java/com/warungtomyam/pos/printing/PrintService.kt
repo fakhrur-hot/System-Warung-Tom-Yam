@@ -126,7 +126,8 @@ class PrintService @Inject constructor(
             pixelWidth = pixelWidth,
             printLanguage = printLanguage,
             timezone = timezone,
-            tableName = tableName
+            tableName = tableName,
+            printLogo = printSettingsStore.getReceiptLogo()
         )
 
         if (payload.isNotBlank()) {

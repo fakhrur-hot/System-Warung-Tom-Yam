@@ -42,6 +42,9 @@ class PrinterConnectionManager @Inject constructor(
         const val MODE_FAST = "fast"
         const val MODE_ECO = "eco"
 
+        /** Sentinel a receipt payload carries (from ReceiptDocument) to request the logo header. */
+        const val RECEIPT_LOGO_MARKER = "RECEIPT_LOGO"
+
         private const val PREFS = "printer_conn_prefs"
         private const val KEY_MODE = "keep_alive_mode"
 
@@ -88,19 +91,31 @@ class PrinterConnectionManager @Inject constructor(
             // no-op when the connection is already open, so this doesn't drop the link.
             val escPosPrinter = EscPosPrinter(connection, dpi, printingWidthMM, paperWidth.charWidth)
 
-            // Multilingual fallback: if the payload contains scripts the printer can't render as
-            // text (Chinese/Tamil/Thai), rasterize the whole slip to a monochrome bitmap and print
-            // it as an image via the library's own encoder. Latin-only payloads take the fast
-            // text path unchanged. See BitmapTicketRenderer.
-            val finalPayload = if (BitmapTicketRenderer.needsBitmap(payload)) {
-                val bmp = BitmapTicketRenderer.render(payload, paperWidth.pixelWidth, paperWidth.charWidth)
+            // Optional receipt logo header: ReceiptDocument injects RECEIPT_LOGO_MARKER when the
+            // "logo on receipt" option is on. Encode the bundled logo via the library's own image
+            // converter and place it (centered) above the rest — works for both print paths.
+            val hasLogo = payload.contains(RECEIPT_LOGO_MARKER)
+            val body = payload.replace(RECEIPT_LOGO_MARKER, "").trimStart('\n')
+            val logoMarkup = if (hasLogo) {
+                loadReceiptLogo(paperWidth.pixelWidth)?.let { logo ->
+                    val hex = PrinterTextParserImg.bitmapToHexadecimalString(escPosPrinter, logo)
+                    logo.recycle()
+                    "[C]<img>$hex</img>\n"
+                } ?: ""
+            } else ""
+
+            // Multilingual fallback: if the body contains scripts the printer can't render as
+            // text (Chinese/Tamil/Thai), rasterize it to a monochrome bitmap and print it as an
+            // image via the library's own encoder. Latin-only bodies take the fast text path.
+            val bodyMarkup = if (BitmapTicketRenderer.needsBitmap(body)) {
+                val bmp = BitmapTicketRenderer.render(body, paperWidth.pixelWidth, paperWidth.charWidth)
                 val hex = PrinterTextParserImg.bitmapToHexadecimalString(escPosPrinter, bmp)
                 bmp.recycle()
                 "[C]<img>$hex</img>\n"
             } else {
-                payload
+                body
             }
-            escPosPrinter.printFormattedTextAndCut(finalPayload)
+            escPosPrinter.printFormattedTextAndCut(logoMarkup + bodyMarkup)
 
             when (getMode()) {
                 MODE_FAST -> {
@@ -151,6 +166,29 @@ class PrinterConnectionManager @Inject constructor(
                 }
             }
         }
+    }
+
+    /**
+     * Decode the bundled default logo (res/raw/qr_default_logo — the same one the QR-card generator
+     * uses) and scale it to a tasteful header width (~55% of the head), preserving aspect. Returns
+     * null on any failure so a receipt still prints without a logo.
+     */
+    private fun loadReceiptLogo(pixelWidth: Int): android.graphics.Bitmap? = try {
+        val raw = android.graphics.BitmapFactory.decodeResource(
+            context.resources, com.warungtomyam.pos.R.raw.qr_default_logo
+        )
+        when {
+            raw == null -> null
+            raw.width <= (pixelWidth * 0.55f).toInt() -> raw
+            else -> {
+                val targetW = (pixelWidth * 0.55f).toInt().coerceAtLeast(1)
+                val targetH = (raw.height * targetW.toFloat() / raw.width).toInt().coerceAtLeast(1)
+                android.graphics.Bitmap.createScaledBitmap(raw, targetW, targetH, true)
+                    .also { if (it !== raw) raw.recycle() }
+            }
+        }
+    } catch (e: Exception) {
+        null
     }
 
     private fun scheduleEcoDisconnect(mac: String) {

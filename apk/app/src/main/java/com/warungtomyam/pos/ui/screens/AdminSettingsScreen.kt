@@ -521,6 +521,19 @@ fun AdminSettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Text(strings.receiptLogoLabel)
+                    Switch(
+                        checked = uiState.receiptLogo,
+                        onCheckedChange = { viewModel.updateReceiptLogo(it) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(strings.showPrintStatusLabel)
                     Switch(
                         checked = showPrintStatus,

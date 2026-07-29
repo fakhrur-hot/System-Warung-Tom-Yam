@@ -24,8 +24,16 @@ class PrintSettingsStore @Inject constructor(
         prefs.edit().putString(KEY_KITCHEN_FONT, size).apply()
     }
 
+    /** Whether to print the café logo as a header on customer receipts (device-local). */
+    fun getReceiptLogo(): Boolean = prefs.getBoolean(KEY_RECEIPT_LOGO, false)
+
+    fun setReceiptLogo(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_RECEIPT_LOGO, enabled).apply()
+    }
+
     private companion object {
         const val KEY_KITCHEN_FONT = "kitchen_font_size"
+        const val KEY_RECEIPT_LOGO = "receipt_logo"
         const val DEFAULT = "M"
     }
 }

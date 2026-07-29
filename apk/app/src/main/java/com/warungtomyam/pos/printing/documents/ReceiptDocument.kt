@@ -45,11 +45,19 @@ object ReceiptDocument {
         pixelWidth: Int,
         printLanguage: String,
         timezone: String,
-        tableName: String
+        tableName: String,
+        printLogo: Boolean = false
     ): String {
         val s = printStrings(printLanguage)
         val separator = "=".repeat(charWidth)
         val sb = StringBuilder()
+
+        // Optional logo header: a sentinel the connection manager swaps for the encoded bundled
+        // logo image, placed above the café name. Kept out of the text here because DantSu's <img>
+        // needs its own encoder (only available where the printer instance lives).
+        if (printLogo) {
+            sb.appendLine(com.warungtomyam.pos.printing.PrinterConnectionManager.RECEIPT_LOGO_MARKER)
+        }
 
         // NOTE: The café logo is intentionally NOT emitted here. LogoPipeline stores a
         // raw 1-bit raster, but DantSu's <img> tag expects its own encoding (a
