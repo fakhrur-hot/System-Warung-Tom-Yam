@@ -37,6 +37,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: website
-          # Deployment-specific: set the repo variable CLOUDFLARE_PROJECT_NAME to your
-          # café's Cloudflare Pages project name (kept out of git so the repo stays generic).
-          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PROJECT_NAME }}
+          # Project name comes from website/wrangler.toml (`name = "tani-tom-yam"`), so no
+          # --project-name flag is needed. Requires two repo secrets to be set:
+          # CLOUDFLARE_API_TOKEN (Pages:Edit) and CLOUDFLARE_ACCOUNT_ID.
+          command: pages deploy dist
