@@ -11,7 +11,6 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -21,6 +20,7 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.warungtomyam.pos.ui.navigation.AppNavGraph
 import com.warungtomyam.pos.ui.navigation.DeepLinkInvite
+import com.warungtomyam.pos.ui.theme.WarungTomYamTheme
 import com.warungtomyam.pos.ui.viewmodels.StartupViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
         startupViewModel.resolve(deepLinkInvite)
 
         setContent {
-            MaterialTheme {
+            WarungTomYamTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val startupState by startupViewModel.state.collectAsState()
 
