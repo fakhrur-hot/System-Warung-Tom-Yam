@@ -22,7 +22,7 @@ import javax.inject.Inject
 @HiltViewModel
 class DevicesViewModel @Inject constructor(
     private val apiClient: ApiClient,
-    secureStorage: SecureStorage,
+    private val secureStorage: SecureStorage,
     private val languageManager: LanguageManager
 ) : ViewModel() {
 
@@ -30,6 +30,15 @@ class DevicesViewModel @Inject constructor(
 
     /** This device's own persistent id — used to mark the "(Current)" row in the list. */
     private val currentDeviceId: String = secureStorage.getDeviceId()
+
+    val isSecondaryAdmin: Boolean
+        get() = secureStorage.getRole() == SecureStorage.Role.ADMIN_SECONDARY
+
+    private fun isTargetDeviceAdmin(deviceId: String): Boolean {
+        val target = _uiState.value.devices.find { it.id == deviceId }
+            ?: _pendingRequests.value.find { it.id == deviceId }
+        return target?.role == "ADMIN" || target?.role == "ADMIN_SECONDARY"
+    }
 
     data class UiState(
         val devices: List<DeviceDto> = emptyList(),
@@ -93,14 +102,26 @@ class DevicesViewModel @Inject constructor(
     }
 
     fun approveDevice(deviceId: String) {
+        if (isSecondaryAdmin && isTargetDeviceAdmin(deviceId)) {
+            _uiState.value = _uiState.value.copy(error = "Secondary Admin cannot approve another Admin device")
+            return
+        }
         performAction(deviceId, "APPROVE", str().deviceApproved)
     }
 
     fun rejectDevice(deviceId: String) {
+        if (isSecondaryAdmin && isTargetDeviceAdmin(deviceId)) {
+            _uiState.value = _uiState.value.copy(error = "Secondary Admin cannot reject another Admin device")
+            return
+        }
         performAction(deviceId, "REJECT", str().deviceRejected)
     }
 
     fun revokeDevice(deviceId: String) {
+        if (isSecondaryAdmin && isTargetDeviceAdmin(deviceId)) {
+            _uiState.value = _uiState.value.copy(error = "Secondary Admin cannot revoke another Admin device")
+            return
+        }
         performAction(deviceId, "REVOKE", str().deviceRevoked)
     }
 
@@ -110,6 +131,10 @@ class DevicesViewModel @Inject constructor(
 
     /** Promote a secondary admin to Main Admin (printer host); demotes the current Main. */
     fun promoteToMain(deviceId: String) {
+        if (isSecondaryAdmin) {
+            _uiState.value = _uiState.value.copy(error = "Secondary Admin cannot change Admin roles")
+            return
+        }
         performAction(deviceId, "PROMOTE_MAIN", "Made Main Admin")
     }
 

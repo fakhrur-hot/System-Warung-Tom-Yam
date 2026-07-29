@@ -52,14 +52,18 @@ class MainActivity : ComponentActivity() {
 
         ensureNotificationPermission()
 
-        // Capture an invite token arriving via deep link (https://<host>/join?invite=TOKEN)
+        // Capture an invite or recover token arriving via deep link (https://<host>/join?invite=TOKEN or ?recover=TOKEN)
         val deepLinkInvite = intent?.data?.getQueryParameter("invite")?.takeIf { it.isNotBlank() }
+        val deepLinkRecover = intent?.data?.getQueryParameter("recover")?.takeIf { it.isNotBlank() }
         if (deepLinkInvite != null) {
             DeepLinkInvite.pendingToken = deepLinkInvite
         }
+        if (deepLinkRecover != null) {
+            DeepLinkInvite.pendingRecoverToken = deepLinkRecover
+        }
 
         // Resolve start destination on IO thread (EncryptedSharedPreferences / Keystore reads).
-        startupViewModel.resolve(deepLinkInvite)
+        startupViewModel.resolve(deepLinkInvite, deepLinkRecover)
 
         setContent {
             WarungTomYamTheme {

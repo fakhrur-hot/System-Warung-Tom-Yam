@@ -89,6 +89,7 @@ fun DevicesScreen(
     val strings = uiStrings(language)
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val isSecondaryAdmin = viewModel.isSecondaryAdmin
     var renameDevice by remember { mutableStateOf<DeviceDto?>(null) }
     var renameText by remember { mutableStateOf("") }
     // Reveals the secondary-admin invite QR (loaded on demand, separate from staff invite).
@@ -202,106 +203,108 @@ fun DevicesScreen(
                     Text(strings.noInvitationAvailable, style = MaterialTheme.typography.bodyMedium)
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(12.dp))
+                if (!isSecondaryAdmin) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                // === Add Secondary Admin ===
-                // A separate QR that grants an admin-level device with full management but no
-                // local printer (its orders print on this Main Admin). Loaded on demand.
-                Text(
-                    text = "Secondary Admin",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Add another admin device with full management access but no printer. It prints through this device.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (!showAdminInvite) {
-                    OutlinedButton(onClick = {
-                        showAdminInvite = true
-                        settingsViewModel.loadAdminInvite()
-                    }) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add Secondary Admin")
-                    }
-                } else if (settingsState.adminInviteLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                } else if (settingsState.adminInvite != null) {
-                    val adminUrl = settingsState.adminInvite!!.url
-                    val adminQr = remember(adminUrl) { QrCodeUtil.encode(adminUrl, 512) }
-                    if (adminQr != null) {
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Image(
-                                bitmap = adminQr.asImageBitmap(),
-                                contentDescription = "Secondary admin invite QR code",
-                                modifier = Modifier.size(220.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
+                    // === Add Secondary Admin ===
+                    // A separate QR that grants an admin-level device with full management but no
+                    // local printer (its orders print on this Main Admin). Loaded on demand.
                     Text(
-                        text = adminUrl,
+                        text = "Secondary Admin",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Add another admin device with full management access but no printer. It prints through this device.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth()
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = {
-                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, adminUrl)
-                                }
-                                context.startActivity(
-                                    Intent.createChooser(shareIntent, strings.shareInviteLink)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                    if (!showAdminInvite) {
+                        OutlinedButton(onClick = {
+                            showAdminInvite = true
+                            settingsViewModel.loadAdminInvite()
+                        }) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Add Secondary Admin")
+                        }
+                    } else if (settingsState.adminInviteLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    } else if (settingsState.adminInvite != null) {
+                        val adminUrl = settingsState.adminInvite!!.url
+                        val adminQr = remember(adminUrl) { QrCodeUtil.encode(adminUrl, 512) }
+                        if (adminQr != null) {
+                            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Image(
+                                    bitmap = adminQr.asImageBitmap(),
+                                    contentDescription = "Secondary admin invite QR code",
+                                    modifier = Modifier.size(220.dp)
                                 )
                             }
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(strings.shareButton)
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
-                        OutlinedButton(onClick = { settingsViewModel.regenerateAdminInvite() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(strings.regenerateButton)
+                        Text(
+                            text = adminUrl,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = {
+                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, adminUrl)
+                                    }
+                                    context.startActivity(
+                                        Intent.createChooser(shareIntent, strings.shareInviteLink)
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    )
+                                }
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(strings.shareButton)
+                            }
+                            OutlinedButton(onClick = { settingsViewModel.regenerateAdminInvite() }) {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(strings.regenerateButton)
+                            }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // === Owner Recovery Key (permanent) ===
+                    Text(
+                        text = "Owner Recovery Key",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "A permanent key to restore Main Admin on a NEW phone if this one is lost or broken. Keep it secret — anyone who scans it gains full control.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    // Generating the key just reveals a QR in a timed modal — it does NOT touch
+                    // this device's session (no logout). The modal auto-closes after 30s and the
+                    // QR is saved to local storage as a PNG so the owner can keep/print it.
+                    OutlinedButton(onClick = {
+                        settingsViewModel.loadRecoveryToken()
+                        showRecovery = true
+                    }) { Text("Show Owner Recovery QR") }
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // === Owner Recovery Key (permanent) ===
-                Text(
-                    text = "Owner Recovery Key",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "A permanent key to restore Main Admin on a NEW phone if this one is lost or broken. Keep it secret — anyone who scans it gains full control.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                // Generating the key just reveals a QR in a timed modal — it does NOT touch
-                // this device's session (no logout). The modal auto-closes after 30s and the
-                // QR is saved to local storage as a PNG so the owner can keep/print it.
-                OutlinedButton(onClick = {
-                    settingsViewModel.loadRecoveryToken()
-                    showRecovery = true
-                }) { Text("Show Owner Recovery QR") }
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider()
@@ -344,6 +347,7 @@ fun DevicesScreen(
                         isCurrent = device.deviceIdentifier.isNotBlank() &&
                             device.deviceIdentifier == uiState.currentDeviceId,
                         strings = strings,
+                        isSecondaryAdmin = isSecondaryAdmin,
                         onApprove = { viewModel.approveDevice(device.id) },
                         onReject = { viewModel.rejectDevice(device.id) },
                         onRevoke = { viewModel.revokeDevice(device.id) },
@@ -504,6 +508,7 @@ private fun DeviceCard(
     device: DeviceDto,
     isCurrent: Boolean,
     strings: UiStrings,
+    isSecondaryAdmin: Boolean,
     onApprove: () -> Unit,
     onReject: () -> Unit,
     onRevoke: () -> Unit,
@@ -582,26 +587,32 @@ private fun DeviceCard(
 
             // Actions row
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                val isTargetAdmin = device.role == "ADMIN" || device.role == "ADMIN_SECONDARY"
+                val isOtherAdmin = isTargetAdmin && !isCurrent
+                val hideAdminActions = isSecondaryAdmin && isOtherAdmin
+
                 when (device.status) {
                     "PENDING" -> {
-                        IconButton(onClick = onApprove) {
-                            Icon(
-                                Icons.Default.Check,
-                                contentDescription = strings.commonConfirm,
-                                tint = Color(0xFF4CAF50)
-                            )
-                        }
-                        IconButton(onClick = onReject) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = strings.commonDelete,
-                                tint = Color(0xFFF44336)
-                            )
+                        if (!hideAdminActions) {
+                            IconButton(onClick = onApprove) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = strings.commonConfirm,
+                                    tint = Color(0xFF4CAF50)
+                                )
+                            }
+                            IconButton(onClick = onReject) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = strings.commonDelete,
+                                    tint = Color(0xFFF44336)
+                                )
+                            }
                         }
                     }
                     "APPROVED" -> {
                         // Promote a Secondary Admin to Main (printer host); demotes current Main.
-                        if (device.role == "ADMIN_SECONDARY") {
+                        if (device.role == "ADMIN_SECONDARY" && !isSecondaryAdmin) {
                             androidx.compose.material3.TextButton(onClick = onPromoteToMain) {
                                 Text("Make Main")
                             }
@@ -609,12 +620,14 @@ private fun DeviceCard(
                         IconButton(onClick = onRename) {
                             Icon(Icons.Default.Edit, contentDescription = strings.commonEdit)
                         }
-                        IconButton(onClick = onRevoke) {
-                            Icon(
-                                Icons.Default.RemoveCircle,
-                                contentDescription = strings.commonDelete,
-                                tint = Color(0xFFF44336)
-                            )
+                        if (!hideAdminActions) {
+                            IconButton(onClick = onRevoke) {
+                                Icon(
+                                    Icons.Default.RemoveCircle,
+                                    contentDescription = strings.commonDelete,
+                                    tint = Color(0xFFF44336)
+                                )
+                            }
                         }
                         if (device.isCheckedIn) {
                             IconButton(onClick = onForceCheckOut) {

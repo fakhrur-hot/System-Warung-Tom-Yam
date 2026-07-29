@@ -255,6 +255,12 @@ fun AdminConnectScreen(
     var debugCipherText by remember { mutableStateOf("") }
     var keyInput by remember { mutableStateOf("") }
 
+    LaunchedEffect(Unit) {
+        com.warungtomyam.pos.ui.navigation.DeepLinkInvite.consumeRecover()?.let {
+            keyInput = it
+        }
+    }
+
     // Admin login is the café owner key, accepted three ways: camera scan, a saved QR
     // image (jpg/png), or manual entry. All three funnel into the same sign-in.
     var showScanner by remember { mutableStateOf(false) }

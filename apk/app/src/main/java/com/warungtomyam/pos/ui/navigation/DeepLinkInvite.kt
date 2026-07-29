@@ -11,10 +11,20 @@ object DeepLinkInvite {
     @Volatile
     var pendingToken: String? = null
 
+    @Volatile
+    var pendingRecoverToken: String? = null
+
     /** Return and clear the pending token (consume-once). */
     fun consume(): String? {
         val t = pendingToken
         pendingToken = null
+        return t
+    }
+
+    /** Return and clear the pending recovery token (consume-once). */
+    fun consumeRecover(): String? {
+        val t = pendingRecoverToken
+        pendingRecoverToken = null
         return t
     }
 }

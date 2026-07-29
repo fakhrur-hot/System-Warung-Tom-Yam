@@ -526,7 +526,10 @@ fun AdminHomeScreen(
 
     // New ordering-staff device requesting to connect → approve/reject popup, auto-closing
     // after 30s (the request stays pending in Devices & Staff if ignored).
-    val deviceRequest = pendingRequests.firstOrNull { it.id !in handledRequestIds }
+    val deviceRequest = pendingRequests.firstOrNull {
+        it.id !in handledRequestIds &&
+            !(sessionViewModel.isSecondaryAdmin && (it.role == "ADMIN" || it.role == "ADMIN_SECONDARY"))
+    }
     if (deviceRequest != null) {
         LaunchedEffect(deviceRequest.id) {
             kotlinx.coroutines.delay(30_000)

@@ -130,7 +130,13 @@ class OrderingConnectViewModel @Inject constructor(
 
         return when (result) {
             is ApiResult.Success -> {
-                secureStorage.setRole(SecureStorage.Role.ORDERING)
+                val statusResult = apiClient.pollDeviceStatus(deviceId)
+                val resolvedRole = if (statusResult is ApiResult.Success && statusResult.data.role == "ADMIN_SECONDARY") {
+                    SecureStorage.Role.ADMIN_SECONDARY
+                } else {
+                    SecureStorage.Role.ORDERING
+                }
+                secureStorage.setRole(resolvedRole)
                 true
             }
             is ApiResult.Error -> {

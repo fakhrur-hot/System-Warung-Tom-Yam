@@ -33,12 +33,14 @@ class StartupViewModel @Inject constructor(
     private val _state = MutableStateFlow<State>(State.Loading)
     val state: StateFlow<State> = _state.asStateFlow()
 
-    fun resolve(deepLinkInvite: String?) {
+    fun resolve(deepLinkInvite: String?, deepLinkRecover: String?) {
         // Only resolve once — guard against re-entry on config change.
         if (_state.value is State.Ready) return
         viewModelScope.launch {
             val dest = withContext(Dispatchers.IO) {
                 when {
+                    deepLinkRecover != null && !secureStorage.isAuthenticated() ->
+                        NavRoutes.ADMIN_CONNECT
                     deepLinkInvite != null && !secureStorage.isAuthenticated() ->
                         NavRoutes.ORDERING_CONNECT
                     secureStorage.isAuthenticated() ->
