@@ -48,9 +48,45 @@ class AdminSessionViewModel @Inject constructor(
 
     private fun str() = uiStrings(languageManager.language.value)
 
+    // This device's admin role, observable so the UI (greyed printer controls) reacts when a
+    // promote/demote changes it. The print gating itself reads SecureStorage live per-print.
+    private val _currentRole = MutableStateFlow(secureStorage.getRole())
+    val currentRole: StateFlow<com.warungtomyam.pos.data.SecureStorage.Role?> = _currentRole.asStateFlow()
+
     /** True on a secondary-admin device — used to grey out printer controls it can't use. */
     val isSecondaryAdmin: Boolean
-        get() = secureStorage.getRole() == com.warungtomyam.pos.data.SecureStorage.Role.ADMIN_SECONDARY
+        get() = _currentRole.value == com.warungtomyam.pos.data.SecureStorage.Role.ADMIN_SECONDARY
+
+    /**
+     * Re-check this device's role from the server (it may have been promoted to Main or demoted
+     * to Secondary from another device). Updates the stored role so printing + the greyed printer
+     * controls follow. Best-effort; safe to call on every admin-home resume.
+     */
+    fun refreshRole() {
+        viewModelScope.launch {
+            val deviceId = secureStorage.getDeviceId()
+            if (deviceId.isBlank()) return@launch
+            when (val result = apiClient.pollDeviceStatus(deviceId)) {
+                is ApiResult.Success -> {
+                    val newRole = when (result.data.role) {
+                        "ADMIN" -> com.warungtomyam.pos.data.SecureStorage.Role.ADMIN
+                        "ADMIN_SECONDARY" -> com.warungtomyam.pos.data.SecureStorage.Role.ADMIN_SECONDARY
+                        else -> null
+                    }
+                    val current = secureStorage.getRole()
+                    // Only reconcile between the two admin roles (never touch ORDERING/null here).
+                    if (newRole != null && newRole != current &&
+                        (current == com.warungtomyam.pos.data.SecureStorage.Role.ADMIN ||
+                            current == com.warungtomyam.pos.data.SecureStorage.Role.ADMIN_SECONDARY)
+                    ) {
+                        secureStorage.setRole(newRole)
+                        _currentRole.value = newRole
+                    }
+                }
+                else -> { /* best-effort */ }
+            }
+        }
+    }
 
     data class UiState(
         val isSessionOpen: Boolean = false,

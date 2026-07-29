@@ -72,6 +72,9 @@ class AdminSettingsViewModel @Inject constructor(
         // Invite for adding a SECONDARY ADMIN device (full management, no local printer)
         val adminInvite: InviteResponse? = null,
         val adminInviteLoading: Boolean = false,
+        // Permanent owner-recovery key (restores Main Admin on a fresh device). Keep secret.
+        val recoveryInvite: InviteResponse? = null,
+        val recoveryLoading: Boolean = false,
         // Kitchen-slip menu-text size (device-local): XS/S/M/L/XL/XXL. Applied immediately.
         val kitchenFontSize: String = "S",
 
@@ -308,6 +311,20 @@ class AdminSettingsViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(adminInviteLoading = false, error = result.message)
                 is ApiResult.NetworkError ->
                     _uiState.value = _uiState.value.copy(adminInviteLoading = false, error = str().msgNetworkError.format(result.message))
+            }
+        }
+    }
+
+    fun loadRecoveryToken() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(recoveryLoading = true)
+            when (val result = apiClient.getRecoveryToken()) {
+                is ApiResult.Success ->
+                    _uiState.value = _uiState.value.copy(recoveryInvite = result.data, recoveryLoading = false)
+                is ApiResult.Error ->
+                    _uiState.value = _uiState.value.copy(recoveryLoading = false, error = result.message)
+                is ApiResult.NetworkError ->
+                    _uiState.value = _uiState.value.copy(recoveryLoading = false, error = str().msgNetworkError.format(result.message))
             }
         }
     }

@@ -802,6 +802,62 @@ class ApiClient @Inject constructor(
         }
     }
 
+    /** Fetch the permanent owner-recovery token + QR url (admin only) to show the owner. */
+    suspend fun getRecoveryToken(): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
+        try {
+            val token = adminBearerToken()
+                ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+            val request = Request.Builder()
+                .url("$BASE_URL/admin-recovery")
+                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("Authorization", "Bearer $token")
+                .get().build()
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+            when (response.code) {
+                200 -> {
+                    val json = JSONObject(responseBody)
+                    ApiResult.Success(InviteResponse(token = json.getString("token"), url = json.getString("url")))
+                }
+                401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
+                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+            }
+        } catch (e: IOException) {
+            ApiResult.NetworkError(e.message ?: "Network error")
+        } catch (e: Exception) {
+            ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+        }
+    }
+
+    /** Recover Main Admin on this device using the permanent owner-recovery token (public). */
+    suspend fun recoverAdmin(recoveryToken: String, deviceId: String, deviceModel: String): ApiResult<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                val bodyJson = JSONObject().apply {
+                    put("recoveryToken", recoveryToken)
+                    put("deviceId", deviceId)
+                    put("deviceModel", deviceModel)
+                }
+                val request = Request.Builder()
+                    .url("$BASE_URL/admin-recovery")
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .post(bodyJson.toString().toRequestBody(JSON_MEDIA_TYPE))
+                    .build()
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string() ?: ""
+                when (response.code) {
+                    200 -> ApiResult.Success(JSONObject(responseBody).getString("sessionToken"))
+                    403 -> ApiResult.Error("INVALID_RECOVERY", "Invalid recovery key")
+                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                }
+            } catch (e: IOException) {
+                ApiResult.NetworkError(e.message ?: "Network error")
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
     /**
      * Create a new order using the ordering API key (staff device).
      * Staff devices submit orders with source=STAFF via their API key.

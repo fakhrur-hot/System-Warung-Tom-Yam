@@ -90,6 +90,8 @@ fun DevicesScreen(
     var renameText by remember { mutableStateOf("") }
     // Reveals the secondary-admin invite QR (loaded on demand, separate from staff invite).
     var showAdminInvite by remember { mutableStateOf(false) }
+    // Reveals the permanent owner-recovery QR (loaded on demand).
+    var showRecovery by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
@@ -275,6 +277,62 @@ fun DevicesScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // === Owner Recovery Key (permanent) ===
+                Text(
+                    text = "Owner Recovery Key",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "A permanent key to restore Main Admin on a NEW phone if this one is lost or broken. Keep it secret — anyone who scans it gains full control.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (!showRecovery) {
+                    OutlinedButton(onClick = {
+                        showRecovery = true
+                        settingsViewModel.loadRecoveryToken()
+                    }) { Text("Show Owner Recovery QR") }
+                } else if (settingsState.recoveryLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                } else if (settingsState.recoveryInvite != null) {
+                    val recUrl = settingsState.recoveryInvite!!.url
+                    val recQr = remember(recUrl) { QrCodeUtil.encode(recUrl, 512) }
+                    if (recQr != null) {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Image(
+                                bitmap = recQr.asImageBitmap(),
+                                contentDescription = "Owner recovery QR code",
+                                modifier = Modifier.size(220.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, recUrl)
+                            }
+                            context.startActivity(
+                                Intent.createChooser(shareIntent, strings.shareInviteLink)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }) {
+                            Icon(Icons.Default.Share, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(strings.shareButton)
+                        }
+                        OutlinedButton(onClick = { showRecovery = false }) { Text("Hide") }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Devices section header
@@ -317,6 +375,7 @@ fun DevicesScreen(
                         onApprove = { viewModel.approveDevice(device.id) },
                         onReject = { viewModel.rejectDevice(device.id) },
                         onRevoke = { viewModel.revokeDevice(device.id) },
+                        onPromoteToMain = { viewModel.promoteToMain(device.id) },
                         onForceCheckOut = { viewModel.forceCheckOut(device.id) },
                         onRename = {
                             renameDevice = device
@@ -373,7 +432,8 @@ private fun DeviceCard(
     onReject: () -> Unit,
     onRevoke: () -> Unit,
     onForceCheckOut: () -> Unit,
-    onRename: () -> Unit
+    onRename: () -> Unit,
+    onPromoteToMain: () -> Unit = {}
 ) {
     val containerColor = when (device.status) {
         "PENDING" -> MaterialTheme.colorScheme.tertiaryContainer
@@ -464,6 +524,12 @@ private fun DeviceCard(
                         }
                     }
                     "APPROVED" -> {
+                        // Promote a Secondary Admin to Main (printer host); demotes current Main.
+                        if (device.role == "ADMIN_SECONDARY") {
+                            androidx.compose.material3.TextButton(onClick = onPromoteToMain) {
+                                Text("Make Main")
+                            }
+                        }
                         IconButton(onClick = onRename) {
                             Icon(Icons.Default.Edit, contentDescription = strings.commonEdit)
                         }

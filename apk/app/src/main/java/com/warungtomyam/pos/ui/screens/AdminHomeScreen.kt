@@ -134,7 +134,11 @@ fun AdminHomeScreen(
     // after reinstall even though the server-side data was untouched).
     LaunchedEffect(Unit) {
         tableViewModel.rehydrateTablesIfEmpty()
+        // Reconcile this device's admin role (it may have been promoted/demoted elsewhere).
+        sessionViewModel.refreshRole()
     }
+    // Observed so the greyed printer control reacts to a role change.
+    val currentRole by sessionViewModel.currentRole.collectAsState()
 
     // Open the table management dialog when navigating back from CafeManagementScreen
     LaunchedEffect(openTableManagementOnStart) {
@@ -268,7 +272,7 @@ fun AdminHomeScreen(
                                 // A secondary admin has no local printer — keep the item visible
                                 // (so the menu looks the same) but greyed out and unclickable.
                                 text = { Text(strings.printersTitle) },
-                                enabled = !sessionViewModel.isSecondaryAdmin,
+                                enabled = currentRole != com.warungtomyam.pos.data.SecureStorage.Role.ADMIN_SECONDARY,
                                 onClick = {
                                     showOverflowMenu = false
                                     onNavigateToPrinters()

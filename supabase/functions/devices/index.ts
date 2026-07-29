@@ -97,7 +97,7 @@ async function handlePatchDevice(
   }
 
   const { action, label } = body;
-  const validActions = ["APPROVE", "REJECT", "REVOKE", "FORCE_CHECKOUT", "RENAME"];
+  const validActions = ["APPROVE", "REJECT", "REVOKE", "FORCE_CHECKOUT", "RENAME", "PROMOTE_MAIN"];
   if (!validActions.includes(action)) {
     return errorResponse(
       422,
@@ -166,6 +166,24 @@ async function handlePatchDevice(
         return errorResponse(422, "VALIDATION", "label is required for RENAME");
       }
       updatePayload = { label };
+      break;
+    }
+
+    case "PROMOTE_MAIN": {
+      // Make this device the Main Admin (printer host) and demote every OTHER current main
+      // to Secondary — exactly one printer host at a time. Devices learn their new role on
+      // their next self role-check (devices-status).
+      if (device.role !== "ADMIN" && device.role !== "ADMIN_SECONDARY") {
+        return errorResponse(409, "NOT_ADMIN", "Only an admin device can be promoted to Main");
+      }
+      await supabase
+        .from("devices")
+        .update({ role: "ADMIN_SECONDARY" })
+        .eq("role", "ADMIN")
+        .neq("id", deviceId);
+      updatePayload = { role: "ADMIN" };
+      broadcastEvent = "ROLE_CHANGED";
+      broadcastPayload = { type: "ROLE_CHANGED", deviceId };
       break;
     }
   }
