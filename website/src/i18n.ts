@@ -12,9 +12,11 @@ import th from './locales/th.json'
 export const SUPPORTED_LANGS = ['en', 'bm', 'zh', 'ta', 'th'] as const
 export type Lang = (typeof SUPPORTED_LANGS)[number]
 
+// Default the customer UI to Bahasa Malaysia; a returning visitor's saved choice still wins,
+// and any key missing from a locale falls back to English (fallbackLng below).
 const stored = localStorage.getItem('lang')
 const initialLang: Lang =
-  stored && (SUPPORTED_LANGS as readonly string[]).includes(stored) ? (stored as Lang) : 'en'
+  stored && (SUPPORTED_LANGS as readonly string[]).includes(stored) ? (stored as Lang) : 'bm'
 
 void i18n.use(initReactI18next).init({
   resources: {
