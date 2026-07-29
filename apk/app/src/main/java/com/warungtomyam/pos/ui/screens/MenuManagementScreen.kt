@@ -85,6 +85,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.warungtomyam.pos.data.local.MenuCategory
 import com.warungtomyam.pos.data.local.MenuItem
 import com.warungtomyam.pos.ui.i18n.LanguageViewModel
+import com.warungtomyam.pos.ui.i18n.AppLanguage
 import com.warungtomyam.pos.ui.i18n.UiStrings
 import com.warungtomyam.pos.ui.i18n.uiStrings
 import com.warungtomyam.pos.ui.viewmodels.MenuViewModel
@@ -255,6 +256,7 @@ fun MenuManagementScreen(
                             MenuItemCard(
                                 item = item,
                                 strings = strings,
+                                language = language,
                                 onToggleAvailability = { viewModel.toggleAvailability(item.id) },
                                 onEdit = { onEditItem(item.id) },
                                 onDelete = { itemToDelete = item },
@@ -272,7 +274,7 @@ fun MenuManagementScreen(
         AlertDialog(
             onDismissRequest = { itemToDelete = null },
             title = { Text(strings.deleteItemTitle) },
-            text = { Text("${strings.deleteItemConfirm} \"${item.nameEn}\"?") },
+            text = { Text("${strings.deleteItemConfirm} \"${language.menuName(item)}\"?") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -393,7 +395,7 @@ fun MenuManagementScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = item.nameBm.ifBlank { item.nameEn },
+                                    text = language.menuName(item),
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
@@ -582,6 +584,7 @@ private fun CategoryEditorDialog(
 private fun MenuItemCard(
     item: MenuItem,
     strings: UiStrings,
+    language: AppLanguage,
     onToggleAvailability: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -683,7 +686,9 @@ private fun MenuItemCard(
                     Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = item.nameEn,
+                                // Show the item name in the active app language (was hardcoded
+                                // English), falling back to BM then EN when a translation is blank.
+                                text = language.menuName(item),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Medium,
                                 maxLines = 1,

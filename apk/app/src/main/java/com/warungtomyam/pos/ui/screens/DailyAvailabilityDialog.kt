@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.warungtomyam.pos.data.local.MenuItem
+import com.warungtomyam.pos.ui.i18n.AppLanguage
 import com.warungtomyam.pos.ui.i18n.UiStrings
 
 /**
@@ -43,6 +44,7 @@ import com.warungtomyam.pos.ui.i18n.UiStrings
 fun DailyAvailabilityDialog(
     items: List<MenuItem>,
     strings: UiStrings,
+    language: AppLanguage,
     onConfirm: (updates: List<DailyItemUpdate>) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -109,6 +111,7 @@ fun DailyAvailabilityDialog(
                         DailyItemRow(
                             item = item,
                             strings = strings,
+                            language = language,
                             isAvailable = availabilityState[item.id] ?: item.available,
                             priceText = priceState[item.id] ?: item.price.toString(),
                             activeOption = activeOptionState[item.id] ?: 1,
@@ -156,6 +159,7 @@ fun DailyAvailabilityDialog(
 private fun DailyItemRow(
     item: MenuItem,
     strings: UiStrings,
+    language: AppLanguage,
     isAvailable: Boolean,
     priceText: String,
     activeOption: Int,
@@ -174,7 +178,7 @@ private fun DailyItemRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = item.nameEn,
+                text = language.menuName(item),
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f)
             )

@@ -467,6 +467,7 @@ fun AdminHomeScreen(
         DailyAvailabilityDialog(
             items = sessionState.dailyItems,
             strings = strings,
+            language = language,
             onConfirm = { updates ->
                 updates.forEach { update ->
                     sessionViewModel.updateItemAvailability(
