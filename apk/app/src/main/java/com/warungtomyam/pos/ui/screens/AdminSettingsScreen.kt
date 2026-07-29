@@ -533,6 +533,24 @@ fun AdminSettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Text(strings.escAsteriskLabel)
+                    Switch(
+                        checked = uiState.escAsteriskMode,
+                        onCheckedChange = { viewModel.updateEscAsteriskMode(it) }
+                    )
+                }
+                Text(
+                    text = strings.escAsteriskDesc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(strings.showPrintStatusLabel)
                     Switch(
                         checked = showPrintStatus,

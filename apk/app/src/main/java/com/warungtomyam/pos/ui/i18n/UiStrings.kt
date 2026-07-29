@@ -512,6 +512,8 @@ data class UiStringsGroup8(
     val newDeviceRequestBody: String,
     val approveButton: String,
     val rejectButton: String,
+    val escAsteriskLabel: String,
+    val escAsteriskDesc: String,
 )
 
 class UiStrings(
@@ -950,6 +952,8 @@ class UiStrings(
     val newDeviceRequestBody: String get() = g8.newDeviceRequestBody
     val approveButton: String get() = g8.approveButton
     val rejectButton: String get() = g8.rejectButton
+    val escAsteriskLabel: String get() = g8.escAsteriskLabel
+    val escAsteriskDesc: String get() = g8.escAsteriskDesc
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1395,6 +1399,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             newDeviceRequestBody = "%s mahu menyambung sebagai staf pesanan.",
             approveButton = "Luluskan",
             rejectButton = "Tolak",
+            escAsteriskLabel = "Mod imej ESC * (keserasian)",
+            escAsteriskDesc = "Hidupkan jika logo/slip tidak keluar pada pencetak murah.",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -1839,6 +1845,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             newDeviceRequestBody = "%s wants to connect as ordering staff.",
             approveButton = "Approve",
             rejectButton = "Reject",
+            escAsteriskLabel = "ESC * image mode (compatibility)",
+            escAsteriskDesc = "Turn on if logos/slips don't print on cheap printers.",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2283,6 +2291,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             newDeviceRequestBody = "%s 请求作为点餐员工连接。",
             approveButton = "批准",
             rejectButton = "拒绝",
+            escAsteriskLabel = "ESC * 图像模式（兼容）",
+            escAsteriskDesc = "如果廉价打印机不打印标志/单据，请开启。",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -2727,6 +2737,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             newDeviceRequestBody = "%s ஆர்டர் ஊழியராக இணைய விரும்புகிறது.",
             approveButton = "அனுமதி",
             rejectButton = "நிராகரி",
+            escAsteriskLabel = "ESC * பட முறை (இணக்கம்)",
+            escAsteriskDesc = "மலிவு அச்சுப்பொறிகளில் லோகோ/சீட்டு அச்சாகவில்லை எனில் இயக்கவும்.",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -3171,6 +3183,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             newDeviceRequestBody = "%s ต้องการเชื่อมต่อเป็นพนักงานรับออเดอร์",
             approveButton = "อนุมัติ",
             rejectButton = "ปฏิเสธ",
+            escAsteriskLabel = "โหมดภาพ ESC * (ความเข้ากันได้)",
+            escAsteriskDesc = "เปิดหากโลโก้/สลิปไม่พิมพ์บนเครื่องพิมพ์ราคาถูก",
         ),
     )
 }

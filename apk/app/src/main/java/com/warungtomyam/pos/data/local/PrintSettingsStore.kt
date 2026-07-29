@@ -31,9 +31,21 @@ class PrintSettingsStore @Inject constructor(
         prefs.edit().putBoolean(KEY_RECEIPT_LOGO, enabled).apply()
     }
 
+    /**
+     * Use the older ESC * bit-image command for printing bitmaps (logos + multilingual slips)
+     * instead of DantSu's default GS v 0 raster. Many low-cost 58mm printers only render images
+     * correctly with ESC * (GS v 0 comes out blank/garbled), so this defaults ON. Device-local.
+     */
+    fun getEscAsteriskImageMode(): Boolean = prefs.getBoolean(KEY_ESC_ASTERISK, true)
+
+    fun setEscAsteriskImageMode(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ESC_ASTERISK, enabled).apply()
+    }
+
     private companion object {
         const val KEY_KITCHEN_FONT = "kitchen_font_size"
         const val KEY_RECEIPT_LOGO = "receipt_logo"
+        const val KEY_ESC_ASTERISK = "esc_asterisk_image_mode"
         const val DEFAULT = "M"
     }
 }

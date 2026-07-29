@@ -85,6 +85,10 @@ class AdminSettingsViewModel @Inject constructor(
         // Print the café logo as a header on customer receipts (device-local). Applied immediately.
         val receiptLogo: Boolean = false,
 
+        // Use ESC * bit-image mode for bitmap printing (device-local; default on for cheap 58mm
+        // printers that can't do GS v 0 raster). Applied immediately.
+        val escAsteriskMode: Boolean = true,
+
         // Staff Permissions
         val staffCanSendKitchen: Boolean = false,
         val staffCanTakePayment: Boolean = false,
@@ -170,7 +174,8 @@ class AdminSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         UiState(
             kitchenFontSize = printSettingsStore.getKitchenFontSize(),
-            receiptLogo = printSettingsStore.getReceiptLogo()
+            receiptLogo = printSettingsStore.getReceiptLogo(),
+            escAsteriskMode = printSettingsStore.getEscAsteriskImageMode()
         )
     )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -192,6 +197,12 @@ class AdminSettingsViewModel @Inject constructor(
     fun updateReceiptLogo(enabled: Boolean) {
         printSettingsStore.setReceiptLogo(enabled)
         _uiState.value = _uiState.value.copy(receiptLogo = enabled)
+    }
+
+    /** ESC * bit-image mode is device-local — persist and apply immediately. */
+    fun updateEscAsteriskMode(enabled: Boolean) {
+        printSettingsStore.setEscAsteriskImageMode(enabled)
+        _uiState.value = _uiState.value.copy(escAsteriskMode = enabled)
     }
 
     /**

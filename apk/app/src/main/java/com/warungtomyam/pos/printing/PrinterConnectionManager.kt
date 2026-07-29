@@ -36,7 +36,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class PrinterConnectionManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val printSettingsStore: com.warungtomyam.pos.data.local.PrintSettingsStore
 ) {
     companion object {
         const val MODE_FAST = "fast"
@@ -90,6 +91,9 @@ class PrinterConnectionManager @Inject constructor(
             // Reuse the persistent connection; EscPosPrinter's constructor connect() is a
             // no-op when the connection is already open, so this doesn't drop the link.
             val escPosPrinter = EscPosPrinter(connection, dpi, printingWidthMM, paperWidth.charWidth)
+            // Force ESC * bit-image mode for bitmap printing on printers that don't implement
+            // GS v 0 raster (common on cheap 58mm units — logos/slips come out blank otherwise).
+            escPosPrinter.useEscAsteriskCommand(printSettingsStore.getEscAsteriskImageMode())
 
             // Optional receipt logo header: ReceiptDocument injects RECEIPT_LOGO_MARKER when the
             // "logo on receipt" option is on. Encode the bundled logo via the library's own image
