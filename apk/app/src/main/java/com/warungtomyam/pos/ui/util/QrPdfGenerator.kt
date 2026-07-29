@@ -43,11 +43,15 @@ object QrPdfGenerator {
     // QR code size: 60×60mm = ~170 pt
     private const val QR_SIZE_PT = 170f
 
-    // Logo max size: 40×40mm = ~113 pt
-    private const val LOGO_MAX_PT = 113f
+    // Logo max size (~46mm) — a bit larger since in logo mode it replaces the café-name text.
+    private const val LOGO_MAX_PT = 130f
 
     // Cards per page
     private const val CARDS_PER_PAGE = 4
+
+    // Fixed dev-company footer printed on every card. Not configurable, not surfaced in the UI.
+    private const val FOOTER_LINE1 = "Zero-Commitment POS by RAZStudio"
+    private const val FOOTER_LINE2 = "+60 11-3260 5406"
 
     /**
      * Result of PDF generation.
@@ -72,10 +76,11 @@ object QrPdfGenerator {
     fun generatePdf(
         context: Context,
         tables: List<Table>,
-        cafeName: String,
-        logoBitmap: Bitmap?,
+        cafeName: String,          // header text — drawn only when non-blank (logo mode passes "")
+        logoBitmap: Bitmap?,       // header logo — drawn when non-null (text mode passes null)
         baseUrl: String,
-        tokenMap: Map<String, String> = emptyMap()
+        tokenMap: Map<String, String> = emptyMap(),
+        fileNameBase: String = cafeName.ifBlank { "QR" }
     ): PdfResult {
         if (tables.isEmpty()) {
             return PdfResult(null, null, 0, 0)
@@ -124,7 +129,7 @@ object QrPdfGenerator {
         }
 
         // Save to file
-        val result = saveAndGetUri(context, document, cafeName)
+        val result = saveAndGetUri(context, document, fileNameBase)
         document.close()
 
         return PdfResult(
@@ -183,16 +188,18 @@ object QrPdfGenerator {
             currentY += logoH + 12f
         }
 
-        // 2. Café name (bold, ~16pt)
-        val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            textSize = 16f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textAlign = Paint.Align.CENTER
+        // 2. Café name (bold, ~16pt) — drawn only in text mode (blank in logo mode).
+        if (cafeName.isNotBlank()) {
+            val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.BLACK
+                textSize = 16f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+            currentY += namePaint.textSize
+            canvas.drawText(cafeName, centerX, currentY, namePaint)
+            currentY += 16f
         }
-        currentY += namePaint.textSize
-        canvas.drawText(cafeName, centerX, currentY, namePaint)
-        currentY += 16f
 
         // 3. QR code (170×170 pt, EC-H)
         // Prefer the opaque QR token so the printed link isn't a guessable table id.
@@ -220,6 +227,16 @@ object QrPdfGenerator {
         }
         currentY += labelPaint.textSize
         canvas.drawText(table.label, centerX, currentY, labelPaint)
+
+        // 5. Fixed dev-company footer, anchored to the bottom of each card (two centered lines).
+        val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.GRAY
+            textSize = 8f
+            textAlign = Paint.Align.CENTER
+        }
+        val cardBottom = offsetY + CARD_HEIGHT
+        canvas.drawText(FOOTER_LINE1, centerX, cardBottom - 22f, footerPaint)
+        canvas.drawText(FOOTER_LINE2, centerX, cardBottom - 12f, footerPaint)
     }
 
     /**

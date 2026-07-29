@@ -498,6 +498,10 @@ data class UiStringsGroup8(
     val printerLanguageLabel: String,
     val takeoutSection: String,
     val addTakeoutButton: String,
+    val qrHeaderTextOption: String,
+    val qrHeaderLogoOption: String,
+    val qrUploadLogo: String,
+    val qrResetLogo: String,
 )
 
 class UiStrings(
@@ -922,6 +926,10 @@ class UiStrings(
     val printerLanguageLabel: String get() = g8.printerLanguageLabel
     val takeoutSection: String get() = g8.takeoutSection
     val addTakeoutButton: String get() = g8.addTakeoutButton
+    val qrHeaderTextOption: String get() = g8.qrHeaderTextOption
+    val qrHeaderLogoOption: String get() = g8.qrHeaderLogoOption
+    val qrUploadLogo: String get() = g8.qrUploadLogo
+    val qrResetLogo: String get() = g8.qrResetLogo
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1353,6 +1361,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             printerLanguageLabel = "Pencetak (slip & resit)",
             takeoutSection = "Bawa Pulang (Tapaw)",
             addTakeoutButton = "Tambah Tapaw",
+            qrHeaderTextOption = "Nama kafe (teks)",
+            qrHeaderLogoOption = "Imej logo",
+            qrUploadLogo = "Muat naik imej",
+            qrResetLogo = "Set semula ke lalai",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -1783,6 +1795,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             printerLanguageLabel = "Printer (slips & receipt)",
             takeoutSection = "Take-out (Tapaw)",
             addTakeoutButton = "Add Tapaw",
+            qrHeaderTextOption = "Café name (text)",
+            qrHeaderLogoOption = "Logo image",
+            qrUploadLogo = "Upload image",
+            qrResetLogo = "Reset to default",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2213,6 +2229,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             printerLanguageLabel = "打印机（厨房单和收据）",
             takeoutSection = "外带 (Tapaw)",
             addTakeoutButton = "添加 Tapaw",
+            qrHeaderTextOption = "咖啡店名称（文字）",
+            qrHeaderLogoOption = "标志图片",
+            qrUploadLogo = "上传图片",
+            qrResetLogo = "重置为默认",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -2643,6 +2663,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             printerLanguageLabel = "அச்சுப்பொறி (சீட்டு & ரசீது)",
             takeoutSection = "பார்சல் (Tapaw)",
             addTakeoutButton = "Tapaw சேர்",
+            qrHeaderTextOption = "கஃபே பெயர் (உரை)",
+            qrHeaderLogoOption = "லோகோ படம்",
+            qrUploadLogo = "படத்தை பதிவேற்று",
+            qrResetLogo = "இயல்புக்கு மீட்டமை",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -3073,6 +3097,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             printerLanguageLabel = "เครื่องพิมพ์ (สลิป & ใบเสร็จ)",
             takeoutSection = "ห่อกลับ (Tapaw)",
             addTakeoutButton = "เพิ่ม Tapaw",
+            qrHeaderTextOption = "ชื่อร้าน (ข้อความ)",
+            qrHeaderLogoOption = "รูปโลโก้",
+            qrUploadLogo = "อัปโหลดรูป",
+            qrResetLogo = "รีเซ็ตเป็นค่าเริ่มต้น",
         ),
     )
 }
