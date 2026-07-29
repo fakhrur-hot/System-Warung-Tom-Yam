@@ -292,6 +292,15 @@ fun AdminSettingsScreen(
                     onSelect = { viewModel.updateDefaultLangCustomer(it) }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
+                // Printer language — BM/EN only (thermal printers render Latin reliably).
+                // Always used for slips & receipts regardless of any device's UI language.
+                LanguagePickerRow(
+                    label = strings.printerLanguageLabel,
+                    selectedCode = uiState.printLanguage,
+                    onSelect = { viewModel.updatePrintLanguage(it) },
+                    options = listOf(AppLanguage.MY, AppLanguage.EN)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = strings.defaultLanguageHint,
                     style = MaterialTheme.typography.bodySmall,
@@ -648,7 +657,8 @@ private fun SettingsSection(
 private fun LanguagePickerRow(
     label: String,
     selectedCode: String,
-    onSelect: (String) -> Unit
+    onSelect: (String) -> Unit,
+    options: List<AppLanguage> = AppLanguage.entries
 ) {
     var expanded by remember { mutableStateOf(false) }
     val selected = AppLanguage.fromServerCode(selectedCode)
@@ -664,7 +674,7 @@ private fun LanguagePickerRow(
                 Icon(Icons.Default.ArrowDropDown, contentDescription = null)
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                AppLanguage.entries.forEach { lang ->
+                options.forEach { lang ->
                     DropdownMenuItem(
                         text = { Text(lang.displayName) },
                         onClick = {

@@ -66,6 +66,7 @@ class AdminSettingsViewModel @Inject constructor(
         val defaultLangAdmin: String = "BM",
         val defaultLangOrdering: String = "BM",
         val defaultLangCustomer: String = "BM",
+        val printLanguage: String = "EN",
     )
 
     data class UiState(
@@ -120,6 +121,10 @@ class AdminSettingsViewModel @Inject constructor(
         val defaultLangOrdering: String = "BM",
         val defaultLangCustomer: String = "BM",
 
+        // Printer language for kitchen slips & receipts (BM/EN only). ALWAYS used for prints
+        // regardless of any device's UI language; mirrored into Room for PrintService.
+        val printLanguage: String = "EN",
+
         // Branding
         val cafeName: String = "",
         val existingLogoUrl: String? = null,
@@ -155,7 +160,8 @@ class AdminSettingsViewModel @Inject constructor(
                 businessDayStartHour != savedSnapshot.businessDayStartHour ||
                 defaultLangAdmin != savedSnapshot.defaultLangAdmin ||
                 defaultLangOrdering != savedSnapshot.defaultLangOrdering ||
-                defaultLangCustomer != savedSnapshot.defaultLangCustomer
+                defaultLangCustomer != savedSnapshot.defaultLangCustomer ||
+                printLanguage != savedSnapshot.printLanguage
     }
 
     private val _uiState = MutableStateFlow(UiState(kitchenFontSize = printSettingsStore.getKitchenFontSize()))
@@ -212,11 +218,15 @@ class AdminSettingsViewModel @Inject constructor(
             when (val result = apiClient.getSettings()) {
                 is ApiResult.Success -> {
                     val tz = result.data.timezone
-                    // Mirror the backend timezone into local Room so PrintService (kitchen
-                    // slips / receipts) renders timestamps in the café zone immediately.
-                    if (tz.isNotBlank()) {
+                    // Mirror the backend timezone + print language into local Room so
+                    // PrintService (kitchen slips / receipts) uses the café zone and the
+                    // configured print language immediately.
+                    run {
                         val existing = settingsDao.get() ?: SystemSettings()
-                        settingsDao.upsert(existing.copy(timezone = tz))
+                        settingsDao.upsert(existing.copy(
+                            timezone = if (tz.isNotBlank()) tz else existing.timezone,
+                            printLanguage = result.data.printLanguage
+                        ))
                     }
                     _uiState.value = _uiState.value.copy(
                         staffCanSendKitchen = result.data.staffCanSendKitchen,
@@ -230,6 +240,7 @@ class AdminSettingsViewModel @Inject constructor(
                         defaultLangAdmin = result.data.defaultLangAdmin,
                         defaultLangOrdering = result.data.defaultLangOrdering,
                         defaultLangCustomer = result.data.defaultLangCustomer,
+                        printLanguage = result.data.printLanguage,
                         permissionsLoading = false,
                         savedSnapshot = _uiState.value.savedSnapshot.copy(
                             staffCanSendKitchen = result.data.staffCanSendKitchen,
@@ -242,7 +253,8 @@ class AdminSettingsViewModel @Inject constructor(
                             businessDayStartHour = result.data.businessDayStartHour,
                             defaultLangAdmin = result.data.defaultLangAdmin,
                             defaultLangOrdering = result.data.defaultLangOrdering,
-                            defaultLangCustomer = result.data.defaultLangCustomer
+                            defaultLangCustomer = result.data.defaultLangCustomer,
+                            printLanguage = result.data.printLanguage
                         )
                     )
                 }
@@ -465,6 +477,11 @@ class AdminSettingsViewModel @Inject constructor(
     /** Stage the café default UI language for the customer website; saved via [saveAll]. */
     fun updateDefaultLangCustomer(code: String) {
         _uiState.value = _uiState.value.copy(defaultLangCustomer = code)
+    }
+
+    /** Stage the printer language (BM/EN) for slips & receipts; saved via [saveAll]. */
+    fun updatePrintLanguage(code: String) {
+        _uiState.value = _uiState.value.copy(printLanguage = code)
     }
 
     fun onLocationCaptured(lat: Double, lng: Double) {
@@ -720,6 +737,21 @@ class AdminSettingsViewModel @Inject constructor(
                 }
             }
 
+            // Printer language — dirty when it differs. Push to backend AND mirror into Room
+            // so PrintService uses it for the next slip/receipt right away.
+            if (!anyError && state.printLanguage != state.savedSnapshot.printLanguage) {
+                when (apiClient.putSettings(JSONObject().put("printLanguage", state.printLanguage))) {
+                    is ApiResult.Success -> {
+                        val existing = settingsDao.get() ?: SystemSettings()
+                        settingsDao.upsert(existing.copy(printLanguage = state.printLanguage))
+                    }
+                    else -> {
+                        anyError = true
+                        _uiState.value = _uiState.value.copy(error = str().saveFailedGeneric)
+                    }
+                }
+            }
+
             if (!anyError) {
                 val current = _uiState.value
                 _uiState.value = current.copy(
@@ -740,6 +772,7 @@ class AdminSettingsViewModel @Inject constructor(
                         defaultLangAdmin = current.defaultLangAdmin,
                         defaultLangOrdering = current.defaultLangOrdering,
                         defaultLangCustomer = current.defaultLangCustomer,
+                        printLanguage = current.printLanguage,
                     ),
                     successMessage = str().settingsSaved
                 )
