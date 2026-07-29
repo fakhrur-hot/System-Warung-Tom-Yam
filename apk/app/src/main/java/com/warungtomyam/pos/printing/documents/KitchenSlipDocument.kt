@@ -27,7 +27,7 @@ object KitchenSlipDocument {
      */
     private fun appendSessionLine(sb: StringBuilder, sessionNumber: Int?, printLanguage: String) {
         if (sessionNumber == null || sessionNumber <= 0) return
-        val label = if (printLanguage == "BM") "Sesi #$sessionNumber" else "Session #$sessionNumber"
+        val label = "${printStrings(printLanguage).session} #$sessionNumber"
         sb.appendLine("[C]<b><font size='tall'>$label</font></b>")
     }
 
@@ -77,15 +77,16 @@ object KitchenSlipDocument {
     ): String {
         if (items.isEmpty()) return ""
 
+        val s = printStrings(printLanguage)
         val separator = "-".repeat(charWidth)
-        val tableLabel = if (printLanguage == "BM") "Meja" else "Table"
+        val tableLabel = s.table
         val timestamp = ZonedDateTime.now(zoneOf(timezone)).format(TIME_FORMAT)
 
         val sb = StringBuilder()
 
         // Amendment header
         if (isAmendment) {
-            sb.appendLine("[C]<b>TAMBAHAN / ADDED</b>")
+            sb.appendLine("[C]<b>${s.added}</b>")
         }
 
         // Big table number
@@ -144,14 +145,15 @@ object KitchenSlipDocument {
         val result = mutableMapOf<String, String>()
 
         for ((category, categoryItems) in grouped) {
+            val s = printStrings(printLanguage)
             val separator = "-".repeat(charWidth)
-            val tableLabel = if (printLanguage == "BM") "Meja" else "Table"
+            val tableLabel = s.table
             val timestamp = ZonedDateTime.now(zoneOf(timezone)).format(TIME_FORMAT)
             val categoryLabel = when (category.uppercase()) {
-                "FOOD" -> if (printLanguage == "BM") "Makanan" else "Food"
-                "BEVERAGES" -> if (printLanguage == "BM") "Minuman" else "Beverages"
-                "SIDE_DISHES", "SIDE DISHES" -> if (printLanguage == "BM") "Lauk" else "Side Dishes"
-                "OTHERS" -> if (printLanguage == "BM") "Lain-lain" else "Others"
+                "FOOD" -> s.food
+                "BEVERAGES" -> s.beverages
+                "SIDE_DISHES", "SIDE DISHES" -> s.sideDishes
+                "OTHERS" -> s.others
                 else -> category
             }
 
@@ -159,7 +161,7 @@ object KitchenSlipDocument {
 
             // Amendment header
             if (isAmendment) {
-                sb.appendLine("[C]<b>TAMBAHAN / ADDED</b>")
+                sb.appendLine("[C]<b>${s.added}</b>")
             }
 
             // Big table number
@@ -213,7 +215,8 @@ object KitchenSlipDocument {
 
         val menuSize = com.warungtomyam.pos.data.local.KitchenFontSize.menu(menuFontSize)
         val noteSize = com.warungtomyam.pos.data.local.KitchenFontSize.note(menuFontSize)
-        val tableLabel = if (printLanguage == "BM") "Meja" else "Table"
+        val s = printStrings(printLanguage)
+        val tableLabel = s.table
         val separator = "-".repeat(charWidth)
         val timestamp = ZonedDateTime.now(zoneOf(timezone)).format(TIME_FORMAT)
 
@@ -222,12 +225,12 @@ object KitchenSlipDocument {
 
         for ((bucket, bucketItems) in byBucket) {
             val bucketLabel = when (bucket) {
-                "BEVERAGE" -> if (printLanguage == "BM") "MINUMAN" else "BEVERAGES"
-                else -> if (printLanguage == "BM") "MAKANAN" else "FOOD"
+                "BEVERAGE" -> s.beverages
+                else -> s.food
             }
 
             val sb = StringBuilder()
-            if (isAmendment) sb.appendLine("[C]<b>TAMBAHAN / ADDED</b>")
+            if (isAmendment) sb.appendLine("[C]<b>${s.added}</b>")
             sb.appendLine("[C]<b><font size='big'>$tableLabel $tableId</font></b>")
             appendSessionLine(sb, sessionNumber, printLanguage)
             sb.appendLine("[C]<b><font size='tall'>[$bucketLabel]</font></b>")

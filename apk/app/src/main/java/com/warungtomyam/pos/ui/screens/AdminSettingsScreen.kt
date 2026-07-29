@@ -292,13 +292,13 @@ fun AdminSettingsScreen(
                     onSelect = { viewModel.updateDefaultLangCustomer(it) }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                // Printer language — BM/EN only (thermal printers render Latin reliably).
+                // Printer language — all 5 supported. Latin (BM/EN) prints as fast ESC/POS text;
+                // Chinese/Tamil/Thai auto-render as a bitmap so the glyphs print correctly.
                 // Always used for slips & receipts regardless of any device's UI language.
                 LanguagePickerRow(
                     label = strings.printerLanguageLabel,
                     selectedCode = uiState.printLanguage,
-                    onSelect = { viewModel.updatePrintLanguage(it) },
-                    options = listOf(AppLanguage.MY, AppLanguage.EN)
+                    onSelect = { viewModel.updatePrintLanguage(it) }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(

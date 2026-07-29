@@ -47,6 +47,7 @@ object ReceiptDocument {
         timezone: String,
         tableName: String
     ): String {
+        val s = printStrings(printLanguage)
         val separator = "=".repeat(charWidth)
         val sb = StringBuilder()
 
@@ -64,8 +65,8 @@ object ReceiptDocument {
 
         // Table and date — createdAt is stored as UTC ISO; render it in the café timezone
         // so the receipt matches the kitchen slip and reports (previously it showed UTC).
-        val tableLabel = if (printLanguage == "BM") "Meja" else "Table"
-        val dateLabel = if (printLanguage == "BM") "Tarikh" else "Date"
+        val tableLabel = s.table
+        val dateLabel = s.date
         val zone = try {
             if (timezone.isBlank()) ZoneId.systemDefault() else ZoneId.of(timezone)
         } catch (_: Exception) {
@@ -92,29 +93,22 @@ object ReceiptDocument {
 
         // Total
         sb.appendLine("[L]$separator")
-        val totalLabel = if (printLanguage == "BM") "JUMLAH" else "TOTAL"
+        val totalLabel = s.total
         val totalText = formatPrice(order.total)
         val totalLine = padRight(totalLabel, totalText, charWidth)
         sb.appendLine("[L]$totalLine")
 
         // Payment method
-        val paymentLabel = if (printLanguage == "BM") "Bayaran" else "Payment"
+        val paymentLabel = s.payment
         val paymentDisplay = when {
-            paymentMethod.equals("CASH", ignoreCase = true) ->
-                if (printLanguage == "BM") "Tunai" else "Cash"
+            paymentMethod.equals("CASH", ignoreCase = true) -> s.cash
             else -> "QR"
         }
         sb.appendLine("[L]$paymentLabel: $paymentDisplay")
         sb.appendLine("[L]$separator")
 
-        // Thank you
-        val thankYou = if (printLanguage == "BM") {
-            "Terima Kasih / Thank You"
-        } else {
-            "Thank You / Terima Kasih"
-        }
-        // Emphasized (taller) so the normal-size studio footer below reads clearly smaller.
-        sb.appendLine("[C]<font size='tall'>$thankYou</font>")
+        // Thank you (localized). Emphasized (taller) so the studio footer below reads smaller.
+        sb.appendLine("[C]<font size='tall'>${s.thankYou}</font>")
 
         // Always-on studio footer at the very bottom, two neat centered lines.
         // NOTE: thermal printers (via the DantSu library) print upright — there's no italic —

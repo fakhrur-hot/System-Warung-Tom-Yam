@@ -4,6 +4,7 @@ import android.content.Context
 import com.dantsu.escposprinter.EscPosPrinter
 import com.dantsu.escposprinter.connection.bluetooth.BluetoothConnection
 import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
+import com.dantsu.escposprinter.textparser.PrinterTextParserImg
 import com.warungtomyam.pos.data.local.PaperWidth
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -86,7 +87,20 @@ class PrinterConnectionManager @Inject constructor(
             // Reuse the persistent connection; EscPosPrinter's constructor connect() is a
             // no-op when the connection is already open, so this doesn't drop the link.
             val escPosPrinter = EscPosPrinter(connection, dpi, printingWidthMM, paperWidth.charWidth)
-            escPosPrinter.printFormattedTextAndCut(payload)
+
+            // Multilingual fallback: if the payload contains scripts the printer can't render as
+            // text (Chinese/Tamil/Thai), rasterize the whole slip to a monochrome bitmap and print
+            // it as an image via the library's own encoder. Latin-only payloads take the fast
+            // text path unchanged. See BitmapTicketRenderer.
+            val finalPayload = if (BitmapTicketRenderer.needsBitmap(payload)) {
+                val bmp = BitmapTicketRenderer.render(payload, paperWidth.pixelWidth, paperWidth.charWidth)
+                val hex = PrinterTextParserImg.bitmapToHexadecimalString(escPosPrinter, bmp)
+                bmp.recycle()
+                "[C]<img>$hex</img>\n"
+            } else {
+                payload
+            }
+            escPosPrinter.printFormattedTextAndCut(finalPayload)
 
             when (getMode()) {
                 MODE_FAST -> {

@@ -197,8 +197,9 @@ function coerceValue(apiKey: string, value: string): unknown {
 function validateSetting(apiKey: string, value: unknown): string | null {
   switch (apiKey) {
     case "printLanguage":
-      if (value !== "EN" && value !== "BM") {
-        return "printLanguage must be EN or BM";
+      // BM/EN print as ESC/POS text; ZH/TA/TH print via the app's bitmap fallback.
+      if (typeof value !== "string" || !DEFAULT_LANG_OPTIONS.includes(value)) {
+        return `printLanguage must be one of ${DEFAULT_LANG_OPTIONS.join(", ")}`;
       }
       break;
     case "topN": {
