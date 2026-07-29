@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.warungtomyam.pos.data.ApiClient
 import com.warungtomyam.pos.data.ApiResult
 import com.warungtomyam.pos.data.SecureStorage
+import com.warungtomyam.pos.data.local.SettingsDao
+import com.warungtomyam.pos.data.local.SystemSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -20,6 +22,7 @@ class LanguageViewModel @Inject constructor(
     private val languageManager: LanguageManager,
     private val apiClient: ApiClient,
     private val secureStorage: SecureStorage,
+    private val settingsDao: SettingsDao,
 ) : ViewModel() {
 
     val language: StateFlow<AppLanguage> = languageManager.language
@@ -27,25 +30,42 @@ class LanguageViewModel @Inject constructor(
     fun select(language: AppLanguage) = languageManager.set(language)
 
     /**
-     * On startup, if this device has no explicit language choice yet, adopt the café-wide
-     * default for its role: ordering-staff devices follow `defaultLangOrdering`, the admin
-     * (and secondary-admin) device follows `defaultLangAdmin`. Once the operator picks a
-     * language via the language button, [LanguageManager.set] records it and this no longer
-     * applies. Best-effort: on any failure the device keeps its current default (BM).
+     * On startup: fetch café settings and (a) mirror the print language into local Room so
+     * PrintService uses it even before the Settings screen is opened, and (b) if this device has
+     * no explicit language choice, adopt the café-wide UI default for its role (ordering-staff
+     * devices → defaultLangOrdering, admin/secondary-admin → defaultLangAdmin). Best-effort.
      */
     fun bootstrapCafeDefault() {
-        if (languageManager.hasUserChoice()) return
-        viewModelScope.launch {
-            when (val result = apiClient.getSettings()) {
-                is ApiResult.Success -> {
+        viewModelScope.launch { fetchAndApply() }
+    }
+
+    /**
+     * Discard this device's manual language choice and re-adopt the café default (from the "Café
+     * default" language-menu entry). Lets an operator undo a local override and follow the setting.
+     */
+    fun useCafeDefault() {
+        languageManager.clearChoice()
+        viewModelScope.launch { fetchAndApply() }
+    }
+
+    private suspend fun fetchAndApply() {
+        when (val result = apiClient.getSettings()) {
+            is ApiResult.Success -> {
+                // Always mirror the print language into Room (independent of the UI language choice).
+                val existing = settingsDao.get() ?: SystemSettings()
+                if (existing.printLanguage != result.data.printLanguage) {
+                    settingsDao.upsert(existing.copy(printLanguage = result.data.printLanguage))
+                }
+                // Adopt the role's café UI default only when there's no explicit local choice.
+                if (!languageManager.hasUserChoice()) {
                     val code = when (secureStorage.getRole()) {
                         SecureStorage.Role.ORDERING -> result.data.defaultLangOrdering
                         else -> result.data.defaultLangAdmin // ADMIN / ADMIN_SECONDARY / null
                     }
                     languageManager.applyDefaultIfUnset(AppLanguage.fromServerCode(code))
                 }
-                else -> { /* offline / unauthenticated: keep the current default */ }
             }
+            else -> { /* offline / unauthenticated: keep the current default */ }
         }
     }
 }

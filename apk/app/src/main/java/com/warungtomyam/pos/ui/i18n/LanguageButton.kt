@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,10 +53,20 @@ fun LanguageButton(
             )
         }
 
+        val strings = uiStrings(current)
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
+            // Clears this device's manual choice and re-adopts the café-wide default for its role.
+            DropdownMenuItem(
+                text = { Text(strings.cafeDefaultLanguage) },
+                onClick = {
+                    expanded = false
+                    viewModel.useCafeDefault()
+                },
+            )
+            HorizontalDivider()
             AppLanguage.entries.forEach { lang ->
                 DropdownMenuItem(
                     text = {

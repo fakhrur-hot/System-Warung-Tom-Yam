@@ -43,6 +43,16 @@ class LanguageManager @Inject constructor(
         }
     }
 
+    /**
+     * Discard this device's explicit language choice so it follows the café default again.
+     * Resets to [AppLanguage.DEFAULT] immediately; the caller re-applies the café default
+     * (via the settings fetch) right after.
+     */
+    fun clearChoice() {
+        prefs.edit().remove(KEY).apply()
+        _language.value = AppLanguage.DEFAULT
+    }
+
     companion object {
         private const val PREFS = "app_language_prefs"
         private const val KEY = "app_language"
