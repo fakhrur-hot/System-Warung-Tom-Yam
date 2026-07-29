@@ -71,7 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -99,7 +99,7 @@ import androidx.compose.ui.window.Dialog
  * Menu management screen showing all items grouped by category tabs.
  * Supports add, edit, delete, and quick availability toggle.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun MenuManagementScreen(
     viewModel: MenuViewModel = hiltViewModel(),
@@ -206,13 +206,21 @@ fun MenuManagementScreen(
                     categories.forEachIndexed { index, category ->
                         Tab(
                             selected = index == selectedIndex,
-                            onClick = { viewModel.selectCategory(category) },
-                            // Long-press opens an edit/delete chooser for this tab. onLongPress-only
-                            // detection doesn't consume normal taps, so tab selection still works.
-                            modifier = Modifier.pointerInput(category) {
-                                detectTapGestures(onLongPress = { longPressCategory = category })
-                            },
-                            text = { Text(categoryTabLabel(category, strings)) }
+                            // Handle tap + long-press on the tab's own content via combinedClickable.
+                            // Tab's built-in `selectable` would otherwise swallow gestures before an
+                            // outer pointerInput could see the long-press, so onClick here is a no-op
+                            // and the inner content owns both gestures. Tap selects; long-press opens
+                            // the edit/delete chooser.
+                            onClick = {},
+                            text = {
+                                Text(
+                                    text = categoryTabLabel(category, strings),
+                                    modifier = Modifier.combinedClickable(
+                                        onClick = { viewModel.selectCategory(category) },
+                                        onLongClick = { longPressCategory = category }
+                                    )
+                                )
+                            }
                         )
                     }
                 }
