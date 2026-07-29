@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import QRCode from 'qrcode'
+import { getSupabase } from '../../lib/supabase'
 import './qr-sheets-print.css'
 
 interface TableSlot {
@@ -35,9 +36,24 @@ export default function QrSheetsPage() {
     try {
       const baseUrl = window.location.origin
 
+      // Resolve typed table ids → their opaque QR tokens so the printed QR isn't a
+      // guessable ?table=T0006. Falls back to the raw id if a token isn't found
+      // (the backend resolves either form).
+      const tokenById = new Map<string, string>()
+      try {
+        const { data } = await getSupabase().functions.invoke('tables', { method: 'GET' })
+        for (const t of (data?.tables ?? []) as Array<{ id: string; qrToken?: string }>) {
+          if (t.id && t.qrToken) tokenById.set(t.id, t.qrToken)
+        }
+      } catch {
+        /* offline / no tokens — fall back to raw ids below */
+      }
+
       for (const slot of slots) {
         if (slot.tableId.trim()) {
-          const url = `${baseUrl}/order?table=${encodeURIComponent(slot.tableId.trim())}`
+          const id = slot.tableId.trim()
+          const qrValue = tokenById.get(id) ?? id
+          const url = `${baseUrl}/order?table=${encodeURIComponent(qrValue)}`
           const svg = await QRCode.toString(url, {
             type: 'svg',
             errorCorrectionLevel: 'H',
