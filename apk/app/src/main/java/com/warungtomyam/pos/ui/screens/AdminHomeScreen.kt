@@ -206,7 +206,15 @@ fun AdminHomeScreen(
                 actions = {
                     LanguageButton()
                     Box {
-                        IconButton(onClick = { showOverflowMenu = true }) {
+                        // The PIN gate now guards the whole overflow menu (not just Settings),
+                        // so no management screen inside it is reachable without the PIN.
+                        IconButton(onClick = {
+                            if (pinLockViewModel.isGateActive()) {
+                                showPinGate = true
+                            } else {
+                                showOverflowMenu = true
+                            }
+                        }) {
                             Icon(Icons.Default.MoreVert, contentDescription = strings.moreOptions)
                         }
                         DropdownMenu(
@@ -287,11 +295,7 @@ fun AdminHomeScreen(
                                 text = { Text(strings.settingsTitle) },
                                 onClick = {
                                     showOverflowMenu = false
-                                    if (pinLockViewModel.isGateActive()) {
-                                        showPinGate = true
-                                    } else {
-                                        onNavigateToSettings()
-                                    }
+                                    onNavigateToSettings()
                                 }
                             )
 
@@ -489,19 +493,19 @@ fun AdminHomeScreen(
         )
     }
 
-    // PIN gate before Settings opens (when enabled). Forgot-PIN resets it since this is the
-    // logged-in admin device.
+    // PIN gate before the overflow menu opens (when enabled). Success unlocks the whole menu;
+    // Forgot-PIN resets the lock since this is the logged-in admin device.
     if (showPinGate) {
         PinEntryDialog(
             strings = strings,
             title = strings.pinRequiredTitle,
             onVerify = { pinLockViewModel.verifyPin(it) },
-            onSuccess = { showPinGate = false; onNavigateToSettings() },
+            onSuccess = { showPinGate = false; showOverflowMenu = true },
             onCancel = { showPinGate = false },
             onForgot = {
                 pinLockViewModel.resetForgotten()
                 showPinGate = false
-                onNavigateToSettings()
+                showOverflowMenu = true
             }
         )
     }
