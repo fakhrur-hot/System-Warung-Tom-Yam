@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,7 +32,10 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -117,6 +121,8 @@ fun MenuManagementScreen(
     // Add-category dialog + its text field.
     var showAddCategory by remember { mutableStateOf(false) }
     var newCategoryName by remember { mutableStateOf("") }
+    // Sort-items dialog (auto-sort + manual up/down within the selected category).
+    var showSortItems by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
@@ -146,8 +152,14 @@ fun MenuManagementScreen(
                             Icon(Icons.Default.SwapVert, contentDescription = strings.reorderCategories)
                         }
                     }
-                    // Edit the currently-selected category: translations + which printer prints it.
+                    // Sort items in the selected category (auto by number→A–Z, or manual up/down).
                     val current = uiState.effectiveSelectedCategory
+                    if (current.isNotBlank()) {
+                        IconButton(onClick = { showSortItems = true }) {
+                            Icon(Icons.Default.Sort, contentDescription = strings.sortItemsTitle)
+                        }
+                    }
+                    // Edit the currently-selected category: translations + which printer prints it.
                     if (current.isNotBlank()) {
                         IconButton(onClick = { editingCategory = current }) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit category")
@@ -311,6 +323,49 @@ fun MenuManagementScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showAddCategory = false }) { Text(strings.commonCancel) }
+            }
+        )
+    }
+
+    // Sort items in the selected category: one-tap auto-sort (number → A–Z) or manual up/down.
+    // Either way the new order persists and drives table view, New Dine-In, and the customer web.
+    if (showSortItems) {
+        val cat = uiState.effectiveSelectedCategory
+        val catItems = uiState.items.filter { it.allCategories().contains(cat) }
+        AlertDialog(
+            onDismissRequest = { showSortItems = false },
+            title = { Text("${strings.sortItemsTitle}: ${categoryTabLabel(cat, strings)}") },
+            text = {
+                Column {
+                    OutlinedButton(
+                        onClick = { viewModel.autoSortItems() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(strings.autoSortItems) }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                        items(catItems, key = { it.id }) { item ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = item.nameBm.ifBlank { item.nameEn },
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                IconButton(onClick = { viewModel.moveItem(item.id, up = true) }) {
+                                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Up")
+                                }
+                                IconButton(onClick = { viewModel.moveItem(item.id, up = false) }) {
+                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Down")
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSortItems = false }) { Text(strings.commonDone) }
             }
         )
     }

@@ -137,6 +137,69 @@ class MenuViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Auto-sort items: within each category (in the current category order), order by the numeric
+     * part of the item code ascending, then by name (A–Z). Items without a code number fall last,
+     * alphabetically. The resulting flat order is written to Room and re-published so it drives the
+     * admin table view, New Dine-In, and the customer web (all render in snapshot-array order).
+     */
+    fun autoSortItems() {
+        viewModelScope.launch {
+            val all = menuDao.getAll()
+            val comparator = compareBy<MenuItem>(
+                { codeNumber(it.code) ?: Int.MAX_VALUE },
+                { itemDisplayName(it).lowercase() }
+            )
+            val result = mutableListOf<MenuItem>()
+            val seen = mutableSetOf<String>()
+            val byPrimary = all.groupBy { it.category }
+            for (cat in _uiState.value.categories) {
+                byPrimary[cat]?.sortedWith(comparator)?.forEach { if (seen.add(it.id)) result.add(it) }
+            }
+            all.forEach { if (seen.add(it.id)) result.add(it) } // safety: anything uncategorized
+            persistItemOrder(result)
+        }
+    }
+
+    /**
+     * Manually move [itemId] up/down within the currently-selected category tab. The category's
+     * items are reordered in place within the global list (other categories keep their positions),
+     * then persisted + re-published. Reflected on every ordering surface.
+     */
+    fun moveItem(itemId: String, up: Boolean) {
+        viewModelScope.launch {
+            val cat = _uiState.value.effectiveSelectedCategory
+            val all = menuDao.getAll()
+            val catIds = all.filter { it.allCategories().contains(cat) }.map { it.id }.toMutableList()
+            val idx = catIds.indexOf(itemId)
+            if (idx < 0) return@launch
+            val target = if (up) idx - 1 else idx + 1
+            if (target !in catIds.indices) return@launch
+            catIds[idx] = catIds[target].also { catIds[target] = catIds[idx] }
+            // Refill this category's slots in the global list from the reordered id queue.
+            val queue = ArrayDeque(catIds)
+            val byId = all.associateBy { it.id }
+            val newGlobal = all.map { item ->
+                if (item.allCategories().contains(cat)) byId.getValue(queue.removeFirst()) else item
+            }
+            persistItemOrder(newGlobal)
+        }
+    }
+
+    /** Rewrite Room in [ordered] order (same deleteAll+upsertAll the sync uses) and re-publish. */
+    private suspend fun persistItemOrder(ordered: List<MenuItem>) {
+        menuDao.deleteAll()
+        menuDao.upsertAll(ordered)
+        loadItems()
+        pushMenuToBackend()
+    }
+
+    /** Trailing digits of an item code as an Int (e.g. "A01"→1, "U07"→7); null when none. */
+    private fun codeNumber(code: String): Int? =
+        Regex("(\\d+)\\s*$").find(code.trim())?.groupValues?.get(1)?.toIntOrNull()
+
+    private fun itemDisplayName(item: MenuItem): String = item.nameBm.ifBlank { item.nameEn }
+
     fun loadItems() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }

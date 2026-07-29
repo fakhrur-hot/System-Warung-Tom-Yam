@@ -502,6 +502,8 @@ data class UiStringsGroup8(
     val qrHeaderLogoOption: String,
     val qrUploadLogo: String,
     val qrResetLogo: String,
+    val sortItemsTitle: String,
+    val autoSortItems: String,
 )
 
 class UiStrings(
@@ -930,6 +932,8 @@ class UiStrings(
     val qrHeaderLogoOption: String get() = g8.qrHeaderLogoOption
     val qrUploadLogo: String get() = g8.qrUploadLogo
     val qrResetLogo: String get() = g8.qrResetLogo
+    val sortItemsTitle: String get() = g8.sortItemsTitle
+    val autoSortItems: String get() = g8.autoSortItems
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1365,6 +1369,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             qrHeaderLogoOption = "Imej logo",
             qrUploadLogo = "Muat naik imej",
             qrResetLogo = "Set semula ke lalai",
+            sortItemsTitle = "Susun item",
+            autoSortItems = "Auto-susun (nombor, kemudian A–Z)",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -1799,6 +1805,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             qrHeaderLogoOption = "Logo image",
             qrUploadLogo = "Upload image",
             qrResetLogo = "Reset to default",
+            sortItemsTitle = "Sort items",
+            autoSortItems = "Auto-sort (number, then A–Z)",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2233,6 +2241,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             qrHeaderLogoOption = "标志图片",
             qrUploadLogo = "上传图片",
             qrResetLogo = "重置为默认",
+            sortItemsTitle = "排序菜品",
+            autoSortItems = "自动排序（先数字后 A–Z）",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -2667,6 +2677,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             qrHeaderLogoOption = "லோகோ படம்",
             qrUploadLogo = "படத்தை பதிவேற்று",
             qrResetLogo = "இயல்புக்கு மீட்டமை",
+            sortItemsTitle = "உருப்படிகளை வரிசைப்படுத்து",
+            autoSortItems = "தானியங்கு வரிசை (எண், பின் A–Z)",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -3101,6 +3113,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             qrHeaderLogoOption = "รูปโลโก้",
             qrUploadLogo = "อัปโหลดรูป",
             qrResetLogo = "รีเซ็ตเป็นค่าเริ่มต้น",
+            sortItemsTitle = "จัดเรียงเมนู",
+            autoSortItems = "จัดเรียงอัตโนมัติ (ตัวเลข แล้ว A–Z)",
         ),
     )
 }
