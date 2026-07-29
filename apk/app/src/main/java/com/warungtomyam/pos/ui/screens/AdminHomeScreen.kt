@@ -25,6 +25,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Composable
@@ -78,6 +79,7 @@ fun AdminHomeScreen(
     printAlertsViewModel: PrintAlertsViewModel = hiltViewModel(),
     pinLockViewModel: PinLockViewModel = hiltViewModel(),
     devicePrefsViewModel: com.warungtomyam.pos.ui.viewmodels.DevicePrefsViewModel = hiltViewModel(),
+    devicesViewModel: com.warungtomyam.pos.ui.viewmodels.DevicesViewModel = hiltViewModel(),
     onNavigateToLock: () -> Unit,
     onNavigateToReconnect: () -> Unit = {},
     onNavigateToDineIn: () -> Unit = {},
@@ -110,6 +112,17 @@ fun AdminHomeScreen(
     var selectedTableLabel by remember { mutableStateOf("") }
     var showOrderSheet by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Poll for pending device requests while on the home screen, so a new ordering-staff device
+    // that scans in triggers an approve/reject popup here (not only when the Devices page is open).
+    val pendingRequests by devicesViewModel.pendingRequests.collectAsState()
+    var handledRequestIds by remember { mutableStateOf(setOf<String>()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            devicesViewModel.refreshPendingRequests()
+            kotlinx.coroutines.delay(8_000)
+        }
+    }
 
     // Ensure the realtime listener (new orders, kitchen auto-print) is running whenever
     // this screen is reached — on fresh admin login AND on every app relaunch that lands
@@ -507,6 +520,33 @@ fun AdminHomeScreen(
                 pinLockViewModel.resetForgotten()
                 showPinGate = false
                 showOverflowMenu = true
+            }
+        )
+    }
+
+    // New ordering-staff device requesting to connect → approve/reject popup, auto-closing
+    // after 30s (the request stays pending in Devices & Staff if ignored).
+    val deviceRequest = pendingRequests.firstOrNull { it.id !in handledRequestIds }
+    if (deviceRequest != null) {
+        LaunchedEffect(deviceRequest.id) {
+            kotlinx.coroutines.delay(30_000)
+            handledRequestIds = handledRequestIds + deviceRequest.id
+        }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { handledRequestIds = handledRequestIds + deviceRequest.id },
+            title = { Text(strings.newDeviceRequestTitle) },
+            text = { Text(strings.newDeviceRequestBody.format(deviceRequest.label)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    devicesViewModel.approveDevice(deviceRequest.id)
+                    handledRequestIds = handledRequestIds + deviceRequest.id
+                }) { Text(strings.approveButton) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    devicesViewModel.rejectDevice(deviceRequest.id)
+                    handledRequestIds = handledRequestIds + deviceRequest.id
+                }) { Text(strings.rejectButton, color = MaterialTheme.colorScheme.error) }
             }
         )
     }

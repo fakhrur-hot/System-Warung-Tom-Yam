@@ -508,6 +508,10 @@ data class UiStringsGroup8(
     val deleteCategoryWarning: String,
     val receiptLogoLabel: String,
     val cafeDefaultLanguage: String,
+    val newDeviceRequestTitle: String,
+    val newDeviceRequestBody: String,
+    val approveButton: String,
+    val rejectButton: String,
 )
 
 class UiStrings(
@@ -942,6 +946,10 @@ class UiStrings(
     val deleteCategoryWarning: String get() = g8.deleteCategoryWarning
     val receiptLogoLabel: String get() = g8.receiptLogoLabel
     val cafeDefaultLanguage: String get() = g8.cafeDefaultLanguage
+    val newDeviceRequestTitle: String get() = g8.newDeviceRequestTitle
+    val newDeviceRequestBody: String get() = g8.newDeviceRequestBody
+    val approveButton: String get() = g8.approveButton
+    val rejectButton: String get() = g8.rejectButton
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1383,6 +1391,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             deleteCategoryWarning = "Memadam \"%1\$s\" akan membuang %2\$d item di dalamnya secara kekal di semua tempat — termasuk di kategori lain yang turut memaparkannya. Tindakan ini tidak boleh dibatalkan.",
             receiptLogoLabel = "Logo pada resit",
             cafeDefaultLanguage = "Guna Lalai Kafe",
+            newDeviceRequestTitle = "Permintaan peranti baharu",
+            newDeviceRequestBody = "%s mahu menyambung sebagai staf pesanan.",
+            approveButton = "Luluskan",
+            rejectButton = "Tolak",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -1823,6 +1835,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             deleteCategoryWarning = "Deleting \"%1\$s\" permanently removes its %2\$d item(s) everywhere — including where they're also shown in other categories. This can't be undone.",
             receiptLogoLabel = "Logo on receipt",
             cafeDefaultLanguage = "Café default",
+            newDeviceRequestTitle = "New device request",
+            newDeviceRequestBody = "%s wants to connect as ordering staff.",
+            approveButton = "Approve",
+            rejectButton = "Reject",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2263,6 +2279,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             deleteCategoryWarning = "删除 \"%1\$s\" 将永久删除其中的 %2\$d 个菜品（包括在其他类别中“同时显示”的）。此操作无法撤销。",
             receiptLogoLabel = "收据上打印标志",
             cafeDefaultLanguage = "使用咖啡店默认",
+            newDeviceRequestTitle = "新设备请求",
+            newDeviceRequestBody = "%s 请求作为点餐员工连接。",
+            approveButton = "批准",
+            rejectButton = "拒绝",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -2703,6 +2723,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             deleteCategoryWarning = "\"%1\$s\" ஐ நீக்கினால் அதிலுள்ள %2\$d உருப்படிகள் எல்லா இடங்களிலும் நிரந்தரமாக நீக்கப்படும் — மற்ற வகைகளில் காட்டப்படுபவை உட்பட. இதை மீட்டெடுக்க முடியாது.",
             receiptLogoLabel = "ரசீதில் லோகோ",
             cafeDefaultLanguage = "கஃபே இயல்பு",
+            newDeviceRequestTitle = "புதிய சாதன கோரிக்கை",
+            newDeviceRequestBody = "%s ஆர்டர் ஊழியராக இணைய விரும்புகிறது.",
+            approveButton = "அனுமதி",
+            rejectButton = "நிராகரி",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -3143,6 +3167,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             deleteCategoryWarning = "การลบ \"%1\$s\" จะลบเมนู %2\$d รายการอย่างถาวรทุกที่ — รวมถึงที่แสดงในหมวดอื่นด้วย ไม่สามารถย้อนกลับได้",
             receiptLogoLabel = "โลโก้บนใบเสร็จ",
             cafeDefaultLanguage = "ค่าเริ่มต้นของร้าน",
+            newDeviceRequestTitle = "คำขอเชื่อมต่ออุปกรณ์ใหม่",
+            newDeviceRequestBody = "%s ต้องการเชื่อมต่อเป็นพนักงานรับออเดอร์",
+            approveButton = "อนุมัติ",
+            rejectButton = "ปฏิเสธ",
         ),
     )
 }

@@ -43,8 +43,25 @@ class DevicesViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(UiState(currentDeviceId = currentDeviceId))
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    /** PENDING devices awaiting approval — drives the admin home approval popup. */
+    private val _pendingRequests = MutableStateFlow<List<DeviceDto>>(emptyList())
+    val pendingRequests: StateFlow<List<DeviceDto>> = _pendingRequests.asStateFlow()
+
     init {
         loadDevices()
+    }
+
+    /**
+     * Lightweight poll (no UI-state churn) for PENDING device requests, so the admin home can
+     * pop up an approve/reject prompt as soon as an ordering-staff device scans in.
+     */
+    fun refreshPendingRequests() {
+        viewModelScope.launch {
+            val result = apiClient.getDevices()
+            if (result is ApiResult.Success) {
+                _pendingRequests.value = result.data.filter { it.status == "PENDING" }
+            }
+        }
     }
 
     fun loadDevices() {
