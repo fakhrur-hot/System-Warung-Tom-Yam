@@ -3,6 +3,7 @@ package com.warungtomyam.pos.ui.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.warungtomyam.pos.data.SecureStorage
+import com.warungtomyam.pos.data.local.SessionPrefs
 import com.warungtomyam.pos.ui.navigation.NavRoutes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +21,8 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class StartupViewModel @Inject constructor(
-    private val secureStorage: SecureStorage
+    private val secureStorage: SecureStorage,
+    private val sessionPrefs: SessionPrefs
 ) : ViewModel() {
 
     sealed class State {
@@ -41,8 +43,11 @@ class StartupViewModel @Inject constructor(
                         NavRoutes.ORDERING_CONNECT
                     secureStorage.isAuthenticated() ->
                         when (secureStorage.getRole()) {
+                            // If the admin signed out (café locked), stay on the lock screen and
+                            // require a manual reopen instead of silently logging back in.
                             SecureStorage.Role.ADMIN,
-                            SecureStorage.Role.ADMIN_SECONDARY -> NavRoutes.ADMIN_HOME
+                            SecureStorage.Role.ADMIN_SECONDARY ->
+                                if (sessionPrefs.isLocked()) NavRoutes.ADMIN_LOCK else NavRoutes.ADMIN_HOME
                             SecureStorage.Role.ORDERING -> NavRoutes.ORDERING_HOME
                             null -> NavRoutes.ROLE_SELECT
                         }

@@ -123,6 +123,8 @@ class AdminSessionViewModel @Inject constructor(
             // Post OPEN to backend
             when (val result = apiClient.postSession("OPEN")) {
                 is ApiResult.Success -> {
+                    // Café is open again → clear the signed-out/locked flag so startup goes home.
+                    sessionPrefs.setLocked(false)
                     _uiState.value = _uiState.value.copy(isSessionOpen = true)
                     // Capture "is this the first open of the day?" BEFORE marking today opened —
                     // otherwise checkDailyPopup()'s own isNewDay() check would always be false
@@ -177,6 +179,9 @@ class AdminSessionViewModel @Inject constructor(
      * the next print).
      */
     private fun quietBackground() {
+        // Persist the signed-out state so a cold relaunch shows the lock screen instead of
+        // auto-signing back in (credentials remain valid). Cleared when the session reopens.
+        sessionPrefs.setLocked(true)
         com.warungtomyam.pos.realtime.RealtimeService.stop(context)
         com.warungtomyam.pos.realtime.OrderingForegroundService.stop(context)
         printerConnectionManager.disconnectAll()

@@ -104,7 +104,6 @@ fun AdminSettingsScreen(
     var showChangePin by remember { mutableStateOf(false) }
     // Device-local UI prefs (immediate).
     var showPrintStatus by remember { mutableStateOf(devicePrefsViewModel.showPrintStatus()) }
-    var lowStockAlerts by remember { mutableStateOf(devicePrefsViewModel.lowStockAlerts()) }
 
     // Location permission helper
     val locationPermHelper = rememberPermissionHelper(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -544,26 +543,6 @@ fun AdminSettingsScreen(
                 }
                 Text(
                     text = strings.showPrintStatusDesc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(strings.lowStockAlertsLabel)
-                    Switch(
-                        checked = lowStockAlerts,
-                        onCheckedChange = {
-                            devicePrefsViewModel.setLowStockAlerts(it); lowStockAlerts = it
-                        }
-                    )
-                }
-                Text(
-                    text = strings.lowStockAlertsDesc,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
