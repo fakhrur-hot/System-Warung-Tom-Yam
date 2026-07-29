@@ -24,10 +24,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -63,6 +66,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.warungtomyam.pos.ui.components.PermissionSettingsDialog
 import com.warungtomyam.pos.ui.components.rememberPermissionHelper
+import com.warungtomyam.pos.ui.i18n.AppLanguage
 import com.warungtomyam.pos.ui.i18n.LanguageViewModel
 import com.warungtomyam.pos.ui.i18n.uiStrings
 import com.warungtomyam.pos.ui.viewmodels.AdminSettingsViewModel
@@ -264,6 +268,35 @@ fun AdminSettingsScreen(
                         onCheckedChange = { viewModel.updateStaffCanTakePayment(it) }
                     )
                 }
+            }
+
+            HorizontalDivider()
+
+            // === Default Language (café-wide, per surface) ===
+            SettingsSection(title = strings.defaultLanguageSection) {
+                LanguagePickerRow(
+                    label = strings.defaultLangAdminLabel,
+                    selectedCode = uiState.defaultLangAdmin,
+                    onSelect = { viewModel.updateDefaultLangAdmin(it) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LanguagePickerRow(
+                    label = strings.defaultLangOrderingLabel,
+                    selectedCode = uiState.defaultLangOrdering,
+                    onSelect = { viewModel.updateDefaultLangOrdering(it) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                LanguagePickerRow(
+                    label = strings.defaultLangCustomerLabel,
+                    selectedCode = uiState.defaultLangCustomer,
+                    onSelect = { viewModel.updateDefaultLangCustomer(it) }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = strings.defaultLanguageHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             HorizontalDivider()
@@ -603,5 +636,44 @@ private fun SettingsSection(
         )
         Spacer(modifier = Modifier.height(12.dp))
         content()
+    }
+}
+
+/**
+ * A labelled language selector: the label on the left, a dropdown showing the currently
+ * selected language on the right. [selectedCode] / [onSelect] use the café server codes
+ * (BM/EN/ZH/TA/TH); option labels come from [AppLanguage.displayName].
+ */
+@Composable
+private fun LanguagePickerRow(
+    label: String,
+    selectedCode: String,
+    onSelect: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selected = AppLanguage.fromServerCode(selectedCode)
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label)
+        Box {
+            OutlinedButton(onClick = { expanded = true }) {
+                Text(selected.displayName)
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                AppLanguage.entries.forEach { lang ->
+                    DropdownMenuItem(
+                        text = { Text(lang.displayName) },
+                        onClick = {
+                            expanded = false
+                            onSelect(lang.serverCode)
+                        }
+                    )
+                }
+            }
+        }
     }
 }

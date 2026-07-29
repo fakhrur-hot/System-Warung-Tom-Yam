@@ -489,6 +489,12 @@ data class UiStringsGroup8(
     val marketPriceMode: String,
     val codeFieldLabel: String,
     val newCategoryLabel: String,
+    // ── Default language (café-wide, per surface) ──
+    val defaultLanguageSection: String,
+    val defaultLangAdminLabel: String,
+    val defaultLangOrderingLabel: String,
+    val defaultLangCustomerLabel: String,
+    val defaultLanguageHint: String,
 )
 
 class UiStrings(
@@ -905,6 +911,11 @@ class UiStrings(
     val marketPriceMode: String get() = g8.marketPriceMode
     val codeFieldLabel: String get() = g8.codeFieldLabel
     val newCategoryLabel: String get() = g8.newCategoryLabel
+    val defaultLanguageSection: String get() = g8.defaultLanguageSection
+    val defaultLangAdminLabel: String get() = g8.defaultLangAdminLabel
+    val defaultLangOrderingLabel: String get() = g8.defaultLangOrderingLabel
+    val defaultLangCustomerLabel: String get() = g8.defaultLangCustomerLabel
+    val defaultLanguageHint: String get() = g8.defaultLanguageHint
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1328,6 +1339,11 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             marketPriceMode = "Harga Pasaran",
             codeFieldLabel = "Kod (pilihan)",
             newCategoryLabel = "Kategori baharu",
+            defaultLanguageSection = "Bahasa Lalai",
+            defaultLangAdminLabel = "Apl Admin",
+            defaultLangOrderingLabel = "Staf Pesanan",
+            defaultLangCustomerLabel = "Web Pelanggan",
+            defaultLanguageHint = "Peranti dan pelawat baharu bermula dalam bahasa ini. Sesiapa yang menukar bahasa pada peranti sendiri akan mengekalkan pilihan mereka.",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -1750,6 +1766,11 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             marketPriceMode = "Market Price",
             codeFieldLabel = "Code (optional)",
             newCategoryLabel = "New category",
+            defaultLanguageSection = "Default Language",
+            defaultLangAdminLabel = "Admin app",
+            defaultLangOrderingLabel = "Ordering staff",
+            defaultLangCustomerLabel = "Customer web",
+            defaultLanguageHint = "New devices and visitors start in this language. Anyone who changes language on their own device keeps their choice.",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2172,6 +2193,11 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             marketPriceMode = "时价",
             codeFieldLabel = "编号（可选）",
             newCategoryLabel = "新类别",
+            defaultLanguageSection = "默认语言",
+            defaultLangAdminLabel = "管理员应用",
+            defaultLangOrderingLabel = "点餐员工",
+            defaultLangCustomerLabel = "顾客网页",
+            defaultLanguageHint = "新设备和访客以此语言开始。任何人在自己设备上更改语言后将保留其选择。",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -2594,6 +2620,11 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             marketPriceMode = "சந்தை விலை",
             codeFieldLabel = "குறியீடு (விருப்பம்)",
             newCategoryLabel = "புதிய வகை",
+            defaultLanguageSection = "இயல்பு மொழி",
+            defaultLangAdminLabel = "நிர்வாக ஆப்",
+            defaultLangOrderingLabel = "ஆர்டர் ஊழியர்",
+            defaultLangCustomerLabel = "வாடிக்கையாளர் வலை",
+            defaultLanguageHint = "புதிய சாதனங்களும் பார்வையாளர்களும் இந்த மொழியில் தொடங்கும். தங்கள் சாதனத்தில் மொழியை மாற்றியவர்கள் தங்கள் தேர்வை வைத்திருப்பர்.",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -3016,6 +3047,11 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             marketPriceMode = "ราคาตลาด",
             codeFieldLabel = "รหัส (ไม่บังคับ)",
             newCategoryLabel = "หมวดหมู่ใหม่",
+            defaultLanguageSection = "ภาษาเริ่มต้น",
+            defaultLangAdminLabel = "แอปผู้ดูแล",
+            defaultLangOrderingLabel = "พนักงานรับออเดอร์",
+            defaultLangCustomerLabel = "เว็บลูกค้า",
+            defaultLanguageHint = "อุปกรณ์และผู้เยี่ยมชมใหม่จะเริ่มต้นด้วยภาษานี้ ผู้ที่เปลี่ยนภาษาบนอุปกรณ์ของตนเองจะคงตัวเลือกไว้",
         ),
     )
 }

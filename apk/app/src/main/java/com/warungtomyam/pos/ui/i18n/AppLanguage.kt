@@ -16,12 +16,12 @@ import com.warungtomyam.pos.data.local.MenuItem
  * is BM, not English); the other languages are manual per-item overrides, with
  * English used as the last-resort fallback if a translated field is left blank.
  */
-enum class AppLanguage(val buttonLabel: String, val displayName: String) {
-    MY("MY", "Bahasa Malaysia"),
-    EN("EN", "English"),
-    ZH("中文", "中文"),
-    TA("TA", "தமிழ்"),
-    TH("TH", "ไทย");
+enum class AppLanguage(val buttonLabel: String, val displayName: String, val serverCode: String) {
+    MY("MY", "Bahasa Malaysia", "BM"),
+    EN("EN", "English", "EN"),
+    ZH("中文", "中文", "ZH"),
+    TA("TA", "தமிழ்", "TA"),
+    TH("TH", "ไทย", "TH");
 
     /** The menu-item name in this language, falling back to Bahasa Malaysia then English. */
     fun menuName(item: MenuItem): String {
@@ -40,5 +40,15 @@ enum class AppLanguage(val buttonLabel: String, val displayName: String) {
 
         fun fromName(name: String?): AppLanguage =
             entries.firstOrNull { it.name == name } ?: DEFAULT
+
+        /** Map a café-wide server default code (BM/EN/ZH/TA/TH; "MY" also accepted) to a language. */
+        fun fromServerCode(code: String?): AppLanguage = when (code?.uppercase()) {
+            "BM", "MY" -> MY
+            "EN" -> EN
+            "ZH" -> ZH
+            "TA" -> TA
+            "TH" -> TH
+            else -> DEFAULT
+        }
     }
 }

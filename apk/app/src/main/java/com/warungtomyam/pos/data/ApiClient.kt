@@ -1189,7 +1189,10 @@ class ApiClient @Inject constructor(
                             customerOrderAutoPrint = json.optBoolean("customerOrderAutoPrint", true),
                             todaysSpecial = json.optString("todaysSpecial", ""),
                             reportEmail = json.optString("reportEmail", ""),
-                            businessDayStartHour = json.optInt("businessDayStartHour", 15)
+                            businessDayStartHour = json.optInt("businessDayStartHour", 15),
+                            defaultLangAdmin = json.optString("defaultLangAdmin", "BM"),
+                            defaultLangOrdering = json.optString("defaultLangOrdering", "BM"),
+                            defaultLangCustomer = json.optString("defaultLangCustomer", "BM")
                         )
                     )
                 }
@@ -2001,5 +2004,10 @@ data class SettingsResponse(
     val customerOrderAutoPrint: Boolean = true,
     val todaysSpecial: String = "",
     val reportEmail: String = "",
-    val businessDayStartHour: Int = 15
+    val businessDayStartHour: Int = 15,
+    // Café-wide default UI language per surface (BM/EN/ZH/TA/TH). Applied by a device only
+    // when it has no locally-saved language choice yet — see LanguageManager.applyDefaultIfUnset.
+    val defaultLangAdmin: String = "BM",
+    val defaultLangOrdering: String = "BM",
+    val defaultLangCustomer: String = "BM"
 )

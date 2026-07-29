@@ -12,14 +12,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.warungtomyam.pos.ui.navigation.AppNavGraph
 import com.warungtomyam.pos.ui.navigation.DeepLinkInvite
+import com.warungtomyam.pos.ui.i18n.LanguageViewModel
 import com.warungtomyam.pos.ui.theme.WarungTomYamTheme
 import com.warungtomyam.pos.ui.viewmodels.StartupViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -75,6 +78,10 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         is StartupViewModel.State.Ready -> {
+                            // Adopt the café-wide default language for this device's role, but
+                            // only if the operator hasn't already picked one on this device.
+                            val languageViewModel: LanguageViewModel = hiltViewModel()
+                            LaunchedEffect(Unit) { languageViewModel.bootstrapCafeDefault() }
                             val navController = rememberNavController()
                             AppNavGraph(
                                 navController = navController,

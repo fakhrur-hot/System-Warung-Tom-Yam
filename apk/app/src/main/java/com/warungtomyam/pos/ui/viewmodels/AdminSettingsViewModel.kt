@@ -63,6 +63,9 @@ class AdminSettingsViewModel @Inject constructor(
         val todaysSpecial: String = "",
         val reportEmail: String = "",
         val businessDayStartHour: Int = 15,
+        val defaultLangAdmin: String = "BM",
+        val defaultLangOrdering: String = "BM",
+        val defaultLangCustomer: String = "BM",
     )
 
     data class UiState(
@@ -111,6 +114,12 @@ class AdminSettingsViewModel @Inject constructor(
         // to the opening day rather than the post-midnight calendar date.
         val businessDayStartHour: Int = 15,
 
+        // Café-wide default UI language per surface (BM/EN/ZH/TA/TH). A device/browser applies
+        // its surface's default only when it has no locally-saved language choice yet.
+        val defaultLangAdmin: String = "BM",
+        val defaultLangOrdering: String = "BM",
+        val defaultLangCustomer: String = "BM",
+
         // Branding
         val cafeName: String = "",
         val existingLogoUrl: String? = null,
@@ -143,7 +152,10 @@ class AdminSettingsViewModel @Inject constructor(
                 autoPrintToKitchen != savedSnapshot.autoPrintToKitchen ||
                 todaysSpecial != savedSnapshot.todaysSpecial ||
                 reportEmail != savedSnapshot.reportEmail ||
-                businessDayStartHour != savedSnapshot.businessDayStartHour
+                businessDayStartHour != savedSnapshot.businessDayStartHour ||
+                defaultLangAdmin != savedSnapshot.defaultLangAdmin ||
+                defaultLangOrdering != savedSnapshot.defaultLangOrdering ||
+                defaultLangCustomer != savedSnapshot.defaultLangCustomer
     }
 
     private val _uiState = MutableStateFlow(UiState(kitchenFontSize = printSettingsStore.getKitchenFontSize()))
@@ -215,6 +227,9 @@ class AdminSettingsViewModel @Inject constructor(
                         todaysSpecial = result.data.todaysSpecial,
                         reportEmail = result.data.reportEmail,
                         businessDayStartHour = result.data.businessDayStartHour,
+                        defaultLangAdmin = result.data.defaultLangAdmin,
+                        defaultLangOrdering = result.data.defaultLangOrdering,
+                        defaultLangCustomer = result.data.defaultLangCustomer,
                         permissionsLoading = false,
                         savedSnapshot = _uiState.value.savedSnapshot.copy(
                             staffCanSendKitchen = result.data.staffCanSendKitchen,
@@ -224,7 +239,10 @@ class AdminSettingsViewModel @Inject constructor(
                             autoPrintToKitchen = result.data.customerOrderAutoPrint,
                             todaysSpecial = result.data.todaysSpecial,
                             reportEmail = result.data.reportEmail,
-                            businessDayStartHour = result.data.businessDayStartHour
+                            businessDayStartHour = result.data.businessDayStartHour,
+                            defaultLangAdmin = result.data.defaultLangAdmin,
+                            defaultLangOrdering = result.data.defaultLangOrdering,
+                            defaultLangCustomer = result.data.defaultLangCustomer
                         )
                     )
                 }
@@ -432,6 +450,21 @@ class AdminSettingsViewModel @Inject constructor(
     /** Stage the business-day start hour (0–23); committed via [saveAll]. */
     fun updateBusinessDayStartHour(hour: Int) {
         _uiState.value = _uiState.value.copy(businessDayStartHour = hour.coerceIn(0, 23))
+    }
+
+    /** Stage the café default UI language for the admin app (BM/EN/ZH/TA/TH); saved via [saveAll]. */
+    fun updateDefaultLangAdmin(code: String) {
+        _uiState.value = _uiState.value.copy(defaultLangAdmin = code)
+    }
+
+    /** Stage the café default UI language for ordering-staff devices; saved via [saveAll]. */
+    fun updateDefaultLangOrdering(code: String) {
+        _uiState.value = _uiState.value.copy(defaultLangOrdering = code)
+    }
+
+    /** Stage the café default UI language for the customer website; saved via [saveAll]. */
+    fun updateDefaultLangCustomer(code: String) {
+        _uiState.value = _uiState.value.copy(defaultLangCustomer = code)
     }
 
     fun onLocationCaptured(lat: Double, lng: Double) {
@@ -662,6 +695,31 @@ class AdminSettingsViewModel @Inject constructor(
                 }
             }
 
+            // Default UI languages — one PUT carrying whichever of the three changed.
+            if (!anyError && (
+                state.defaultLangAdmin != state.savedSnapshot.defaultLangAdmin ||
+                state.defaultLangOrdering != state.savedSnapshot.defaultLangOrdering ||
+                state.defaultLangCustomer != state.savedSnapshot.defaultLangCustomer
+            )) {
+                val body = JSONObject()
+                if (state.defaultLangAdmin != state.savedSnapshot.defaultLangAdmin) {
+                    body.put("defaultLangAdmin", state.defaultLangAdmin)
+                }
+                if (state.defaultLangOrdering != state.savedSnapshot.defaultLangOrdering) {
+                    body.put("defaultLangOrdering", state.defaultLangOrdering)
+                }
+                if (state.defaultLangCustomer != state.savedSnapshot.defaultLangCustomer) {
+                    body.put("defaultLangCustomer", state.defaultLangCustomer)
+                }
+                when (apiClient.putSettings(body)) {
+                    is ApiResult.Success -> { /* persisted */ }
+                    else -> {
+                        anyError = true
+                        _uiState.value = _uiState.value.copy(error = str().saveFailedGeneric)
+                    }
+                }
+            }
+
             if (!anyError) {
                 val current = _uiState.value
                 _uiState.value = current.copy(
@@ -679,6 +737,9 @@ class AdminSettingsViewModel @Inject constructor(
                         todaysSpecial = current.todaysSpecial,
                         reportEmail = current.reportEmail,
                         businessDayStartHour = current.businessDayStartHour,
+                        defaultLangAdmin = current.defaultLangAdmin,
+                        defaultLangOrdering = current.defaultLangOrdering,
+                        defaultLangCustomer = current.defaultLangCustomer,
                     ),
                     successMessage = str().settingsSaved
                 )

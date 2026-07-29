@@ -23,9 +23,24 @@ class LanguageManager @Inject constructor(
     )
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
+    /** True once the operator has explicitly picked a language on THIS device. */
+    fun hasUserChoice(): Boolean = prefs.contains(KEY)
+
     fun set(language: AppLanguage) {
         _language.value = language
         prefs.edit().putString(KEY, language.name).apply()
+    }
+
+    /**
+     * Apply a café-wide default language, but ONLY when this device has no explicit choice
+     * yet. Deliberately NOT persisted to [KEY] — so [hasUserChoice] stays false and the device
+     * keeps following the café default (even if the admin later changes it) until the operator
+     * picks a language here, at which point [set] records their choice and this stops applying.
+     */
+    fun applyDefaultIfUnset(default: AppLanguage) {
+        if (!hasUserChoice()) {
+            _language.value = default
+        }
     }
 
     companion object {

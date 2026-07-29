@@ -21,7 +21,16 @@ const KEY_MAP: Record<string, string> = {
   customer_order_hold_seconds: "customerOrderHoldSeconds",
   todays_special: "todaysSpecial",
   business_day_start_hour: "businessDayStartHour",
+  // Café-wide default UI language per surface (BM/EN/ZH/TA/TH). Each client applies the
+  // relevant one ONLY when it has no locally-saved language choice yet — see the apps'
+  // language bootstrap. Default seed is BM.
+  default_lang_admin: "defaultLangAdmin",
+  default_lang_ordering: "defaultLangOrdering",
+  default_lang_customer: "defaultLangCustomer",
 };
+
+// Allowed default-language codes (shared by the three defaultLang* settings).
+const DEFAULT_LANG_OPTIONS = ["BM", "EN", "ZH", "TA", "TH"];
 
 // Allowed values for the customer "hold before kitchen" delay (seconds).
 const CUSTOMER_HOLD_OPTIONS = [10, 15, 30, 60];
@@ -39,6 +48,7 @@ const PUBLIC_KEYS = new Set([
   "timezone",
   "customerOrderHoldSeconds",
   "todaysSpecial", // shown on the customer menu
+  "defaultLangCustomer", // the customer website reads its default language unauthenticated
 ]);
 
 serve(async (req) => {
@@ -236,6 +246,13 @@ function validateSetting(apiKey: string, value: unknown): string | null {
       }
       if (value.length > 200) {
         return "todaysSpecial must be 200 characters or fewer";
+      }
+      break;
+    case "defaultLangAdmin":
+    case "defaultLangOrdering":
+    case "defaultLangCustomer":
+      if (typeof value !== "string" || !DEFAULT_LANG_OPTIONS.includes(value)) {
+        return `${apiKey} must be one of ${DEFAULT_LANG_OPTIONS.join(", ")}`;
       }
       break;
   }

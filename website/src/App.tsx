@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { applyCafeDefault, serverCodeToLang } from './i18n'
 import { getSupabase } from './lib/supabase'
 import { getBrowserId } from './lib/browserId'
 import Header from './components/Header'
@@ -211,6 +212,9 @@ export default function App() {
         const s = Number(data?.customerOrderHoldSeconds)
         if (Number.isFinite(s) && s > 0) setHoldSeconds(s)
         if (typeof data?.todaysSpecial === 'string') setTodaysSpecial(data.todaysSpecial)
+        // Adopt the café-wide default language — only if this visitor hasn't chosen one.
+        const def = serverCodeToLang(data?.defaultLangCustomer)
+        if (def) applyCafeDefault(def)
       } catch {
         // Non-critical — fall back to defaults.
       }

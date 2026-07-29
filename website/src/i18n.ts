@@ -36,4 +36,32 @@ export function setLang(lang: Lang) {
   void i18n.changeLanguage(lang)
 }
 
+// Map a café-wide server default code (BM/EN/ZH/TA/TH; "MY" also accepted) to our Lang token.
+export function serverCodeToLang(code: string | null | undefined): Lang | null {
+  switch ((code ?? '').toUpperCase()) {
+    case 'BM':
+    case 'MY':
+      return 'bm'
+    case 'EN':
+      return 'en'
+    case 'ZH':
+      return 'zh'
+    case 'TA':
+      return 'ta'
+    case 'TH':
+      return 'th'
+    default:
+      return null
+  }
+}
+
+// Apply the café-wide default language, but ONLY when this browser has no saved choice yet.
+// Deliberately does NOT write localStorage — a returning visitor who picked a language keeps
+// it, and the café default stays overridable until they choose one here.
+export function applyCafeDefault(lang: Lang) {
+  if (!localStorage.getItem('lang')) {
+    void i18n.changeLanguage(lang)
+  }
+}
+
 export default i18n
