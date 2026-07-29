@@ -166,8 +166,11 @@ class MenuViewModel @Inject constructor(
                 selectCategory(trimmed)
                 return@launch
             }
+            // Add + persist, but DON'T move the tab selection to the new last tab in the same
+            // frame — ScrollableTabRow reads tabPositions[selectedIndex] before its positions
+            // list has grown, which throws IndexOutOfBounds. The new tab simply appears at the
+            // end and the admin taps it. (The list stays on the current selection, always valid.)
             ensureCategory(trimmed)
-            _uiState.update { it.copy(selectedCategory = trimmed) }
             pushMenuToBackend()
         }
     }

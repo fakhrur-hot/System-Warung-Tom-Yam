@@ -178,7 +178,10 @@ fun MenuManagementScreen(
             // Category tabs — dynamic ordered category names. Custom names render verbatim;
             // the 4 legacy enum names keep their localized labels.
             val categories = uiState.categories
-            val selectedIndex = categories.indexOf(uiState.effectiveSelectedCategory).coerceAtLeast(0)
+            // Clamp into the current tab range — ScrollableTabRow throws IndexOutOfBounds if
+            // selectedTabIndex ever exceeds the tab count (e.g. the frame the list changes size).
+            val selectedIndex = categories.indexOf(uiState.effectiveSelectedCategory)
+                .coerceIn(0, (categories.size - 1).coerceAtLeast(0))
 
             if (categories.isNotEmpty()) {
                 androidx.compose.material3.ScrollableTabRow(
