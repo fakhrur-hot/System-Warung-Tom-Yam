@@ -79,9 +79,12 @@ async function handlePutCafeLocation(req: Request): Promise<Response> {
 
 // ── GET /api/cafe-location ─────────────────────────────────────────────────
 async function handleGetCafeLocation(req: Request): Promise<Response> {
-  const device = await verifyOrderingKey(req);
-  if (!device) {
-    return errorResponse(401, "UNAUTHORIZED", "Ordering API key required");
+  // The admin sets the location (PUT is admin-only) and its own Settings screen must be able to
+  // read it back, so accept the admin token here too — not just an ordering device's key.
+  const admin = await verifyAdminToken(req);
+  const device = admin ? null : await verifyOrderingKey(req);
+  if (!admin && !device) {
+    return errorResponse(401, "UNAUTHORIZED", "Admin or ordering credentials required");
   }
 
   const supabase = getSupabaseClient();

@@ -171,6 +171,7 @@ class AdminSettingsViewModel @Inject constructor(
         loadInvite()
         loadBranding()
         loadPermissions()
+        loadCafeLocation()
     }
 
     /** Kitchen-slip menu font size is device-local — persist and apply immediately. */
@@ -212,6 +213,31 @@ class AdminSettingsViewModel @Inject constructor(
      * Load staff permission settings from the backend and update both the editable
      * fields and the snapshot so [isDirty] is false right after a fresh load.
      */
+    /**
+     * Load the saved café GPS location from the backend so the Settings screen shows the persisted
+     * coordinates/radius on open (and [isDirty] stays false afterwards). Best-effort: if the
+     * location was never configured, the fields simply stay empty.
+     */
+    fun loadCafeLocation() {
+        viewModelScope.launch {
+            when (val result = apiClient.getCafeLocation()) {
+                is ApiResult.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        latitude = result.data.latitude,
+                        longitude = result.data.longitude,
+                        radiusMeters = result.data.radiusMeters,
+                        savedSnapshot = _uiState.value.savedSnapshot.copy(
+                            latitude = result.data.latitude,
+                            longitude = result.data.longitude,
+                            radiusMeters = result.data.radiusMeters
+                        )
+                    )
+                }
+                else -> { /* not configured / unreachable — leave fields empty */ }
+            }
+        }
+    }
+
     fun loadPermissions() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(permissionsLoading = true)
@@ -787,6 +813,7 @@ class AdminSettingsViewModel @Inject constructor(
     fun cancelAll() {
         loadBranding()
         loadPermissions()
+        loadCafeLocation()
         // Staged logo is cleared — after reload the server state is authoritative
         _uiState.value = _uiState.value.copy(
             logoPreview = null,

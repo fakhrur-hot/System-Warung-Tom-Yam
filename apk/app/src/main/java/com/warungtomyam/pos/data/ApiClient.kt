@@ -1212,8 +1212,11 @@ class ApiClient @Inject constructor(
     suspend fun getCafeLocation(): ApiResult<CafeLocationResponse> =
         withContext(Dispatchers.IO) {
             try {
-                val token = orderingBearerToken()
-                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
+                // Role-aware: admin devices (which set the location) use their session token;
+                // ordering devices use their API key. Was ordering-only, so the admin's own
+                // Settings screen could never read the saved location back.
+                val token = getAuthToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No auth token")
 
                 val request = Request.Builder()
                     .url("$BASE_URL/cafe-location")
@@ -1228,13 +1231,18 @@ class ApiClient @Inject constructor(
                 when (response.code) {
                     200 -> {
                         val json = JSONObject(responseBody)
-                        ApiResult.Success(
-                            CafeLocationResponse(
-                                latitude = json.getDouble("latitude"),
-                                longitude = json.getDouble("longitude"),
-                                radiusMeters = json.getInt("radiusMeters")
+                        // A never-configured café has null coordinates — treat as "not set".
+                        if (json.isNull("latitude") || json.isNull("longitude")) {
+                            ApiResult.Error("NOT_CONFIGURED", "Location not set")
+                        } else {
+                            ApiResult.Success(
+                                CafeLocationResponse(
+                                    latitude = json.getDouble("latitude"),
+                                    longitude = json.getDouble("longitude"),
+                                    radiusMeters = if (json.isNull("radiusMeters")) 100 else json.getInt("radiusMeters")
+                                )
                             )
-                        )
+                        }
                     }
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired API key")
                     else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
