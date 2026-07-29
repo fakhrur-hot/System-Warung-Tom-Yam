@@ -68,6 +68,7 @@ type ViewState =
   | { type: 'menu'; menu: MenuData }
   | { type: 'status'; order: Order }
   | { type: 'placeholder' }
+  | { type: 'closed' }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -246,7 +247,10 @@ export default function App() {
         setTableName((sessionData as { displayName?: string }).displayName ?? null)
 
         // Step 2: Branch based on session state
-        if (sessionData.state === 'FREE') {
+        if (sessionData.state === 'CLOSED') {
+          // Café signed out for the day — not taking orders.
+          setView({ type: 'closed' })
+        } else if (sessionData.state === 'FREE') {
           // Fetch menu
           const { data: menuData, error: menuError } = await supabase.functions.invoke('menu', {
             method: 'GET',
@@ -519,6 +523,17 @@ export default function App() {
 
       case 'placeholder':
         return <PlaceholderView />
+
+      case 'closed':
+        return (
+          <div className="flex min-h-[60vh] items-center justify-center px-4">
+            <div className="text-center">
+              <span className="mb-4 block text-5xl" aria-hidden="true">🌙</span>
+              <h2 className="text-xl font-semibold text-emerald-800">{t('cafeClosedTitle')}</h2>
+              <p className="mt-2 text-sm text-emerald-600">{t('cafeClosedBody')}</p>
+            </div>
+          </div>
+        )
 
       case 'menu': {
         const orderedCategories = deriveCategories(view.menu)

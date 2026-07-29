@@ -57,5 +57,7 @@
   "scanQrNotTable": "That doesn't look like a table QR code. Try again.",
   "cameraDenied": "Camera permission is needed to scan. Allow it in your browser settings, then try again.",
   "cameraUnsupported": "This browser can't open the camera. Please scan the QR code with your phone's camera app instead.",
-  "closeScanner": "Close"
+  "closeScanner": "Close",
+  "cafeClosedTitle": "Not open yet",
+  "cafeClosedBody": "The restaurant isn't open right now. Please check back soon!"
 }

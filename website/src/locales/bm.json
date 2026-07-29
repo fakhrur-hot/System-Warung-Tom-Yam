@@ -57,5 +57,7 @@
   "scanQrNotTable": "Itu tidak kelihatan seperti kod QR meja. Cuba lagi.",
   "cameraDenied": "Kebenaran kamera diperlukan untuk mengimbas. Benarkannya dalam tetapan pelayar anda, kemudian cuba lagi.",
   "cameraUnsupported": "Pelayar ini tidak dapat membuka kamera. Sila imbas kod QR menggunakan aplikasi kamera telefon anda.",
-  "closeScanner": "Tutup"
+  "closeScanner": "Tutup",
+  "cafeClosedTitle": "Belum dibuka",
+  "cafeClosedBody": "Restoran belum dibuka lagi. Sila kembali sebentar lagi!"
 }

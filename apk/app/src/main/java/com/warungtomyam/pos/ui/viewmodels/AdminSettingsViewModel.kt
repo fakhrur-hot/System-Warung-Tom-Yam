@@ -39,7 +39,8 @@ class AdminSettingsViewModel @Inject constructor(
     private val apiClient: ApiClient,
     private val settingsDao: SettingsDao,
     @ApplicationContext private val context: Context,
-    private val languageManager: LanguageManager
+    private val languageManager: LanguageManager,
+    private val printSettingsStore: com.warungtomyam.pos.data.local.PrintSettingsStore
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
@@ -71,6 +72,8 @@ class AdminSettingsViewModel @Inject constructor(
         // Invite for adding a SECONDARY ADMIN device (full management, no local printer)
         val adminInvite: InviteResponse? = null,
         val adminInviteLoading: Boolean = false,
+        // Kitchen-slip menu-text size (device-local): XS/S/M/L/XL/XXL. Applied immediately.
+        val kitchenFontSize: String = "S",
 
         // Staff Permissions
         val staffCanSendKitchen: Boolean = false,
@@ -140,13 +143,19 @@ class AdminSettingsViewModel @Inject constructor(
                 businessDayStartHour != savedSnapshot.businessDayStartHour
     }
 
-    private val _uiState = MutableStateFlow(UiState())
+    private val _uiState = MutableStateFlow(UiState(kitchenFontSize = printSettingsStore.getKitchenFontSize()))
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     init {
         loadInvite()
         loadBranding()
         loadPermissions()
+    }
+
+    /** Kitchen-slip menu font size is device-local — persist and apply immediately. */
+    fun updateKitchenFontSize(size: String) {
+        printSettingsStore.setKitchenFontSize(size)
+        _uiState.value = _uiState.value.copy(kitchenFontSize = size)
     }
 
     /**

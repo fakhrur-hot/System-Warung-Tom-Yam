@@ -57,5 +57,7 @@
   "scanQrNotTable": "这看起来不是餐桌二维码，请重试。",
   "cameraDenied": "扫描需要相机权限。请在浏览器设置中允许后重试。",
   "cameraUnsupported": "此浏览器无法打开相机。请改用手机的相机应用扫描二维码。",
-  "closeScanner": "关闭"
+  "closeScanner": "关闭",
+  "cafeClosedTitle": "尚未营业",
+  "cafeClosedBody": "餐厅尚未营业，请稍后再来！"
 }

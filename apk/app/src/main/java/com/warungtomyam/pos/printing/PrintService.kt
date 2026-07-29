@@ -29,7 +29,8 @@ class PrintService @Inject constructor(
     private val printerConfigDao: PrinterConfigDao,
     private val settingsDao: SettingsDao,
     private val tableDao: TableDao,
-    private val secureStorage: SecureStorage
+    private val secureStorage: SecureStorage,
+    private val printSettingsStore: com.warungtomyam.pos.data.local.PrintSettingsStore
 ) {
 
     // A secondary-admin device has no local printer — all its slips/receipts are printed by
@@ -69,7 +70,8 @@ class PrintService @Inject constructor(
             charWidth = charWidth,
             printLanguage = printLanguage,
             timezone = timezone,
-            sessionNumber = sessionNumber
+            sessionNumber = sessionNumber,
+            menuFontSize = printSettingsStore.getKitchenFontSize()
         )
 
         for ((category, payload) in slipsByCategory) {
