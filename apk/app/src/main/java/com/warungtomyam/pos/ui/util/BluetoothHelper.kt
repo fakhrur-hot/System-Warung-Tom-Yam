@@ -138,9 +138,14 @@ class BluetoothHelper(private val context: Context) {
         }
         context.registerReceiver(discoveryReceiver, filter)
 
-        // Cancel any ongoing discovery and start fresh
-        adapter.cancelDiscovery()
-        adapter.startDiscovery()
+        // Cancel any ongoing discovery and start fresh. Guard against a permission being
+        // revoked between hasPermissions() above and here so a scan can never crash the app.
+        try {
+            adapter.cancelDiscovery()
+            adapter.startDiscovery()
+        } catch (_: SecurityException) {
+            _isScanning.value = false
+        }
     }
 
     /**
@@ -148,7 +153,14 @@ class BluetoothHelper(private val context: Context) {
      */
     @SuppressLint("MissingPermission")
     fun stopDiscovery() {
-        bluetoothAdapter?.cancelDiscovery()
+        // cancelDiscovery() needs BLUETOOTH_SCAN on Android 12+. If it was never granted
+        // (or was revoked), the platform throws SecurityException — which, when this runs from
+        // PrintersViewModel.onCleared() on back-navigation, was crashing the whole app. Cleanup
+        // must never crash, so swallow it: there's nothing of ours to cancel in that case.
+        try {
+            bluetoothAdapter?.cancelDiscovery()
+        } catch (_: SecurityException) {
+        }
         _isScanning.value = false
         discoveryReceiver?.let {
             try {
