@@ -59,5 +59,6 @@
   "cameraUnsupported": "Pelayar ini tidak dapat membuka kamera. Sila imbas kod QR menggunakan aplikasi kamera telefon anda.",
   "closeScanner": "Tutup",
   "cafeClosedTitle": "Belum dibuka",
-  "cafeClosedBody": "Restoran belum dibuka lagi. Sila kembali sebentar lagi!"
+  "cafeClosedBody": "Restoran belum dibuka lagi. Sila kembali sebentar lagi!",
+  "searchMenu": "Cari"
 }

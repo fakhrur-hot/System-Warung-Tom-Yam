@@ -7,6 +7,10 @@ keystore.properties
 .env.local
 .env.*.local
 # .env.example templates ARE committed (they hold placeholders only)
+supabase_k*
+*.supabase-keys*
+credentials.txt
+secrets.txt
 
 # ── Deployment-specific (per-café) — keep the product repo generic ─────
 # The actual café's Cloudflare Pages config is local-only; commit only the .example.

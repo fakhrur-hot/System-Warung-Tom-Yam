@@ -29,6 +29,7 @@ import com.warungtomyam.pos.ui.screens.PrintersScreen
 import com.warungtomyam.pos.ui.screens.QrPdfScreen
 import com.warungtomyam.pos.ui.screens.ReportsScreen
 import com.warungtomyam.pos.ui.screens.RoleSelectScreen
+import com.warungtomyam.pos.ui.screens.TableManagementScreen
 
 /**
  * Main navigation graph. Start destination is determined by current auth state.
@@ -109,16 +110,7 @@ fun AppNavGraph(
         }
 
         composable(NavRoutes.ADMIN_HOME) {
-            // Listen for "openTableManagement" signal from CafeManagementScreen
-            val openTableManagement = it.savedStateHandle
-                .getStateFlow("openTableManagement", false)
-                .collectAsState()
-
             AdminHomeScreen(
-                openTableManagementOnStart = openTableManagement.value,
-                onTableManagementOpened = {
-                    it.savedStateHandle["openTableManagement"] = false
-                },
                 onNavigateToLock = {
                     navController.navigate(NavRoutes.ADMIN_LOCK) {
                         popUpTo(NavRoutes.ADMIN_HOME) { inclusive = true }
@@ -287,15 +279,21 @@ fun AppNavGraph(
                     navController.navigate(NavRoutes.MENU_MANAGEMENT)
                 },
                 onNavigateToTables = {
-                    // Signal AdminHomeScreen to open the table management dialog on return
-                    navController.previousBackStackEntry
-                        ?.savedStateHandle
-                        ?.set("openTableManagement", true)
-                    navController.popBackStack()
+                    navController.navigate(NavRoutes.TABLE_MANAGEMENT)
                 },
                 onNavigateToQrPdf = {
                     navController.navigate(NavRoutes.QR_PDF)
+                },
+                onNavigateToPrinters = {
+                    navController.navigate(NavRoutes.PRINTERS)
                 }
+            )
+        }
+
+        // Tables Management — dedicated full-screen page (was a modal over the table view).
+        composable(NavRoutes.TABLE_MANAGEMENT) {
+            TableManagementScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

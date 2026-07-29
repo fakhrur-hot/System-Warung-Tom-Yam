@@ -80,8 +80,6 @@ fun AdminHomeScreen(
     devicePrefsViewModel: com.warungtomyam.pos.ui.viewmodels.DevicePrefsViewModel = hiltViewModel(),
     onNavigateToLock: () -> Unit,
     onNavigateToReconnect: () -> Unit = {},
-    openTableManagementOnStart: Boolean = false,
-    onTableManagementOpened: () -> Unit = {},
     onNavigateToDineIn: () -> Unit = {},
     onNavigateToDevices: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
@@ -136,16 +134,6 @@ fun AdminHomeScreen(
         tableViewModel.rehydrateTablesIfEmpty()
         // Reconcile this device's admin role (it may have been promoted/demoted elsewhere).
         sessionViewModel.refreshRole()
-    }
-    // Observed so the greyed printer control reacts to a role change.
-    val currentRole by sessionViewModel.currentRole.collectAsState()
-
-    // Open the table management dialog when navigating back from CafeManagementScreen
-    LaunchedEffect(openTableManagementOnStart) {
-        if (openTableManagementOnStart) {
-            tableViewModel.showTableManagement()
-            onTableManagementOpened()
-        }
     }
 
     // Handle navigation to lock screen
@@ -268,16 +256,7 @@ fun AdminHomeScreen(
                                     onNavigateToDevices()
                                 }
                             )
-                            DropdownMenuItem(
-                                // A secondary admin has no local printer — keep the item visible
-                                // (so the menu looks the same) but greyed out and unclickable.
-                                text = { Text(strings.printersTitle) },
-                                enabled = currentRole != com.warungtomyam.pos.data.SecureStorage.Role.ADMIN_SECONDARY,
-                                onClick = {
-                                    showOverflowMenu = false
-                                    onNavigateToPrinters()
-                                }
-                            )
+                            // Printers moved into Café Management (under Generate Table QR).
 
                             HorizontalDivider()
 
@@ -438,18 +417,20 @@ fun AdminHomeScreen(
             cart = orderEntry.cart.map {
                 CartLine(
                     menuItemId = it.menuItem.id,
-                    name = language.menuName(it.menuItem),
-                    unitPrice = it.menuItem.price,
+                    name = language.menuName(it.menuItem) + (it.size?.let { s -> " ($s)" } ?: ""),
+                    unitPrice = it.unitPrice ?: it.menuItem.price,
                     quantity = it.quantity,
+                    note = it.note,
                 )
             },
             language = language,
             strings = strings,
             isSubmitting = orderEntry.isSubmitting,
-            onAdd = { tableViewModel.addToCart(it) },
-            onRemove = { tableViewModel.removeFromCart(it) },
+            onAdd = { item, note, size, price -> tableViewModel.addToCart(item, note, size, price) },
+            onRemove = { index -> tableViewModel.removeFromCart(index) },
             onSubmit = { tableViewModel.submitOrder() },
             onDismiss = { tableViewModel.dismissOrderEntry() },
+            categoryOrder = orderEntry.categoryOrder,
         )
     }
 

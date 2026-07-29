@@ -49,6 +49,7 @@ class TableViewViewModel @Inject constructor(
     private val tableDao: TableDao,
     private val settingsDao: SettingsDao,
     private val menuDao: MenuDao,
+    private val categoryStore: com.warungtomyam.pos.data.local.MenuCategoryStore,
     private val printService: PrintService,
     private val languageManager: LanguageManager
 ) : ViewModel() {
@@ -152,13 +153,23 @@ class TableViewViewModel @Inject constructor(
 
     // --- Order entry (new order on a free table) ---
 
-    data class EntryCartItem(val menuItem: MenuItem, val quantity: Int)
+    data class EntryCartItem(
+        val menuItem: MenuItem,
+        val quantity: Int,
+        val note: String? = null,
+        /** Chosen size label (e.g. "S"/"M"/"L") for a variable-price item; null otherwise. */
+        val size: String? = null,
+        /** Chosen size price; null means use the item's base price. */
+        val unitPrice: Double? = null,
+    )
 
     data class OrderEntryState(
         val isVisible: Boolean = false,
         val tableId: String? = null,
         val tableLabel: String = "",
         val menuItems: List<MenuItem> = emptyList(),
+        /** Admin-defined category order, so the order-entry tabs match Menu Management. */
+        val categoryOrder: List<String> = emptyList(),
         val cart: List<EntryCartItem> = emptyList(),
         val isSubmitting: Boolean = false,
         // Non-null while the pre-send hold countdown is running (seconds remaining).
@@ -180,23 +191,29 @@ class TableViewViewModel @Inject constructor(
                 tableId = tableId,
                 tableLabel = tableLabel,
                 menuItems = menu,
+                categoryOrder = categoryStore.get(),
             )
         }
     }
 
-    fun addToCart(item: MenuItem) {
+    fun addToCart(item: MenuItem, note: String? = null, size: String? = null, unitPrice: Double? = null) {
+        val n = note?.trim()?.ifBlank { null }
         val cart = _orderEntry.value.cart.toMutableList()
-        val idx = cart.indexOfFirst { it.menuItem.id == item.id }
+        // Plain repeats of the same dish+size merge (×2, ×3); a different note or size is its
+        // own line (so Small and Large of the same dish stay separate).
+        val idx = cart.indexOfFirst { it.menuItem.id == item.id && it.note == n && it.size == size }
         if (idx >= 0) {
             cart[idx] = cart[idx].copy(quantity = cart[idx].quantity + 1)
         } else {
-            cart.add(EntryCartItem(item, 1))
+            cart.add(EntryCartItem(item, 1, n, size, unitPrice))
         }
         _orderEntry.value = _orderEntry.value.copy(cart = cart)
     }
 
-    fun removeFromCart(menuItemId: String) {
-        val cart = _orderEntry.value.cart.filterNot { it.menuItem.id == menuItemId }
+    /** Remove a single cart line by its position (notes make ids non-unique). */
+    fun removeFromCart(index: Int) {
+        val cart = _orderEntry.value.cart.toMutableList()
+        if (index in cart.indices) cart.removeAt(index)
         _orderEntry.value = _orderEntry.value.copy(cart = cart)
     }
 
@@ -211,7 +228,15 @@ class TableViewViewModel @Inject constructor(
         if (entry.cart.isEmpty()) return
         if (orderHoldJob?.isActive == true) return
 
-        val items = entry.cart.map { NewOrderItem(menuItemId = it.menuItem.id, quantity = it.quantity) }
+        val items = entry.cart.map {
+            NewOrderItem(
+                menuItemId = it.menuItem.id,
+                quantity = it.quantity,
+                note = it.note,
+                unitPrice = it.unitPrice,
+                size = it.size,
+            )
+        }
 
         orderHoldJob = viewModelScope.launch {
             for (s in STAFF_ORDER_HOLD_SECONDS downTo 1) {

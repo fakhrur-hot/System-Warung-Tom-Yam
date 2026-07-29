@@ -1,0 +1,44 @@
+package com.warungtomyam.pos.ui.i18n
+
+import com.warungtomyam.pos.data.local.MenuItem
+
+/**
+ * The languages the operator can switch between in the app.
+ *
+ * Default is [MY] (Bahasa Malaysia) — the app always opens in BM. The top-right
+ * language button shows the current language's [buttonLabel]; tapping it reveals
+ * the other four. The selection is persisted (see [LanguageManager]) and survives
+ * app close/reopen/restart.
+ *
+ * The app ships with 5 languages, matching the customer website: Bahasa Malaysia
+ * (default), English, 中文, தமிழ், and ไทย. Bahasa Malaysia is the authored source
+ * for menu-item names (see [MenuItem] — the mandatory name field in menu management
+ * is BM, not English); the other languages are manual per-item overrides, with
+ * English used as the last-resort fallback if a translated field is left blank.
+ */
+enum class AppLanguage(val buttonLabel: String, val displayName: String) {
+    MY("MY", "Bahasa Malaysia"),
+    EN("EN", "English"),
+    ZH("中文", "中文"),
+    TA("TA", "தமிழ்"),
+    TH("TH", "ไทย");
+
+    /** The menu-item name in this language, falling back to Bahasa Malaysia then English. */
+    fun menuName(item: MenuItem): String {
+        val localized = when (this) {
+            MY -> item.nameBm
+            EN -> item.nameEn
+            ZH -> item.nameZh
+            TA -> item.nameTa
+            TH -> item.nameTh
+        }
+        return localized.ifBlank { item.nameBm.ifBlank { item.nameEn } }
+    }
+
+    companion object {
+        val DEFAULT = MY
+
+        fun fromName(name: String?): AppLanguage =
+            entries.firstOrNull { it.name == name } ?: DEFAULT
+    }
+}

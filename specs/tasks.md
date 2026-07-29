@@ -307,7 +307,7 @@ and runs `assembleRelease`, uploading the APK to the GitHub Release.
 
 - [ ] 13. Website QR sheet generator (optional convenience path)
   - Table list → in-browser QR SVGs (`qrcode` npm) → print-ready A4 portrait CSS
-    (`@page`) with 4 self-contained A6 cards per sheet, hairline cut guides,
+    (`@page`) with 4 self-contained A6 cards per sheet. Users can choose exactly which table goes into which of the 4 containers (1, 2, 3, or 4 tables per sheet). Hairline cut guides,
     `window.print()`.
   - **Deliverable**: browser-printable QR sheets matching the APK PDF layout.
   - *(REQ-3 QR PDF — SHOULD-level alternative)*
@@ -599,7 +599,7 @@ gates real service.
 - **Supabase 2-active-project limit**: use one project; a second free project can serve
   as staging only temporarily.
 - **Realtime message budget** (2M/month free): each order generates a handful of
-  broadcasts across ≤ 30 subscribers — thousands/day at stall scale, well under budget.
+  broadcasts across ≤ 70 subscribers (30 tables × 2 + 10 devices) — well under budget at stall scale (~2.5% monthly utilisation).
 - **Printing is the schedule risk**, not the backend: Task 2's spike verdict decides
   whether Task 21 is a formality or needs a library change. Do not defer the spike.
 - **`ANDROID_ID` resets on factory reset** — a reset staff phone simply re-joins via the

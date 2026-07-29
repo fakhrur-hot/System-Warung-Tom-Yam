@@ -82,14 +82,14 @@ on the website) becomes the POS; the rest join as ordering staff.
 
 ## Features
 
-- **QR table ordering** — 4 customer languages (English default, Malay, 中文, Tamil), rescan-for-status, table-occupied guard, cancel-before-kitchen.
+- **QR table ordering** — 5 customer languages (English default, Malay, 中文, Tamil, ไทย), rescan-for-status, table-occupied guard, cancel-before-kitchen.
 - **Table View POS** — Free/Occupied grid, Send to Kitchen, status, Cancel, **Payment (Cash / QR)**; staff permissions gated by admin RBAC.
 - **Bluetooth thermal printing** — multiple printers, role-based dispatch (Receipt / Kitchen / Both) with fallback, 58 mm + 80 mm, **delta kitchen slips** for items added after send.
 - **GPS attendance** — staff check-in/out within a configurable radius of the GPS-locked café location; admin force-checkout override.
 - **Daily availability popup** — market items ("Ask me daily", e.g. ikan kembung) prompt the owner at first sign-in each day.
 - **Reports** — emailed closing report on "Sign Out with Closing", monthly report, on-device daily/weekly (revenue, cash-vs-QR split, cancels, top-N per category).
 - **QR card PDF** — A6 portrait cards, 4-up on A4, hairline cut guides, share to a print shop.
-- **Zero-cost i18n** — English is the authored source; other languages via bundled **dictionary translation** with English fallback.
+- **Zero-cost i18n** — English is the authored source; other languages via bundled **dictionary translation** with English fallback (BM, 中文, Tamil, ไทย for customer site; English/Malay for operational output).
 - **Local-first** — SQLite on the admin phone is the source of truth; full JSON backup export/import.
 
 ## Free-tier stack (verified July 2026)

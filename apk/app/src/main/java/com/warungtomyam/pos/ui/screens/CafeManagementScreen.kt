@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -21,17 +22,20 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.warungtomyam.pos.data.SecureStorage
 import com.warungtomyam.pos.ui.i18n.LanguageViewModel
 import com.warungtomyam.pos.ui.i18n.uiStrings
+import com.warungtomyam.pos.ui.viewmodels.AdminSessionViewModel
 
 /**
  * Café Management hub screen.
- * Entry point for Menu Management and Tables Management.
+ * Entry point for Menu Management, Tables Management, printable Table QR cards, and Printers.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,10 +44,18 @@ fun CafeManagementScreen(
     onNavigateToMenu: () -> Unit,
     onNavigateToTables: () -> Unit,
     onNavigateToQrPdf: () -> Unit = {},
-    languageViewModel: LanguageViewModel = hiltViewModel()
+    onNavigateToPrinters: () -> Unit = {},
+    languageViewModel: LanguageViewModel = hiltViewModel(),
+    sessionViewModel: AdminSessionViewModel = hiltViewModel()
 ) {
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
+
+    // A secondary-admin device has no local printer — reconcile the role, then grey the
+    // Printers entry (it prints via the Main Admin) rather than hiding it.
+    LaunchedEffect(Unit) { sessionViewModel.refreshRole() }
+    val currentRole by sessionViewModel.currentRole.collectAsState()
+    val printersEnabled = currentRole != SecureStorage.Role.ADMIN_SECONDARY
 
     Scaffold(
         topBar = {
@@ -66,73 +78,73 @@ fun CafeManagementScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            OutlinedButton(
-                onClick = onNavigateToMenu,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    Icons.Default.RestaurantMenu,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 12.dp)
-                )
-                Column {
-                    Text(
-                        text = strings.menuManagementTitle,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = strings.menuManagementDesc,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            HubCard(
+                icon = Icons.Default.RestaurantMenu,
+                title = strings.menuManagementTitle,
+                description = strings.menuManagementDesc,
+                onClick = onNavigateToMenu
+            )
 
-            OutlinedButton(
-                onClick = onNavigateToTables,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    Icons.Default.TableRestaurant,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 12.dp)
-                )
-                Column {
-                    Text(
-                        text = strings.tablesManagementTitle,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = strings.tablesManagementDesc,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            HubCard(
+                icon = Icons.Default.TableRestaurant,
+                title = strings.tablesManagementTitle,
+                description = strings.tablesManagementDesc,
+                onClick = onNavigateToTables
+            )
 
-            // Generate the printable table QR cards (moved here from the home overflow menu,
-            // sits right under Tables Management since it's about the tables you just set up).
-            OutlinedButton(
-                onClick = onNavigateToQrPdf,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    Icons.Default.QrCode2,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 12.dp)
-                )
-                Column {
-                    Text(
-                        text = "Generate Table QR",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "Print QR code cards for each table",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            // Generate the printable table QR cards (sits under Tables Management since it's
+            // about the tables you just set up).
+            HubCard(
+                icon = Icons.Default.QrCode2,
+                title = strings.generateTableQrTitle,
+                description = strings.generateTableQrDesc,
+                onClick = onNavigateToQrPdf
+            )
+
+            // Printers moved here from the home overflow menu, directly under Generate Table QR.
+            HubCard(
+                icon = Icons.Default.Print,
+                title = strings.printersTitle,
+                description = strings.printersManagementDesc,
+                onClick = onNavigateToPrinters,
+                enabled = printersEnabled
+            )
+        }
+    }
+}
+
+/** A single Café-Management entry: icon + title + one-line description, left-aligned. */
+@Composable
+private fun HubCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.padding(end = 12.dp)
+        )
+        // weight(1f) fills the row so every icon + title pins to the same left edge,
+        // regardless of how long each card's text is (otherwise the button centers its
+        // content and shorter cards drift right).
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

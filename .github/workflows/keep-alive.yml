@@ -1,0 +1,34 @@
+name: Keep-Alive Ping
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC (8:00 AM MYT) — prevents Supabase 7-day pause
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping Supabase (prevent 7-day pause)
+        run: |
+          echo "Pinging Supabase to prevent project pause..."
+          # Hit the REST API (PostgREST) — lightweight query
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/settings?select=id&limit=1")
+          echo "REST API response: $HTTP_CODE"
+
+          # Hit an Edge Function endpoint to keep it warm
+          EDGE_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/api/menu")
+          echo "Edge Function response: $EDGE_CODE"
+
+          # Fail if both are unreachable (5xx or network error)
+          if [ "$HTTP_CODE" -ge 500 ] && [ "$EDGE_CODE" -ge 500 ]; then
+            echo "ERROR: Both endpoints returned 5xx — Supabase may be paused!"
+            exit 1
+          fi
+          echo "Keep-alive successful"

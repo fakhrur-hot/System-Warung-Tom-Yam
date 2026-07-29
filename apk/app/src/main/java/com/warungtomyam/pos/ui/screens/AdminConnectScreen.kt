@@ -1,5 +1,14 @@
 package com.warungtomyam.pos.ui.screens
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,13 +18,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,7 +41,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.warungtomyam.pos.BuildConfig
 import com.warungtomyam.pos.data.ApiClient
@@ -44,7 +52,14 @@ import androidx.lifecycle.ViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.warungtomyam.pos.ui.i18n.LanguageViewModel
 import com.warungtomyam.pos.ui.i18n.uiStrings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.DecodeHintType
+import com.google.zxing.MultiFormatReader
+import com.google.zxing.RGBLuminanceSource
+import com.google.zxing.common.HybridBinarizer
 import javax.inject.Inject
 
 @HiltViewModel
@@ -52,9 +67,6 @@ class AdminConnectViewModel @Inject constructor(
     private val apiClient: ApiClient,
     private val secureStorage: SecureStorage
 ) : ViewModel() {
-
-    var rotatingKey by mutableStateOf("")
-        private set
 
     var isLoading by mutableStateOf(false)
         private set
@@ -89,37 +101,16 @@ class AdminConnectViewModel @Inject constructor(
         }
     }
 
-    fun onKeyChanged(key: String) {
-        // Only allow digits, max 6 characters
-        if (key.length <= 6 && key.all { it.isDigit() }) {
-            rotatingKey = key
-            errorMessage = null
-            errorKey = null
-        }
-    }
-
-    suspend fun connect(): Boolean {
-        if (rotatingKey.length != 6) {
-            errorMessage = "Enter the 6-digit rotating key from the website"
-            errorKey = "ENTER_KEY"
-            return false
-        }
-
-        isLoading = true
-        errorMessage = null
+    /** Surface a client-side error (e.g. a chosen image that held no readable QR). */
+    fun reportError(message: String) {
+        errorMessage = message
         errorKey = null
-
-        val deviceId = secureStorage.getDeviceId()
-        val result = apiClient.adminHandshake(deviceId, rotatingKey)
-
-        isLoading = false
-        return applyHandshakeResult(result)
     }
 
     /**
      * Debug-only: claim the admin slot with the café's plaintext name (deciphered from
-     * whatever was typed/tapped) instead of the rotating key. Same session-token result
-     * shape as [connect] — the caller only needs to distinguish which triggered success.
+     * whatever was typed/tapped) instead of a key. Same session-token result shape as
+     * [recover] — the caller only needs to distinguish which triggered success.
      */
     suspend fun connectDebug(cafeName: String): Boolean {
         isLoading = true
@@ -134,8 +125,9 @@ class AdminConnectViewModel @Inject constructor(
     }
 
     /**
-     * Restore Main Admin on this device using the permanent owner-recovery token (scanned
-     * from the Owner Recovery QR). QR-only: the token alone grants Main Admin.
+     * Sign in as Main Admin on this device using the permanent café owner key (the
+     * owner-recovery token). This is the sole production admin login: the key alone grants
+     * Main Admin, whether it arrives by camera scan, saved QR image, or manual entry.
      */
     suspend fun recover(recoveryToken: String): Boolean {
         isLoading = true
@@ -152,7 +144,7 @@ class AdminConnectViewModel @Inject constructor(
                 true
             }
             is ApiResult.Error -> {
-                errorMessage = if (result.code == "INVALID_RECOVERY") "Invalid recovery key." else result.message
+                errorMessage = if (result.code == "INVALID_RECOVERY") "Invalid owner key." else result.message
                 errorKey = null
                 false
             }
@@ -199,15 +191,53 @@ class AdminConnectViewModel @Inject constructor(
 }
 
 /**
- * Admin connection screen: enter rotating key from website → handshake → store token.
+ * Admin connection screen: sign in with the café owner key (camera scan, saved QR image,
+ * or manual entry) → mint Main Admin session → store token. Debug builds also expose a
+ * quick-connect shortcut.
  */
-/** Pull the recover token from a pasted "…/join?recover=<token>" link, or accept a raw
+/** Pull the owner key from a pasted "…/join?recover=<token>" link, or accept a raw
  *  32-hex token; null if neither. */
 private fun extractRecoverToken(input: String): String? {
     val t = input.trim()
     Regex("[?&]recover=([a-fA-F0-9]+)").find(t)?.let { return it.groupValues[1] }
     if (Regex("^[a-fA-F0-9]{32}$").matches(t)) return t
     return null
+}
+
+/**
+ * Decode a QR code from a saved image (jpg/png) the user picked from storage. Downsamples
+ * large photos first so a full-resolution camera shot doesn't OOM. Returns the decoded text,
+ * or null if the image couldn't be read or held no QR. Safe to call off the main thread.
+ */
+private fun decodeQrFromImage(context: Context, uri: Uri): String? {
+    return try {
+        val resolver = context.contentResolver
+        // First pass: bounds only, to pick a downsample that keeps the image manageable.
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        var sample = 1
+        val maxDim = 1600
+        while (bounds.outWidth / sample > maxDim || bounds.outHeight / sample > maxDim) {
+            sample *= 2
+        }
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        val bitmap = resolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, opts)
+        } ?: return null
+
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val source = RGBLuminanceSource(width, height, pixels)
+        val binary = BinaryBitmap(HybridBinarizer(source))
+        val result = MultiFormatReader().apply {
+            setHints(mapOf(DecodeHintType.TRY_HARDER to true))
+        }.decode(binary)
+        result.text.takeIf { it.isNotBlank() }
+    } catch (_: Exception) {
+        null
+    }
 }
 
 @Composable
@@ -218,14 +248,70 @@ fun AdminConnectScreen(
     languageViewModel: LanguageViewModel = hiltViewModel()
 ) {
     val scope = rememberCoroutineScope()
-    var recoverInput by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    val context = LocalContext.current
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
 
     var debugCipherText by remember { mutableStateOf("") }
+    var keyInput by remember { mutableStateOf("") }
+
+    // Admin login is the café owner key, accepted three ways: camera scan, a saved QR
+    // image (jpg/png), or manual entry. All three funnel into the same sign-in.
+    var showScanner by remember { mutableStateOf(false) }
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasCameraPermission = granted }
+
+    // Validate a key from any source (scan / image / manual), then sign in as Main Admin.
+    val signInWithToken: (String?) -> Unit = { raw ->
+        val tok = raw?.let { extractRecoverToken(it) ?: it.trim().ifBlank { null } }
+        if (tok.isNullOrBlank()) {
+            viewModel.reportError("That doesn't look like a valid owner key.")
+        } else {
+            scope.launch { if (viewModel.recover(tok)) onConnected() }
+        }
+    }
+
+    // Pick a saved QR image (jpg/png) from storage and decode the owner key off the main thread.
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val decoded = withContext(Dispatchers.IO) { decodeQrFromImage(context, uri) }
+                if (decoded == null) {
+                    viewModel.reportError("Couldn't read a QR code from that image.")
+                } else {
+                    signInWithToken(decoded)
+                }
+            }
+        }
+    }
 
     if (BuildConfig.DEBUG) {
         LaunchedEffect(Unit) { viewModel.loadDebugCafeName() }
+    }
+
+    // Full-screen scanner: on decode, extract the owner key from the QR and sign in.
+    if (showScanner) {
+        QrScannerScreen(
+            hasCameraPermission = hasCameraPermission,
+            onRequestPermission = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+            onQrDecoded = { text ->
+                showScanner = false
+                signInWithToken(text)
+            },
+            onCancel = { showScanner = false },
+            promptText = "Point the camera at the owner key QR",
+            cancelText = strings.commonBack
+        )
+        return
     }
 
     val localizedError = when (viewModel.errorKey) {
@@ -253,23 +339,65 @@ fun AdminConnectScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = strings.adminConnectSubtitle,
+                text = "Sign in with the café owner key",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            OutlinedTextField(
-                value = viewModel.rotatingKey,
-                onValueChange = { viewModel.onKeyChanged(it) },
-                label = { Text(strings.rotatingKeyLabel) },
-                placeholder = { Text("000000") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !viewModel.isLoading
-            )
+            if (viewModel.isLoading) {
+                CircularProgressIndicator()
+            } else {
+                // 1) Scan the owner key QR with the camera.
+                Button(
+                    onClick = {
+                        if (!hasCameraPermission) {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                        showScanner = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Scan owner key QR")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 2) Pick a saved QR photo (jpg/png) and decode it.
+                OutlinedButton(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Choose saved QR image")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "or enter the key manually",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // 3) Type / paste the long owner key.
+                OutlinedTextField(
+                    value = keyInput,
+                    onValueChange = { keyInput = it },
+                    label = { Text("Owner key") },
+                    placeholder = { Text("Paste or type the owner key") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { signInWithToken(keyInput) },
+                    enabled = keyInput.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Sign in")
+                }
+            }
 
             if (localizedError != null) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -280,58 +408,7 @@ fun AdminConnectScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            if (viewModel.isLoading) {
-                CircularProgressIndicator()
-            } else {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            if (viewModel.connect()) {
-                                onConnected()
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = viewModel.rotatingKey.length == 6
-                ) {
-                    Text(strings.connectButton)
-                }
-            }
-
             Spacer(modifier = Modifier.height(16.dp))
-            androidx.compose.material3.HorizontalDivider()
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Owner recovery — restore Main Admin on this fresh device using the permanent
-            // Owner Recovery key/link (from the old phone's Devices screen). Scanning the QR
-            // opens this same link; it can also be pasted here.
-            Text(
-                text = "Lost or broke the main admin phone?",
-                style = MaterialTheme.typography.labelLarge
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            androidx.compose.material3.OutlinedTextField(
-                value = recoverInput,
-                onValueChange = { recoverInput = it },
-                label = { Text("Owner recovery key or link") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            TextButton(
-                onClick = {
-                    val tok = extractRecoverToken(recoverInput) ?: recoverInput.trim()
-                    scope.launch { if (viewModel.recover(tok)) onConnected() }
-                },
-                enabled = recoverInput.isNotBlank() && !viewModel.isLoading,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Recover Main Admin (owner)")
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
 
             TextButton(onClick = onBack) {
                 Text(strings.commonBack)

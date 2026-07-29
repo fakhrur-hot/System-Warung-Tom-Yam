@@ -441,6 +441,8 @@ class ApiClient @Inject constructor(
                         put("menuItemId", item.menuItemId)
                         put("quantity", item.quantity)
                         if (item.note != null) put("note", item.note)
+                        if (item.unitPrice != null) put("unitPrice", item.unitPrice)
+                        if (item.size != null) put("size", item.size)
                     })
                 }
                 val body = JSONObject().apply {
@@ -876,6 +878,8 @@ class ApiClient @Inject constructor(
                     put("menuItemId", item.menuItemId)
                     put("quantity", item.quantity)
                     if (item.note != null) put("note", item.note)
+                    if (item.unitPrice != null) put("unitPrice", item.unitPrice)
+                    if (item.size != null) put("size", item.size)
                 })
             }
             val body = JSONObject().apply {
@@ -1069,6 +1073,8 @@ class ApiClient @Inject constructor(
                         put("menuItemId", item.menuItemId)
                         put("quantity", item.quantity)
                         if (item.note != null) put("note", item.note)
+                        if (item.unitPrice != null) put("unitPrice", item.unitPrice)
+                        if (item.size != null) put("size", item.size)
                     })
                 }
                 val body = JSONObject().apply {
@@ -1594,6 +1600,8 @@ class ApiClient @Inject constructor(
                     put("menuItemId", item.menuItemId)
                     put("quantity", item.quantity)
                     if (item.note != null) put("note", item.note)
+                    if (item.unitPrice != null) put("unitPrice", item.unitPrice)
+                    if (item.size != null) put("size", item.size)
                 })
             }
             val body = JSONObject().apply {
@@ -1936,7 +1944,11 @@ data class KitchenResponse(
 data class NewOrderItem(
     val menuItemId: String,
     val quantity: Int,
-    val note: String? = null
+    val note: String? = null,
+    /** Chosen Small/Medium/Large price for a variable-price item (null = use the item's base). */
+    val unitPrice: Double? = null,
+    /** Size label baked into the name server-side, e.g. "S"/"M"/"L". */
+    val size: String? = null
 )
 
 // --- Device management data classes ---

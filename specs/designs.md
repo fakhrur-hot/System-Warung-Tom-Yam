@@ -49,6 +49,10 @@ All data persistence for business records (orders, menu, devices, reports) lives
 - Customer builds cart → submits → `POST /api/orders` with `{ tableId, items[], timestamp }`.
 - After submission, subscribes to a Supabase Realtime channel `order:<orderId>` to receive status updates.
 
+**Customer page UI pattern** (Shell + Engine approach):
+- **Engine**: state machine (LOADING → SESSION_CHECK → MENU / STATUS_VIEW / TABLE_OCCUPIED), `order:<orderId>` Realtime subscription, cookie + localStorage browser ID, `X-Browser-Id` header enforcement.
+- **Shell** (preferred visual style): emerald-themed Tailwind, inline category tabs (sticky below header), inline selection summary tray (amber highlight showing selected items across tabs), sticky bottom bar with total + "Confirm & Place Order" button, bottom-sheet confirmation modal with item summary and "Send to Kitchen" CTA. Mobile-first, `max-w-md mx-auto`, zero asset bloat.
+
 **Backend API — Supabase Edge Functions** (Deno runtime, free tier)
 - `POST /api/register` — ordering device sends `{ inviteToken, deviceId, deviceModel, androidId, appVersion }`. Backend validates the invite token, creates a record with status `pending` (label = deviceModel), returns `deviceId`. No key yet.
 - `POST /api/admin/handshake` — admin APK submits `{ deviceId, rotatingKey }`. Backend validates the rotating key against the current 30s window. If valid, issues a long-lived session token (`adminSessionToken`) stored against the device record. Returns `{ sessionToken }`.
@@ -178,12 +182,21 @@ Settings
 
 **Free Tier Limits Fit-Check (Supabase)**
 
-| Resource | Free Limit | Expected Usage |
-|---|---|---|
-| DB storage | 500 MB | < 5 MB (transient orders only) |
-| Realtime concurrent connections | 200 | ≤ 30 (20 tables + 10 devices) |
-| Edge Function invocations | 500,000 / month | < 10,000 / month |
-| Bandwidth | 5 GB / month | < 500 MB / month |
+Planning for **30 tables** and ~60–70 max concurrent connections (up to 2 active browser sessions per table + 10 devices). This puts the system at ~35% of Supabase's free-tier Realtime quota — a 70% safety buffer for unexpected spikes.
+
+| Resource | Free Limit | Expected Usage (30 tables) | Utilisation |
+|---|---|---|---|
+| DB storage | 500 MB | < 5 MB (transient orders only) | ~1% |
+| Realtime concurrent connections | 200 | ~70 peak (30 tables × 2 browsers + 10 devices) | ~35% |
+| Realtime messages | 2,000,000 / month | ~50,000 / month (handful of broadcasts per order × daily volume) | ~2.5% |
+| Edge Function invocations | 500,000 / month | < 15,000 / month | ~3% |
+| Bandwidth | 5 GB / month | < 500 MB / month | ~10% |
+
+**Operational impact of 30-table ceiling:**
+- **Admin APK RAM**: ~30–60 active order objects ≈ 150 KB — negligible for Android memory management.
+- **Table View UI**: 5×6 grid fits comfortably on a 6.5" phone without virtualised scrolling.
+- **Print queue throughput**: peak ~1 order/30–60s; thermal printer clears in ~2s per slip — no queue backlog.
+- **Edge Function load**: ~0.1–0.5 req/sec peak — zero cold-start queueing concern.
 
 ---
 
@@ -389,7 +402,7 @@ Print jobs are queued in Room `PrintJob` table per target printer. If a printer 
 
 Library: **ZXing** (QR bitmap generation) + **Android PdfDocument API** (built-in, no dependency).
 
-The PDF is designed for **print shop output and manual cutting**. Each table card is sized at **A6 portrait (105 × 148 mm)**. Cards are tiled onto **A4 portrait sheets (210 × 297 mm)** in a **2-column × 2-row grid** — exactly 4 cards per sheet with near-zero paper waste (0 mm horizontally, 1 mm vertically).
+The PDF is designed for **print shop output and manual cutting**. Each table card is sized at **A6 portrait (105 × 148 mm)**. Cards are tiled onto **A4 portrait sheets (210 × 297 mm)** in a **2-column × 2-row grid** — exactly 4 cards per sheet with near-zero paper waste (0 mm horizontally, 1 mm vertically). The user can choose exactly which table goes into which of the 4 containers (e.g., placing 1, 2, 3, or 4 specific tables on a single A4 sheet).
 
 **Why A4 portrait + A6 portrait?**
 
@@ -804,7 +817,7 @@ Admin opens APK again (next session start)
 | Website frontend | React + Vite + TailwindCSS | Lightweight, fast static build, deploys to Cloudflare Pages free |
 | Website i18n | i18next + react-i18next | Industry-standard React i18n, locale JSON files, easy fallback |
 | Website backend | Supabase Edge Functions (Deno) | Free tier, co-located with DB, no cold-start penalty |
-| Real-time messaging | Supabase Realtime (WebSocket) | Free up to 200 concurrent connections — fits ≤30 device scale |
+| Real-time messaging | Supabase Realtime (WebSocket) | Free up to 200 concurrent connections — 30 tables + 10 devices ≈ 70 peak (~35% utilisation) |
 | Backend database | Supabase PostgreSQL (transient) | Stores device registry and live orders only |
 | Website hosting | Cloudflare Pages (free tier) | CDN-backed, HTTPS, unlimited bandwidth, **commercial use allowed on free tier** (Vercel Hobby is not) |
 | Report email | Brevo (free tier, 300/day) | Sender verified by email address — no paid custom domain required (Resend free needs a verified domain) |

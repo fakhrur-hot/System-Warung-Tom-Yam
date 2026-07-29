@@ -1,6 +1,128 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- English is the base/source language (see specs REQ-9). values-ms holds Malay. -->
 <resources>
+    <!-- App -->
     <string name="app_name">Warung Tom Yam</string>
-    <string name="placeholder_subtitle">POS — setup coming soon</string>
+
+    <!-- Screen titles -->
+    <string name="title_table_view">Table View</string>
+    <string name="title_menu_management">Menu Management</string>
+    <string name="title_settings">Settings</string>
+    <string name="title_devices">Devices</string>
+    <string name="title_printers">Printers</string>
+    <string name="title_reports">Reports</string>
+    <string name="title_role_select">Select Role</string>
+    <string name="title_pending_approval">Pending Approval</string>
+    <string name="title_daily_availability">Daily Availability</string>
+    <string name="title_order_detail">Order Detail</string>
+    <string name="title_add_item">Add Item</string>
+    <string name="title_staff_invitation">Staff Invitation</string>
+    <string name="title_cafe_profile">Café Profile</string>
+    <string name="title_cafe_location">Café Location</string>
+    <string name="title_staff_permissions">Staff Permissions</string>
+
+    <!-- Buttons -->
+    <string name="btn_sign_out">Sign Out</string>
+    <string name="btn_sign_out_closing">Sign Out with Closing</string>
+    <string name="btn_check_in">Check In</string>
+    <string name="btn_check_out">Check Out</string>
+    <string name="btn_send_to_kitchen">Send to Kitchen</string>
+    <string name="btn_pay_cash">Pay Cash</string>
+    <string name="btn_pay_qr">Pay QR</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_cancel_order">Cancel Order</string>
+    <string name="btn_confirm">Confirm</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_add">Add</string>
+    <string name="btn_edit">Edit</string>
+    <string name="btn_delete">Delete</string>
+    <string name="btn_connect">Connect</string>
+    <string name="btn_approve">Approve</string>
+    <string name="btn_reject">Reject</string>
+    <string name="btn_revoke">Revoke</string>
+    <string name="btn_force_checkout">Force Check-Out</string>
+    <string name="btn_test_print">Test Print</string>
+    <string name="btn_retry">Retry</string>
+    <string name="btn_share">Share</string>
+    <string name="btn_regenerate">Regenerate</string>
+    <string name="btn_submit_order">Submit Order</string>
+    <string name="btn_reprint">Reprint</string>
+    <string name="btn_connect_admin">Connect as Admin</string>
+    <string name="btn_connect_ordering">Connect as Ordering Staff</string>
+
+    <!-- Table states -->
+    <string name="table_free">Free</string>
+    <string name="table_occupied">Occupied</string>
+
+    <!-- Order statuses -->
+    <string name="status_received">Received</string>
+    <string name="status_sent_to_kitchen">Sent to Kitchen</string>
+    <string name="status_preparing">Preparing</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_completed">Completed</string>
+    <string name="status_cancelled">Cancelled</string>
+
+    <!-- Categories -->
+    <string name="category_food">Food</string>
+    <string name="category_beverages">Beverages</string>
+    <string name="category_side_dishes">Side Dishes</string>
+    <string name="category_others">Others</string>
+
+    <!-- Settings labels -->
+    <string name="label_print_language">Print Language</string>
+    <string name="label_timezone">Timezone</string>
+    <string name="label_top_n">Top Items (N)</string>
+    <string name="label_staff_can_send_kitchen">Staff can Send to Kitchen</string>
+    <string name="label_staff_can_take_payment">Staff can Take Payment</string>
+    <string name="label_report_email">Report Email</string>
+    <string name="label_auto_closing_report">Auto Closing Report</string>
+
+    <!-- Daily availability popup -->
+    <string name="daily_available">Available</string>
+    <string name="daily_not_available">Not Available</string>
+    <string name="daily_popup_title">Set today\'s availability</string>
+    <string name="daily_popup_price_hint">Override price (optional)</string>
+
+    <!-- Print document labels -->
+    <string name="print_table">Table</string>
+    <string name="print_date">Date</string>
+    <string name="print_total">TOTAL</string>
+    <string name="print_payment">Payment</string>
+    <string name="print_cash">Cash</string>
+    <string name="print_qr">QR</string>
+    <string name="print_thank_you">Thank You / Terima Kasih</string>
+    <string name="print_kitchen_slip">Kitchen Slip</string>
+    <string name="print_added">ADDED</string>
+    <string name="print_receipt">Receipt</string>
+
+    <!-- Error messages -->
+    <string name="error_generic">Something went wrong</string>
+    <string name="error_network">Network error. Please check your connection.</string>
+    <string name="error_admin_exists">An admin device is already registered</string>
+    <string name="error_invalid_key">Invalid or expired key</string>
+    <string name="error_invalid_invite">Invalid invitation</string>
+    <string name="error_outside_radius">You are outside the café area</string>
+    <string name="error_no_printer">No printer configured</string>
+    <string name="error_bluetooth_off">Bluetooth is off</string>
+    <string name="error_print_failed">Print failed</string>
+    <string name="error_table_occupied">Table is already occupied</string>
+    <string name="error_item_unavailable">Item is not available</string>
+
+    <!-- Notifications -->
+    <string name="notif_listening">Listening for orders…</string>
+    <string name="notif_connected">Connected — listening for orders</string>
+    <string name="notif_disconnected">Disconnected — reconnecting…</string>
+    <string name="notif_new_order">New order for Table %1$s</string>
+    <string name="notif_channel_orders">Order Notifications</string>
+    <string name="notif_channel_service">Background Service</string>
+
+    <!-- Misc -->
+    <string name="cafe_closed">Café is closed</string>
+    <string name="awaiting_approval">Waiting for admin approval…</string>
+    <string name="no_items">No items</string>
+    <string name="item_note_hint">Special instructions</string>
+    <string name="closing_reason_hint">Closing reason (optional)</string>
+    <string name="search_hint">Search…</string>
+    <string name="total_label">Total</string>
+    <string name="quantity_label">Qty</string>
 </resources>

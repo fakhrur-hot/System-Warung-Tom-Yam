@@ -59,5 +59,6 @@
   "cameraUnsupported": "此浏览器无法打开相机。请改用手机的相机应用扫描二维码。",
   "closeScanner": "关闭",
   "cafeClosedTitle": "尚未营业",
-  "cafeClosedBody": "餐厅尚未营业，请稍后再来！"
+  "cafeClosedBody": "餐厅尚未营业，请稍后再来！",
+  "searchMenu": "搜索"
 }

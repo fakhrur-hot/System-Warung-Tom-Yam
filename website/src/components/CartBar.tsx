@@ -295,7 +295,7 @@ export default function CartBar({
                 onSubmit()
               }}
               disabled={totalItems === 0 || isSubmitting}
-              className={`min-h-[44px] shrink-0 rounded-full px-6 py-3 text-sm font-semibold transition-colors ${
+              className={`min-h-[44px] shrink-0 rounded-full px-6 py-3 text-sm font-semibold transition active:scale-95 ${
                 totalItems === 0
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50'

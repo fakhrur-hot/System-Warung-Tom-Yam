@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { getSupabase } from './lib/supabase'
 import { getBrowserId } from './lib/browserId'
 import Header from './components/Header'
-import LoadingView from './components/LoadingView'
+import SplashScreen from './components/SplashScreen'
 import PlaceholderView from './components/PlaceholderView'
 import OccupiedView from './components/OccupiedView'
 import MenuView from './components/MenuView'
@@ -140,7 +140,7 @@ export default function App() {
   const [isAddingMore, setIsAddingMore] = useState(false)
   // Whether the in-page camera QR scanner overlay is open.
   const [scanning, setScanning] = useState(false)
-  const pendingOrderRef = useRef<Array<{ menuItemId: string; quantity: number; note: string }>>([])
+  const pendingOrderRef = useRef<Array<{ menuItemId: string; quantity: number; note: string; size?: string; unitPrice?: number }>>([])
   const channelRef = useRef<ReturnType<ReturnType<typeof getSupabase>['channel']> | null>(null)
 
   const tableId = getTableFromUrl()
@@ -287,7 +287,9 @@ export default function App() {
   }, [tableId, browserId, subscribeToOrder, t])
 
   // Submit order - show confirmation first
-  const handleSubmitOrder = (items: Array<{ menuItemId: string; quantity: number; note: string }>) => {
+  const handleSubmitOrder = (
+    items: Array<{ menuItemId: string; quantity: number; note: string; size?: string; unitPrice?: number }>,
+  ) => {
     pendingOrderRef.current = items
     setShowConfirm(true)
   }
@@ -332,6 +334,9 @@ export default function App() {
       menuItemId: item.menuItemId,
       quantity: item.quantity,
       note: item.note || undefined,
+      // Small/Medium/Large: the chosen size + its price (validated server-side).
+      size: item.size || undefined,
+      unitPrice: item.unitPrice,
     }))
 
     try {
@@ -482,7 +487,9 @@ export default function App() {
   const renderView = () => {
     switch (view.type) {
       case 'loading':
-        return <LoadingView />
+        // Full-screen branded splash is rendered as an early return below; this is unreachable
+        // but keeps the switch exhaustive.
+        return null
 
       case 'no-table':
         return (
@@ -492,7 +499,7 @@ export default function App() {
               <p className="text-sm text-emerald-600">{t('noTable')}</p>
               <button
                 onClick={() => setScanning(true)}
-                className="mt-5 inline-flex min-h-[44px] items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+                className="mt-5 inline-flex min-h-[44px] items-center gap-2 rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 active:scale-95"
               >
                 <span aria-hidden="true">📷</span>
                 {t('scanQrButton')}
@@ -510,7 +517,7 @@ export default function App() {
               <p className="mt-2 text-sm text-emerald-600">{view.message}</p>
               <button
                 onClick={handleRetry}
-                className="mt-4 min-h-[44px] rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+                className="mt-4 min-h-[44px] rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 active:scale-95"
               >
                 {t('retry')}
               </button>
@@ -580,6 +587,16 @@ export default function App() {
           />
         )
     }
+  }
+
+  // First-load branded splash (logo + name + skeleton menu), before the app chrome renders.
+  if (view.type === 'loading') {
+    return (
+      <SplashScreen
+        cafeName={branding.configured ? branding.cafeName : undefined}
+        logoUrl={branding.configured ? branding.logoUrl : undefined}
+      />
+    )
   }
 
   return (

@@ -28,6 +28,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -108,6 +111,8 @@ fun MenuManagementScreen(
     var selectedImageUrl by remember { mutableStateOf<String?>(null) }
     // Category being edited (translations + printer routing); null when the dialog is closed.
     var editingCategory by remember { mutableStateOf<String?>(null) }
+    // Category reorder dialog (drag-free up/down); the new order propagates everywhere.
+    var showReorder by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
@@ -126,6 +131,13 @@ fun MenuManagementScreen(
                     }
                 },
                 actions = {
+                    // Reorder categories — the new order drives the tabs here, the ordering
+                    // screens (admin/staff), and the customer web.
+                    if (uiState.categories.size > 1) {
+                        IconButton(onClick = { showReorder = true }) {
+                            Icon(Icons.Default.SwapVert, contentDescription = strings.reorderCategories)
+                        }
+                    }
                     // Edit the currently-selected category: translations + which printer prints it.
                     val current = uiState.effectiveSelectedCategory
                     if (current.isNotBlank()) {
@@ -264,6 +276,18 @@ fun MenuManagementScreen(
         )
     }
 
+    // Reorder categories — up/down; each move persists the new order and re-publishes the
+    // menu so the tabs here, the admin/staff ordering screens, and the customer web all follow.
+    if (showReorder) {
+        ReorderCategoriesDialog(
+            categories = uiState.categories,
+            label = { categoryTabLabel(it, strings) },
+            strings = strings,
+            onMove = { name, up -> viewModel.moveCategory(name, up) },
+            onDismiss = { showReorder = false }
+        )
+    }
+
     // Full-screen image overlay (1:1) when selected
     selectedImageUrl?.let { url ->
         Dialog(onDismissRequest = { selectedImageUrl = null }) {
@@ -290,6 +314,60 @@ private fun categoryTabLabel(name: String, strings: UiStrings): String = when (n
     MenuCategory.SIDE_DISHES.name -> strings.catSideDishes
     MenuCategory.OTHERS.name -> strings.catOthers
     else -> name
+}
+
+/**
+ * Reorder categories with up/down controls. Each move calls [onMove] (name, moveUp) which
+ * persists the new order and re-publishes the menu, so every surface follows the same order.
+ */
+@Composable
+private fun ReorderCategoriesDialog(
+    categories: List<String>,
+    label: (String) -> String,
+    strings: UiStrings,
+    onMove: (String, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.reorderCategories) },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(360.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                items(categories, key = { it }) { cat ->
+                    val index = categories.indexOf(cat)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = label(cat),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        IconButton(onClick = { onMove(cat, true) }, enabled = index > 0) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move up")
+                        }
+                        IconButton(
+                            onClick = { onMove(cat, false) },
+                            enabled = index < categories.size - 1,
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move down")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(strings.commonDone) }
+        },
+    )
 }
 
 /**

@@ -17,10 +17,15 @@ This folder holds the schema migration and (later) the Edge Functions. Provision
    - or paste `migrations/0001_initial_schema.sql` into the SQL editor and run it.
 5. **Auth**: enable Email provider; turn on "Confirm email". Set Site URL + Redirect URL to
    your Cloudflare Pages domain (`https://<project>.pages.dev`).
-6. **Storage**: create a public bucket named `logos`.
+6. **Storage**: create two public buckets — `logos` and `menu-images`.
 7. **Secrets** (Edge Functions → Secrets), never commit:
    - `ROTATING_KEY_SECRET` — random 32+ byte hex, for the HMAC pairing key.
    - `BREVO_API_KEY` — for report emails.
+   - `ALLOW_DEBUG_ADMIN` — **leave unset on every real deployment.** Only set to the exact
+     string `"true"` on a throwaway dev/test Supabase project if you want the debug APK's
+     "type the café's Caesar-ciphered name" admin shortcut to work there instead of the
+     rotating key. Even with a debug APK build, `admin-handshake` rejects that path unless
+     this is set — it's a second, independent gate on top of `BuildConfig.DEBUG`.
 8. Deploy Edge Functions (added in Phase 2): `supabase functions deploy`.
 
 ## Keep-alive

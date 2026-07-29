@@ -83,7 +83,7 @@ This document defines the full requirements for **System Warung Tom Yam**, a sma
 - SHOULD: Supports re-printing of any previous receipt or kitchen slip to the appropriate assigned printer.
 
 #### QR Code PDF Generation
-- MUST: Admin APK generates a printable PDF where each table QR code is laid out as an **A6 portrait card** (105 × 148 mm). Cards are tiled onto A4 portrait sheets (210 × 297 mm) in a 2-column × 2-row grid, yielding exactly **4 cards per A4 sheet** with near-zero paper waste (0 mm horizontal, 1 mm vertical remainder).
+- MUST: Admin APK generates a printable PDF where each table QR code is laid out as an **A6 portrait card** (105 × 148 mm). Cards are tiled onto A4 portrait sheets (210 × 297 mm) in a 2-column × 2-row grid, yielding exactly **4 cards per A4 sheet** with near-zero paper waste (0 mm horizontal, 1 mm vertical remainder). The user can choose exactly which table goes into which of the 4 containers (e.g., placing 1, 2, 3, or 4 specific tables on a single A4 sheet).
 - MUST: Each A6 card is self-contained and includes, within its own boundary: the café name, the café logo (if configured), the QR code, and the table number label. There is no shared page header or footer — every card is a complete standalone piece after cutting.
 - MUST: Each QR code is unique per table, encoding that table's ordering URL.
 - MUST: A hairline border (cut guide) is printed on every card boundary so the print shop knows exactly where to cut.
@@ -276,8 +276,9 @@ This document defines the full requirements for **System Warung Tom Yam**, a sma
 - SHOULD: The customer ordering page loads in under 2 seconds on a mid-range smartphone on a 4G connection.
 
 #### Cost
-- MUST: All hosting costs must be zero (free tier) for the expected scale of ≤ 20 tables and ≤ 10 devices.
+- MUST: All hosting costs must be zero (free tier) for the expected scale of ≤ 30 tables and ≤ 10 devices.
 - Recommended hosting: Supabase (free tier — 500 MB DB, 50,000 monthly active users, Realtime up to 200 concurrent connections, Edge Functions).
+- Capacity planning: 30 tables × ~2 concurrent browser sessions + 10 devices = ~70 peak connections, consuming only ~35% of the 200-connection Supabase free quota (70% safety buffer). The 2M/month Realtime message allowance is well within budget at this scale.
 
 #### Time Zone
 - MUST: All daily/weekly/monthly boundaries (metrics, reports, first-sign-in-of-the-day detection for the Daily Availability popup) are computed in the café's local time zone (default `Asia/Kuala_Lumpur`, configurable in settings) — never raw UTC.
@@ -290,7 +291,7 @@ This document defines the full requirements for **System Warung Tom Yam**, a sma
 - SHOULD: API keys are rotatable without requiring app reinstallation.
 
 #### Scalability
-- The system is designed for small-scale use: ≤ 20 tables, ≤ 10 connected devices, ≤ 200 simultaneous connections.
+- The system is designed for small-scale use: ≤ 30 tables, ≤ 10 connected devices, ~60–70 peak simultaneous connections (well within the 200-connection Supabase free-tier limit at ~35% utilisation).
 
 #### Reliability
 - MUST: Ordering-role phones cache unsubmitted orders locally during connectivity loss.

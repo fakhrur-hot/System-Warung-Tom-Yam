@@ -1,6 +1,128 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Malay (Bahasa Melayu). Dictionary-generated from the English base; overridable. -->
 <resources>
+    <!-- App -->
     <string name="app_name">Warung Tom Yam</string>
-    <string name="placeholder_subtitle">POS — persediaan akan datang</string>
+
+    <!-- Screen titles -->
+    <string name="title_table_view">Paparan Meja</string>
+    <string name="title_menu_management">Pengurusan Menu</string>
+    <string name="title_settings">Tetapan</string>
+    <string name="title_devices">Peranti</string>
+    <string name="title_printers">Pencetak</string>
+    <string name="title_reports">Laporan</string>
+    <string name="title_role_select">Pilih Peranan</string>
+    <string name="title_pending_approval">Menunggu Kelulusan</string>
+    <string name="title_daily_availability">Ketersediaan Harian</string>
+    <string name="title_order_detail">Butiran Pesanan</string>
+    <string name="title_add_item">Tambah Item</string>
+    <string name="title_staff_invitation">Jemputan Staf</string>
+    <string name="title_cafe_profile">Profil Kafe</string>
+    <string name="title_cafe_location">Lokasi Kafe</string>
+    <string name="title_staff_permissions">Kebenaran Staf</string>
+
+    <!-- Buttons -->
+    <string name="btn_sign_out">Log Keluar</string>
+    <string name="btn_sign_out_closing">Log Keluar dengan Penutupan</string>
+    <string name="btn_check_in">Daftar Masuk</string>
+    <string name="btn_check_out">Daftar Keluar</string>
+    <string name="btn_send_to_kitchen">Hantar ke Dapur</string>
+    <string name="btn_pay_cash">Bayar Tunai</string>
+    <string name="btn_pay_qr">Bayar QR</string>
+    <string name="btn_cancel">Batal</string>
+    <string name="btn_cancel_order">Batal Pesanan</string>
+    <string name="btn_confirm">Sahkan</string>
+    <string name="btn_save">Simpan</string>
+    <string name="btn_add">Tambah</string>
+    <string name="btn_edit">Sunting</string>
+    <string name="btn_delete">Padam</string>
+    <string name="btn_connect">Sambung</string>
+    <string name="btn_approve">Lulus</string>
+    <string name="btn_reject">Tolak</string>
+    <string name="btn_revoke">Batalkan</string>
+    <string name="btn_force_checkout">Paksa Daftar Keluar</string>
+    <string name="btn_test_print">Cetak Ujian</string>
+    <string name="btn_retry">Cuba Semula</string>
+    <string name="btn_share">Kongsi</string>
+    <string name="btn_regenerate">Jana Semula</string>
+    <string name="btn_submit_order">Hantar Pesanan</string>
+    <string name="btn_reprint">Cetak Semula</string>
+    <string name="btn_connect_admin">Sambung sebagai Admin</string>
+    <string name="btn_connect_ordering">Sambung sebagai Staf Pesanan</string>
+
+    <!-- Table states -->
+    <string name="table_free">Kosong</string>
+    <string name="table_occupied">Diduduki</string>
+
+    <!-- Order statuses -->
+    <string name="status_received">Diterima</string>
+    <string name="status_sent_to_kitchen">Dihantar ke Dapur</string>
+    <string name="status_preparing">Sedang Disediakan</string>
+    <string name="status_ready">Siap</string>
+    <string name="status_completed">Selesai</string>
+    <string name="status_cancelled">Dibatalkan</string>
+
+    <!-- Categories -->
+    <string name="category_food">Makanan</string>
+    <string name="category_beverages">Minuman</string>
+    <string name="category_side_dishes">Lauk</string>
+    <string name="category_others">Lain-lain</string>
+
+    <!-- Settings labels -->
+    <string name="label_print_language">Bahasa Cetakan</string>
+    <string name="label_timezone">Zon Waktu</string>
+    <string name="label_top_n">Item Teratas (N)</string>
+    <string name="label_staff_can_send_kitchen">Staf boleh Hantar ke Dapur</string>
+    <string name="label_staff_can_take_payment">Staf boleh Terima Bayaran</string>
+    <string name="label_report_email">Emel Laporan</string>
+    <string name="label_auto_closing_report">Laporan Penutupan Auto</string>
+
+    <!-- Daily availability popup -->
+    <string name="daily_available">Tersedia</string>
+    <string name="daily_not_available">Tidak Tersedia</string>
+    <string name="daily_popup_title">Tetapkan ketersediaan hari ini</string>
+    <string name="daily_popup_price_hint">Harga ganti (pilihan)</string>
+
+    <!-- Print document labels -->
+    <string name="print_table">Meja</string>
+    <string name="print_date">Tarikh</string>
+    <string name="print_total">JUMLAH</string>
+    <string name="print_payment">Bayaran</string>
+    <string name="print_cash">Tunai</string>
+    <string name="print_qr">QR</string>
+    <string name="print_thank_you">Terima Kasih / Thank You</string>
+    <string name="print_kitchen_slip">Slip Dapur</string>
+    <string name="print_added">TAMBAHAN</string>
+    <string name="print_receipt">Resit</string>
+
+    <!-- Error messages -->
+    <string name="error_generic">Sesuatu tidak kena</string>
+    <string name="error_network">Ralat rangkaian. Sila semak sambungan anda.</string>
+    <string name="error_admin_exists">Peranti admin sudah didaftarkan</string>
+    <string name="error_invalid_key">Kunci tidak sah atau tamat tempoh</string>
+    <string name="error_invalid_invite">Jemputan tidak sah</string>
+    <string name="error_outside_radius">Anda di luar kawasan kafe</string>
+    <string name="error_no_printer">Tiada pencetak dikonfigurasi</string>
+    <string name="error_bluetooth_off">Bluetooth dimatikan</string>
+    <string name="error_print_failed">Cetakan gagal</string>
+    <string name="error_table_occupied">Meja sudah diduduki</string>
+    <string name="error_item_unavailable">Item tidak tersedia</string>
+
+    <!-- Notifications -->
+    <string name="notif_listening">Mendengar pesanan…</string>
+    <string name="notif_connected">Disambung — mendengar pesanan</string>
+    <string name="notif_disconnected">Terputus — menyambung semula…</string>
+    <string name="notif_new_order">Pesanan baharu untuk Meja %1$s</string>
+    <string name="notif_channel_orders">Pemberitahuan Pesanan</string>
+    <string name="notif_channel_service">Perkhidmatan Latar Belakang</string>
+
+    <!-- Misc -->
+    <string name="cafe_closed">Kafe ditutup</string>
+    <string name="awaiting_approval">Menunggu kelulusan admin…</string>
+    <string name="no_items">Tiada item</string>
+    <string name="item_note_hint">Arahan khas</string>
+    <string name="closing_reason_hint">Sebab penutupan (pilihan)</string>
+    <string name="search_hint">Cari…</string>
+    <string name="total_label">Jumlah</string>
+    <string name="quantity_label">Bil</string>
 </resources>

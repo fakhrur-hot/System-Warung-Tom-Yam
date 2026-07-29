@@ -1,6 +1,7 @@
 package com.warungtomyam.pos.ui.screens
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,9 +63,11 @@ import com.warungtomyam.pos.data.DeviceDto
 import com.warungtomyam.pos.ui.i18n.LanguageViewModel
 import com.warungtomyam.pos.ui.i18n.UiStrings
 import com.warungtomyam.pos.ui.i18n.uiStrings
+import com.warungtomyam.pos.ui.util.ImageSaver
 import com.warungtomyam.pos.ui.util.QrCodeUtil
 import com.warungtomyam.pos.ui.viewmodels.AdminSettingsViewModel
 import com.warungtomyam.pos.ui.viewmodels.DevicesViewModel
+import kotlinx.coroutines.delay
 
 /**
  * Device management screen.
@@ -292,44 +295,13 @@ fun DevicesScreen(
                     color = MaterialTheme.colorScheme.error
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                if (!showRecovery) {
-                    OutlinedButton(onClick = {
-                        showRecovery = true
-                        settingsViewModel.loadRecoveryToken()
-                    }) { Text("Show Owner Recovery QR") }
-                } else if (settingsState.recoveryLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                } else if (settingsState.recoveryInvite != null) {
-                    val recUrl = settingsState.recoveryInvite!!.url
-                    val recQr = remember(recUrl) { QrCodeUtil.encode(recUrl, 512) }
-                    if (recQr != null) {
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Image(
-                                bitmap = recQr.asImageBitmap(),
-                                contentDescription = "Owner recovery QR code",
-                                modifier = Modifier.size(220.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = {
-                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, recUrl)
-                            }
-                            context.startActivity(
-                                Intent.createChooser(shareIntent, strings.shareInviteLink)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
-                        }) {
-                            Icon(Icons.Default.Share, contentDescription = null)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(strings.shareButton)
-                        }
-                        OutlinedButton(onClick = { showRecovery = false }) { Text("Hide") }
-                    }
-                }
+                // Generating the key just reveals a QR in a timed modal — it does NOT touch
+                // this device's session (no logout). The modal auto-closes after 30s and the
+                // QR is saved to local storage as a PNG so the owner can keep/print it.
+                OutlinedButton(onClick = {
+                    settingsViewModel.loadRecoveryToken()
+                    showRecovery = true
+                }) { Text("Show Owner Recovery QR") }
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider()
@@ -421,6 +393,110 @@ fun DevicesScreen(
             }
         )
     }
+
+    // Owner Recovery QR — timed modal. Reveals the QR (fetched without touching this device's
+    // session, so no logout), auto-saves it to local storage as a PNG, and auto-closes after 30s.
+    if (showRecovery) {
+        OwnerRecoveryQrDialog(
+            url = settingsState.recoveryInvite?.url,
+            loading = settingsState.recoveryLoading,
+            onDismiss = { showRecovery = false }
+        )
+    }
+}
+
+/**
+ * Timed modal that shows the permanent Owner Recovery QR, auto-saves it as a PNG to local
+ * storage the moment it loads, and auto-dismisses after 30 seconds (a "keep it on screen only
+ * briefly" secret). Fetching/showing the key never mutates this device's admin session.
+ */
+@Composable
+private fun OwnerRecoveryQrDialog(
+    url: String?,
+    loading: Boolean,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var secondsLeft by remember { mutableStateOf(30) }
+    var savedLocation by remember { mutableStateOf<String?>(null) }
+    val qr = remember(url) { url?.let { QrCodeUtil.encode(it, 512) } }
+
+    // Auto-save once as soon as the QR is ready.
+    LaunchedEffect(qr) {
+        if (qr != null && savedLocation == null) {
+            savedLocation = ImageSaver.savePng(context, qr, "owner-recovery-qr")
+            Toast.makeText(
+                context,
+                savedLocation?.let { "Saved recovery QR to $it" } ?: "Couldn't save the QR image",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    // 30-second countdown → auto-dismiss (only starts ticking once the QR is visible).
+    LaunchedEffect(qr) {
+        if (qr != null) {
+            secondsLeft = 30
+            while (secondsLeft > 0) {
+                delay(1000)
+                secondsLeft--
+            }
+            onDismiss()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(if (qr != null) "Owner Recovery QR — closes in ${secondsLeft}s" else "Owner Recovery QR")
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                when {
+                    loading || (url == null) -> {
+                        CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    }
+                    qr != null -> {
+                        Image(
+                            bitmap = qr.asImageBitmap(),
+                            contentDescription = "Owner recovery QR code",
+                            modifier = Modifier.size(240.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Keep this secret. Scan it from a new phone's Admin login to regain Main Admin. A PNG copy was saved to your device.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    else -> {
+                        Text(
+                            text = "Couldn't load the recovery key. Try again.",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        },
+        dismissButton = if (qr != null) {
+            {
+                TextButton(onClick = {
+                    val loc = ImageSaver.savePng(context, qr, "owner-recovery-qr")
+                    Toast.makeText(
+                        context,
+                        loc?.let { "Saved recovery QR to $it" } ?: "Couldn't save the QR image",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }) { Text("Save PNG again") }
+            }
+        } else null
+    )
 }
 
 @Composable

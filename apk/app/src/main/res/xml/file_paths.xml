@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- QR PDF cards exported to external files Downloads directory -->
+    <external-files-path name="qr_cards" path="Download/qr_cards/" />
+    <!-- Cache directory for temporary share files -->
+    <cache-path name="cache" path="/" />
+</paths>

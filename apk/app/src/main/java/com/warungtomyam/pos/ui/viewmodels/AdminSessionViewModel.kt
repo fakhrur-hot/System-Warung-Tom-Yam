@@ -123,13 +123,17 @@ class AdminSessionViewModel @Inject constructor(
             when (val result = apiClient.postSession("OPEN")) {
                 is ApiResult.Success -> {
                     _uiState.value = _uiState.value.copy(isSessionOpen = true)
+                    // Capture "is this the first open of the day?" BEFORE marking today opened —
+                    // otherwise checkDailyPopup()'s own isNewDay() check would always be false
+                    // (we'd have just stamped today), so the daily popup could never appear.
+                    val firstOpenToday = sessionPrefs.isNewDay()
                     sessionPrefs.markTodayOpened()
 
                     // Sync menu from backend to Room
                     syncMenuFromBackend()
 
                     // Check if daily popup is needed
-                    checkDailyPopup()
+                    checkDailyPopup(firstOpenToday)
                 }
                 is ApiResult.Error -> {
                     // UNAUTHORIZED or NO_TOKEN = expired/revoked token → must re-handshake
@@ -269,9 +273,9 @@ class AdminSessionViewModel @Inject constructor(
      * Check if the daily availability popup should be shown.
      * Shown on first OPEN of the day if any askMeDaily items exist.
      */
-    private suspend fun checkDailyPopup() {
+    private suspend fun checkDailyPopup(isNewDay: Boolean) {
         val askMeDailyItems = menuDao.getAskMeDaily()
-        if (askMeDailyItems.isNotEmpty() && sessionPrefs.isNewDay()) {
+        if (askMeDailyItems.isNotEmpty() && isNewDay) {
             _uiState.value = _uiState.value.copy(
                 showDailyPopup = true,
                 dailyItems = askMeDailyItems

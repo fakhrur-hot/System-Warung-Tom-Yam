@@ -115,6 +115,28 @@ class MenuViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Move a category up or down in the shared order, then persist + re-publish the menu so
+     * the new order drives the tabs here, the admin/staff ordering screens, and the customer
+     * web (which sort by the snapshot's category sortOrder). Operates on the full effective
+     * category list so every category ends up with an explicit position.
+     */
+    fun moveCategory(name: String, up: Boolean) {
+        viewModelScope.launch {
+            val current = _uiState.value.categories.toMutableList()
+            val idx = current.indexOf(name)
+            if (idx < 0) return@launch
+            val target = if (up) idx - 1 else idx + 1
+            if (target !in current.indices) return@launch
+            val tmp = current[idx]
+            current[idx] = current[target]
+            current[target] = tmp
+            categoryStore.set(current)
+            _uiState.update { it.copy(categoryOrder = categoryStore.get()) }
+            pushMenuToBackend()
+        }
+    }
+
     fun loadItems() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }

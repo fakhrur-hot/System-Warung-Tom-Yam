@@ -209,14 +209,18 @@ async function handleCreateOrder(req: Request, _url: URL): Promise<Response> {
       return errorResponse(422, "ITEM_UNAVAILABLE", `Menu item '${item.menuItemId}' not found or unavailable`);
     }
 
+    // For a Small/Medium/Large item the client sends the chosen size + its price; validate
+    // the price against the item's presets and bake the size into the name ("Nasi Goreng (L)").
+    const priced = resolveSizedLine(menuItem, item);
+
     // sentToKitchen is conditional on the customerOrderAutoPrint setting.
     // sessionNumber is always 1 for the initial order; later rounds appended
     // via POST /orders/:id/items get the next sessionNumber up.
     const lineItem: OrderItemLine = {
       id: crypto.randomUUID(),
       menuItemId: item.menuItemId,
-      nameSnapshot: menuItem.name,
-      unitPriceSnapshot: menuItem.price,
+      nameSnapshot: priced.name,
+      unitPriceSnapshot: priced.price,
       categorySnapshot: menuItem.category,
       codeSnapshot: menuItem.code,
       marketPriceSnapshot: menuItem.marketPrice,
@@ -226,7 +230,7 @@ async function handleCreateOrder(req: Request, _url: URL): Promise<Response> {
       sessionNumber: 1,
     };
     orderItems.push(lineItem);
-    total += menuItem.price * item.quantity;
+    total += priced.price * item.quantity;
   }
 
   const now = new Date().toISOString();
@@ -296,6 +300,42 @@ interface MenuItemInfo {
   category: string;
   code: string;
   marketPrice: boolean;
+  hasVariablePrice: boolean;
+  // Allowed size prices (Small/Medium/Large) for a variable-price item; used to validate a
+  // client-chosen unitPrice so a tampered price can't be stored.
+  priceOptions: number[];
+}
+
+// Collect the Small/Medium/Large preset prices present on a menu item.
+function priceOptionsOf(mi: Record<string, unknown>): number[] {
+  return [mi.priceOption1, mi.priceOption2, mi.priceOption3]
+    .map((v) => Number(v))
+    .filter((n) => Number.isFinite(n) && n > 0);
+}
+
+/**
+ * Resolve a line's price + display name for a Small/Medium/Large ("variable price") item.
+ * A client-supplied unitPrice is honored only when it matches one of the item's presets
+ * (anti-tamper); the chosen size (e.g. "L") is baked inline into the name → "Nasi Goreng (L)".
+ */
+function resolveSizedLine(
+  menuItem: MenuItemInfo,
+  item: { unitPrice?: unknown; size?: unknown },
+): { name: string; price: number } {
+  let price = menuItem.price;
+  const chosen = Number(item.unitPrice);
+  if (
+    Number.isFinite(chosen) && chosen > 0 &&
+    menuItem.hasVariablePrice && menuItem.priceOptions.includes(chosen)
+  ) {
+    price = chosen;
+  }
+  let name = menuItem.name;
+  if (typeof item.size === "string" && item.size.trim()) {
+    const size = item.size.trim().slice(0, 8).replace(/[()]/g, "");
+    if (size) name = `${name} (${size})`;
+  }
+  return { name, price };
 }
 
 // Menu item names are stored as a localized-name object ({ en, bm, zh, ta, th,
@@ -338,6 +378,8 @@ function buildMenuLookup(menuJson: unknown): Map<string, MenuItemInfo> {
               category: catName,
               code: (mi.code as string) || "",
               marketPrice: mi.marketPrice === true,
+              hasVariablePrice: mi.hasVariablePrice === true,
+              priceOptions: priceOptionsOf(mi),
             });
           }
         }
@@ -355,6 +397,8 @@ function buildMenuLookup(menuJson: unknown): Map<string, MenuItemInfo> {
           category: (mi.category as string) || "Uncategorized",
           code: (mi.code as string) || "",
           marketPrice: mi.marketPrice === true,
+          hasVariablePrice: mi.hasVariablePrice === true,
+          priceOptions: priceOptionsOf(mi),
         });
       }
     }

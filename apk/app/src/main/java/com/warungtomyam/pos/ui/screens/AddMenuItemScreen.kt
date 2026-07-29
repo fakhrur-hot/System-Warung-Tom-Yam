@@ -286,11 +286,9 @@ fun AddMenuItemScreen(
                         if (option1 == null || option1 <= 0) return@ItemFormContent
                         if (option2 == null || option2 <= 0) return@ItemFormContent
                         if (option3 == null || option3 <= 0) return@ItemFormContent
-                        effectivePrice = when (activeOptionIndex) {
-                            2 -> option2
-                            3 -> option3
-                            else -> option1
-                        }
+                        // No single "active" price — Small/Medium/Large are all offered when
+                        // ordering. Store Small as the item's base price for snapshots/fallback.
+                        effectivePrice = option1
                     } else {
                         val price = priceText.toDoubleOrNull() ?: 0.0
                         if (price <= 0) return@ItemFormContent
@@ -318,7 +316,7 @@ fun AddMenuItemScreen(
                             imageUrl = imageUrl.trim(),
                             imagePath = imagePath,
                             hasVariablePrice = hasVariablePrice,
-                            variablePriceDailyPrompt = hasVariablePrice && variablePriceDailyPrompt,
+                            variablePriceDailyPrompt = false,
                             priceOption1 = option1,
                             priceOption2 = option2,
                             priceOption3 = option3,
@@ -341,7 +339,7 @@ fun AddMenuItemScreen(
                             imageUrl = imageUrl.trim(),
                             imagePath = imagePath,
                             hasVariablePrice = hasVariablePrice,
-                            variablePriceDailyPrompt = hasVariablePrice && variablePriceDailyPrompt,
+                            variablePriceDailyPrompt = false,
                             priceOption1 = option1,
                             priceOption2 = option2,
                             priceOption3 = option3,
@@ -656,13 +654,21 @@ private fun ItemFormContent(
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Market price is decided daily, so selecting it auto-enables "Ask me daily"
+                // (the daily popup then prompts for today's price). The admin can still turn
+                // the switch back off if they prefer to set the price manually in Menu Mgmt.
+                val selectMarket = {
+                    onMarketPriceChange(true)
+                    onHasVariablePriceChange(false)
+                    onAskMeDailyChange(true)
+                }
                 RadioButton(
                     selected = marketPrice,
-                    onClick = { onMarketPriceChange(true); onHasVariablePriceChange(false) }
+                    onClick = selectMarket
                 )
                 Text(
                     text = strings.marketPriceMode,
-                    modifier = Modifier.clickable { onMarketPriceChange(true); onHasVariablePriceChange(false) }
+                    modifier = Modifier.clickable(onClick = selectMarket)
                 )
             }
         }
@@ -691,76 +697,16 @@ private fun ItemFormContent(
                 prefix = { Text("RM ") }
             )
         } else {
-            // Multiple Price: nested sub-choice — daily-prompted or manually managed.
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = !variablePriceDailyPrompt,
-                        onClick = { onVariablePriceDailyPromptChange(false) }
-                    )
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onVariablePriceDailyPromptChange(false) }
-                    ) {
-                        Text(strings.variablePriceDailyPromptOffLabel, style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            strings.variablePriceDailyPromptOffDesc,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = variablePriceDailyPrompt,
-                        onClick = { onVariablePriceDailyPromptChange(true) }
-                    )
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onVariablePriceDailyPromptChange(true) }
-                    ) {
-                        Text(strings.variablePriceDailyPromptOnLabel, style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            strings.variablePriceDailyPromptOnDesc,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // 3 price presets, entered once, editable anytime. The radio marks which one
-            // is currently active/effective (what customers see) — for daily-prompt items
-            // this gets overridden each day via the login popup instead.
-            PriceOptionRow(
-                index = 1,
-                label = "${strings.priceOptionLabel} 1",
-                value = priceOption1Text,
-                onValueChange = onPriceOption1Change,
-                isActive = activeOptionIndex == 1,
-                onSetActive = { onActiveOptionIndexChange(1) },
-                strings = strings
+            // Multiple Price: three fixed sizes — Small / Medium / Large. All three are shown
+            // as separate options when ordering; there's no single "active" price.
+            Text(
+                text = "Small / Medium / Large — all three appear when ordering",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            PriceOptionRow(
-                index = 2,
-                label = "${strings.priceOptionLabel} 2",
-                value = priceOption2Text,
-                onValueChange = onPriceOption2Change,
-                isActive = activeOptionIndex == 2,
-                onSetActive = { onActiveOptionIndexChange(2) },
-                strings = strings
-            )
-            PriceOptionRow(
-                index = 3,
-                label = "${strings.priceOptionLabel} 3",
-                value = priceOption3Text,
-                onValueChange = onPriceOption3Change,
-                isActive = activeOptionIndex == 3,
-                onSetActive = { onActiveOptionIndexChange(3) },
-                strings = strings
-            )
+            SizePriceField("Small (S)", priceOption1Text, onPriceOption1Change)
+            SizePriceField("Medium (M)", priceOption2Text, onPriceOption2Change)
+            SizePriceField("Large (L)", priceOption3Text, onPriceOption3Change)
         }
 
         // Toggles
@@ -848,41 +794,24 @@ private fun ItemFormContent(
     }
 }
 
+/** One size's price field (Small/Medium/Large) — no "active" selection; all sizes are offered. */
 @Composable
-private fun PriceOptionRow(
-    index: Int,
+private fun SizePriceField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
-    isActive: Boolean,
-    onSetActive: () -> Unit,
-    strings: UiStrings
 ) {
-    Row(
+    OutlinedTextField(
+        value = value,
+        onValueChange = { v ->
+            if (v.isEmpty() || v.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
+                onValueChange(v)
+            }
+        },
+        label = { Text(label) },
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = isActive, onClick = onSetActive)
-        OutlinedTextField(
-            value = value,
-            onValueChange = { v ->
-                if (v.isEmpty() || v.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
-                    onValueChange(v)
-                }
-            },
-            label = { Text(label) },
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            prefix = { Text("RM ") }
-        )
-        if (isActive) {
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = strings.activePriceLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        prefix = { Text("RM ") }
+    )
 }

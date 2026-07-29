@@ -59,5 +59,6 @@
   "cameraUnsupported": "This browser can't open the camera. Please scan the QR code with your phone's camera app instead.",
   "closeScanner": "Close",
   "cafeClosedTitle": "Not open yet",
-  "cafeClosedBody": "The restaurant isn't open right now. Please check back soon!"
+  "cafeClosedBody": "The restaurant isn't open right now. Please check back soon!",
+  "searchMenu": "Search"
 }

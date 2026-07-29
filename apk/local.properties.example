@@ -1,2 +1,9 @@
 # Copy to local.properties (git-ignored) and set your Android SDK path.
 sdk.dir=C\:\\Users\\<user>\\AppData\\Local\\Android\\Sdk
+
+# Supabase credentials (required for backend connectivity)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+
+# Website URL for QR code generation (Cloudflare Pages URL printed on QR cards)
+WEBSITE_URL=https://your-project.pages.dev
