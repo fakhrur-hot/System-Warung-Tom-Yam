@@ -602,9 +602,9 @@ class TableViewViewModel @Inject constructor(
     }
 
     /**
-     * Add a table with an auto-generated ID (T0001..T9999, always incrementing — see
-     * [SystemSettings.nextTableNumber]; deleting a table never frees its number for reuse).
-     * Capped at [MAX_TABLES] concurrently registered tables.
+     * Add a table with an auto-generated ID. Reuses the LOWEST unused number (T0001, T0002,
+     * …) so ids stay dense and aligned with the table count even after deletions — deleting
+     * T0002 lets the next add reclaim it. Capped at [MAX_TABLES] concurrent tables.
      */
     fun addTable() {
         viewModelScope.launch {
@@ -616,19 +616,26 @@ class TableViewViewModel @Inject constructor(
                 return@launch
             }
 
-            val settings = settingsDao.get() ?: SystemSettings()
-            if (settings.nextTableNumber > MAX_TABLE_NUMBER) {
+            // Lowest unused number, so a deleted id (gap) is reclaimed before extending.
+            val used = tableDao.getAll().mapNotNull { it.id.removePrefix("T").toIntOrNull() }.toSet()
+            var n = 1
+            while (used.contains(n)) n++
+            if (n > MAX_TABLE_NUMBER) {
                 _tableManagement.value = _tableManagement.value.copy(
                     error = str().tableNumberLimitReached.format(MAX_TABLE_NUMBER)
                 )
                 return@launch
             }
 
-            val id = "T" + settings.nextTableNumber.toString().padStart(4, '0')
+            val id = "T" + n.toString().padStart(4, '0')
             val label = _tableManagement.value.newTableLabel.trim().ifEmpty { id }
 
             tableDao.insert(Table(id = id, label = label, sortOrder = count))
-            settingsDao.upsert(settings.copy(nextTableNumber = settings.nextTableNumber + 1))
+            // nextTableNumber is now only a monotonic hint (generation uses the gap-fill above).
+            val settings = settingsDao.get() ?: SystemSettings()
+            if (settings.nextTableNumber <= n) {
+                settingsDao.upsert(settings.copy(nextTableNumber = n + 1))
+            }
 
             val tables = tableDao.getAll()
             _tableManagement.value = _tableManagement.value.copy(
