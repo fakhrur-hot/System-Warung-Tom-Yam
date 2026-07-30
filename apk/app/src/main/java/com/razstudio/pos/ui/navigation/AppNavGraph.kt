@@ -145,8 +145,11 @@ fun AppNavGraph(
         composable(NavRoutes.ADMIN_HOME) {
             AdminHomeScreen(
                 onNavigateToLock = {
+                    // Sign-out: pop the ENTIRE logged-in stack back to ROLE_SELECT, so pressing
+                    // back from the lock screen stays at role-select (or closes the app), never
+                    // returning to the pre-logout home/ordering screen.
                     navController.navigate(NavRoutes.ADMIN_LOCK) {
-                        popUpTo(NavRoutes.ADMIN_HOME) { inclusive = true }
+                        popUpTo(NavRoutes.ROLE_SELECT) { inclusive = false }
                     }
                 },
                 onNavigateToReconnect = {
