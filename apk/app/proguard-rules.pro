@@ -45,7 +45,7 @@
 
 # ── App data classes used in JSON parsing ─────────────────────────────────────
 # Keep all data classes in the pos.data package (used in JSONObject parsing).
--keep class com.warungtomyam.pos.data.** { *; }
+-keep class com.razstudio.pos.data.** { *; }
 
 # ── Suppress common benign warnings ──────────────────────────────────────────
 -dontwarn javax.annotation.**

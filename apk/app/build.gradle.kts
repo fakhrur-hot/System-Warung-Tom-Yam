@@ -22,12 +22,20 @@ val supabaseUrl = localProps.getProperty("SUPABASE_URL") ?: ""
 val supabaseAnonKey = localProps.getProperty("SUPABASE_ANON_KEY") ?: ""
 val websiteUrl = localProps.getProperty("WEBSITE_URL") ?: "https://tani-tom-yam.pages.dev"
 
+// The source package (namespace) is the constant vendor base `com.razstudio.pos` on every branch —
+// this keeps git merges between the template (main) and café builds (e.g. tani-tom-yam) conflict-free.
+// The APPLICATION ID, which is what Android uses as the installed-app identity (and what the signing
+// cert + Play/update path bind to), is overridable per café via local.properties `APPLICATION_ID`.
+// Template default = the vendor base; a café build sets its own (e.g. com.warungtomyam.pos) to keep
+// its existing installed identity and update path.
+val cafeApplicationId = localProps.getProperty("APPLICATION_ID") ?: "com.razstudio.pos"
+
 android {
-    namespace = "com.warungtomyam.pos"
+    namespace = "com.razstudio.pos"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.warungtomyam.pos"
+        applicationId = cafeApplicationId
         minSdk = 26
         targetSdk = 36
         versionCode = 4
@@ -62,7 +70,7 @@ android {
         debug {
             isMinifyEnabled = false
             // NOTE: no applicationIdSuffix — debug builds share the applicationId
-            // (com.warungtomyam.pos) so they update the installed app in place rather than
+            // (com.razstudio.pos) so they update the installed app in place rather than
             // creating a second ".debug" package. Re-add a suffix only if you deliberately
             // want debug + release installed side-by-side.
         }

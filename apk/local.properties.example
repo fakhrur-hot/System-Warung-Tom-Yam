@@ -7,3 +7,9 @@ SUPABASE_ANON_KEY=your-anon-key
 
 # Website URL for QR code generation (Cloudflare Pages URL printed on QR cards)
 WEBSITE_URL=https://your-project.pages.dev
+
+# Installed-app identity. Leave unset for the template (defaults to the vendor base
+# com.razstudio.pos). A café build sets its OWN applicationId here to keep its existing
+# installed identity + update path (the source package/namespace stays com.razstudio.pos
+# on every branch). Example for the Tani build:
+#   APPLICATION_ID=com.warungtomyam.pos
