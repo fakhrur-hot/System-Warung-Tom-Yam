@@ -13,6 +13,7 @@ import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import androidx.annotation.RequiresApi
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import com.google.zxing.BarcodeFormat
@@ -347,6 +348,10 @@ object QrPdfGenerator {
     /**
      * API 29+: Save PDF to Downloads via MediaStore.
      */
+    // Only called from the Build.VERSION.SDK_INT >= Q branch below — @RequiresApi lets lint
+    // correlate that guard with this function instead of flagging EXTERNAL_CONTENT_URI as
+    // unreachable-on-minSdk-26 (a false positive; it can't trace the guard across the call site).
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun saveViaMediaStore(
         context: Context,
         document: PdfDocument,

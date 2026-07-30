@@ -1,5 +1,6 @@
 package com.razstudio.pos.ui.viewmodels
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -90,12 +91,29 @@ class OrderingViewModel @Inject constructor(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             application.registerReceiver(cafeStatusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
-            application.registerReceiver(cafeStatusReceiver, filter)
+            registerReceiverPreTiramisu(application, cafeStatusReceiver, filter)
         }
 
         // Initial state: assume café is open (CHECK_IN) — user can check in
         // The foreground service will broadcast actual state shortly
         fetchInitialState()
+    }
+
+    /**
+     * Lint false positive on the call site (UnspecifiedRegisterReceiverFlag): the caller's
+     * SDK_INT branch already uses the 3-arg RECEIVER_NOT_EXPORTED overload on API 33+, where the
+     * flag is actually required — this 2-arg overload only ever runs below that, where the flag
+     * parameter doesn't exist. Lint can't trace the branch, so this is isolated into its own
+     * annotated function rather than suppressed inline (Kotlin can't @SuppressLint a bare
+     * statement).
+     */
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    private fun registerReceiverPreTiramisu(
+        application: Application,
+        receiver: BroadcastReceiver,
+        filter: IntentFilter
+    ) {
+        application.registerReceiver(receiver, filter)
     }
 
     override fun onCleared() {

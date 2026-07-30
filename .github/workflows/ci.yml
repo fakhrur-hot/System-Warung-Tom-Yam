@@ -48,3 +48,20 @@ jobs:
           name: app-debug
           path: apk/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      # Fails the job on any lint ERROR (abortOnError = true in app/build.gradle.kts) — the
+      # ~179 pre-existing warnings don't fail it, only NEW errors introduced going forward.
+      # NOTE: this is standard Android Lint, not Google's newer "Play Policy Insights" checks —
+      # those currently only run interactively via Android Studio's own menu (Code → Inspect for
+      # Play Policy Insights), with no Gradle/CLI entry point as of this writing, so they can't
+      # be automated into CI yet. Real, CI-automatable Play Store/privacy-policy compliance
+      # scanning is Google's separate "Checks" product (checks.google.com) — wiring in its
+      # official GitHub Action (google-checks/checks-app-scan-github-action) needs a Checks
+      # account + app registration + service-account credential this repo doesn't have yet.
+      - name: Lint
+        run: ./gradlew :app:lintDebug --no-daemon --stacktrace
+      - name: Upload lint report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-results
+          path: apk/app/build/reports/lint-results-debug.html
