@@ -64,6 +64,7 @@ fun AmbientScreen(
     newOrderLabel: String?,
     cafeName: String,
     isCustomerFacing: Boolean,
+    strings: com.razstudio.pos.ui.i18n.UiStrings,
 ) {
     // Monotonic seconds since this screen appeared. A monotonic clock (rather than a looping
     // animateFloat) keeps the procedural motion seamless — a restarting transition would make every
@@ -99,7 +100,7 @@ fun AmbientScreen(
                 cafeName = cafeName,
                 occupied = tables.count { it.status != TableUiStatus.FREE },
                 total = tables.size,
-                timeProvider = { time.floatValue },
+                strings = strings,
             )
 
             // weight(1f), not fillMaxSize(): the grid must yield the last row of space to the
@@ -109,6 +110,7 @@ fun AmbientScreen(
                     tables = tables,
                     isCustomerFacing = isCustomerFacing,
                     timeProvider = { time.floatValue },
+                    strings = strings,
                 )
 
                 newOrderLabel?.let { label ->
@@ -121,7 +123,7 @@ fun AmbientScreen(
             }
 
             Text(
-                text = "Tap anywhere to resume",
+                text = strings.ambientTapToResume,
                 color = Color.White.copy(alpha = 0.22f),
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
@@ -235,7 +237,7 @@ private fun AmbientHeader(
     cafeName: String,
     occupied: Int,
     total: Int,
-    timeProvider: () -> Float,
+    strings: com.razstudio.pos.ui.i18n.UiStrings,
 ) {
     // Recomputed on the minute rather than per-frame — the clock text only changes that often.
     var clock by remember { mutableStateOf(currentClock()) }
@@ -258,7 +260,8 @@ private fun AmbientHeader(
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                text = if (total == 0) "No tables configured" else "$occupied of $total tables active",
+                text = if (total == 0) strings.ambientNoTables
+                       else strings.ambientTablesActive.format(occupied, total),
                 color = Color.White.copy(alpha = 0.30f),
                 fontSize = 13.sp,
             )
@@ -283,6 +286,7 @@ private fun AmbientTableGrid(
     tables: List<TableState>,
     isCustomerFacing: Boolean,
     timeProvider: () -> Float,
+    strings: com.razstudio.pos.ui.i18n.UiStrings,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 104.dp),
@@ -297,6 +301,7 @@ private fun AmbientTableGrid(
                 state = state,
                 isCustomerFacing = isCustomerFacing,
                 timeProvider = timeProvider,
+                strings = strings,
             )
         }
     }
@@ -311,6 +316,7 @@ private fun AmbientTableTile(
     state: TableState,
     isCustomerFacing: Boolean,
     timeProvider: () -> Float,
+    strings: com.razstudio.pos.ui.i18n.UiStrings,
 ) {
     val isActive = state.status != TableUiStatus.FREE
     val base = state.status.ambientColor()
@@ -341,7 +347,7 @@ private fun AmbientTableTile(
             )
             Box(modifier = Modifier.fillMaxSize()) {
                 Text(
-                    text = state.ambientDetail(isCustomerFacing),
+                    text = state.ambientDetail(isCustomerFacing, strings),
                     color = Color.White.copy(alpha = if (isActive) 0.38f else 0.18f),
                     fontSize = 11.sp,
                     modifier = Modifier.align(Alignment.BottomStart),
@@ -364,16 +370,19 @@ private fun TableUiStatus.ambientColor(): Color = when (this) {
  * Tile subtitle. In customer-facing mode this is deliberately non-numeric — occupancy only, so a
  * screen the dining room can see never exposes order values.
  */
-private fun TableState.ambientDetail(isCustomerFacing: Boolean): String {
-    if (status == TableUiStatus.FREE) return if (isCustomerFacing) "" else "Free"
-    if (isCustomerFacing) {
-        return when (status) {
-            TableUiStatus.READY -> "Ready"
-            TableUiStatus.PREPARING -> "Cooking"
-            else -> "Seated"
-        }
+private fun TableState.ambientDetail(
+    isCustomerFacing: Boolean,
+    strings: com.razstudio.pos.ui.i18n.UiStrings,
+): String {
+    if (status == TableUiStatus.FREE) return if (isCustomerFacing) "" else strings.free
+    val statusWord = when (status) {
+        TableUiStatus.READY -> strings.ambientReady
+        TableUiStatus.PREPARING -> strings.ambientCooking
+        else -> strings.ambientSeated
     }
-    val total = order?.total ?: return status.name.replace('_', ' ').lowercase()
+    if (isCustomerFacing) return statusWord
+    // Staff mode shows the running total; fall back to the localized status if the order is gone.
+    val total = order?.total ?: return statusWord
     return "RM ${"%.2f".format(total)}"
 }
 

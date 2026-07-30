@@ -578,29 +578,27 @@ fun AdminSettingsScreen(
             // === Ambient / screensaver mode (device-local, applied immediately) ===
             // Describes THIS terminal's physical situation (powered counter, guest-visible screen),
             // so it is stored per device rather than café-wide.
-            SettingsSection(title = "Ambient display") {
+            SettingsSection(title = strings.ambientSection) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Keep screen on + ambient mode")
+                    Text(strings.ambientEnableLabel)
                     Switch(
                         checked = ambientEnabled,
                         onCheckedChange = { ambientStore.setEnabled(it); ambientEnabled = it }
                     )
                 }
                 Text(
-                    text = "Stops the display from ever sleeping, and after the station sits idle " +
-                        "it shows a dimmed live table board instead of the bright POS screen. " +
-                        "Best on a terminal that stays on a charger.",
+                    text = strings.ambientEnableDesc,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 if (ambientEnabled) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Start after", style = MaterialTheme.typography.bodyMedium)
+                    Text(strings.ambientStartAfter, style = MaterialTheme.typography.bodyMedium)
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         com.razstudio.pos.data.local.AmbientSettingsStore.TIMEOUT_OPTIONS.forEach { minutes ->
@@ -610,7 +608,7 @@ fun AdminSettingsScreen(
                                     ambientStore.setTimeoutMinutes(minutes)
                                     ambientTimeout = minutes
                                 },
-                                label = { Text("$minutes min") }
+                                label = { Text(strings.ambientMinutes.format(minutes)) }
                             )
                         }
                     }
@@ -621,7 +619,7 @@ fun AdminSettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Guests can see this screen")
+                        Text(strings.ambientGuestVisibleLabel)
                         Switch(
                             checked = ambientCustomerFacing,
                             onCheckedChange = {
@@ -630,7 +628,7 @@ fun AdminSettingsScreen(
                         )
                     }
                     Text(
-                        text = "Hides order values on the ambient board — shows table occupancy only.",
+                        text = strings.ambientGuestVisibleDesc,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

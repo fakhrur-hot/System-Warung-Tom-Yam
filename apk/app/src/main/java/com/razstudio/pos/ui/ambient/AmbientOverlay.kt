@@ -13,6 +13,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.R
+import com.razstudio.pos.ui.i18n.LanguageViewModel
+import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.viewmodels.AmbientViewModel
 import kotlinx.coroutines.delay
 
@@ -30,9 +32,12 @@ private const val NEW_ORDER_VISIBLE_MS = 12_000L
 fun AmbientOverlay(
     onDismiss: () -> Unit,
     viewModel: AmbientViewModel = hiltViewModel(),
+    languageViewModel: LanguageViewModel = hiltViewModel(),
 ) {
     val tables by viewModel.tableStates.collectAsState()
     val newOrder by viewModel.newOrder.collectAsState()
+    val language by languageViewModel.language.collectAsState()
+    val strings = uiStrings(language)
 
     // Retire the celebration card on its own timer.
     LaunchedEffect(newOrder) {
@@ -47,7 +52,7 @@ fun AmbientOverlay(
 
     val newOrderLabel = newOrder?.let { order ->
         val tableLabel = tables.firstOrNull { it.table.id == order.tableId }?.table?.label
-        if (tableLabel != null) "New order · $tableLabel" else "New order received"
+        if (tableLabel != null) "${strings.newOrder} · $tableLabel" else strings.newOrder
     }
 
     // Back must dismiss ambient mode, never pop the screen underneath it.
@@ -64,6 +69,7 @@ fun AmbientOverlay(
             newOrderLabel = newOrderLabel,
             cafeName = cafeName,
             isCustomerFacing = viewModel.isCustomerFacing(),
+            strings = strings,
         )
     }
 }
