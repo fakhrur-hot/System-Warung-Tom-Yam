@@ -514,6 +514,20 @@ data class UiStringsGroup8(
     val rejectButton: String,
     val escAsteriskLabel: String,
     val escAsteriskDesc: String,
+    // ── Ambient (screensaver) display ──
+    val ambientSection: String,
+    val ambientEnableLabel: String,
+    val ambientEnableDesc: String,
+    val ambientStartAfter: String,
+    val ambientMinutes: String,
+    val ambientGuestVisibleLabel: String,
+    val ambientGuestVisibleDesc: String,
+    val ambientTapToResume: String,
+    val ambientTablesActive: String,
+    val ambientNoTables: String,
+    val ambientSeated: String,
+    val ambientCooking: String,
+    val ambientReady: String,
 )
 
 class UiStrings(
@@ -954,6 +968,19 @@ class UiStrings(
     val rejectButton: String get() = g8.rejectButton
     val escAsteriskLabel: String get() = g8.escAsteriskLabel
     val escAsteriskDesc: String get() = g8.escAsteriskDesc
+    val ambientSection: String get() = g8.ambientSection
+    val ambientEnableLabel: String get() = g8.ambientEnableLabel
+    val ambientEnableDesc: String get() = g8.ambientEnableDesc
+    val ambientStartAfter: String get() = g8.ambientStartAfter
+    val ambientMinutes: String get() = g8.ambientMinutes
+    val ambientGuestVisibleLabel: String get() = g8.ambientGuestVisibleLabel
+    val ambientGuestVisibleDesc: String get() = g8.ambientGuestVisibleDesc
+    val ambientTapToResume: String get() = g8.ambientTapToResume
+    val ambientTablesActive: String get() = g8.ambientTablesActive
+    val ambientNoTables: String get() = g8.ambientNoTables
+    val ambientSeated: String get() = g8.ambientSeated
+    val ambientCooking: String get() = g8.ambientCooking
+    val ambientReady: String get() = g8.ambientReady
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1401,6 +1428,22 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "Tolak",
             escAsteriskLabel = "Mod imej ESC * (keserasian)",
             escAsteriskDesc = "Hidupkan jika logo/slip tidak keluar pada pencetak murah.",
+            ambientSection = "Paparan ambien",
+            ambientEnableLabel = "Biarkan skrin hidup + mod ambien",
+            ambientEnableDesc = "Menghalang skrin daripada tidur. Selepas terminal tidak " +
+                "digunakan, ia memaparkan papan meja langsung yang malap dan bukan skrin POS " +
+                "yang cerah. Terbaik pada peranti yang sentiasa dicas.",
+            ambientStartAfter = "Mula selepas",
+            ambientMinutes = "%d min",
+            ambientGuestVisibleLabel = "Pelanggan boleh melihat skrin ini",
+            ambientGuestVisibleDesc = "Menyembunyikan jumlah pesanan pada papan ambien — " +
+                "hanya menunjukkan meja yang diduduki.",
+            ambientTapToResume = "Ketik di mana-mana untuk sambung semula",
+            ambientTablesActive = "%1\$d daripada %2\$d meja aktif",
+            ambientNoTables = "Tiada meja dikonfigurasikan",
+            ambientSeated = "Diduduki",
+            ambientCooking = "Sedang dimasak",
+            ambientReady = "Sedia",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -1847,6 +1890,22 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "Reject",
             escAsteriskLabel = "ESC * image mode (compatibility)",
             escAsteriskDesc = "Turn on if logos/slips don't print on cheap printers.",
+            ambientSection = "Ambient display",
+            ambientEnableLabel = "Keep screen on + ambient mode",
+            ambientEnableDesc = "Stops the display from ever sleeping, and after the station " +
+                "sits idle it shows a dimmed live table board instead of the bright POS screen. " +
+                "Best on a terminal that stays on a charger.",
+            ambientStartAfter = "Start after",
+            ambientMinutes = "%d min",
+            ambientGuestVisibleLabel = "Guests can see this screen",
+            ambientGuestVisibleDesc = "Hides order values on the ambient board — shows table " +
+                "occupancy only.",
+            ambientTapToResume = "Tap anywhere to resume",
+            ambientTablesActive = "%1\$d of %2\$d tables active",
+            ambientNoTables = "No tables configured",
+            ambientSeated = "Seated",
+            ambientCooking = "Cooking",
+            ambientReady = "Ready",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2293,6 +2352,20 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "拒绝",
             escAsteriskLabel = "ESC * 图像模式（兼容）",
             escAsteriskDesc = "如果廉价打印机不打印标志/单据，请开启。",
+            ambientSection = "环境显示",
+            ambientEnableLabel = "保持屏幕常亮 + 环境模式",
+            ambientEnableDesc = "防止屏幕休眠。终端闲置后会显示调暗的实时桌台看板，而不是明亮的POS界面。" +
+                "建议在持续充电的设备上使用。",
+            ambientStartAfter = "启动延迟",
+            ambientMinutes = "%d 分钟",
+            ambientGuestVisibleLabel = "顾客可以看到此屏幕",
+            ambientGuestVisibleDesc = "在环境看板上隐藏订单金额 — 仅显示桌台占用情况。",
+            ambientTapToResume = "点击任意位置继续",
+            ambientTablesActive = "%2\$d 张桌台中 %1\$d 张使用中",
+            ambientNoTables = "未设置桌台",
+            ambientSeated = "已入座",
+            ambientCooking = "制作中",
+            ambientReady = "已就绪",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -2739,6 +2812,22 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "நிராகரி",
             escAsteriskLabel = "ESC * பட முறை (இணக்கம்)",
             escAsteriskDesc = "மலிவு அச்சுப்பொறிகளில் லோகோ/சீட்டு அச்சாகவில்லை எனில் இயக்கவும்.",
+            ambientSection = "சுற்றுப்புற காட்சி",
+            ambientEnableLabel = "திரையை இயக்கத்தில் வைத்திரு + சுற்றுப்புற பயன்முறை",
+            ambientEnableDesc = "திரை உறங்குவதைத் தடுக்கிறது. முனையம் பயன்பாட்டில் இல்லாதபோது, " +
+                "பிரகாசமான POS திரைக்குப் பதிலாக மங்கிய நேரடி மேசைப் பலகையைக் காட்டும். " +
+                "எப்போதும் சார்ஜரில் இருக்கும் சாதனத்தில் சிறந்தது.",
+            ambientStartAfter = "இதற்குப் பிறகு தொடங்கு",
+            ambientMinutes = "%d நிமிடம்",
+            ambientGuestVisibleLabel = "விருந்தினர்கள் இந்தத் திரையைப் பார்க்க முடியும்",
+            ambientGuestVisibleDesc = "சுற்றுப்புற பலகையில் ஆர்டர் தொகையை மறைக்கும் — " +
+                "மேசை பயன்பாட்டை மட்டும் காட்டும்.",
+            ambientTapToResume = "தொடர எங்கும் தட்டவும்",
+            ambientTablesActive = "%2\$d மேசைகளில் %1\$d செயலில்",
+            ambientNoTables = "மேசைகள் அமைக்கப்படவில்லை",
+            ambientSeated = "அமர்ந்துள்ளது",
+            ambientCooking = "சமைக்கப்படுகிறது",
+            ambientReady = "தயார்",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -3185,6 +3274,22 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "ปฏิเสธ",
             escAsteriskLabel = "โหมดภาพ ESC * (ความเข้ากันได้)",
             escAsteriskDesc = "เปิดหากโลโก้/สลิปไม่พิมพ์บนเครื่องพิมพ์ราคาถูก",
+            ambientSection = "โหมดแสดงผลแอมเบียนท์",
+            ambientEnableLabel = "เปิดหน้าจอค้างไว้ + โหมดแอมเบียนท์",
+            ambientEnableDesc = "ป้องกันไม่ให้หน้าจอดับ และเมื่อเครื่องไม่มีการใช้งานจะแสดง" +
+                "กระดานโต๊ะแบบเรียลไทม์ที่หรี่แสงแทนหน้าจอ POS ที่สว่าง " +
+                "เหมาะกับเครื่องที่เสียบสายชาร์จไว้",
+            ambientStartAfter = "เริ่มหลังจาก",
+            ambientMinutes = "%d นาที",
+            ambientGuestVisibleLabel = "ลูกค้าสามารถเห็นหน้าจอนี้",
+            ambientGuestVisibleDesc = "ซ่อนยอดออร์เดอร์บนกระดานแอมเบียนท์ — " +
+                "แสดงเฉพาะสถานะการใช้โต๊ะ",
+            ambientTapToResume = "แตะที่ใดก็ได้เพื่อดำเนินการต่อ",
+            ambientTablesActive = "ใช้งาน %1\$d จาก %2\$d โต๊ะ",
+            ambientNoTables = "ยังไม่ได้ตั้งค่าโต๊ะ",
+            ambientSeated = "มีลูกค้า",
+            ambientCooking = "กำลังปรุง",
+            ambientReady = "พร้อมเสิร์ฟ",
         ),
     )
 }
