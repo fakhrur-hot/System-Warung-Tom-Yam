@@ -1,32 +1,34 @@
 # Design Document: Café Provisioning Wizard
 
-## Research findings that shape this design (2026-07-30)
+## Overview
 
-Before designing against it, I checked the Supabase Management API's actual documented behavior
-rather than assuming a clean REST contract exists. Two findings changed the design:
+This is a **Bring-Your-Own-Infrastructure (BYOI)** provisioning tool: a café owner buys the POS app,
+then a standalone Web Setup Wizard walks them through initializing their *own* Supabase and
+Cloudflare accounts (free or paid) to host their data and ordering site. The Wizard collects the
+owner's high-privilege tokens once in a browser, uses them immediately against official APIs/direct
+Postgres, and hands the tablet only the low-privilege values it already stores today. No browser
+automation, scraping, or headless-browser driving is used anywhere — every step is a plain REST call
+or a direct database connection, both because scraping breaks the moment a vendor's dashboard UI
+changes and because app-store review treats automated web-driving code as a red flag.
 
-1. **`POST /v1/projects/{ref}/database/migrations` is gated** — Supabase's own docs note "only select
-   customers have access to the database migrations endpoint." A wizard built on this endpoint would
-   silently fail to work for most Supabase accounts. **Avoided entirely** — see Schema Provisioning
-   below.
-2. **The Edge Function deploy endpoint's only documented example is single-file**:
-   ```
-   POST https://api.supabase.com/v1/projects/{ref}/functions/deploy?slug=my-func
-   Authorization: Bearer sbp_TOKEN
-   content-type: multipart/form-data
-   --form 'metadata={ "entrypoint_path": "index.ts", "name": "My test" }'
-   --form file=@file
-   ```
-   26 of this repo's 27 functions `import { handleCors } from "../_shared/cors.ts"` — a relative
-   import to a second file. Whether the multipart body supports multiple file parts is **not
-   documented** anywhere I found. Guessing here risks a Wizard that appears to work in testing on one
-   function and silently mis-deploys the other 26. See Function Deployment below for how this is
-   de-risked instead of assumed.
+Two of this design's three integrations do **not** work the way a first read of "there's an API for
+that" would suggest, and both were changed as a result of checking their actual documented behavior
+rather than assuming a clean contract exists:
 
-These are exactly the kind of unverified specifics Requirement R8 exists to catch — this document
-treats them as open items to close with a live test account, not as solved.
+1. **Supabase schema provisioning** cannot use the obvious `POST /v1/projects/{ref}/database/migrations`
+   endpoint — it is access-gated to "select customers" per Supabase's own docs. The design instead
+   reuses this repo's own already-proven direct-Postgres approach (`supabase/apply-migration.mjs`),
+   which needs no special account tier.
+2. **Cloudflare site deployment** cannot safely use "Direct Upload" as first imagined — its only
+   concrete protocol comes from a third party's reverse-engineering of Wrangler's network traffic,
+   not from Cloudflare's own REST docs. The owner chose Cloudflare's officially-documented
+   **git-integration** instead, backed by a repo RAZStudio owns (the café owner never touches GitHub).
 
-## Architecture Overview
+The third integration, Supabase Edge Function deployment, IS on a documented endpoint, but that
+endpoint's only worked example is single-file, while 26 of this repo's 27 functions import a second
+shared file — handled via a build-time import-inliner (see Components and Interfaces).
+
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -40,13 +42,13 @@ treats them as open items to close with a live test account, not as solved.
 │  → held in page memory only, submitted directly to the backend      │
 │    Functions below, never written to any RAZStudio-operated store.  │
 ├─────────────────────────────────────────────────────────────────────┤
-│  Backend: Cloudflare Pages Functions (website/functions-style,      │
-│  in the Wizard's OWN repo folder) — serverless, stateless, each      │
-│  request is independent, nothing persisted between calls.           │
+│  Backend: Cloudflare Pages Functions — serverless, stateless, each   │
+│  request independent, nothing persisted between calls.              │
 │    /api/provision/schema     → runs migrations (direct pg)          │
 │    /api/provision/functions  → deploys Edge Functions (Mgmt API)     │
-│    /api/provision/pages      → creates Pages project + uploads dist  │
-│    /api/provision/dns        → creates the DNS record                │
+│    /api/provision/pages      → creates a Pages project via git       │
+│                                 integration (RAZStudio-owned repo)   │
+│    /api/provision/dns        → creates the DNS record (optional)    │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Handoff: Wizard displays anon key + Supabase URL + website URL,     │
 │  optionally as a QR code, for the EXISTING APK SetupScreen to        │
@@ -55,88 +57,170 @@ treats them as open items to close with a live test account, not as solved.
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-Each backend step is an independent, retryable HTTP call from the frontend (Requirement R6.2) — the
-UI is a checklist, not one "Provision everything" button, so a failure in step 3 doesn't force
-re-running steps 1–2.
+Each backend step is an independent, retryable HTTP call from the frontend — the UI is a checklist,
+not one "Provision everything" button, so a failure in step 3 doesn't force re-running steps 1–2 (see
+Correctness Properties).
 
----
+## Components and Interfaces
 
-## Schema Provisioning (R2)
+### Wizard frontend (single onboarding page)
+A masked-input form (Supabase connection string + PAT; Cloudflare account id / zone id / API token)
+plus a per-step checklist UI. Each checklist row calls exactly one backend endpoint and shows that
+step's own success/failure independently — this is the interface contract that makes Requirement
+R6.2 (independently retryable steps) concrete rather than aspirational.
 
-**Design: reuse the repo's own already-proven approach, orchestrated remotely.**
-`supabase/apply-migration.mjs` already applies these exact migrations via a direct Postgres
-connection string (`postgresql://postgres:<password>@<host>:5432/postgres` — every Supabase project
-exposes this in Project Settings → Database, with no special access tier required, unlike the gated
-Management API migrations endpoint).
+### `/api/provision/schema` — direct-Postgres migration runner
+**Input:** `{ connectionString: string }`. **Behavior:** connects with a `pg`-compatible client,
+runs each `supabase/migrations/*.sql` file (bundled into the Wizard's own build, since it's built from
+this same monorepo) in filename order. **Output:** `{ results: [{ file, status: "ok"|"error", error? }] }`
+— one entry per migration file, never a single pass/fail for the whole batch.
 
-The `/api/provision/schema` Pages Function does the same thing server-side: takes the owner's
-connection string, connects with a `pg`-compatible client, and runs each `supabase/migrations/*.sql`
-file in order (bundled into the Wizard's own deployment as it's built from this same monorepo).
-Because these migrations are first-run-only (`create table` errors if the table exists — same
-caveat `apply-migration.mjs` already documents), a failed run is reported per-file
-(Requirement R2.3) rather than assumed complete.
+**Open verification item:** whether a Cloudflare Pages Function can hold a raw TCP connection to
+Postgres port 5432 for the ~1–2 seconds a migration batch takes — Workers' networking model differs
+from Node's. If it can't, this endpoint moves to a small persistent-runtime service instead of an
+edge Function; the interface contract above is unaffected either way.
 
-**Open verification item:** confirm a Cloudflare Pages Function can hold a raw TCP connection to
-Postgres port 5432 for the ~1–2 seconds a migration batch takes (Workers' networking model differs
-from Node's; this needs confirming against a real project before trusting it in production per R8).
+### Function-inliner (build-time tool, not a request-time endpoint)
+Reads each `supabase/functions/<name>/index.ts`, resolves its `import ... from "../_shared/X.ts"`
+lines, and inlines the referenced file's contents in place — producing one self-contained `.ts` file
+per function with no relative imports left. Runs when the Wizard itself is deployed (once per Wizard
+release), not per café, and its output is what `/api/provision/functions` uploads. This sidesteps
+relying on the Supabase Management API's undocumented multi-file upload behavior entirely — every
+upload uses the one shape its docs actually demonstrate.
 
-## Function Deployment (R3)
+**Open verification item:** must be checked against one real function with a live deploy (confirm it
+actually invokes correctly afterward) before trusting it across all 27 — a name collision between two
+functions' shared imports would otherwise ship silently broken functions.
 
-**Design: pre-inline `_shared` imports at Wizard build time, so every upload matches the one
-confirmed-working single-file shape — no reliance on undocumented multi-file support.**
+### `/api/provision/functions` — Edge Function deployer
+**Input:** `{ personalAccessToken: string, projectRef: string }`. **Behavior:** loops the inliner's
+27 output files through `POST /v1/projects/{ref}/functions/deploy?slug=<name>` (confirmed endpoint;
+`metadata={entrypoint_path: "index.ts", name: "<name>"}` + the single inlined file as the multipart
+`file` part). Redeploying an existing slug updates it in place, so this call is safe to repeat.
+**Output:** `{ results: [{ function, status, error? }] }` — one entry per function.
 
-A small build step (run when the Wizard itself is built/deployed, not per-café) reads each
-`supabase/functions/<name>/index.ts`, finds its `import ... from "../_shared/X.ts"` lines, and
-inlines the referenced file's contents in place of the import — producing one self-contained
-`.ts` file per function with no relative imports left. This is a textual transform, not a Deno
-bundler invocation, so it doesn't add a new toolchain dependency.
+### `/api/provision/pages` — Cloudflare Pages project creation (git-integration)
+**Input:** `{ cafeSlug: string, cloudflareAccountId: string, cloudflareApiToken: string,
+supabaseUrl: string, supabaseAnonKey: string }`. **Behavior:** a single confirmed, officially
+documented call —
+```
+POST https://api.cloudflare.com/client/v4/accounts/{account_id}/pages/projects
+```
+with a GitHub `source` pointing at a repo RAZStudio owns, `build_config` (`npm run build` / `dist`),
+and that café's `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` set via
+`deployment_configs.production.env_vars` — see Data Models for the exact body. Cloudflare's own build
+servers then clone the repo and build per project; this endpoint never touches a build artifact
+itself.
 
-`/api/provision/functions` then loops over the 27 pre-inlined files and calls the documented
-`POST /v1/projects/{ref}/functions/deploy?slug=<name>` with `metadata={entrypoint_path: "index.ts",
-name: "<name>"}` and the single inlined file — matching the ONE shape actually confirmed to work.
-Per-function results are collected and shown individually (Requirement R3.2), and the same call is
-safe to repeat (Requirement R3.3 — the docs confirm redeploying an existing slug updates it).
+**Prerequisite (one-time, RAZStudio-side only, done once ever — not per café):** the Cloudflare Pages
+GitHub App must be installed and authorized on RAZStudio's GitHub org before the Wizard's first use.
+Confirmed this authorization is account/org-level, so a single one-time authorization (or "all
+repositories") covers every future café — it never becomes a per-onboarding step, and no café owner
+ever needs a GitHub account.
 
-**Open verification item:** the inlining step must be tested against at least one real function with
-a live deploy before trusting it for all 27 — a subtle bug in the inliner (e.g. two functions
-importing the same shared symbol under different names) would silently ship broken functions.
+**Open item, not yet verified either way:** since a Pages project merely *references* a git source,
+multiple projects may be able to point at the exact SAME repo+branch, differentiated only by each
+project's own env vars — meaning zero per-café branch/repo management, just N independent
+project-creation calls against one shared template repo. If a Cloudflare quirk requires distinct
+branches per project instead, the fallback is a branch-per-café created via GitHub's (fully
+scriptable) API. Confirm against the disposable test account before committing to either path.
 
-## Cloudflare Pages + DNS (R4)
+### `/api/provision/dns` — optional custom domain
+**Input:** `{ zoneId, apiToken, recordName, target }`. A single, well-documented
+`POST /zones/{zone_id}/dns_records` call, independent of the Pages work above.
 
-This is the best-documented, lowest-risk piece: Cloudflare's REST API (`api.cloudflare.com/client/v4`)
-supports both creating a Pages project and a "direct upload" deployment (as opposed to a git
-integration) with a standard API token, and a DNS record is a single well-documented `POST
-/zones/{zone_id}/dns_records` call. `/api/provision/pages` builds `website/dist` (same
-`VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY`-parameterized build the existing GitHub Actions
-workflow already does — see `.github/workflows/deploy-website.yml`) using that café's own values, then
-uploads it. `/api/provision/dns` is optional per R4.2.
+## Data Models
 
-## Credential Handling (R5) — how "never persisted" is actually enforced
+**Wizard in-memory credential set** (component state only; never sent anywhere but the four
+`/api/provision/*` endpoints; never written to `localStorage`/cookies/a database):
+```
+{ supabaseConnectionString, supabasePersonalAccessToken, supabaseProjectRef,
+  cloudflareAccountId, cloudflareZoneId?, cloudflareApiToken, cafeSlug, customDomain? }
+```
 
-- The Wizard frontend keeps credentials in component state only; nothing is written to
-  `localStorage`/`sessionStorage`/cookies.
-- Cloudflare Pages Functions are stateless per-invocation — there is no database or file write
-  anywhere in this design for a credential to land in. Request bodies are used to construct the
-  outbound `fetch()` to Supabase/Cloudflare and then go out of scope when the function returns.
-- No logging statement in any Function SHALL include a credential value (this is a code-review
-  gate for implementation, not just a design note).
-- `SetupScreen`/`AppConfigStore` in the APK are untouched — confirmed by re-reading their current
-  source: `AppConfigStore.save()` takes only the fields it already takes (Supabase URL/anon key,
-  website URL, café name, and the already-separately-stored Cloudflare/GitHub *reference* fields from
-  the earlier Setup-screen work, which were always described as "stored for reference, not used by
-  the app" — this spec does not change that).
+**Cloudflare Pages project-creation body** (the confirmed shape `/api/provision/pages` sends):
+```json
+{
+  "name": "<cafe-slug>",
+  "production_branch": "main",
+  "source": {
+    "type": "github",
+    "config": { "owner": "razstudio-org", "repo_name": "cafe-website-template", "production_branch": "main" }
+  },
+  "build_config": { "build_command": "npm run build", "destination_dir": "dist", "root_dir": "/" },
+  "deployment_configs": {
+    "production": {
+      "env_vars": {
+        "VITE_SUPABASE_URL": { "type": "plain_text", "value": "<that café's URL>" },
+        "VITE_SUPABASE_PUBLISHABLE_KEY": { "type": "plain_text", "value": "<that café's anon key>" }
+      }
+    }
+  }
+}
+```
+
+**Per-step result shape**, shared across every `/api/provision/*` endpoint so the frontend checklist
+can render them uniformly: `{ step: string, status: "ok" | "error" | "skipped", detail?: string }[]`.
+
+**Handoff payload** (what the APK's existing `SetupScreen` receives — unchanged shape, confirmed by
+re-reading `AppConfigStore.save()`'s current fields): `{ supabaseUrl, supabaseAnonKey, websiteUrl,
+cafeName }`. No Cloudflare or Supabase high-privilege field is ever part of this payload.
+
+## Correctness Properties
+
+### Property 1: No high-privilege credential is ever persisted
+Not to a database, log, or file, at any point in the Wizard's backend — request bodies construct one
+outbound call and then go out of scope. This holds for every current and future endpoint under
+`/api/provision/*`, not just the ones designed today.
+**Validates: Requirements R5.1, R5.2**
+
+### Property 2: Every provisioning step is independently retryable and independently reported
+No endpoint returns a single pass/fail for a batch of underlying operations (migrations, functions) —
+each item in the batch gets its own result, and re-running the batch must not fail merely because
+some items were already applied (idempotent where the underlying API allows it — e.g. redeploying an
+existing function slug updates it rather than erroring).
+**Validates: Requirements R2.3, R3.2, R3.3, R6.1, R6.2**
+
+### Property 3: The APK's SetupScreen/AppConfigStore never gain a high-privilege field or code path
+This spec's entire credential-custody argument depends on that boundary holding; any change to
+`AppConfigStore` that adds a Supabase PAT or Cloudflare API token field would silently break the
+security model this design exists to provide.
+**Validates: Requirement R5.3**
+
+### Property 4: Nothing in this design drives a browser or scrapes a vendor's UI
+Every step is a plain REST call or a direct Postgres connection — the explicit reason being that
+scraping breaks on the vendor's next UI change, gets blocked by Turnstile/CAPTCHA, and risks
+app-store rejection for automated web-driving code.
+**Validates: Requirements R1.1, R8.1**
+
+## Error Handling
+
+- **Per-item, not per-batch.** `/api/provision/schema` and `/api/provision/functions` report one
+  result per migration file / per function, so a single bad migration or one broken function doesn't
+  hide the status of the other 5 or 26.
+- **The Wizard UI is a checklist, not a single "Provision" action** — a failed step is retried on its
+  own without re-running steps that already succeeded (Correctness Property 2).
+- **A migration failure is expected to be diagnosable, not silent**: since these migrations are
+  first-run-only (`create table`/`create type` error if the object exists — the same caveat
+  `apply-migration.mjs` already documents), a failure on re-run against an already-partially-applied
+  project is reported per-file so the operator can see exactly which statement failed, rather than the
+  Wizard assuming a clean run.
+- **Verification failures block promotion, not just implementation.** Per the Testing Strategy below,
+  an unverified endpoint (schema-runner networking, the function-inliner, the Cloudflare git-source
+  behavior) is not to be treated as production-ready until checked against a real disposable account —
+  this is an explicit gate, not an assumption that "it should work."
 
 ## Testing Strategy
 
-Per Requirement R8, this cannot be verified by reading documentation alone. Before any phase is
-considered done:
+This cannot be verified by reading documentation alone. Before any phase is considered done:
 1. Create one disposable Supabase project + one Cloudflare account/zone for testing.
 2. Verify the direct-Postgres migration runner against that disposable project.
-3. Verify the function-inliner + deploy against ONE real function first (e.g. `settings`, one of the
-   simpler ones), confirm it actually invokes correctly post-deploy, before trusting the loop over
-   all 27.
-4. Verify Cloudflare Pages direct-upload + DNS against the same disposable account.
-5. Only after 2–4 pass does the Wizard get pointed at a real café's accounts.
+3. Verify the function-inliner + deploy against ONE real function first (e.g. `settings`), confirm it
+   actually invokes correctly post-deploy, before trusting the loop over all 27.
+4. Verify Cloudflare Pages project creation via git-integration against the same disposable account,
+   including the open "one shared repo, many projects" question above.
+5. Verify DNS record creation, if a custom domain is exercised.
+6. Only after 2–5 pass does the Wizard get pointed at a real café's accounts.
 
-This is also why Requirement R8 blocks calling this spec "done" — none of steps 2–4 can happen inside
-this environment, which has no live Supabase/Cloudflare credentials of its own.
+None of steps 2–5 can happen inside this environment, which has no live Supabase/Cloudflare
+credentials of its own — this is why Requirement R8 blocks calling this spec "done."
