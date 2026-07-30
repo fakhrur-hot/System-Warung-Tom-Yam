@@ -149,8 +149,18 @@ dependencies {
     // OkHttp: WebSocket client for Supabase Realtime (Spike 02)
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // JSON parsing
-    implementation("org.json:json:20231013")
+    // JSON parsing — test-only ON PURPOSE. Android's framework already provides org.json.*, and
+    // bundling the Maven artifact into the APK is actively dangerous: in json-20231013,
+    // JSONException extends RuntimeException, whereas Android's built-in JSONException extends
+    // Exception. The framework class wins at runtime (boot classpath), so any library code R8
+    // compiled against the bundled copy fails verification on-device. That is not theoretical —
+    // adding play-services-ads pulled in androidx.webkit's onPostMessage, and the release build
+    // crashed on launch with:
+    //   java.lang.VerifyError: Verifier rejected class ...onPostMessage...
+    //   register v5 has type Reference: org.json.JSONException
+    //   but expected Reference: java.lang.RuntimeException
+    // The JVM parser tests still need it on the classpath, hence testImplementation.
+    testImplementation("org.json:json:20231013")
 
     // Image loading for compose
     implementation("io.coil-kt:coil-compose:2.4.0")
