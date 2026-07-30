@@ -30,7 +30,7 @@ export default function SplashScreen({ cafeName, logoUrl }: SplashScreenProps) {
           <span className="text-6xl" aria-hidden="true">🍜</span>
         )}
         <h1 className="mt-4 text-2xl font-extrabold tracking-tight text-emerald-800">
-          {cafeName || 'POS'}
+          {cafeName || 'Warung Tom Yam'}
         </h1>
         <p className="mt-1 flex items-center gap-2 text-sm text-emerald-600">
           <span className="h-3 w-3 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600" />

@@ -98,17 +98,17 @@ object OemKeepAliveHelper {
             OemType.XIAOMI -> {
                 steps.add(WhitelistStep(
                     title = "Enable AutoStart",
-                    description = "Settings → Apps → Manage apps → RAZ POS → AutoStart → Enable",
+                    description = "Settings → Apps → Manage apps → Warung Tom Yam → AutoStart → Enable",
                     intent = createXiaomiAutoStartIntent()
                 ))
                 steps.add(WhitelistStep(
                     title = "Set battery saver to No restrictions",
-                    description = "Settings → Battery → App battery saver → RAZ POS → No restrictions",
+                    description = "Settings → Battery → App battery saver → Warung Tom Yam → No restrictions",
                     intent = createXiaomiBatteryIntent()
                 ))
                 steps.add(WhitelistStep(
                     title = "Lock app in recents",
-                    description = "Open Recent Apps → Long-press RAZ POS → tap Lock icon",
+                    description = "Open Recent Apps → Long-press Warung Tom Yam → tap Lock icon",
                     intent = null
                 ))
             }
@@ -116,12 +116,12 @@ object OemKeepAliveHelper {
             OemType.SAMSUNG -> {
                 steps.add(WhitelistStep(
                     title = "Add to Never Sleeping Apps",
-                    description = "Settings → Battery → Background usage limits → Never sleeping apps → Add RAZ POS",
+                    description = "Settings → Battery → Background usage limits → Never sleeping apps → Add Warung Tom Yam",
                     intent = createSamsungBatteryIntent()
                 ))
                 steps.add(WhitelistStep(
                     title = "Set battery to Unrestricted",
-                    description = "Settings → Apps → RAZ POS → Battery → Unrestricted",
+                    description = "Settings → Apps → Warung Tom Yam → Battery → Unrestricted",
                     intent = createAppBatterySettingsIntent(context)
                 ))
             }
@@ -129,7 +129,7 @@ object OemKeepAliveHelper {
             OemType.OPPO -> {
                 steps.add(WhitelistStep(
                     title = "Enable Auto Launch",
-                    description = "Settings → Battery → App Launch Management → RAZ POS → Manual → Enable all three toggles",
+                    description = "Settings → Battery → App Launch Management → Warung Tom Yam → Manual → Enable all three toggles",
                     intent = createOppoAutoLaunchIntent()
                 ))
             }
@@ -137,12 +137,12 @@ object OemKeepAliveHelper {
             OemType.VIVO -> {
                 steps.add(WhitelistStep(
                     title = "Allow background activity",
-                    description = "Settings → Battery → Background Power Consumption → RAZ POS → Don't restrict",
+                    description = "Settings → Battery → Background Power Consumption → Warung Tom Yam → Don't restrict",
                     intent = createVivoBackgroundIntent()
                 ))
                 steps.add(WhitelistStep(
                     title = "Enable AutoStart",
-                    description = "i Manager → App Manager → Autostart → Enable RAZ POS",
+                    description = "i Manager → App Manager → Autostart → Enable Warung Tom Yam",
                     intent = createVivoAutoStartIntent()
                 ))
             }
@@ -150,7 +150,7 @@ object OemKeepAliveHelper {
             OemType.HUAWEI -> {
                 steps.add(WhitelistStep(
                     title = "Set App Launch to Manual",
-                    description = "Settings → Battery → App launch → RAZ POS → Manual → Enable all three",
+                    description = "Settings → Battery → App launch → Warung Tom Yam → Manual → Enable all three",
                     intent = createHuaweiProtectedAppsIntent()
                 ))
             }

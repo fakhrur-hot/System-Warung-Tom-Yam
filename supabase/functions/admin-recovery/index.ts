@@ -31,7 +31,7 @@ serve(async (req) => {
       .single();
     if (!data?.value) return errorResponse(500, "SERVER_ERROR", "Recovery token not set");
 
-    const base = (Deno.env.get("WEBSITE_ORIGIN") ?? "https://your-site.pages.dev").replace(/\/+$/, "");
+    const base = (Deno.env.get("WEBSITE_ORIGIN") ?? "https://tani-tom-yam.pages.dev").replace(/\/+$/, "");
     return jsonResponse({ token: data.value, url: `${base}/join?recover=${data.value}` });
   }
 

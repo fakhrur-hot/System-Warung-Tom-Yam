@@ -39,7 +39,7 @@ serve(async (req) => {
     return errorResponse(405, "METHOD_NOT_ALLOWED", "Use GET or POST /regenerate");
   }
 
-  const base = (Deno.env.get("WEBSITE_ORIGIN") ?? "https://your-site.pages.dev").replace(/\/+$/, "");
+  const base = (Deno.env.get("WEBSITE_ORIGIN") ?? "https://tani-tom-yam.pages.dev").replace(/\/+$/, "");
 
   if (isRegenerate) {
     // Generate a new invite token and replace the target role's row
