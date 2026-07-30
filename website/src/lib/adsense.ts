@@ -21,7 +21,9 @@ declare global {
   }
 }
 
-const ADSENSE_CLIENT_ID = import.meta.env.VITE_ADSENSE_CLIENT_ID as string | undefined
+// Exported so InFeedAd.tsx (a specific, manually-created ad unit — not part of auto ads) can
+// reuse the same configured client ID instead of re-reading import.meta.env separately.
+export const ADSENSE_CLIENT_ID = import.meta.env.VITE_ADSENSE_CLIENT_ID as string | undefined
 
 let alreadyLoaded = false
 
