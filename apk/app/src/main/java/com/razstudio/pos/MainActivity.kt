@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
+import com.google.android.gms.ads.MobileAds
 import com.razstudio.pos.ui.navigation.AppNavGraph
 import com.razstudio.pos.ui.navigation.DeepLinkInvite
 import com.razstudio.pos.ui.i18n.LanguageViewModel
@@ -49,6 +50,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize Google Mobile Ads SDK (one-time, safe to call multiple times)
+        MobileAds.initialize(this)
 
         ensureNotificationPermission()
 
