@@ -41,6 +41,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -104,6 +105,12 @@ fun AdminSettingsScreen(
     var showChangePin by remember { mutableStateOf(false) }
     // Device-local UI prefs (immediate).
     var showPrintStatus by remember { mutableStateOf(devicePrefsViewModel.showPrintStatus()) }
+
+    // Ambient / screensaver prefs (device-local, immediate — this terminal's physical situation).
+    val ambientStore = remember { com.razstudio.pos.data.local.AmbientSettingsStore(context) }
+    var ambientEnabled by remember { mutableStateOf(ambientStore.isEnabled()) }
+    var ambientTimeout by remember { mutableStateOf(ambientStore.getTimeoutMinutes()) }
+    var ambientCustomerFacing by remember { mutableStateOf(ambientStore.isCustomerFacing()) }
 
     // Location permission helper
     val locationPermHelper = rememberPermissionHelper(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -564,6 +571,70 @@ fun AdminSettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            HorizontalDivider()
+
+            // === Ambient / screensaver mode (device-local, applied immediately) ===
+            // Describes THIS terminal's physical situation (powered counter, guest-visible screen),
+            // so it is stored per device rather than café-wide.
+            SettingsSection(title = "Ambient display") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Keep screen on + ambient mode")
+                    Switch(
+                        checked = ambientEnabled,
+                        onCheckedChange = { ambientStore.setEnabled(it); ambientEnabled = it }
+                    )
+                }
+                Text(
+                    text = "Stops the display from ever sleeping, and after the station sits idle " +
+                        "it shows a dimmed live table board instead of the bright POS screen. " +
+                        "Best on a terminal that stays on a charger.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (ambientEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Start after", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        com.razstudio.pos.data.local.AmbientSettingsStore.TIMEOUT_OPTIONS.forEach { minutes ->
+                            FilterChip(
+                                selected = ambientTimeout == minutes,
+                                onClick = {
+                                    ambientStore.setTimeoutMinutes(minutes)
+                                    ambientTimeout = minutes
+                                },
+                                label = { Text("$minutes min") }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Guests can see this screen")
+                        Switch(
+                            checked = ambientCustomerFacing,
+                            onCheckedChange = {
+                                ambientStore.setCustomerFacing(it); ambientCustomerFacing = it
+                            }
+                        )
+                    }
+                    Text(
+                        text = "Hides order values on the ambient board — shows table occupancy only.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             HorizontalDivider()
