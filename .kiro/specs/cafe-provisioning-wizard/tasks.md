@@ -5,7 +5,7 @@
 Automates café onboarding (Supabase schema + functions, Cloudflare Pages + DNS) via a standalone Web
 Setup Wizard, keeping high-privilege tokens out of the APK entirely (see `requirements.md`/`design.md`
 for the security rationale). Phases 1–4.1 are built and locally verified against real repo data;
-**end-to-end verification against real accounts is blocked** (Requirement R8) until a disposable
+**end-to-end verification against real accounts is blocked** (Requirement 8) until a disposable
 Supabase project + Cloudflare account/zone are available — this environment has none of its own.
 
 ## Session checkpoint (2026-07-30) — deliberately paused here, not blocked
@@ -58,10 +58,10 @@ from context by then.
 
 - [x] 1.1 Created the Wizard as its own deployable: `provisioning/` (Vite + React + TS, matching
   `website/`'s conventions), its own `wrangler.toml` (project name `cafe-setup-wizard`) — separate
-  from `website/` per Requirement R1.1.
+  from `website/` per Requirement 1.1.
 - [x] 1.2 Built the one-page frontend (`src/App.tsx`): masked-input fields for every field in the
   agreed layout (Supabase ref/anon key/connection string/PAT, Cloudflare account id/token/zone id,
-  café slug/name) plus a per-step checklist (not one "Provision" button) per Requirement R6.2, each
+  café slug/name) plus a per-step checklist (not one "Provision" button) per Requirement 6.2, each
   step showing its own `StepResult[]`.
 - [x] 1.3 **Revised from "direct upload" to git-integration** (see design.md's git-integration
   pivot). `functions/api/provision/pages.ts` calls the confirmed
@@ -71,7 +71,7 @@ from context by then.
   artifact itself (no `website/dist` build step needed here after all).
 - [x] 1.4 `functions/api/provision/dns.ts`: optional custom-domain DNS record via the Cloudflare API.
 - [x] 1.5 Reviewed: every `/api/provision/*` Function only ever uses a credential inside the one
-  `fetch()`/`pg` call that needs it; nothing is logged or written anywhere (Requirement R5.1/R5.2).
+  `fetch()`/`pg` call that needs it; nothing is logged or written anywhere (Requirement 5.1/5.2).
   The frontend's `WizardState` lives in `useState` only — no `localStorage`/`sessionStorage` call
   exists anywhere in `src/`.
 - [x] 1.6 (not originally planned, done because it was cheap alongside 1.1–1.5): full local build
@@ -108,7 +108,7 @@ from context by then.
 - [x] 3.3 `functions/api/provision/functions.ts`: loops `EDGE_FUNCTIONS` through
   `POST /v1/projects/{ref}/functions/deploy?slug=<name>` (confirmed shape — multipart `metadata` +
   single `file` part, no `Content-Type` override so `fetch` sets its own boundary), one `StepResult`
-  per function (Requirement R3.2), safe to re-run (R3.3 — redeploying a slug updates it).
+  per function (Requirement 3.2), safe to re-run (3.3 — redeploying a slug updates it).
 
 ### Phase 4 — Handoff
 
@@ -116,7 +116,7 @@ from context by then.
   anon key + website URL + café name once the Pages step succeeds.
 - [ ] 4.2 QR code rendering of the handoff payload — NOT built; still an optional enhancement, not
   required for the wizard to be usable. `AppConfigStore`/`SetupScreen` storage itself is unchanged
-  either way (Requirement R5.3).
+  either way (Requirement 5.3).
 
 ## Notes
 
@@ -126,7 +126,7 @@ from context by then.
   is independent of that decision either way, so sequencing schema first surfaces the bigger unknown
   earlier.
 - **Nothing in this spec touches `apk/`.** The APK's `SetupScreen`/`AppConfigStore` remain exactly as
-  shipped; this is intentionally true throughout, not just at handoff (Requirement R5.3).
+  shipped; this is intentionally true throughout, not just at handoff (Requirement 5.3).
 - GitHub provisioning is explicitly NOT in scope — confirmed earlier this session there is no
   GitHub-side target to provision; those Setup-screen fields remain reference-only.
 

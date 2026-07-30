@@ -67,7 +67,7 @@ Correctness Properties).
 A masked-input form (Supabase connection string + PAT; Cloudflare account id / zone id / API token)
 plus a per-step checklist UI. Each checklist row calls exactly one backend endpoint and shows that
 step's own success/failure independently — this is the interface contract that makes Requirement
-R6.2 (independently retryable steps) concrete rather than aspirational.
+6.2 (independently retryable steps) concrete rather than aspirational.
 
 ### `/api/provision/schema` — direct-Postgres migration runner
 **Input:** `{ connectionString: string }`. **Behavior:** connects with a `pg`-compatible client,
@@ -89,12 +89,12 @@ relying on the Supabase Management API's undocumented multi-file upload behavior
 upload uses the one shape its docs actually demonstrate.
 
 **Open verification item:** must be checked against one real function with a live deploy (confirm it
-actually invokes correctly afterward) before trusting it across all 27 — a name collision between two
+actually invokes correctly afterward) before trusting it across all 26 — a name collision between two
 functions' shared imports would otherwise ship silently broken functions.
 
 ### `/api/provision/functions` — Edge Function deployer
 **Input:** `{ personalAccessToken: string, projectRef: string }`. **Behavior:** loops the inliner's
-27 output files through `POST /v1/projects/{ref}/functions/deploy?slug=<name>` (confirmed endpoint;
+26 output files through `POST /v1/projects/{ref}/functions/deploy?slug=<name>` (confirmed endpoint;
 `metadata={entrypoint_path: "index.ts", name: "<name>"}` + the single inlined file as the multipart
 `file` part). Redeploying an existing slug updates it in place, so this call is safe to repeat.
 **Output:** `{ results: [{ function, status, error? }] }` — one entry per function.
@@ -145,7 +145,14 @@ scriptable) API. Confirm against the disposable test account before committing t
   "production_branch": "main",
   "source": {
     "type": "github",
-    "config": { "owner": "razstudio-org", "repo_name": "cafe-website-template", "production_branch": "main" }
+    "config": {
+      "owner": "razstudio-org",
+      "repo_name": "cafe-website-template",
+      "production_branch": "main",
+      "deployments_enabled": true,
+      "production_deployments_enabled": true,
+      "preview_deployment_setting": "none"
+    }
   },
   "build_config": { "build_command": "npm run build", "destination_dir": "dist", "root_dir": "/" },
   "deployment_configs": {
@@ -172,26 +179,26 @@ cafeName }`. No Cloudflare or Supabase high-privilege field is ever part of this
 Not to a database, log, or file, at any point in the Wizard's backend — request bodies construct one
 outbound call and then go out of scope. This holds for every current and future endpoint under
 `/api/provision/*`, not just the ones designed today.
-**Validates: Requirements R5.1, R5.2**
+**Validates: Requirements 5.1, 5.2**
 
 ### Property 2: Every provisioning step is independently retryable and independently reported
 No endpoint returns a single pass/fail for a batch of underlying operations (migrations, functions) —
 each item in the batch gets its own result, and re-running the batch must not fail merely because
 some items were already applied (idempotent where the underlying API allows it — e.g. redeploying an
 existing function slug updates it rather than erroring).
-**Validates: Requirements R2.3, R3.2, R3.3, R6.1, R6.2**
+**Validates: Requirements 2.3, 3.2, 3.3, 6.1, 6.2**
 
 ### Property 3: The APK's SetupScreen/AppConfigStore never gain a high-privilege field or code path
 This spec's entire credential-custody argument depends on that boundary holding; any change to
 `AppConfigStore` that adds a Supabase PAT or Cloudflare API token field would silently break the
 security model this design exists to provide.
-**Validates: Requirement R5.3**
+**Validates: Requirement 5.3**
 
 ### Property 4: Nothing in this design drives a browser or scrapes a vendor's UI
 Every step is a plain REST call or a direct Postgres connection — the explicit reason being that
 scraping breaks on the vendor's next UI change, gets blocked by Turnstile/CAPTCHA, and risks
 app-store rejection for automated web-driving code.
-**Validates: Requirements R1.1, R8.1**
+**Validates: Requirements 1.1, 8.1**
 
 ## Error Handling
 
@@ -216,11 +223,11 @@ This cannot be verified by reading documentation alone. Before any phase is cons
 1. Create one disposable Supabase project + one Cloudflare account/zone for testing.
 2. Verify the direct-Postgres migration runner against that disposable project.
 3. Verify the function-inliner + deploy against ONE real function first (e.g. `settings`), confirm it
-   actually invokes correctly post-deploy, before trusting the loop over all 27.
+   actually invokes correctly post-deploy, before trusting the loop over all 26.
 4. Verify Cloudflare Pages project creation via git-integration against the same disposable account,
    including the open "one shared repo, many projects" question above.
 5. Verify DNS record creation, if a custom domain is exercised.
 6. Only after 2–5 pass does the Wizard get pointed at a real café's accounts.
 
 None of steps 2–5 can happen inside this environment, which has no live Supabase/Cloudflare
-credentials of its own — this is why Requirement R8 blocks calling this spec "done."
+credentials of its own — this is why Requirement 8 blocks calling this spec "done."
