@@ -1,0 +1,25 @@
+# MenuView.tsx and StatusView.tsx each contain one deliberate NUL byte, used as a
+# collision-proof delimiter in composite cart/merge keys (MenuView's NOTE_SEP, and the
+# mergeLines key in StatusView). A dish name or a customer note can contain a space but
+# never a NUL, so a space separator would let "Nasi Goreng" + note "Ayam" collide with
+# "Nasi" + note "Goreng Ayam" and merge two distinct lines into one.
+#
+# Git's binary heuristic is "any NUL in the first 8000 bytes", so it marks both files
+# binary — which blinds `git diff` and blocks textual merges between the template branch
+# and café branches. That matters here: a silent cross-branch regression has bitten this
+# repo before.
+#
+# The three attributes are deliberate, and `text` specifically is NOT one of them:
+#   -text  no CRLF/LF conversion. These blobs were committed while git considered them
+#          binary, so they hold CRLF. Setting `text` would renormalize to LF and turn any
+#          one-line edit into a whole-file 306-line diff — and a whole-file change on both
+#          branches is precisely the merge hazard this file exists to prevent.
+#   diff   force a textual diff despite the NUL, so reviews and `git diff` work.
+#   merge  force the built-in 3-way text merge instead of git's binary
+#          "take one side wholesale" behaviour.
+# The NUL bytes are stored verbatim under all of these; none of them rewrite content.
+#
+# Do NOT "fix" these files by re-encoding them — stripping the NUL reintroduces the
+# key-collision bug in order merging.
+website/src/components/MenuView.tsx   -text diff merge
+website/src/components/StatusView.tsx -text diff merge
