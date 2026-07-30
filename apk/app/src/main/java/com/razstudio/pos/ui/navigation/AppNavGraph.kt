@@ -3,11 +3,13 @@ package com.razstudio.pos.ui.navigation
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -17,7 +19,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -77,6 +82,16 @@ fun AppNavGraph(
     }
 
     val demoActive by demoModeViewModel.active.collectAsState()
+    // DemoModeOverlay is a global banner drawn ON TOP of the entire NavHost (same outer Box,
+    // composed after it) — without this, it silently covers AND intercepts touches for any
+    // screen's own bottom bar (e.g. AdminSettingsScreen's Save/Cancel row), since both sit at the
+    // same screen Y position. Measuring the banner's real height and reserving that much bottom
+    // padding on the NavHost's container means every screen's own bottom UI renders just above it
+    // instead — no per-screen changes needed, and no hardcoded height to keep in sync by hand.
+    var demoOverlayHeightPx by remember { mutableIntStateOf(0) }
+    val demoOverlayHeightDp = with(LocalDensity.current) {
+        if (demoActive) demoOverlayHeightPx.toDp() else 0.dp
+    }
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val demoRole = if (currentRoute == NavRoutes.ORDERING_HOME) DemoRole.STAFF else DemoRole.ADMIN
 
@@ -132,6 +147,7 @@ fun AppNavGraph(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .padding(bottom = demoOverlayHeightDp)
             // Observe every touch on the Initial pass so the idle timer resets without consuming
             // the event — child buttons and scrolling keep working untouched. Throttled to one
             // write per second so a scroll gesture doesn't thrash state.
@@ -438,7 +454,9 @@ fun AppNavGraph(
                     }
                 }
             },
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .onSizeChanged { demoOverlayHeightPx = it.height },
         )
 
         // Ambient (screensaver) mode sits above everything, including the demo banner. Any touch
