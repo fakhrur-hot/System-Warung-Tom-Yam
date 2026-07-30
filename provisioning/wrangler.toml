@@ -1,0 +1,18 @@
+# Deployment config for the Café Provisioning Wizard's OWN Cloudflare Pages project.
+#
+# Unlike website/wrangler.toml (per-café, git-ignored), this file describes ONE
+# RAZStudio-operated tool used to onboard every café — safe and intended to be committed.
+name = "cafe-setup-wizard"
+compatibility_date = "2026-07-30"
+# nodejs_compat is REQUIRED for /api/provision/schema.ts's direct-Postgres connection (the `pg`
+# package's Cloudflare support depends on it) — per Cloudflare's own tutorial at
+# developers.cloudflare.com/workers/tutorials/postgres/, confirmed 2026-07-30. Without this flag
+# schema.ts's `import { Client } from "pg"` fails at request time, not build time.
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"
+
+# The RAZStudio-owned repo Cloudflare git-integration deploys each café's website FROM.
+# Set as Pages env vars (Settings -> Environment variables) on the Wizard's OWN project,
+# not baked in here, since these are operational details, not per-deploy secrets:
+#   RAZSTUDIO_GITHUB_OWNER   e.g. "razstudio-org"
+#   RAZSTUDIO_GITHUB_REPO    e.g. "cafe-website-template"

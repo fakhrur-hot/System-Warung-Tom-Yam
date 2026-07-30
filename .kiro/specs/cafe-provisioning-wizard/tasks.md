@@ -18,48 +18,69 @@ verification against real accounts is blocked** (Requirement R8) until a disposa
 - [x] 0.2 Write `requirements.md` (EARS) and `design.md`, including the credential-custody decision
   (Web Wizard, not in-app) the owner explicitly chose.
 
-### Phase 1 — Wizard scaffold + Cloudflare Pages/DNS (lowest risk, best-documented)
+### Phase 1 — Wizard scaffold + Cloudflare Pages/DNS (lowest risk, best-documented) — DONE
 
-- [ ] 1.1 Create the Wizard as its own deployable: a new top-level folder (e.g. `provisioning/`),
-  its own `package.json`/Vite (or plain static) frontend, its own `wrangler.toml`, its own Cloudflare
-  Pages project — separate from `website/` per Requirement R1.1.
-- [ ] 1.2 Build the one-page frontend: masked-input fields for Supabase connection string + PAT,
-  Cloudflare account id/zone id/API token, and a per-step checklist UI (not one "Provision" button)
-  per Requirement R6.2.
-- [ ] 1.3 `/api/provision/pages`: build `website/dist` parameterized by the target café's
-  `VITE_SUPABASE_URL`/`VITE_SUPABASE_PUBLISHABLE_KEY` (mirrors `.github/workflows/deploy-website.yml`),
-  create the Cloudflare Pages project via direct upload.
-- [ ] 1.4 `/api/provision/dns`: optional custom-domain DNS record via the Cloudflare API.
-- [ ] 1.5 Confirm no credential is written to any log/response body beyond the single request that
-  needs it (Requirement R5.1/R5.2 — a code-review checklist item, not just a design intent).
+- [x] 1.1 Created the Wizard as its own deployable: `provisioning/` (Vite + React + TS, matching
+  `website/`'s conventions), its own `wrangler.toml` (project name `cafe-setup-wizard`) — separate
+  from `website/` per Requirement R1.1.
+- [x] 1.2 Built the one-page frontend (`src/App.tsx`): masked-input fields for every field in the
+  agreed layout (Supabase ref/anon key/connection string/PAT, Cloudflare account id/token/zone id,
+  café slug/name) plus a per-step checklist (not one "Provision" button) per Requirement R6.2, each
+  step showing its own `StepResult[]`.
+- [x] 1.3 **Revised from "direct upload" to git-integration** (see design.md's git-integration
+  pivot). `functions/api/provision/pages.ts` calls the confirmed
+  `POST /accounts/{account_id}/pages/projects` with a GitHub `source` pointing at a RAZStudio-owned
+  repo + per-project `deployment_configs.env_vars` for that café's Supabase URL/anon key —
+  Cloudflare's own build servers run `npm run build`, so this endpoint never touches a build
+  artifact itself (no `website/dist` build step needed here after all).
+- [x] 1.4 `functions/api/provision/dns.ts`: optional custom-domain DNS record via the Cloudflare API.
+- [x] 1.5 Reviewed: every `/api/provision/*` Function only ever uses a credential inside the one
+  `fetch()`/`pg` call that needs it; nothing is logged or written anywhere (Requirement R5.1/R5.2).
+  The frontend's `WizardState` lives in `useState` only — no `localStorage`/`sessionStorage` call
+  exists anywhere in `src/`.
+- [x] 1.6 (not originally planned, done because it was cheap alongside 1.1–1.5): full local build
+  verification — `npm install && npm run build` succeeds (tsc + Vite) against the real repo.
 
-### Phase 2 — Schema provisioning
+### Phase 2 — Schema provisioning — code written, verification gate still blocked
 
-- [ ] 2.1 `/api/provision/schema`: direct Postgres connection (same approach as
-  `supabase/apply-migration.mjs`), running `supabase/migrations/*.sql` in order, one result per file.
-- [ ] 2.2 **Verification gate (blocked on a real test project):** confirm a Cloudflare Pages Function
-  can hold a raw Postgres TCP connection long enough to run the migration batch. If it can't (Workers'
-  networking model is a real open question here), fall back to the Function only proxying through to
-  a small persistent-runtime service, or to the Wizard displaying a ready-to-run `apply-migration.mjs`
-  command as a manual step for this phase only.
+- [x] 2.1 `functions/api/provision/schema.ts`: direct Postgres connection via the official `pg`
+  package (Cloudflare's own tutorial pattern — `Client({ connectionString })`, confirmed via their
+  docs, not guessed), running the bundled `supabase/migrations/*.sql` in order, one `StepResult` per
+  file. `wrangler.toml` updated with the required `compatibility_flags = ["nodejs_compat"]`.
+- [ ] 2.2 **Verification gate (blocked on a real test project) — NOT YET DONE.** The code compiles
+  and follows Cloudflare's official example, but has not been run against a real deployed Function.
+  Confirm the TCP connection actually holds long enough to run the migration batch before trusting
+  this. `src/App.tsx`'s `STEPS[0].verified = false` and the UI shows an "Unverified" badge until this
+  passes — see `provisioning/README.md`'s verification section for the exact steps to run.
 
-### Phase 3 — Edge Function deployment (highest uncertainty)
+### Phase 3 — Edge Function deployment (highest uncertainty) — code written, verification gate still blocked
 
-- [ ] 3.1 Write the `_shared`-import inliner: reads each `supabase/functions/<name>/index.ts`,
-  resolves its `../_shared/*.ts` imports, and emits one self-contained file per function.
-- [ ] 3.2 **Verification gate (blocked on a real test project):** deploy ONE inlined function live,
-  confirm it actually runs correctly post-deploy, before trusting the inliner across all 27 — per
-  `design.md`'s note that a subtle inlining bug (e.g. a name collision between two functions' shared
-  imports) would ship silently broken functions.
-- [ ] 3.3 `/api/provision/functions`: loop the inliner's output through
-  `POST /v1/projects/{ref}/functions/deploy?slug=<name>`, one result per function
-  (Requirement R3.2), safe to re-run (R3.3).
+- [x] 3.1 Wrote the `_shared`-import inliner (`scripts/inline-functions.mjs`): resolves each
+  function's transitive `_shared` dependency closure (not just direct imports — `_shared` files
+  import from EACH OTHER, e.g. `auth.ts` → `supabase.ts`), inlines in dependency order, and
+  self-checks for duplicate top-level declarations before writing output.
+  **Ran it against the real repo and it caught a genuine bug**: `auth.ts` and `supabase.ts` both
+  import `createClient` from the same esm.sh URL, which the first pass left duplicated in the merged
+  file (a Deno `SyntaxError` waiting to happen) — fixed with an explicit external-import
+  deduplication pass, re-verified the fix by inspecting the regenerated output. All 26 real
+  functions (of 27 — `tests/` holds Deno test files, not a deployable function, correctly skipped)
+  inline cleanly with no duplicate-declaration errors.
+- [ ] 3.2 **Verification gate (blocked on a real test project) — NOT YET DONE.** The inliner is
+  verified against every real function's SOURCE (see 3.1), but no inlined function has been
+  live-deployed and invoked yet. Deploy ONE first (see `provisioning/README.md`), confirm it responds
+  correctly, before trusting the loop across all 26.
+- [x] 3.3 `functions/api/provision/functions.ts`: loops `EDGE_FUNCTIONS` through
+  `POST /v1/projects/{ref}/functions/deploy?slug=<name>` (confirmed shape — multipart `metadata` +
+  single `file` part, no `Content-Type` override so `fetch` sets its own boundary), one `StepResult`
+  per function (Requirement R3.2), safe to re-run (R3.3 — redeploying a slug updates it).
 
 ### Phase 4 — Handoff
 
-- [ ] 4.1 On success, display the target project's Supabase URL + anon key + website URL.
-- [ ] 4.2 Optionally render these as a QR code the APK's existing scanner-adjacent flows could read —
-  enhancement only; `AppConfigStore`/`SetupScreen` storage itself does not change (Requirement R5.3).
+- [x] 4.1 `src/App.tsx`'s handoff section displays the Supabase URL (derived from project ref) +
+  anon key + website URL + café name once the Pages step succeeds.
+- [ ] 4.2 QR code rendering of the handoff payload — NOT built; still an optional enhancement, not
+  required for the wizard to be usable. `AppConfigStore`/`SetupScreen` storage itself is unchanged
+  either way (Requirement R5.3).
 
 ## Notes
 
@@ -75,12 +96,30 @@ verification against real accounts is blocked** (Requirement R8) until a disposa
 
 ## Task Dependency Graph
 
+Prose: 1 and 2.1/3.1 could be built in parallel (and were — the Wizard scaffold, the schema-runner
+code, and the inliner were all written and locally verified in the same pass); 2.2/3.2 are the real
+gates, both blocked on the same external prerequisite (a disposable Supabase project); 3.3 only
+needed 3.1 to exist, not 3.2 to pass, so it was written ahead of its verification gate per explicit
+direction; 4 needed 1.3 (Pages creation) to have something to hand off.
+
+```json
+{
+  "waves": [
+    { "wave": 1, "name": "Scoping", "tasks": ["0.1", "0.2"], "status": "done" },
+    {
+      "wave": 2,
+      "name": "Scaffold + low-risk endpoints + unverified endpoint code",
+      "tasks": ["1.1", "1.2", "1.3", "1.4", "1.5", "1.6", "2.1", "3.1", "3.3"],
+      "status": "done"
+    },
+    {
+      "wave": 3,
+      "name": "Live verification gates (external prerequisite: disposable Supabase project + Cloudflare account/zone)",
+      "tasks": ["2.2", "3.2"],
+      "status": "blocked"
+    },
+    { "wave": 4, "name": "Handoff", "tasks": ["4.1"], "status": "done" },
+    { "wave": 5, "name": "Handoff enhancement (optional)", "tasks": ["4.2"], "status": "not_started" }
+  ]
+}
 ```
-0 (done) ─► 1 (Wizard scaffold + Cloudflare) ─┐
-                                               ├─► 4 (Handoff)
-            2 (schema) ─► 2.2 gate ───────────┤
-                                               │
-            3.1 (inliner) ─► 3.2 gate ─► 3.3 ──┘
-```
-1 and 2/3 can be built in parallel; 4 needs all of them to have SOMETHING to hand off, but each
-provisioning step is independently checkable in the UI per R6.2 even before every step is wired.
