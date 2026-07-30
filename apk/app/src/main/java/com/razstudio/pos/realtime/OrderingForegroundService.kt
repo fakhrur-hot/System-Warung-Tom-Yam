@@ -92,6 +92,7 @@ class OrderingForegroundService : Service() {
     @Inject lateinit var secureStorage: SecureStorage
     @Inject lateinit var orderDao: OrderDao
     @Inject lateinit var settingsDao: SettingsDao
+    @Inject lateinit var appConfig: com.razstudio.pos.data.AppConfigStore
 
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -154,8 +155,9 @@ class OrderingForegroundService : Service() {
     }
 
     private fun getSupabaseRealtimeUrl(): String {
-        val baseUrl = BuildConfig.SUPABASE_URL.replace("https://", "wss://")
-        val anonKey = BuildConfig.SUPABASE_ANON_KEY
+        val supabaseUrl = appConfig.supabaseUrl().ifBlank { BuildConfig.SUPABASE_URL }
+        val baseUrl = supabaseUrl.replace("https://", "wss://")
+        val anonKey = appConfig.supabaseAnonKey().ifBlank { BuildConfig.SUPABASE_ANON_KEY }
         return "$baseUrl/realtime/v1/websocket?apikey=$anonKey&vsn=1.0.0"
     }
 

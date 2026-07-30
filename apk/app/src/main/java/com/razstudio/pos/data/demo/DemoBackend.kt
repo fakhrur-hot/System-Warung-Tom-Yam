@@ -116,7 +116,7 @@ class DemoBackend @Inject constructor(
         ApiResult.Success(DemoSeedData.tables.associate { it.id to "demo-token-${it.id}" })
 
     fun getBranding(): ApiResult<BrandingResponse> =
-        ApiResult.Success(BrandingResponse(cafeName = "Tani Tom Yam", logoUrl = ""))
+        ApiResult.Success(BrandingResponse(cafeName = "Demo Café", logoUrl = ""))
 
     fun getSettings(): ApiResult<SettingsResponse> = ApiResult.Success(
         SettingsResponse(

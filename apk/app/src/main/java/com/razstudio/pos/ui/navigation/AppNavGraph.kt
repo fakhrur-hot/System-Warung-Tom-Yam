@@ -38,6 +38,7 @@ import com.razstudio.pos.ui.screens.PrintersScreen
 import com.razstudio.pos.ui.screens.QrPdfScreen
 import com.razstudio.pos.ui.screens.ReportsScreen
 import com.razstudio.pos.ui.screens.RoleSelectScreen
+import com.razstudio.pos.ui.screens.SetupScreen
 import com.razstudio.pos.ui.screens.TableManagementScreen
 
 /**
@@ -87,8 +88,13 @@ fun AppNavGraph(
                             popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
                         }
                     }
-                }
+                },
+                onSetup = { navController.navigate(NavRoutes.SETUP) }
             )
+        }
+
+        composable(NavRoutes.SETUP) {
+            SetupScreen(onBack = { navController.popBackStack() })
         }
 
         composable(NavRoutes.ADMIN_CONNECT) {

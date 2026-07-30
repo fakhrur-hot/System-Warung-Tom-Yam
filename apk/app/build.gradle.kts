@@ -20,7 +20,7 @@ val localProps = Properties().apply {
 }
 val supabaseUrl = localProps.getProperty("SUPABASE_URL") ?: ""
 val supabaseAnonKey = localProps.getProperty("SUPABASE_ANON_KEY") ?: ""
-val websiteUrl = localProps.getProperty("WEBSITE_URL") ?: "https://tani-tom-yam.pages.dev"
+val websiteUrl = localProps.getProperty("WEBSITE_URL") ?: ""
 
 // The source package (namespace) is the constant vendor base `com.razstudio.pos` on every branch —
 // this keeps git merges between the template (main) and café builds (e.g. tani-tom-yam) conflict-free.

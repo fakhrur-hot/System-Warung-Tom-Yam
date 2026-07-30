@@ -22,6 +22,7 @@ object NavRoutes {
     const val KEEP_ALIVE_SETUP = "keep_alive_setup"
     const val CAFE_MANAGEMENT = "cafe_management"
     const val TABLE_MANAGEMENT = "table_management"
+    const val SETUP = "setup"
 
     // Category names can contain "/", spaces or "()" (e.g. "UDANG/SOTONG", "MINUMAN (AIS)"),
     // so URL-encode the path segment; AppNavGraph decodes it when reading the argument.

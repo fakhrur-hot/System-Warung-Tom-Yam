@@ -34,7 +34,8 @@ class QrPdfViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val tableDao: TableDao,
     private val apiClient: ApiClient,
-    private val languageManager: LanguageManager
+    private val languageManager: LanguageManager,
+    private val appConfig: com.razstudio.pos.data.AppConfigStore
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
@@ -145,7 +146,7 @@ class QrPdfViewModel @Inject constructor(
 
             val result = withContext(Dispatchers.IO) {
                 val selectedTables = tables.value.filter { it.id in state.selectedTableIds }
-                val baseUrl = BuildConfig.WEBSITE_URL
+                val baseUrl = appConfig.websiteUrl().ifBlank { BuildConfig.WEBSITE_URL }
 
                 QrPdfGenerator.generatePdf(
                     context = context,
