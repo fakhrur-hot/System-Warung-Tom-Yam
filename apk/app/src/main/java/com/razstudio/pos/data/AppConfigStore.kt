@@ -99,6 +99,17 @@ class AppConfigStore @Inject constructor(
     fun websiteUrl(): String = read(KEY_WEBSITE_URL)
     fun cafeName(): String = read(KEY_CAFE_NAME)
 
+    /**
+     * Update ONLY the café name, leaving the Supabase connection and every other stored value
+     * untouched. The Setup Wizard's [save] sets the initial café name alongside the connection
+     * fields; Admin Settings' Café Profile calls this narrower setter when the admin renames the
+     * café later, so a rename can never accidentally clobber the connection settings that must
+     * persist once Setup has succeeded.
+     */
+    fun setCafeName(name: String) {
+        write(KEY_CAFE_NAME, name)
+    }
+
     // --- Stored vault ---
     fun cloudflareAccountId(): String = read(KEY_CF_ACCOUNT_ID)
     fun cloudflareDnsZone(): String = read(KEY_CF_DNS_ZONE)
