@@ -1,6 +1,9 @@
 package com.razstudio.pos.ui.screens
 
 import android.Manifest
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -42,6 +45,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -59,6 +63,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.IntentCompat
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -105,6 +110,26 @@ fun AdminSettingsScreen(
     var showChangePin by remember { mutableStateOf(false) }
     // Device-local UI prefs (immediate).
     var showPrintStatus by remember { mutableStateOf(devicePrefsViewModel.showPrintStatus()) }
+
+    // New-order alert sound (device-local, immediate).
+    val soundPlayer = devicePrefsViewModel.newOrderSound
+    var alertSoundTitle by remember { mutableStateOf(soundPlayer.currentTitle()) }
+    var alertVolume by remember { mutableStateOf(soundPlayer.volumePercent()) }
+    // System NOTIFICATION-tone picker (TYPE_NOTIFICATION, so it lists notification tones, not ringtones). A null EXTRA_RINGTONE_PICKED_URI means the operator chose "Silent",
+    // which is a real choice — not a cancel — so it must be persisted as such.
+    val notificationTonePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val picked = result.data?.let {
+                IntentCompat.getParcelableExtra(
+                    it, RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java
+                )
+            }
+            soundPlayer.setUri(picked)
+            alertSoundTitle = soundPlayer.currentTitle()
+        }
+    }
 
     // Ambient / screensaver prefs (device-local, immediate — this terminal's physical situation).
     val ambientStore = remember { com.razstudio.pos.data.local.AmbientSettingsStore(context) }
@@ -571,6 +596,76 @@ fun AdminSettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            HorizontalDivider()
+
+            // === New-order alert sound (device-local, applied immediately) ===
+            // Uses the SYSTEM ringtone picker so the operator gets every tone already on the
+            // device (plus any they've added) rather than a bundled subset.
+            SettingsSection(title = strings.alertSoundSection) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(strings.alertSoundLabel)
+                        Text(
+                            text = alertSoundTitle ?: strings.alertSoundSilent,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    OutlinedButton(onClick = {
+                        notificationTonePicker.launch(
+                            Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                                putExtra(
+                                    RingtoneManager.EXTRA_RINGTONE_TYPE,
+                                    RingtoneManager.TYPE_NOTIFICATION
+                                )
+                                putExtra(
+                                    RingtoneManager.EXTRA_RINGTONE_TITLE,
+                                    strings.alertSoundPickerTitle
+                                )
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
+                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
+                                // Pre-select whatever is configured now.
+                                putExtra(
+                                    RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                                    soundPlayer.currentUri()
+                                )
+                            }
+                        )
+                    }) { Text(strings.alertSoundChoose) }
+                }
+                Text(
+                    text = strings.alertSoundDesc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "${strings.alertSoundVolume}  $alertVolume%",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Slider(
+                    value = alertVolume.toFloat(),
+                    onValueChange = { alertVolume = it.toInt() },
+                    // Persist on release rather than on every pixel of the drag.
+                    onValueChangeFinished = { soundPlayer.setVolumePercent(alertVolume) },
+                    valueRange = 0f..100f,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedButton(
+                    onClick = {
+                        // Commit first so Test always reflects the slider's current position.
+                        soundPlayer.setVolumePercent(alertVolume)
+                        soundPlayer.play(respectThrottle = false)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(strings.alertSoundTest) }
             }
 
             HorizontalDivider()

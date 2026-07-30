@@ -528,6 +528,15 @@ data class UiStringsGroup8(
     val ambientSeated: String,
     val ambientCooking: String,
     val ambientReady: String,
+    // ── New-order alert sound ──
+    val alertSoundSection: String,
+    val alertSoundLabel: String,
+    val alertSoundDesc: String,
+    val alertSoundChoose: String,
+    val alertSoundPickerTitle: String,
+    val alertSoundSilent: String,
+    val alertSoundVolume: String,
+    val alertSoundTest: String,
 )
 
 class UiStrings(
@@ -981,6 +990,14 @@ class UiStrings(
     val ambientSeated: String get() = g8.ambientSeated
     val ambientCooking: String get() = g8.ambientCooking
     val ambientReady: String get() = g8.ambientReady
+    val alertSoundSection: String get() = g8.alertSoundSection
+    val alertSoundLabel: String get() = g8.alertSoundLabel
+    val alertSoundDesc: String get() = g8.alertSoundDesc
+    val alertSoundChoose: String get() = g8.alertSoundChoose
+    val alertSoundPickerTitle: String get() = g8.alertSoundPickerTitle
+    val alertSoundSilent: String get() = g8.alertSoundSilent
+    val alertSoundVolume: String get() = g8.alertSoundVolume
+    val alertSoundTest: String get() = g8.alertSoundTest
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1444,6 +1461,14 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             ambientSeated = "Diduduki",
             ambientCooking = "Sedang dimasak",
             ambientReady = "Sedia",
+            alertSoundSection = "Bunyi amaran pesanan",
+            alertSoundLabel = "Bunyi amaran",
+            alertSoundDesc = "Bunyi yang dimainkan pada peranti ini apabila pesanan baharu masuk.",
+            alertSoundChoose = "Pilih bunyi",
+            alertSoundPickerTitle = "Pilih bunyi amaran",
+            alertSoundSilent = "Senyap",
+            alertSoundVolume = "Kelantangan",
+            alertSoundTest = "Uji bunyi",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -1906,6 +1931,14 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             ambientSeated = "Seated",
             ambientCooking = "Cooking",
             ambientReady = "Ready",
+            alertSoundSection = "Order alert sound",
+            alertSoundLabel = "Alert sound",
+            alertSoundDesc = "The sound this device plays when a new order arrives.",
+            alertSoundChoose = "Choose sound",
+            alertSoundPickerTitle = "Select alert sound",
+            alertSoundSilent = "Silent",
+            alertSoundVolume = "Volume",
+            alertSoundTest = "Test sound",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2366,6 +2399,14 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             ambientSeated = "已入座",
             ambientCooking = "制作中",
             ambientReady = "已就绪",
+            alertSoundSection = "订单提示音",
+            alertSoundLabel = "提示音",
+            alertSoundDesc = "本设备收到新订单时播放的声音。",
+            alertSoundChoose = "选择提示音",
+            alertSoundPickerTitle = "选择提示音",
+            alertSoundSilent = "静音",
+            alertSoundVolume = "音量",
+            alertSoundTest = "试听",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -2828,6 +2869,14 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             ambientSeated = "அமர்ந்துள்ளது",
             ambientCooking = "சமைக்கப்படுகிறது",
             ambientReady = "தயார்",
+            alertSoundSection = "ஆர்டர் எச்சரிக்கை ஒலி",
+            alertSoundLabel = "எச்சரிக்கை ஒலி",
+            alertSoundDesc = "புதிய ஆர்டர் வரும்போது இந்தச் சாதனம் இயக்கும் ஒலி.",
+            alertSoundChoose = "ஒலியைத் தேர்வுசெய்",
+            alertSoundPickerTitle = "எச்சரிக்கை ஒலியைத் தேர்வுசெய்",
+            alertSoundSilent = "அமைதி",
+            alertSoundVolume = "ஒலி அளவு",
+            alertSoundTest = "ஒலியை சோதி",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -3290,6 +3339,14 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             ambientSeated = "มีลูกค้า",
             ambientCooking = "กำลังปรุง",
             ambientReady = "พร้อมเสิร์ฟ",
+            alertSoundSection = "เสียงแจ้งเตือนออร์เดอร์",
+            alertSoundLabel = "เสียงแจ้งเตือน",
+            alertSoundDesc = "เสียงที่เครื่องนี้เล่นเมื่อมีออร์เดอร์ใหม่เข้ามา",
+            alertSoundChoose = "เลือกเสียง",
+            alertSoundPickerTitle = "เลือกเสียงแจ้งเตือน",
+            alertSoundSilent = "ปิดเสียง",
+            alertSoundVolume = "ระดับเสียง",
+            alertSoundTest = "ทดสอบเสียง",
         ),
     )
 }

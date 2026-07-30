@@ -65,7 +65,11 @@ class RealtimeService : Service() {
         private const val CHANNEL_ID = "realtime_channel"
         // Separate high-importance channel so new orders pop a heads-up alert WITH sound,
         // while the ongoing foreground notification stays silent/low.
-        private const val NEW_ORDER_CHANNEL_ID = "new_orders_channel"
+        // v2: the channel is now silent (the alert tone is played by NewOrderSoundPlayer so it can
+        // be picked and volume-adjusted). A channel's sound is immutable once created, so switching
+        // to a silent channel REQUIRES a new id — the old one is deleted in createNotificationChannel.
+        private const val NEW_ORDER_CHANNEL_ID = "new_orders_channel_v2"
+        private const val LEGACY_NEW_ORDER_CHANNEL_ID = "new_orders_channel"
         private const val NOTIFICATION_ID = 1001
         private const val NEW_ORDER_NOTIF_BASE = 2000
         private const val SYNC_PREFS_NAME = "realtime_sync_prefs"
@@ -157,6 +161,7 @@ class RealtimeService : Service() {
     @Inject lateinit var tableDao: TableDao
     @Inject lateinit var languageManager: LanguageManager
     @Inject lateinit var appConfig: com.razstudio.pos.data.AppConfigStore
+    @Inject lateinit var newOrderSound: NewOrderSoundPlayer
 
     private fun s() = uiStrings(languageManager.language.value)
 
@@ -523,14 +528,9 @@ class RealtimeService : Service() {
         }
     }
 
+    /** Plays the café's configured alert tone at its configured volume. */
     private fun playNotificationBeep() {
-        try {
-            val uri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
-            val ringtone = android.media.RingtoneManager.getRingtone(applicationContext, uri)
-            ringtone?.play()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to play notification beep", e)
-        }
+        newOrderSound.play()
     }
 
     /**
@@ -565,26 +565,31 @@ class RealtimeService : Service() {
         }
         manager.createNotificationChannel(ongoing)
 
-        // Live new-order channel — high importance so it pops a heads-up alert WITH the
-        // device's notification ringtone + vibration each time an order arrives.
-        val alertSound = android.media.RingtoneManager
-            .getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION)
-        val audioAttrs = android.media.AudioAttributes.Builder()
-            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-            .setUsage(android.media.AudioAttributes.USAGE_NOTIFICATION)
-            .build()
+        // Live new-order channel — high importance so it still pops a heads-up alert and vibrates,
+        // but SILENT: the alert tone is played by [NewOrderSoundPlayer] instead, because a channel's
+        // sound cannot be changed once created and a channel cannot offer volume control at all.
+        // Leaving the channel's own sound on would double-ping.
         val newOrders = NotificationChannel(
             NEW_ORDER_CHANNEL_ID,
             "New Orders",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Alerts with sound when a new order or added items arrive"
+            description = "Alerts when a new order or added items arrive"
             enableVibration(true)
             enableLights(true)
-            setSound(alertSound, audioAttrs)
+            setSound(null, null)
             setShowBadge(true)
         }
         manager.createNotificationChannel(newOrders)
+
+        // Drop the pre-configurable-sound channel. Its sound is baked in and unchangeable, so
+        // devices upgrading from an older build would keep hearing the old default tone on top of
+        // the configured one.
+        try {
+            manager.deleteNotificationChannel(LEGACY_NEW_ORDER_CHANNEL_ID)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not delete legacy new-order channel", e)
+        }
     }
 
     /**
@@ -636,6 +641,11 @@ class RealtimeService : Service() {
         // Distinct id per order so alerts stack rather than overwrite one another.
         getSystemService(NotificationManager::class.java)
             .notify(NEW_ORDER_NOTIF_BASE + (orderId.hashCode() and 0xFFFF), notification)
+
+        // The channel is silent by design (see createNotificationChannel), so the audible alert has
+        // to come from here. This is the path that actually fires in the field — the live socket
+        // does not deliver NEW_ORDER frames, so every real order is announced via the catch-up poll.
+        newOrderSound.play()
     }
 
     /** Table's admin-entered display name for the alert; falls back to the id. */
