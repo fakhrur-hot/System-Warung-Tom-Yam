@@ -156,6 +156,60 @@ class AdminConnectViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Onboard this device as a **Secondary Admin** using an invite token/URL from the Main Admin
+     * (camera scan, saved QR image, or manual entry). Unlike the owner key — which grants Main
+     * Admin immediately — an invite must be approved by the Main Admin, so a success here routes to
+     * the pending-approval screen. The role baked into the invite is resolved server-side and read
+     * back via [ApiClient.pollDeviceStatus]; a staff invite scanned here still registers correctly
+     * (it just resolves to ORDERING and the pending screen routes it to the staff home on approval).
+     */
+    suspend fun registerViaInvite(androidId: String, raw: String): Boolean {
+        val token = extractInviteToken(raw)
+        if (token == null) {
+            errorMessage = "That doesn't look like a valid invite QR or code."
+            errorKey = null
+            return false
+        }
+        isLoading = true
+        errorMessage = null
+        errorKey = null
+        val deviceId = secureStorage.getDeviceId()
+        val deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
+        val result = apiClient.register(
+            inviteToken = token,
+            deviceId = deviceId,
+            deviceModel = deviceModel,
+            androidId = androidId,
+            appVersion = BuildConfig.VERSION_NAME
+        )
+        isLoading = false
+        return when (result) {
+            is ApiResult.Success -> {
+                val statusResult = apiClient.pollDeviceStatus(deviceId)
+                val resolvedRole = if (statusResult is ApiResult.Success &&
+                    statusResult.data.role == "ADMIN_SECONDARY"
+                ) {
+                    SecureStorage.Role.ADMIN_SECONDARY
+                } else {
+                    SecureStorage.Role.ORDERING
+                }
+                secureStorage.setRole(resolvedRole)
+                true
+            }
+            is ApiResult.Error -> {
+                errorMessage = if (result.code == "INVALID_INVITE") "Invalid or expired invite." else result.message
+                errorKey = null
+                false
+            }
+            is ApiResult.NetworkError -> {
+                errorMessage = "Network error. Check your connection and try again."
+                errorKey = "NETWORK"
+                false
+            }
+        }
+    }
+
     private fun applyHandshakeResult(
         result: ApiResult<String>,
         invalidKeyErrorKey: String = "INVALID_KEY"
@@ -204,6 +258,20 @@ private fun extractRecoverToken(input: String): String? {
     return null
 }
 
+/** A secondary-admin (or staff) invite: a "…/join?invite=<token>" link, or a raw ≥8-char token
+ *  that isn't an owner key. null if it doesn't look like an invite. */
+private fun extractInviteToken(input: String): String? {
+    val t = input.trim()
+    Regex("[?&]invite=([^&\\s]+)").find(t)?.let { return it.groupValues[1] }
+    if (t.startsWith("http")) return null // a URL but with no invite param → not an invite
+    return t.takeIf { it.length >= 8 }
+}
+
+/** True when [input] carries an explicit "invite=" param — the reliable signal that a scanned QR
+ *  is a Secondary-Admin invite rather than the owner key. */
+private fun looksLikeInvite(input: String): Boolean =
+    Regex("[?&]invite=").containsMatchIn(input.trim())
+
 /**
  * Decode a QR code from a saved image (jpg/png) the user picked from storage. Downsamples
  * large photos first so a full-resolution camera shot doesn't OOM. Returns the decoded text,
@@ -244,6 +312,7 @@ private fun decodeQrFromImage(context: Context, uri: Uri): String? {
 fun AdminConnectScreen(
     onConnected: () -> Unit,
     onBack: () -> Unit,
+    onSecondaryRegistered: () -> Unit,
     viewModel: AdminConnectViewModel = hiltViewModel(),
     languageViewModel: LanguageViewModel = hiltViewModel()
 ) {
@@ -252,8 +321,14 @@ fun AdminConnectScreen(
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
 
+    @Suppress("DEPRECATION")
+    val androidId = android.provider.Settings.Secure.getString(
+        context.contentResolver, android.provider.Settings.Secure.ANDROID_ID
+    ) ?: "unknown"
+
     var debugCipherText by remember { mutableStateOf("") }
     var keyInput by remember { mutableStateOf("") }
+    var inviteInput by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         com.warungtomyam.pos.ui.navigation.DeepLinkInvite.consumeRecover()?.let {
@@ -274,13 +349,20 @@ fun AdminConnectScreen(
         ActivityResultContracts.RequestPermission()
     ) { granted -> hasCameraPermission = granted }
 
-    // Validate a key from any source (scan / image / manual), then sign in as Main Admin.
-    val signInWithToken: (String?) -> Unit = { raw ->
-        val tok = raw?.let { extractRecoverToken(it) ?: it.trim().ifBlank { null } }
-        if (tok.isNullOrBlank()) {
-            viewModel.reportError("That doesn't look like a valid owner key.")
-        } else {
-            scope.launch { if (viewModel.recover(tok)) onConnected() }
+    // Handle a credential from any source (scan / image / manual). Auto-detects which admin type:
+    //  • an owner key  → sign in as Main Admin immediately (recover)
+    //  • a "?invite="  → register as Secondary Admin, then wait for Main-Admin approval
+    val handleCredential: (String?) -> Unit = { raw ->
+        val text = raw?.trim().orEmpty()
+        when {
+            text.isBlank() ->
+                viewModel.reportError("That doesn't look like a valid owner key or invite.")
+            looksLikeInvite(text) ->
+                scope.launch { if (viewModel.registerViaInvite(androidId, text)) onSecondaryRegistered() }
+            else -> {
+                val tok = extractRecoverToken(text) ?: text
+                scope.launch { if (viewModel.recover(tok)) onConnected() }
+            }
         }
     }
 
@@ -294,7 +376,7 @@ fun AdminConnectScreen(
                 if (decoded == null) {
                     viewModel.reportError("Couldn't read a QR code from that image.")
                 } else {
-                    signInWithToken(decoded)
+                    handleCredential(decoded)
                 }
             }
         }
@@ -304,17 +386,17 @@ fun AdminConnectScreen(
         LaunchedEffect(Unit) { viewModel.loadDebugCafeName() }
     }
 
-    // Full-screen scanner: on decode, extract the owner key from the QR and sign in.
+    // Full-screen scanner: on decode, auto-detect owner key vs Secondary-Admin invite and route.
     if (showScanner) {
         QrScannerScreen(
             hasCameraPermission = hasCameraPermission,
             onRequestPermission = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
             onQrDecoded = { text ->
                 showScanner = false
-                signInWithToken(text)
+                handleCredential(text)
             },
             onCancel = { showScanner = false },
-            promptText = "Point the camera at the owner key QR",
+            promptText = "Scan the owner key QR, or a Secondary Admin invite QR",
             cancelText = strings.commonBack
         )
         return
@@ -397,11 +479,59 @@ fun AdminConnectScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
-                    onClick = { signInWithToken(keyInput) },
+                    onClick = { handleCredential(keyInput) },
                     enabled = keyInput.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Sign in")
+                }
+
+                // ── Secondary Admin ──────────────────────────────────────────────
+                // A Secondary Admin joins with an invite QR from the Main Admin (not the owner
+                // key) and gains admin access once the Main Admin approves the request.
+                Spacer(modifier = Modifier.height(24.dp))
+                Divider()
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Secondary Admin",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Joining as a second admin? Scan the invite QR from the main admin — " +
+                        "you'll get access once they approve this device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        if (!hasCameraPermission) {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                        showScanner = true
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Scan invite QR")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = inviteInput,
+                    onValueChange = { inviteInput = it },
+                    label = { Text("Invite link or code") },
+                    placeholder = { Text("Paste the invite link or code") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { handleCredential(inviteInput) },
+                    enabled = inviteInput.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Register as Secondary Admin")
                 }
             }
 

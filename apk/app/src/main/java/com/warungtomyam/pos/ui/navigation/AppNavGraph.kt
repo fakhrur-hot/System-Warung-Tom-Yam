@@ -1,12 +1,21 @@
 package com.warungtomyam.pos.ui.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import com.warungtomyam.pos.data.AuthEventBus
+import com.warungtomyam.pos.ui.components.DemoModeOverlay
+import com.warungtomyam.pos.ui.components.DemoRole
 import com.warungtomyam.pos.ui.viewmodels.AuthViewModel
+import com.warungtomyam.pos.ui.viewmodels.DemoModeViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -38,7 +47,8 @@ import com.warungtomyam.pos.ui.screens.TableManagementScreen
 fun AppNavGraph(
     navController: NavHostController,
     startDestination: String,
-    authViewModel: AuthViewModel = hiltViewModel()
+    authViewModel: AuthViewModel = hiltViewModel(),
+    demoModeViewModel: DemoModeViewModel = hiltViewModel()
 ) {
     // Global session-expiry observer: any 401 from an admin-authenticated call
     // clears the back stack and sends the admin to re-handshake.
@@ -52,6 +62,11 @@ fun AppNavGraph(
         }
     }
 
+    val demoActive by demoModeViewModel.active.collectAsState()
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    val demoRole = if (currentRoute == NavRoutes.ORDERING_HOME) DemoRole.STAFF else DemoRole.ADMIN
+
+    Box(modifier = Modifier.fillMaxSize()) {
     NavHost(
         navController = navController,
         startDestination = startDestination
@@ -65,7 +80,13 @@ fun AppNavGraph(
                     navController.navigate(NavRoutes.ORDERING_CONNECT)
                 },
                 onTryDemo = {
-                    navController.navigate(NavRoutes.DEMO_WALKTHROUGH)
+                    // Rebuilt demo: seed one shared local dataset, then drop the user into the REAL
+                    // admin home. The global DemoModeOverlay handles exit + teardown from any screen.
+                    demoModeViewModel.enter {
+                        navController.navigate(NavRoutes.ADMIN_HOME) {
+                            popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
+                        }
+                    }
                 }
             )
         }
@@ -75,6 +96,12 @@ fun AppNavGraph(
                 onConnected = {
                     navController.navigate(NavRoutes.ADMIN_HOME) {
                         popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
+                    }
+                },
+                onSecondaryRegistered = {
+                    // Secondary Admin registered via invite → wait for Main-Admin approval.
+                    navController.navigate(NavRoutes.PENDING_APPROVAL) {
+                        popUpTo(NavRoutes.ADMIN_CONNECT) { inclusive = true }
                     }
                 },
                 onBack = { navController.popBackStack() }
@@ -297,7 +324,34 @@ fun AppNavGraph(
             )
         }
 
-        // Demo Mode Navigation Graph
-        demoNavGraph(navController)
+    }
+
+        // Global Demo Mode banner + role switcher + exit-confirm, overlaying every real screen.
+        // Admin and Staff share the same seeded dataset, so an order placed on one surface shows
+        // up live on the other.
+        DemoModeOverlay(
+            active = demoActive,
+            onRole = demoRole,
+            onGoAdmin = {
+                navController.navigate(NavRoutes.ADMIN_HOME) {
+                    popUpTo(NavRoutes.ADMIN_HOME) { inclusive = true }
+                    launchSingleTop = true
+                }
+            },
+            onGoStaff = {
+                navController.navigate(NavRoutes.ORDERING_HOME) {
+                    popUpTo(NavRoutes.ORDERING_HOME) { inclusive = true }
+                    launchSingleTop = true
+                }
+            },
+            onConfirmExit = {
+                demoModeViewModel.exit {
+                    navController.navigate(NavRoutes.ROLE_SELECT) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }

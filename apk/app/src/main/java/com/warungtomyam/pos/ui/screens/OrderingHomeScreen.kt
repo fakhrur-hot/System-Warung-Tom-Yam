@@ -52,7 +52,8 @@ fun OrderingHomeScreen(
 
     // Start the foreground service when this screen is composed
     DisposableEffect(Unit) {
-        OrderingForegroundService.start(context)
+        // In Demo Mode there is no backend/notifications; keep the app fully offline.
+        if (!com.warungtomyam.pos.data.demo.DemoSession.active) OrderingForegroundService.start(context)
         onDispose { /* Service stays running — it's persistent */ }
     }
 

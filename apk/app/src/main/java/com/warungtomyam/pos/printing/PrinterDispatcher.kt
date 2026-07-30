@@ -239,7 +239,7 @@ class PrinterDispatcher @Inject constructor(
      * or reconnects on demand (eco mode) per the admin's choice. Throws on failure so the
      * retry/FAILED handling above still applies.
      */
-    private fun connectAndPrint(printer: PrinterConfig, payload: String) {
+    private suspend fun connectAndPrint(printer: PrinterConfig, payload: String) {
         connectionManager.print(
             macAddress = printer.macAddress,
             printerName = printer.name,

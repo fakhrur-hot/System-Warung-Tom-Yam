@@ -3,7 +3,6 @@ package com.warungtomyam.pos.printing
 import android.content.Context
 import com.dantsu.escposprinter.EscPosPrinter
 import com.dantsu.escposprinter.connection.bluetooth.BluetoothConnection
-import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections
 import com.dantsu.escposprinter.textparser.PrinterTextParserImg
 import com.warungtomyam.pos.data.local.PaperWidth
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -14,6 +13,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,13 +32,15 @@ import javax.inject.Singleton
  * - **Eco**: the socket is disconnected after [ECO_IDLE_DISCONNECT_MS] of no prints, saving
  *   battery; the next print reconnects on demand.
  *
- * All socket access is guarded by [lock] so a print, a keep-alive ping, and a disconnect can
- * never touch the same connection concurrently.
+ * All socket access is guarded by [mutex] so a print, a keep-alive ping, and a disconnect can
+ * never touch the same connection concurrently. It's a coroutine [Mutex] (not `synchronized`) so a
+ * slow BT connect/transfer suspends the waiting coroutine instead of blocking an OS thread.
  */
 @Singleton
 class PrinterConnectionManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val printSettingsStore: com.warungtomyam.pos.data.local.PrintSettingsStore
+    private val printSettingsStore: com.warungtomyam.pos.data.local.PrintSettingsStore,
+    private val secureStorage: com.warungtomyam.pos.data.SecureStorage
 ) {
     companion object {
         const val MODE_FAST = "fast"
@@ -52,13 +55,16 @@ class PrinterConnectionManager @Inject constructor(
         private const val KEEP_ALIVE_INTERVAL_MS = 15_000L
         private const val ECO_IDLE_DISCONNECT_MS = 60_000L
 
-        // ESC/POS real-time status request (DLE EOT 1): asks the printer "are you there?"
-        // without printing or feeding paper — a harmless heartbeat to keep the link warm.
-        private val KEEP_ALIVE_BYTES = byteArrayOf(0x10, 0x04, 0x01)
+        // ESC @  (initialize printer) — a harmless no-op that doesn't expect a response,
+        // safe on cheap 58mm units. Replaces the old DLE EOT status-request bytes which
+        // caused some printers to print blank lines or block waiting for a status reply.
+        private val KEEP_ALIVE_BYTES = byteArrayOf(0x1B, 0x40)
     }
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    private val lock = Any()
+    // Coroutine-friendly Mutex: suspends callers instead of blocking an OS thread,
+    // so a 3-second BT connect doesn't hold a thread hostage.
+    private val mutex = Mutex()
 
     /** Live connections cached by MAC address. */
     private val connections = mutableMapOf<String, BluetoothConnection>()
@@ -66,6 +72,15 @@ class PrinterConnectionManager @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var keepAliveJob: Job? = null
     private val ecoDisconnectJobs = mutableMapOf<String, Job>()
+
+    /**
+     * ONLY the Main Admin device (the printer host) may touch the Bluetooth stack. Ordering-staff
+     * and secondary-admin devices must never open a socket, connect, or run the keep-alive — every
+     * BT entry point below short-circuits when this is false. This is the hard guarantee that an
+     * ordering device runs no Bluetooth activity at all.
+     */
+    private fun isPrinterHost(): Boolean =
+        secureStorage.getRole() == com.warungtomyam.pos.data.SecureStorage.Role.ADMIN
 
     fun getMode(): String = prefs.getString(KEY_MODE, MODE_FAST) ?: MODE_FAST
 
@@ -81,9 +96,14 @@ class PrinterConnectionManager @Inject constructor(
      * Print [payload] to the printer at [macAddress], reusing the cached warm connection when
      * possible (fast) or connecting on demand (eco). Throws on connect/print failure so the
      * caller's retry/FAILED handling still applies.
+     *
+     * Uses a coroutine [Mutex] instead of `synchronized` so a slow BT connect/transfer
+     * suspends the coroutine rather than blocking an IO thread for 1-5 seconds.
      */
-    fun print(macAddress: String, printerName: String, paperWidth: PaperWidth, payload: String) {
-        synchronized(lock) {
+    suspend fun print(macAddress: String, printerName: String, paperWidth: PaperWidth, payload: String) {
+        // Ordering-staff / secondary-admin devices never print locally — no BT socket is ever opened.
+        if (!isPrinterHost()) return
+        mutex.withLock {
             val connection = ensureConnected(macAddress, printerName)
 
             val dpi = 203
@@ -131,28 +151,45 @@ class PrinterConnectionManager @Inject constructor(
         }
     }
 
-    /** Get the cached connection if still live, otherwise (re)connect fresh. Caller holds [lock]. */
+    /** Get the cached connection if still live, otherwise (re)connect fresh. Caller holds [mutex]. */
     private fun ensureConnected(mac: String, name: String): BluetoothConnection {
         connections[mac]?.let { existing ->
             if (existing.isConnected) return existing
             try { existing.disconnect() } catch (_: Exception) {}
             connections.remove(mac)
         }
-        val fresh = BluetoothPrintersConnections().list
-            ?.firstOrNull { it.device?.address == mac }
-            ?: throw RuntimeException("Printer $name ($mac) not paired or unreachable")
+        // Resolve the paired device straight from its MAC — no scan of every bonded peripheral
+        // (headphones, watch, car…), which is slow and unpredictable on well-used phones.
+        // getRemoteDevice() just builds a handle; it does no I/O and never scans.
+        val adapter = (context.getSystemService(Context.BLUETOOTH_SERVICE)
+            as? android.bluetooth.BluetoothManager)?.adapter
+            ?: throw RuntimeException("Bluetooth is unavailable on this device")
+        if (!adapter.isEnabled) {
+            throw RuntimeException("Bluetooth is off — turn it on to print to $name")
+        }
+        val device = try {
+            adapter.getRemoteDevice(mac)
+        } catch (e: IllegalArgumentException) {
+            throw RuntimeException("Invalid printer address for $name ($mac)")
+        }
+        val fresh = BluetoothConnection(device)
         fresh.connect()
+        if (!fresh.isConnected) {
+            throw RuntimeException("Printer $name ($mac) not reachable — ensure it is powered on and paired")
+        }
         connections[mac] = fresh
         return fresh
     }
 
     private fun startKeepAlive() {
+        // Non-host devices (ordering staff, secondary admin) never run the Bluetooth keep-alive loop.
+        if (!isPrinterHost()) return
         if (keepAliveJob?.isActive == true) return
         keepAliveJob = scope.launch {
             while (isActive) {
                 delay(KEEP_ALIVE_INTERVAL_MS)
                 if (getMode() != MODE_FAST) continue
-                synchronized(lock) {
+                mutex.withLock {
                     val iterator = connections.entries.iterator()
                     while (iterator.hasNext()) {
                         val (_, conn) = iterator.next()
@@ -202,10 +239,9 @@ class PrinterConnectionManager @Inject constructor(
             disconnect(mac)
         }
     }
-
     /** Close and evict the connection for [mac] (best-effort). */
-    fun disconnect(mac: String) {
-        synchronized(lock) {
+    suspend fun disconnect(mac: String) {
+        mutex.withLock {
             connections.remove(mac)?.let { try { it.disconnect() } catch (_: Exception) {} }
             ecoDisconnectJobs.remove(mac)?.cancel()
         }
@@ -216,8 +252,8 @@ class PrinterConnectionManager @Inject constructor(
      * heartbeat + pending eco-disconnects). Used on sign-out so a signed-out app holds no
      * Bluetooth link and does no printer chatter. Connections re-open on demand on the next print.
      */
-    fun disconnectAll() {
-        synchronized(lock) {
+    suspend fun disconnectAll() {
+        mutex.withLock {
             keepAliveJob?.cancel()
             keepAliveJob = null
             ecoDisconnectJobs.values.forEach { it.cancel() }

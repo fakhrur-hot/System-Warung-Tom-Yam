@@ -52,12 +52,12 @@ class PrintService @Inject constructor(
         }
     }
 
-    // A secondary-admin device has no local printer — all its slips/receipts are printed by
-    // the Main Admin (its orders reach it via the same broadcast/poll as staff orders). Guard
-    // every print entry point so a secondary admin never prints locally (and never spams
-    // "no printer configured" alerts).
+    // ONLY the Main Admin device is a printer host. Secondary-admin devices have no local printer
+    // (the Main Admin prints their slips/receipts), and ordering-staff devices never print at all —
+    // they must never touch the Bluetooth stack. Guard every print entry point so anyone but the
+    // Main Admin is a no-op (and never spams "no printer configured" alerts).
     private fun isPrinterHost(): Boolean =
-        secureStorage.getRole() != SecureStorage.Role.ADMIN_SECONDARY
+        secureStorage.getRole() == SecureStorage.Role.ADMIN
 
     /**
      * Generate and dispatch kitchen slips to the kitchen printer.

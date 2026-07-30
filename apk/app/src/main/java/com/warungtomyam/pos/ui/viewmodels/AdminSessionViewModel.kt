@@ -118,6 +118,13 @@ class AdminSessionViewModel @Inject constructor(
      */
     fun openSession() {
         viewModelScope.launch {
+            // Demo Mode: the menu/tables are already seeded locally and there is no backend. Just
+            // mark the session open for the UI — never touch session prefs, network, or the daily
+            // popup, so the real app's state stays untouched by a demo run.
+            if (com.warungtomyam.pos.data.demo.DemoSession.active) {
+                _uiState.value = _uiState.value.copy(isSessionOpen = true, isLoading = false, error = null)
+                return@launch
+            }
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             // Post OPEN to backend
@@ -178,7 +185,7 @@ class AdminSessionViewModel @Inject constructor(
      * All of it resumes on sign-in (the home screen restarts the service; printers reconnect on
      * the next print).
      */
-    private fun quietBackground() {
+    private suspend fun quietBackground() {
         // Persist the signed-out state so a cold relaunch shows the lock screen instead of
         // auto-signing back in (credentials remain valid). Cleared when the session reopens.
         sessionPrefs.setLocked(true)

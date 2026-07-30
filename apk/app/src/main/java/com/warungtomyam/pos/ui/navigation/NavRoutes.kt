@@ -22,11 +22,6 @@ object NavRoutes {
     const val KEEP_ALIVE_SETUP = "keep_alive_setup"
     const val CAFE_MANAGEMENT = "cafe_management"
     const val TABLE_MANAGEMENT = "table_management"
-    const val DEMO_WALKTHROUGH = "demo_walkthrough"
-    const val DEMO_HOME = "demo_home"
-    const val DEMO_MENU_MANAGEMENT = "demo_menu_management"
-    const val DEMO_REPORTS = "demo_reports"
-    const val DEMO_CUSTOMER_PREVIEW = "demo_customer_preview"
 
     // Category names can contain "/", spaces or "()" (e.g. "UDANG/SOTONG", "MINUMAN (AIS)"),
     // so URL-encode the path segment; AppNavGraph decodes it when reading the argument.

@@ -131,7 +131,8 @@ fun AdminHomeScreen(
     // silently deaf to new orders until the next reboot.
     val context = LocalContext.current
     LaunchedEffect(Unit) {
-        RealtimeService.start(context)
+        // In Demo Mode there is no backend to subscribe to; keep the app fully offline.
+        if (!com.warungtomyam.pos.data.demo.DemoSession.active) RealtimeService.start(context)
     }
 
     // Open session on first composition

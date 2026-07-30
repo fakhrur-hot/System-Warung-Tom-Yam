@@ -1,6 +1,7 @@
 package com.warungtomyam.pos.data
 
 import com.warungtomyam.pos.BuildConfig
+import com.warungtomyam.pos.data.demo.DemoSession
 import com.warungtomyam.pos.data.json.OrderMapper
 import com.warungtomyam.pos.data.json.optStringOrNull
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +30,8 @@ import javax.inject.Singleton
 @Singleton
 class ApiClient @Inject constructor(
     private val secureStorage: SecureStorage,
-    private val authEventBus: AuthEventBus
+    private val authEventBus: AuthEventBus,
+    private val demoBackend: com.warungtomyam.pos.data.demo.DemoBackend
 ) {
 
     companion object {
@@ -218,6 +220,7 @@ class ApiClient @Inject constructor(
         reason: String? = null,
         closing: Boolean = false
     ): ApiResult<SessionResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.postSession(event)
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -265,6 +268,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun postAggregates(date: String, body: JSONObject): ApiResult<Unit> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext ApiResult.Success(Unit)
             try {
                 val token = adminBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -302,6 +306,7 @@ class ApiClient @Inject constructor(
         categories: JSONArray = JSONArray()
     ): ApiResult<Unit> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext ApiResult.Success(Unit)
             try {
                 val token = adminBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -342,6 +347,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun getOrdersSince(since: String): ApiResult<OrdersSyncResponse> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.getOrdersSince()
             try {
                 val token = adminBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -384,6 +390,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun sendToKitchen(orderId: String, sessionNumber: Int? = null): ApiResult<KitchenResponse> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.sendToKitchen(orderId)
             try {
                 val token = adminBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -431,6 +438,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun addItemsToOrder(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.addItemsToOrder(orderId, items)
             try {
                 val token = adminBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -482,6 +490,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun updateOrderStatus(orderId: String, status: String): ApiResult<OrderDto> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.updateOrderStatus(orderId, status)
             try {
                 val token = adminBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -521,6 +530,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun processPayment(orderId: String, method: String): ApiResult<OrderDto> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.processPayment(orderId, method)
             try {
                 val token = adminBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -561,6 +571,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun cancelOrder(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.cancelOrder(orderId, reason, cancelledBy)
             try {
                 val token = adminBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -608,6 +619,7 @@ class ApiClient @Inject constructor(
      * Get all registered devices (admin bearer).
      */
     suspend fun getDevices(): ApiResult<List<DeviceDto>> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getDevices()
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -660,6 +672,12 @@ class ApiClient @Inject constructor(
         action: String,
         label: String? = null
     ): ApiResult<DeviceDto> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext ApiResult.Success(
+            DeviceDto(
+                id = deviceId, deviceIdentifier = deviceId, label = label ?: "Demo device",
+                role = "ORDERING", status = "ACTIVE", lastSeenAt = null, isCheckedIn = true
+            )
+        )
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -711,6 +729,7 @@ class ApiClient @Inject constructor(
      * Get the current staff invitation URL (admin bearer).
      */
     suspend fun getInvite(role: String? = null): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getInvite()
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -750,6 +769,7 @@ class ApiClient @Inject constructor(
      * Regenerate the staff invitation token (admin bearer).
      */
     suspend fun regenerateInvite(role: String? = null): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getInvite()
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -806,6 +826,7 @@ class ApiClient @Inject constructor(
 
     /** Fetch the permanent owner-recovery token + QR url (admin only) to show the owner. */
     suspend fun getRecoveryToken(): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getInvite()
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -868,6 +889,7 @@ class ApiClient @Inject constructor(
         tableId: String,
         items: List<NewOrderItem>
     ): ApiResult<CreateOrderResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.createOrder(tableId, items, "STAFF")
         try {
             val token = orderingBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
@@ -936,6 +958,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun sendToKitchenAsStaff(orderId: String, sessionNumber: Int? = null): ApiResult<KitchenResponse> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.sendToKitchen(orderId)
             try {
                 val token = orderingBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
@@ -984,6 +1007,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun processPaymentAsStaff(orderId: String, method: String): ApiResult<OrderDto> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.processPayment(orderId, method)
             try {
                 val token = orderingBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
@@ -1025,6 +1049,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun cancelOrderAsStaff(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.cancelOrder(orderId, reason, cancelledBy)
             try {
                 val token = orderingBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
@@ -1063,6 +1088,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun addItemsToOrderAsStaff(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.addItemsToOrder(orderId, items)
             try {
                 val token = orderingBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
@@ -1114,6 +1140,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun getOrdersSinceAsStaff(since: String): ApiResult<OrdersSyncResponse> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.getOrdersSince()
             try {
                 val token = orderingBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
@@ -1158,6 +1185,7 @@ class ApiClient @Inject constructor(
      * an admin token still get the public subset, unchanged.
      */
     suspend fun getSettings(): ApiResult<SettingsResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getSettings()
         try {
             val requestBuilder = Request.Builder()
                 .url("$BASE_URL/settings")
@@ -1211,6 +1239,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun getCafeLocation(): ApiResult<CafeLocationResponse> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.getCafeLocation()
             try {
                 // Role-aware: admin devices (which set the location) use their session token;
                 // ordering devices use their API key. Was ordering-only, so the admin's own
@@ -1264,6 +1293,7 @@ class ApiClient @Inject constructor(
         lng: Double,
         forced: Boolean = false
     ): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext ApiResult.Success(Unit)
         try {
             val token = orderingBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
@@ -1309,6 +1339,7 @@ class ApiClient @Inject constructor(
         lng: Double,
         radius: Int
     ): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext ApiResult.Success(Unit)
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -1353,6 +1384,7 @@ class ApiClient @Inject constructor(
      * nothing local to be authoritative *over* until this first pull happens).
      */
     suspend fun getTables(): ApiResult<List<Pair<String, String>>> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getTables()
         try {
             val request = Request.Builder()
                 .url("$BASE_URL/tables")
@@ -1387,6 +1419,7 @@ class ApiClient @Inject constructor(
      * codes). Public endpoint. Tables missing a token are simply omitted.
      */
     suspend fun getTableTokens(): ApiResult<Map<String, String>> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getTableTokens()
         try {
             val request = Request.Builder()
                 .url("$BASE_URL/tables")
@@ -1425,6 +1458,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun putTables(tables: List<Pair<String, String>>): ApiResult<List<String>> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext ApiResult.Success(emptyList())
             try {
                 val token = adminBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -1475,6 +1509,7 @@ class ApiClient @Inject constructor(
      * when branding isn't configured yet ({"configured": false}).
      */
     suspend fun getBranding(): ApiResult<BrandingResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getBranding()
         try {
             val request = Request.Builder()
                 .url("$BASE_URL/branding")
@@ -1517,6 +1552,7 @@ class ApiClient @Inject constructor(
         cafeName: String,
         logoBase64: String? = null
     ): ApiResult<BrandingResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.putBranding(cafeName)
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -1563,6 +1599,7 @@ class ApiClient @Inject constructor(
      * Partially update system settings (admin bearer, merge semantics).
      */
     suspend fun putSettings(body: JSONObject): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext ApiResult.Success(Unit)
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -1601,6 +1638,7 @@ class ApiClient @Inject constructor(
         items: List<NewOrderItem>,
         source: String = "STAFF"
     ): ApiResult<CreateOrderResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.createOrder(tableId, items, source)
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -1671,6 +1709,7 @@ class ApiClient @Inject constructor(
      */
     suspend fun uploadMenuImage(menuItemId: String, imageBase64: String): ApiResult<MenuImageUploadResponse> =
         withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext ApiResult.Success(MenuImageUploadResponse("", ""))
             try {
                 val token = adminBearerToken()
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -1716,6 +1755,7 @@ class ApiClient @Inject constructor(
      * Delete a superseded menu item image by its Storage path (best-effort cleanup).
      */
     suspend fun deleteMenuImage(path: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext ApiResult.Success(Unit)
         try {
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
@@ -1751,6 +1791,7 @@ class ApiClient @Inject constructor(
      * Fetch current menu state from backend (public, no auth required).
      */
     suspend fun getMenu(): ApiResult<MenuResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getMenu()
         try {
             val request = Request.Builder()
                 .url("$BASE_URL/menu")

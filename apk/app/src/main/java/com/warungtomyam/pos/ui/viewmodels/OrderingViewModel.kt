@@ -113,6 +113,13 @@ class OrderingViewModel @Inject constructor(
      */
     private fun fetchInitialState() {
         viewModelScope.launch {
+            // Demo Mode: there is no café-open broadcast or GPS geofence to clock into — drop staff
+            // straight onto the ordering screen, which reads the shared seeded menu/tables from Room.
+            if (com.warungtomyam.pos.data.demo.DemoSession.active) {
+                _state.value = CafeState.ORDERING
+                return@launch
+            }
+
             // Try to get café location to confirm connectivity
             val client = apiClient
 
