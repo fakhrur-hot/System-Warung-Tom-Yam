@@ -25,6 +25,11 @@ declare global {
 // reuse the same configured client ID instead of re-reading import.meta.env separately.
 export const ADSENSE_CLIENT_ID = import.meta.env.VITE_ADSENSE_CLIENT_ID as string | undefined
 
+// Slot ID for the responsive display unit at the bottom of the order-status view (DisplayAd.tsx).
+// Optional and independent of the client ID: leaving it unset ships the status view with no unit,
+// which is how this lands before a real slot exists in the AdSense dashboard.
+export const ADSENSE_STATUS_SLOT = import.meta.env.VITE_ADSENSE_STATUS_SLOT as string | undefined
+
 let alreadyLoaded = false
 
 export function loadAdSense(): void {
