@@ -58,8 +58,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
 import com.razstudio.pos.data.local.MenuCategory
 import com.razstudio.pos.ui.components.HoldCountdownOverlay
 import com.razstudio.pos.ui.i18n.LanguageViewModel
@@ -193,6 +197,8 @@ fun ManualDineInScreen(
     )
 }
 
+private val AD_BANNER_HEIGHT = 50.dp
+
 @Composable
 private fun TableSelectGrid(
     tables: List<ManualDineInViewModel.TableItem>,
@@ -206,42 +212,63 @@ private fun TableSelectGrid(
         return
     }
 
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 100.dp),
-        contentPadding = PaddingValues(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxSize()
-    ) {
-        items(tables) { table ->
-            val bgColor = if (table.isFree) Color(0xFF4CAF50) else Color(0xFF9E9E9E)
-            Box(
-                modifier = Modifier
-                    .size(100.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(bgColor)
-                    // Occupied tables are selectable too — a New Dine-In order on an occupied
-                    // table appends to its existing order rather than being blocked.
-                    .clickable { onTableSelected(table.id) }
-                    .padding(8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = table.label,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = if (table.isFree) strings.freeLabel else strings.occupiedLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 100.dp),
+            contentPadding = PaddingValues(
+                start = 12.dp,
+                end = 12.dp,
+                top = 12.dp,
+                bottom = 12.dp + AD_BANNER_HEIGHT
+            ),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(tables) { table ->
+                val bgColor = if (table.isFree) Color(0xFF4CAF50) else Color(0xFF9E9E9E)
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(bgColor)
+                        // Occupied tables are selectable too — a New Dine-In order on an occupied
+                        // table appends to its existing order rather than being blocked.
+                        .clickable { onTableSelected(table.id) }
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = table.label,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = if (table.isFree) strings.freeLabel else strings.occupiedLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
                 }
             }
         }
+
+        AndroidView(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(AD_BANNER_HEIGHT),
+            factory = { context ->
+                AdView(context).apply {
+                    setAdSize(AdSize.BANNER)
+                    adUnitId = "ca-app-pub-8323843054100465/6611158260"
+                    loadAd(AdRequest.Builder().build())
+                }
+            }
+        )
     }
 }
 

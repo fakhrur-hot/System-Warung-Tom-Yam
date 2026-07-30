@@ -155,6 +155,12 @@ dependencies {
     // Image loading for compose
     implementation("io.coil-kt:coil-compose:2.4.0")
 
+    // Google Mobile Ads SDK — for native in-app banner ads (Table View)
+    implementation("com.google.android.gms:play-services-ads:23.2.0")
+
+    // Guava — required for CameraX and Google Mobile Ads SDK
+    implementation("com.google.guava:guava:33.0.0-android")
+
     // WorkManager: periodic backup reminders
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 

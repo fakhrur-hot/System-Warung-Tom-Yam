@@ -112,6 +112,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Google Mobile Ads SDK initialization -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-8323843054100465~4507739104" />
     </application>
 
 </manifest>
