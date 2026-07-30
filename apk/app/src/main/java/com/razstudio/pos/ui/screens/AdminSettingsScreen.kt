@@ -776,6 +776,28 @@ fun AdminSettingsScreen(
         )
     }
 
+    // Café renamed — prompt to restart so every screen that reads the name once (RoleSelectScreen,
+    // OEM keep-alive instructions) picks up the change. Not dismissable by tapping outside — the
+    // admin must explicitly choose Restart Now or Later, since accidentally losing this prompt
+    // just means the stale name lingers until the next natural app restart, not a data-loss risk.
+    if (uiState.restartRequired) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text(strings.restartRequiredTitle) },
+            text = { Text(strings.restartRequiredBody) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.restartApp() }) {
+                    Text(strings.restartNowButton)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissRestartPrompt() }) {
+                    Text(strings.restartLaterButton)
+                }
+            }
+        )
+    }
+
     // Location permission dialog
     PermissionSettingsDialog(
         state = locationPermHelper,

@@ -514,6 +514,10 @@ data class UiStringsGroup8(
     val rejectButton: String,
     val escAsteriskLabel: String,
     val escAsteriskDesc: String,
+    val restartRequiredTitle: String,
+    val restartRequiredBody: String,
+    val restartNowButton: String,
+    val restartLaterButton: String,
     // ── Ambient (screensaver) display ──
     val ambientSection: String,
     val ambientEnableLabel: String,
@@ -977,6 +981,10 @@ class UiStrings(
     val rejectButton: String get() = g8.rejectButton
     val escAsteriskLabel: String get() = g8.escAsteriskLabel
     val escAsteriskDesc: String get() = g8.escAsteriskDesc
+    val restartRequiredTitle: String get() = g8.restartRequiredTitle
+    val restartRequiredBody: String get() = g8.restartRequiredBody
+    val restartNowButton: String get() = g8.restartNowButton
+    val restartLaterButton: String get() = g8.restartLaterButton
     val ambientSection: String get() = g8.ambientSection
     val ambientEnableLabel: String get() = g8.ambientEnableLabel
     val ambientEnableDesc: String get() = g8.ambientEnableDesc
@@ -1445,6 +1453,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "Tolak",
             escAsteriskLabel = "Mod imej ESC * (keserasian)",
             escAsteriskDesc = "Hidupkan jika logo/slip tidak keluar pada pencetak murah.",
+            restartRequiredTitle = "Mulakan semula diperlukan",
+            restartRequiredBody = "Nama kafe telah ditukar. Mulakan semula apl supaya semua skrin memaparkan nama baharu.",
+            restartNowButton = "Mulakan Semula",
+            restartLaterButton = "Kemudian",
             ambientSection = "Paparan ambien",
             ambientEnableLabel = "Biarkan skrin hidup + mod ambien",
             ambientEnableDesc = "Menghalang skrin daripada tidur. Selepas terminal tidak " +
@@ -1915,6 +1927,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "Reject",
             escAsteriskLabel = "ESC * image mode (compatibility)",
             escAsteriskDesc = "Turn on if logos/slips don't print on cheap printers.",
+            restartRequiredTitle = "Restart required",
+            restartRequiredBody = "The café name changed. Restart the app so every screen shows the new name.",
+            restartNowButton = "Restart Now",
+            restartLaterButton = "Later",
             ambientSection = "Ambient display",
             ambientEnableLabel = "Keep screen on + ambient mode",
             ambientEnableDesc = "Stops the display from ever sleeping, and after the station " +
@@ -2385,6 +2401,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "拒绝",
             escAsteriskLabel = "ESC * 图像模式（兼容）",
             escAsteriskDesc = "如果廉价打印机不打印标志/单据，请开启。",
+            restartRequiredTitle = "需要重启",
+            restartRequiredBody = "咖啡厅名称已更改。请重启应用，让所有界面显示新名称。",
+            restartNowButton = "立即重启",
+            restartLaterButton = "稍后",
             ambientSection = "环境显示",
             ambientEnableLabel = "保持屏幕常亮 + 环境模式",
             ambientEnableDesc = "防止屏幕休眠。终端闲置后会显示调暗的实时桌台看板，而不是明亮的POS界面。" +
@@ -2853,6 +2873,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "நிராகரி",
             escAsteriskLabel = "ESC * பட முறை (இணக்கம்)",
             escAsteriskDesc = "மலிவு அச்சுப்பொறிகளில் லோகோ/சீட்டு அச்சாகவில்லை எனில் இயக்கவும்.",
+            restartRequiredTitle = "மறுதொடக்கம் தேவை",
+            restartRequiredBody = "கஃபே பெயர் மாற்றப்பட்டது. புதிய பெயரை எல்லா திரைகளிலும் காட்ட ஆப்பை மறுதொடக்கம் செய்யவும்.",
+            restartNowButton = "இப்போது மறுதொடக்கம் செய்",
+            restartLaterButton = "பின்னர்",
             ambientSection = "சுற்றுப்புற காட்சி",
             ambientEnableLabel = "திரையை இயக்கத்தில் வைத்திரு + சுற்றுப்புற பயன்முறை",
             ambientEnableDesc = "திரை உறங்குவதைத் தடுக்கிறது. முனையம் பயன்பாட்டில் இல்லாதபோது, " +
@@ -3323,6 +3347,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "ปฏิเสธ",
             escAsteriskLabel = "โหมดภาพ ESC * (ความเข้ากันได้)",
             escAsteriskDesc = "เปิดหากโลโก้/สลิปไม่พิมพ์บนเครื่องพิมพ์ราคาถูก",
+            restartRequiredTitle = "ต้องรีสตาร์ท",
+            restartRequiredBody = "ชื่อร้านมีการเปลี่ยนแปลง กรุณารีสตาร์ทแอปเพื่อให้ทุกหน้าจอแสดงชื่อใหม่",
+            restartNowButton = "รีสตาร์ทเลย",
+            restartLaterButton = "ไว้ทีหลัง",
             ambientSection = "โหมดแสดงผลแอมเบียนท์",
             ambientEnableLabel = "เปิดหน้าจอค้างไว้ + โหมดแอมเบียนท์",
             ambientEnableDesc = "ป้องกันไม่ให้หน้าจอดับ และเมื่อเครื่องไม่มีการใช้งานจะแสดง" +

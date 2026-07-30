@@ -1,6 +1,7 @@
 package com.razstudio.pos.ui.viewmodels
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -40,7 +41,8 @@ class AdminSettingsViewModel @Inject constructor(
     private val settingsDao: SettingsDao,
     @ApplicationContext private val context: Context,
     private val languageManager: LanguageManager,
-    private val printSettingsStore: com.razstudio.pos.data.local.PrintSettingsStore
+    private val printSettingsStore: com.razstudio.pos.data.local.PrintSettingsStore,
+    private val appConfigStore: com.razstudio.pos.data.AppConfigStore
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
@@ -139,6 +141,11 @@ class AdminSettingsViewModel @Inject constructor(
         val logoBase64: String? = null,
         val brandingLoading: Boolean = false,
         val brandingSaved: Boolean = false,
+        // Set after a save that renamed the café — several screens (RoleSelectScreen, the OEM
+        // keep-alive instructions) read the café name once rather than observing it reactively,
+        // so a full app restart is the simple, reliable way to guarantee they all pick up the
+        // new name instead of auditing every read site for live-update correctness.
+        val restartRequired: Boolean = false,
 
         // Snapshot — last-known-good state loaded from backend
         val savedSnapshot: Snapshot = Snapshot(),
@@ -175,7 +182,14 @@ class AdminSettingsViewModel @Inject constructor(
         UiState(
             kitchenFontSize = printSettingsStore.getKitchenFontSize(),
             receiptLogo = printSettingsStore.getReceiptLogo(),
-            escAsteriskMode = printSettingsStore.getEscAsteriskImageMode()
+            escAsteriskMode = printSettingsStore.getEscAsteriskImageMode(),
+            // Seed instantly from the Setup Wizard's stored café name — avoids a blank-field
+            // flash before loadBranding()'s network call resolves, and gives Admin Settings a
+            // real starting value even on the very first run, before the backend has ever
+            // returned branding data. loadBranding() overwrites this with the backend's value
+            // (the multi-device source of truth) as soon as that call succeeds.
+            cafeName = appConfigStore.cafeName(),
+            savedSnapshot = Snapshot(cafeName = appConfigStore.cafeName())
         )
     )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -639,6 +653,10 @@ class AdminSettingsViewModel @Inject constructor(
                         // Non-fatal: printed/generated output falls back to the bundled default logo
                     }
                 }
+                // Keep AppConfigStore's café name in sync with the backend (the multi-device
+                // source of truth) using the NARROW setter — this touches only the café-name key,
+                // never the Supabase connection the Setup Wizard persisted.
+                appConfigStore.setCafeName(name)
                 _uiState.value = _uiState.value.copy(
                     brandingLoading = false,
                     brandingSaved = true,
@@ -661,6 +679,26 @@ class AdminSettingsViewModel @Inject constructor(
                 false
             }
         }
+    }
+
+    /** Admin declined the restart prompt — dismiss it without relaunching. */
+    fun dismissRestartPrompt() {
+        _uiState.value = _uiState.value.copy(restartRequired = false)
+    }
+
+    /**
+     * Relaunch the app cleanly so every screen that read the café name once at composition
+     * (RoleSelectScreen, OEM keep-alive instructions) re-initialises with the new value. Same
+     * pattern as [com.razstudio.pos.ui.viewmodels.MenuPresetViewModel]'s restart after a menu
+     * reload — a full process relaunch, not just an Activity recreate.
+     */
+    fun restartApp() {
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        if (intent != null) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        }
+        Runtime.getRuntime().exit(0)
     }
 
     // --- Aggregate Save / Cancel ---
@@ -695,11 +733,20 @@ class AdminSettingsViewModel @Inject constructor(
             }
 
             // Branding — dirty when name or logo differ
+            val cafeNameChanged = state.cafeName != state.savedSnapshot.cafeName
             if (!anyError && (
-                state.cafeName != state.savedSnapshot.cafeName ||
+                cafeNameChanged ||
                 state.logoBase64 != state.savedSnapshot.logoBase64
             )) {
                 if (!saveBranding()) anyError = true
+                // A rename specifically (not just a logo change) needs a restart — several
+                // screens read the café name once at composition rather than observing it
+                // reactively, so a fresh process launch is the reliable way to guarantee every
+                // one of them (RoleSelectScreen, the OEM keep-alive instructions) picks up the
+                // new name. Only offered on success — a failed save has nothing to refresh.
+                if (!anyError && cafeNameChanged) {
+                    _uiState.value = _uiState.value.copy(restartRequired = true)
+                }
             }
 
             // Timezone — dirty when the auto-detected zone differs. Push to backend AND
