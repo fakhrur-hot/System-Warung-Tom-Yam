@@ -82,6 +82,24 @@ class RealtimeService : Service() {
         // GET /orders?since=lastSeen catch-up, so it's a cheap incremental fetch.
         private const val POLL_INTERVAL_MS = 10_000L
 
+        /**
+         * Tighter catch-up interval used only while Ambient (screensaver) mode is on screen.
+         *
+         * The live Realtime socket does not deliver NEW_ORDER frames in the field (see
+         * [performCatchUpSync]), so the ambient display's "new order" animation is only as fast as
+         * this poll. 5s halves the worst-case delay while keeping the idle request footprint
+         * modest — going much lower multiplies Edge Function invocations around the clock for a
+         * purely cosmetic gain.
+         */
+        private const val AMBIENT_POLL_INTERVAL_MS = 5_000L
+
+        /**
+         * Set by the ambient overlay while it is visible. Volatile rather than a flow because the
+         * polling loop only needs the latest value at each tick.
+         */
+        @Volatile
+        var ambientModeActive: Boolean = false
+
         // How long the customerOrderAutoPrint setting is cached before the poll refetches it,
         // so toggling auto-print takes effect within ~this window without a GET every poll.
         private const val AUTO_PRINT_TTL_MS = 30_000L
@@ -176,7 +194,8 @@ class RealtimeService : Service() {
         if (pollingJob?.isActive == true) return
         pollingJob = serviceScope.launch {
             while (true) {
-                delay(POLL_INTERVAL_MS)
+                // Ambient mode tightens the interval so an idle station surfaces new orders sooner.
+                delay(if (ambientModeActive) AMBIENT_POLL_INTERVAL_MS else POLL_INTERVAL_MS)
                 performCatchUpSync()
 
                 // Stale-socket watchdog: force reconnect if no WS message in >90s

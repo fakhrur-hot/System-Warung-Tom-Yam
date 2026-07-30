@@ -1,17 +1,30 @@
 package com.razstudio.pos.ui.navigation
 
+import android.view.WindowManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.razstudio.pos.data.AuthEventBus
+import com.razstudio.pos.data.local.AmbientSettingsStore
+import com.razstudio.pos.realtime.RealtimeService
+import com.razstudio.pos.ui.ambient.AmbientOverlay
 import com.razstudio.pos.ui.components.DemoModeOverlay
 import com.razstudio.pos.ui.components.DemoRole
 import com.razstudio.pos.ui.viewmodels.AuthViewModel
@@ -67,7 +80,71 @@ fun AppNavGraph(
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val demoRole = if (currentRoute == NavRoutes.ORDERING_HOME) DemoRole.STAFF else DemoRole.ADMIN
 
+    // ── Ambient (screensaver) mode ────────────────────────────────────────────────────────────
+    // Ambient mode only takes over the two "station idles here" screens; deeper management screens
+    // are always deliberate navigation, so covering them would be surprising.
+    val context = LocalContext.current
+    val ambientStore = remember { AmbientSettingsStore(context) }
+    var ambientEnabled by remember { mutableStateOf(ambientStore.isEnabled()) }
+    var ambientActive by remember { mutableStateOf(false) }
+    var lastInteractionAt by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val routeState = rememberUpdatedState(currentRoute)
+
+    /**
+     * Hold the display awake for as long as the feature is on — this is what makes the station
+     * behave "like a movie playing". It must NOT be scoped to the ambient overlay alone: with a
+     * 30-second system screen timeout the panel would sleep long before an idle delay of minutes
+     * ever elapsed, and ambient mode would never appear. The flag is cleared on dispose, so the
+     * device returns to normal power behaviour the moment the feature is switched off.
+     */
+    val activityWindow = (context as? android.app.Activity)?.window
+    DisposableEffect(ambientEnabled, activityWindow) {
+        if (ambientEnabled) {
+            activityWindow?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activityWindow?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose { activityWindow?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
+    // Idle watcher. Re-reads the store each tick so a settings change applies without a restart.
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(5_000)
+            ambientEnabled = ambientStore.isEnabled()
+            val route = routeState.value
+            val idleHere = route == NavRoutes.ADMIN_HOME || route == NavRoutes.ORDERING_HOME
+            if (ambientEnabled && idleHere && !ambientActive &&
+                System.currentTimeMillis() - lastInteractionAt >= ambientStore.getTimeoutMillis()
+            ) {
+                ambientActive = true
+            }
+        }
+    }
+
+    // Let the foreground service tighten its catch-up poll only while ambient mode is showing.
+    DisposableEffect(ambientActive) {
+        RealtimeService.ambientModeActive = ambientActive
+        onDispose { RealtimeService.ambientModeActive = false }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            // Observe every touch on the Initial pass so the idle timer resets without consuming
+            // the event — child buttons and scrolling keep working untouched. Throttled to one
+            // write per second so a scroll gesture doesn't thrash state.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(PointerEventPass.Initial)
+                        val now = System.currentTimeMillis()
+                        if (now - lastInteractionAt > 1_000) lastInteractionAt = now
+                    }
+                }
+            }
+    ) {
     NavHost(
         navController = navController,
         startDestination = startDestination
@@ -334,6 +411,7 @@ fun AppNavGraph(
         }
 
     }
+    } // end touch-observing Box wrapping the NavHost
 
         // Global Demo Mode banner + role switcher + exit-confirm, overlaying every real screen.
         // Admin and Staff share the same seeded dataset, so an order placed on one surface shows
@@ -362,5 +440,16 @@ fun AppNavGraph(
             },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+
+        // Ambient (screensaver) mode sits above everything, including the demo banner. Any touch
+        // dismisses it and restarts the idle countdown.
+        if (ambientActive) {
+            AmbientOverlay(
+                onDismiss = {
+                    ambientActive = false
+                    lastInteractionAt = System.currentTimeMillis()
+                }
+            )
+        }
     }
 }
