@@ -3,7 +3,7 @@
 ## Introduction
 
 Today, standing up a new café on this system requires manually applying 6 SQL migrations, deploying
-27 Supabase Edge Functions, creating a Cloudflare Pages project, and configuring DNS — all by hand,
+26 Supabase Edge Functions, creating a Cloudflare Pages project, and configuring DNS — all by hand,
 by someone comfortable with the Supabase CLI and `wrangler`. This spec covers a **Setup Wizard** that
 automates that provisioning for a brand-new café owner, while keeping the APK's Setup screen
 (`AppConfigStore`/`SetupScreen`, already shipped) as the low-privilege runtime-config surface it is
@@ -24,7 +24,6 @@ low-privilege values it stores today (Supabase anon key, project URL, website UR
   once, in a desktop/laptop browser, to provision their own Supabase project, Edge Functions, and
   Cloudflare Pages site + DNS. Separate from any café's own customer-facing website because it must
   run *before* that website exists.
-  code and never written to a database, log, or file — see Requirement R6.
 - **High-Privilege Credential**: A Supabase Personal Access Token or a Cloudflare API token scoped to
   create/modify resources. Contrast with **Low-Privilege Credential**: the Supabase anon key and
   project/website URLs, safe to store on-device because Row Level Security gates everything behind
@@ -38,7 +37,7 @@ low-privilege values it stores today (Supabase anon key, project URL, website UR
 
 ## Requirements
 
-### Requirement R1 — The Wizard is a separate, reusable tool
+### Requirement 1: The Wizard is a separate, reusable tool
 
 **User Story:** As RAZStudio, I want one Wizard I can point at any brand-new café's empty accounts, so
 that onboarding a café doesn't require per-café custom tooling.
@@ -54,7 +53,7 @@ that onboarding a café doesn't require per-café custom tooling.
    RAZStudio's guidance — it is not a public self-serve signup flow in this iteration (no auth system
    is in scope; access control is "share the URL," matching the current invite-link trust model).
 
-### Requirement R2 — Supabase schema provisioning
+### Requirement 2: Supabase schema provisioning
 
 **User Story:** As someone onboarding a new café, I want the Wizard to apply the database schema to
 the owner's empty Supabase project, so that I never hand-run `apply-migration.mjs` again.
@@ -70,21 +69,22 @@ the owner's empty Supabase project, so that I never hand-run `apply-migration.mj
 3. THE Wizard SHALL show which migrations succeeded and which failed/were skipped, so a partial
    failure is diagnosable without re-running blind.
 
-### Requirement R3 — Supabase Edge Function deployment
+### Requirement 3: Supabase Edge Function deployment
 
-**User Story:** As someone onboarding a new café, I want the Wizard to deploy all 27 Edge Functions to
+**User Story:** As someone onboarding a new café, I want the Wizard to deploy all 26 Edge Functions to
 the owner's project, so that the backend is immediately callable by the APK and website.
 
 #### Acceptance Criteria
 
-1. THE Wizard SHALL deploy every function under `supabase/functions/` (excluding `_shared`, which is
-   an import, not a function) to the target project via the Supabase Management API.
+1. THE Wizard SHALL deploy every function under `supabase/functions/` that has an `index.ts`,
+   excluding `_shared` (an import, not a function) and `tests` (Deno test files, not a deployable
+   function), to the target project via the Supabase Management API.
 2. THE Wizard SHALL report per-function success/failure, since one broken function must not be
    allowed to silently block the other 26 from deploying.
 3. THE Wizard SHALL be re-runnable against a project that already has some functions deployed
    (update semantics), so a partial-failure retry does not require a full teardown.
 
-### Requirement R4 — Cloudflare Pages + DNS provisioning
+### Requirement 4: Cloudflare Pages + DNS provisioning
 
 **User Story:** As someone onboarding a new café, I want the Wizard to stand up the customer-ordering
 website and point a domain at it, so the café's QR cards have somewhere to link to.
@@ -99,7 +99,7 @@ website and point a domain at it, so the café's QR cards have somewhere to link
    today's manual flow).
 3. THE Wizard SHALL surface the resulting live URL for use as the APK's `WEBSITE_URL` value.
 
-### Requirement R5 — Credential handling (the security-critical requirement)
+### Requirement 5: Credential handling (the security-critical requirement)
 
 **User Story:** As the café owner, I want my Supabase and Cloudflare tokens to never end up stored on
 my POS tablet or in any RAZStudio-operated database, so a lost or rooted tablet can't leak
@@ -120,7 +120,7 @@ account-wide access to my cloud accounts.
 4. THE Wizard's transport SHALL be HTTPS-only; the token fields in its UI SHALL be masked
    (password-style inputs), matching the existing `SetupScreen`'s treatment of secret fields.
 
-### Requirement R6 — Idempotency and partial-failure recovery
+### Requirement 6: Idempotency and partial-failure recovery
 
 **User Story:** As the person running the Wizard, I want to re-run it after a failure without
 worrying it will double-apply anything, so a flaky network call mid-provisioning isn't a disaster.
@@ -129,12 +129,12 @@ worrying it will double-apply anything, so a flaky network call mid-provisioning
 
 1. WHEN re-run against a project that has already had SOME migrations/functions/DNS records applied,
    THE Wizard SHALL skip or update already-provisioned resources rather than erroring the whole run
-   (scoped per Requirement R2.2/R3.3's individual reporting).
+   (scoped per Requirement 2.2/3.3's individual reporting).
 2. THE Wizard SHALL present one overall run as a checklist of discrete steps (each migration file,
    each function, the Pages project, the DNS record), each independently retryable, rather than one
    opaque "Provision" action that succeeds or fails as a monolith.
 
-### Requirement R7 — Handoff to the existing mobile Setup screen
+### Requirement 7: Handoff to the existing mobile Setup screen
 
 **User Story:** As the café owner, I want the Wizard to hand me exactly what I need to type into the
 tablet, so provisioning and device setup are one smooth flow.
@@ -147,7 +147,7 @@ tablet, so provisioning and device setup are one smooth flow.
    hand-type them — reusing the same `AppConfigStore` fields the Setup screen already persists; this
    is an enhancement to the existing Setup screen's entry methods, not a new storage location.
 
-### Requirement R8 — Verification is a hard prerequisite, not an afterthought
+### Requirement 8: Verification is a hard prerequisite, not an afterthought
 
 **User Story:** As the maintainer, I want this spec's implementation actually exercised against a
 real (test) Supabase project and Cloudflare account before it's trusted for a real café, because a
@@ -155,7 +155,7 @@ bug here can leave a paying customer's project half-migrated or their DNS miscon
 
 #### Acceptance Criteria
 
-1. Implementation of R2–R4 SHALL be verified against a real, disposable Supabase project and
+1. Implementation of Requirements 2–4 SHALL be verified against a real, disposable Supabase project and
    Cloudflare account/zone — NOT assumed correct from reading API documentation alone, since the
    exact request/response shapes of the Supabase Management API's SQL-execution and function-deploy
    endpoints must be confirmed against their current live behavior before this is relied upon for a
