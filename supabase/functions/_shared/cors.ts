@@ -4,7 +4,7 @@
  */
 
 export const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("WEBSITE_ORIGIN") ?? "https://tani-tom-yam.pages.dev",
+  "Access-Control-Allow-Origin": Deno.env.get("WEBSITE_ORIGIN") ?? "https://your-site.pages.dev",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-browser-id",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",

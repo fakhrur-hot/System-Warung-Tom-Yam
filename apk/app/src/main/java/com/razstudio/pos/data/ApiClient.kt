@@ -31,13 +31,24 @@ import javax.inject.Singleton
 class ApiClient @Inject constructor(
     private val secureStorage: SecureStorage,
     private val authEventBus: AuthEventBus,
-    private val demoBackend: com.razstudio.pos.data.demo.DemoBackend
+    private val demoBackend: com.razstudio.pos.data.demo.DemoBackend,
+    private val appConfig: AppConfigStore
 ) {
 
     companion object {
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-        private val BASE_URL = BuildConfig.SUPABASE_URL.trimEnd('/') + "/functions/v1"
     }
+
+    // Supabase config is resolved at RUNTIME so one template APK can serve any café: prefer the
+    // in-app Setup value, fall back to a compile-time BuildConfig value (set for café-specific
+    // builds via local.properties). The Functions base is derived from whichever URL wins.
+    private fun supabaseUrl(): String =
+        appConfig.supabaseUrl().ifBlank { BuildConfig.SUPABASE_URL }
+
+    private fun baseUrl(): String = supabaseUrl().trimEnd('/') + "/functions/v1"
+
+    private fun anonKey(): String =
+        appConfig.supabaseAnonKey().ifBlank { BuildConfig.SUPABASE_ANON_KEY }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -96,9 +107,9 @@ class ApiClient @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/admin-handshake")
+                .url("${baseUrl()}/admin-handshake")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .post(body.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
 
@@ -143,9 +154,9 @@ class ApiClient @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/register")
+                .url("${baseUrl()}/register")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .post(body.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
 
@@ -180,8 +191,8 @@ class ApiClient @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val request = Request.Builder()
-                    .url("$BASE_URL/devices-status?deviceId=$deviceId")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .url("${baseUrl()}/devices-status?deviceId=$deviceId")
+                    .addHeader("apikey", anonKey())
                     .get()
                     .build()
 
@@ -232,9 +243,9 @@ class ApiClient @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/sessions")
+                .url("${baseUrl()}/sessions")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .post(body.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
@@ -276,9 +287,9 @@ class ApiClient @Inject constructor(
                 body.put("date", date)
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/aggregates")
+                    .url("${baseUrl()}/aggregates")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -317,9 +328,9 @@ class ApiClient @Inject constructor(
                 }.toString()
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/menu")
+                    .url("${baseUrl()}/menu")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .put(body.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -353,8 +364,8 @@ class ApiClient @Inject constructor(
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders?since=$since")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .url("${baseUrl()}/orders?since=$since")
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .get()
                     .build()
@@ -402,9 +413,9 @@ class ApiClient @Inject constructor(
                 }
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders-kitchen/$orderId")
+                    .url("${baseUrl()}/orders-kitchen/$orderId")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -458,9 +469,9 @@ class ApiClient @Inject constructor(
                 }.toString()
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders-items/$orderId")
+                    .url("${baseUrl()}/orders-items/$orderId")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .post(body.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -500,9 +511,9 @@ class ApiClient @Inject constructor(
                 }.toString()
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders-status/$orderId")
+                    .url("${baseUrl()}/orders-status/$orderId")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .put(body.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -540,9 +551,9 @@ class ApiClient @Inject constructor(
                 }.toString()
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders-payment/$orderId")
+                    .url("${baseUrl()}/orders-payment/$orderId")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .post(body.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -582,9 +593,9 @@ class ApiClient @Inject constructor(
                 }.toString()
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders-cancel/$orderId")
+                    .url("${baseUrl()}/orders-cancel/$orderId")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .delete(body.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -625,8 +636,8 @@ class ApiClient @Inject constructor(
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
 
             val request = Request.Builder()
-                .url("$BASE_URL/devices")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .url("${baseUrl()}/devices")
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .get()
                 .build()
@@ -688,9 +699,9 @@ class ApiClient @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/devices/$deviceId")
+                .url("${baseUrl()}/devices/$deviceId")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .patch(body.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
@@ -734,10 +745,10 @@ class ApiClient @Inject constructor(
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
 
-            val url = if (role != null) "$BASE_URL/invite?role=$role" else "$BASE_URL/invite"
+            val url = if (role != null) "${baseUrl()}/invite?role=$role" else "${baseUrl()}/invite"
             val request = Request.Builder()
                 .url(url)
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .get()
                 .build()
@@ -774,11 +785,11 @@ class ApiClient @Inject constructor(
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
 
-            val url = if (role != null) "$BASE_URL/invite/regenerate?role=$role" else "$BASE_URL/invite/regenerate"
+            val url = if (role != null) "${baseUrl()}/invite/regenerate?role=$role" else "${baseUrl()}/invite/regenerate"
             val request = Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .post("{}".toRequestBody(JSON_MEDIA_TYPE))
                 .build()
@@ -831,8 +842,8 @@ class ApiClient @Inject constructor(
             val token = adminBearerToken()
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
             val request = Request.Builder()
-                .url("$BASE_URL/admin-recovery")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .url("${baseUrl()}/admin-recovery")
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .get().build()
             val response = client.newCall(request).execute()
@@ -862,9 +873,9 @@ class ApiClient @Inject constructor(
                     put("deviceModel", deviceModel)
                 }
                 val request = Request.Builder()
-                    .url("$BASE_URL/admin-recovery")
+                    .url("${baseUrl()}/admin-recovery")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .post(bodyJson.toString().toRequestBody(JSON_MEDIA_TYPE))
                     .build()
                 val response = client.newCall(request).execute()
@@ -910,9 +921,9 @@ class ApiClient @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/orders")
+                .url("${baseUrl()}/orders")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .addHeader("X-Order-Source", "STAFF")
                 .post(body.toRequestBody(JSON_MEDIA_TYPE))
@@ -970,9 +981,9 @@ class ApiClient @Inject constructor(
                 }
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders-kitchen/$orderId")
+                    .url("${baseUrl()}/orders-kitchen/$orderId")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .post(bodyJson.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -1017,9 +1028,9 @@ class ApiClient @Inject constructor(
                 }.toString()
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders-payment/$orderId")
+                    .url("${baseUrl()}/orders-payment/$orderId")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .post(body.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -1060,9 +1071,9 @@ class ApiClient @Inject constructor(
                 }.toString()
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders-cancel/$orderId")
+                    .url("${baseUrl()}/orders-cancel/$orderId")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .delete(body.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -1108,9 +1119,9 @@ class ApiClient @Inject constructor(
                 }.toString()
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders-items/$orderId")
+                    .url("${baseUrl()}/orders-items/$orderId")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .post(body.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -1146,8 +1157,8 @@ class ApiClient @Inject constructor(
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/orders?since=$since")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .url("${baseUrl()}/orders?since=$since")
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .get()
                     .build()
@@ -1188,8 +1199,8 @@ class ApiClient @Inject constructor(
         if (DemoSession.active) return@withContext demoBackend.getSettings()
         try {
             val requestBuilder = Request.Builder()
-                .url("$BASE_URL/settings")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .url("${baseUrl()}/settings")
+                .addHeader("apikey", anonKey())
                 .get()
             // Send whichever token this device has — admin session token on the admin
             // device, ordering API key on a staff device. The backend authorizes either and
@@ -1248,8 +1259,8 @@ class ApiClient @Inject constructor(
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No auth token")
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/cafe-location")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .url("${baseUrl()}/cafe-location")
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .get()
                     .build()
@@ -1306,9 +1317,9 @@ class ApiClient @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/attendance")
+                .url("${baseUrl()}/attendance")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .post(body.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
@@ -1351,9 +1362,9 @@ class ApiClient @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/cafe-location")
+                .url("${baseUrl()}/cafe-location")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .put(body.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
@@ -1387,8 +1398,8 @@ class ApiClient @Inject constructor(
         if (DemoSession.active) return@withContext demoBackend.getTables()
         try {
             val request = Request.Builder()
-                .url("$BASE_URL/tables")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .url("${baseUrl()}/tables")
+                .addHeader("apikey", anonKey())
                 .get()
                 .build()
 
@@ -1422,8 +1433,8 @@ class ApiClient @Inject constructor(
         if (DemoSession.active) return@withContext demoBackend.getTableTokens()
         try {
             val request = Request.Builder()
-                .url("$BASE_URL/tables")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .url("${baseUrl()}/tables")
+                .addHeader("apikey", anonKey())
                 .get()
                 .build()
             val response = client.newCall(request).execute()
@@ -1475,9 +1486,9 @@ class ApiClient @Inject constructor(
                 }.toString()
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/tables")
+                    .url("${baseUrl()}/tables")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .put(body.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -1512,8 +1523,8 @@ class ApiClient @Inject constructor(
         if (DemoSession.active) return@withContext demoBackend.getBranding()
         try {
             val request = Request.Builder()
-                .url("$BASE_URL/branding")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .url("${baseUrl()}/branding")
+                .addHeader("apikey", anonKey())
                 .get()
                 .build()
 
@@ -1563,9 +1574,9 @@ class ApiClient @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/branding")
+                .url("${baseUrl()}/branding")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .put(body.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
@@ -1605,9 +1616,9 @@ class ApiClient @Inject constructor(
                 ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
 
             val request = Request.Builder()
-                .url("$BASE_URL/settings")
+                .url("${baseUrl()}/settings")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .put(body.toString().toRequestBody(JSON_MEDIA_TYPE))
                 .build()
@@ -1659,9 +1670,9 @@ class ApiClient @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/orders")
+                .url("${baseUrl()}/orders")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .addHeader("X-Order-Source", source)
                 .post(body.toRequestBody(JSON_MEDIA_TYPE))
@@ -1720,9 +1731,9 @@ class ApiClient @Inject constructor(
                 }.toString()
 
                 val request = Request.Builder()
-                    .url("$BASE_URL/menu-image")
+                    .url("${baseUrl()}/menu-image")
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                    .addHeader("apikey", anonKey())
                     .addHeader("Authorization", "Bearer $token")
                     .post(body.toRequestBody(JSON_MEDIA_TYPE))
                     .build()
@@ -1765,9 +1776,9 @@ class ApiClient @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url("$BASE_URL/menu-image")
+                .url("${baseUrl()}/menu-image")
                 .addHeader("Content-Type", "application/json")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .addHeader("apikey", anonKey())
                 .addHeader("Authorization", "Bearer $token")
                 .delete(body.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
@@ -1794,8 +1805,8 @@ class ApiClient @Inject constructor(
         if (DemoSession.active) return@withContext demoBackend.getMenu()
         try {
             val request = Request.Builder()
-                .url("$BASE_URL/menu")
-                .addHeader("apikey", BuildConfig.SUPABASE_ANON_KEY)
+                .url("${baseUrl()}/menu")
+                .addHeader("apikey", anonKey())
                 .get()
                 .build()
 

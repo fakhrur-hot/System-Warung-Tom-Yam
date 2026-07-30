@@ -138,6 +138,7 @@ class RealtimeService : Service() {
     @Inject lateinit var printService: PrintService
     @Inject lateinit var tableDao: TableDao
     @Inject lateinit var languageManager: LanguageManager
+    @Inject lateinit var appConfig: com.razstudio.pos.data.AppConfigStore
 
     private fun s() = uiStrings(languageManager.language.value)
 
@@ -343,8 +344,9 @@ class RealtimeService : Service() {
     }
 
     private fun getSupabaseRealtimeUrl(): String {
-        val baseUrl = BuildConfig.SUPABASE_URL.replace("https://", "wss://")
-        val anonKey = BuildConfig.SUPABASE_ANON_KEY
+        val supabaseUrl = appConfig.supabaseUrl().ifBlank { BuildConfig.SUPABASE_URL }
+        val baseUrl = supabaseUrl.replace("https://", "wss://")
+        val anonKey = appConfig.supabaseAnonKey().ifBlank { BuildConfig.SUPABASE_ANON_KEY }
         return "$baseUrl/realtime/v1/websocket?apikey=$anonKey&vsn=1.0.0"
     }
 

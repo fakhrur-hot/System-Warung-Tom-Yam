@@ -38,6 +38,7 @@ import com.razstudio.pos.ui.screens.PrintersScreen
 import com.razstudio.pos.ui.screens.QrPdfScreen
 import com.razstudio.pos.ui.screens.ReportsScreen
 import com.razstudio.pos.ui.screens.RoleSelectScreen
+import com.razstudio.pos.ui.screens.SetupScreen
 import com.razstudio.pos.ui.screens.TableManagementScreen
 
 /**
@@ -87,8 +88,13 @@ fun AppNavGraph(
                             popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
                         }
                     }
-                }
+                },
+                onSetup = { navController.navigate(NavRoutes.SETUP) }
             )
+        }
+
+        composable(NavRoutes.SETUP) {
+            SetupScreen(onBack = { navController.popBackStack() })
         }
 
         composable(NavRoutes.ADMIN_CONNECT) {
@@ -139,8 +145,11 @@ fun AppNavGraph(
         composable(NavRoutes.ADMIN_HOME) {
             AdminHomeScreen(
                 onNavigateToLock = {
+                    // Sign-out: pop the ENTIRE logged-in stack back to ROLE_SELECT, so pressing
+                    // back from the lock screen stays at role-select (or closes the app), never
+                    // returning to the pre-logout home/ordering screen.
                     navController.navigate(NavRoutes.ADMIN_LOCK) {
-                        popUpTo(NavRoutes.ADMIN_HOME) { inclusive = true }
+                        popUpTo(NavRoutes.ROLE_SELECT) { inclusive = false }
                     }
                 },
                 onNavigateToReconnect = {
