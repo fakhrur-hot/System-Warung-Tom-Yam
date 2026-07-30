@@ -628,6 +628,17 @@ class AdminSettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(brandingLoading = true)
         return when (val result = apiClient.putBranding(name, base64)) {
             is ApiResult.Success -> {
+                // Persist the picked logo for LOCAL use (printed receipts, QR-card PDFs) only once
+                // the backend confirms the save — matches this screen's "nothing takes effect
+                // until Save" contract. base64 is null when the admin didn't change the logo this
+                // save, so there's nothing new to persist.
+                if (base64 != null) {
+                    try {
+                        LogoPipeline.saveJpegToInternal(context, android.util.Base64.decode(base64, android.util.Base64.NO_WRAP))
+                    } catch (e: Exception) {
+                        // Non-fatal: printed/generated output falls back to the bundled default logo
+                    }
+                }
                 _uiState.value = _uiState.value.copy(
                     brandingLoading = false,
                     brandingSaved = true,
