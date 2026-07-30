@@ -4,9 +4,45 @@
 
 Automates café onboarding (Supabase schema + functions, Cloudflare Pages + DNS) via a standalone Web
 Setup Wizard, keeping high-privilege tokens out of the APK entirely (see `requirements.md`/`design.md`
-for the security rationale). Scaffolding/logic can be written and unit-tested now; **end-to-end
-verification against real accounts is blocked** (Requirement R8) until a disposable Supabase project
-+ Cloudflare account/zone are available — this environment has none of its own.
+for the security rationale). Phases 1–4.1 are built and locally verified against real repo data;
+**end-to-end verification against real accounts is blocked** (Requirement R8) until a disposable
+Supabase project + Cloudflare account/zone are available — this environment has none of its own.
+
+## Session checkpoint (2026-07-30) — deliberately paused here, not blocked
+
+Work stopped here **by the owner's choice**, not because of a technical obstacle: the owner will
+create the disposable Supabase project + Cloudflare test zone **in a later session**. Everything that
+could be built and verified without those credentials has been. Resuming needs no re-reading beyond
+this note plus the per-phase checkboxes below.
+
+**Exact state at pause:**
+- Phase 0 (scoping) and Phase 1 (wizard scaffold + Cloudflare Pages/DNS) — fully done, committed as
+  `643acf6` (main) → merged as `e4c4d2d` (tani-tom-yam). Both branches have identical
+  `provisioning/` source.
+- Phase 2.1 and Phase 3.1/3.3 (schema runner, function inliner, function deployer) — code written,
+  compiles, and (for the inliner) verified against every real function's source in this repo — but
+  **zero live network calls have been made** to a real Supabase or Cloudflare account by this code.
+  `src/App.tsx` shows an "Unverified" badge on these two checklist steps for exactly this reason —
+  do not remove those badges until the gates below actually pass.
+- Phase 2.2 and Phase 3.2 (the live verification gates) — **blocked, not started.** This is the one
+  remaining prerequisite before the wizard can be trusted for a real café's accounts.
+- Phase 4.1 (handoff display) — done. Phase 4.2 (QR-code rendering of the handoff payload) — **not
+  started**, optional, does not block anything else, and does NOT need live credentials to build.
+
+**Open decision, not yet made** (asked, not answered as of this checkpoint): when the test
+credentials exist, does the owner want to (a) hand them to the assistant to run the three
+verification gates directly, or (b) run `provisioning/README.md`'s verification steps themselves and
+report back what happened? Either is fine — whoever resumes this should ask if it still isn't clear
+from context by then.
+
+**Immediate next action on resume**, in order of what's actually unblocked:
+1. If test credentials now exist: run the three gates from `provisioning/README.md` (schema against a
+   disposable project; deploy ONE function and confirm it responds; confirm the Pages
+   git-integration create-project call succeeds, including the still-open "one shared template repo
+   for every café" question in design.md). Flip `verified: true` on the corresponding `STEPS` entries
+   in `src/App.tsx` only after each gate actually passes — not preemptively.
+2. If test credentials still don't exist: Phase 4.2 (QR handoff) is the only remaining task that
+   needs no live account and can be picked up standalone.
 
 ## Tasks
 
