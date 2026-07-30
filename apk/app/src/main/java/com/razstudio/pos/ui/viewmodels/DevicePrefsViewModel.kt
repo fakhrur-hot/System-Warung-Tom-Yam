@@ -18,7 +18,9 @@ import javax.inject.Inject
 @HiltViewModel
 class DevicePrefsViewModel @Inject constructor(
     private val localPrefs: LocalPrefs,
-    printJobDao: PrintJobDao
+    printJobDao: PrintJobDao,
+    /** Owns the configurable new-order alert (tone + volume); shared with RealtimeService. */
+    val newOrderSound: com.razstudio.pos.realtime.NewOrderSoundPlayer,
 ) : ViewModel() {
 
     fun showPrintStatus(): Boolean = localPrefs.showPrintStatus
