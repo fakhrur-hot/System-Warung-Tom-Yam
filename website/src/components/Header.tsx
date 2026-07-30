@@ -26,14 +26,14 @@ export default function Header({ cafeName, logoUrl }: HeaderProps) {
         {logoUrl ? (
           <img
             src={logoUrl}
-            alt={cafeName || 'Warung Tom Yam'}
+            alt={cafeName || 'Warung POS RAZStudio'}
             className="h-8 w-8 rounded-full object-cover"
           />
         ) : (
           <span className="text-2xl" aria-hidden="true">🍜</span>
         )}
         <h1 className="text-lg font-bold text-emerald-900">
-          {cafeName || 'Warung Tom Yam'}
+          {cafeName || 'Warung POS RAZStudio'}
         </h1>
       </div>
       <nav className="flex gap-1" aria-label="language">

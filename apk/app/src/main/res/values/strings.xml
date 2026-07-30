@@ -2,7 +2,7 @@
 <!-- English is the base/source language (see specs REQ-9). values-ms holds Malay. -->
 <resources>
     <!-- App -->
-    <string name="app_name">Warung Tom Yam</string>
+    <string name="app_name">Warung POS RAZStudio</string>
 
     <!-- Screen titles -->
     <string name="title_table_view">Table View</string>
