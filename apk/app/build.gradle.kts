@@ -90,6 +90,23 @@ android {
         compose = true
         buildConfig = true
     }
+
+    lint {
+        // Fails the build on any lint ERROR (not warning) — safe to enable now that the 5
+        // pre-existing errors are cleared (2 fixed real gaps in OrderingForegroundService's
+        // broadcasts, 2 confirmed lint false positives isolated into @RequiresApi/@SuppressLint
+        // helpers, see git history 2026-07-30). ~179 pre-existing WARNINGS remain untriaged —
+        // warningsAsErrors stays false so this doesn't retroactively fail the build on those;
+        // only NEW errors introduced going forward will fail.
+        abortOnError = true
+        warningsAsErrors = false
+        // Also lints library/module dependencies, not just this module's own source.
+        checkDependencies = true
+        // ProtectedPermissions is a real AGP lint check (flags declaring a signature/system
+        // permission this app can't hold) but this app only uses normal-protection permissions,
+        // so it's inert here — enabled for defense-in-depth against a future permission add.
+        enable += setOf("ProtectedPermissions", "UnusedResources")
+    }
 }
 
 dependencies {

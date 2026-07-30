@@ -271,11 +271,14 @@ class OrderingForegroundService : Service() {
         when (event) {
             "CAFE_OPEN" -> {
                 Log.i(TAG, "Café opened")
-                sendBroadcast(Intent(ACTION_CAFE_OPEN))
+                // Explicit package: this app's own receiver is already RECEIVER_NOT_EXPORTED on
+                // API 33+ (see OrderingViewModel), so this can't reach another app either way —
+                // setPackage is defense-in-depth Android's lint recommends for implicit broadcasts.
+                sendBroadcast(Intent(ACTION_CAFE_OPEN).setPackage(packageName))
             }
             "CAFE_CLOSED" -> {
                 Log.i(TAG, "Café closed")
-                sendBroadcast(Intent(ACTION_CAFE_CLOSED))
+                sendBroadcast(Intent(ACTION_CAFE_CLOSED).setPackage(packageName))
             }
         }
     }
@@ -287,7 +290,7 @@ class OrderingForegroundService : Service() {
             val myDeviceId = secureStorage.getDeviceId()
             if (targetDeviceId == myDeviceId) {
                 Log.i(TAG, "Admin forced check-out for this device")
-                sendBroadcast(Intent(ACTION_FORCE_CHECKOUT))
+                sendBroadcast(Intent(ACTION_FORCE_CHECKOUT).setPackage(packageName))
             }
         }
     }
