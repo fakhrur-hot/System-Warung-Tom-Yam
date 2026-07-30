@@ -210,14 +210,16 @@ class PrinterConnectionManager @Inject constructor(
     }
 
     /**
-     * Decode the bundled default logo (res/raw/qr_default_logo — the same one the QR-card generator
-     * uses) and scale it to a tasteful header width (~55% of the head), preserving aspect. Returns
-     * null on any failure so a receipt still prints without a logo.
+     * The café's own uploaded logo (Settings → Café Profile → Change Logo) if one exists, else the
+     * bundled default (res/raw/qr_default_logo — the same one the QR-card generator uses), scaled
+     * to a tasteful header width (~55% of the head), preserving aspect. Returns null on any failure
+     * so a receipt still prints without a logo.
      */
     private fun loadReceiptLogo(pixelWidth: Int): android.graphics.Bitmap? = try {
-        val raw = android.graphics.BitmapFactory.decodeResource(
-            context.resources, com.razstudio.pos.R.raw.qr_default_logo
-        )
+        val raw = com.razstudio.pos.ui.util.LogoPipeline.loadJpegFromInternal(context)
+            ?: android.graphics.BitmapFactory.decodeResource(
+                context.resources, com.razstudio.pos.R.raw.qr_default_logo
+            )
         when {
             raw == null -> null
             raw.width <= (pixelWidth * 0.55f).toInt() -> raw

@@ -13,6 +13,7 @@ import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.local.Table
 import com.razstudio.pos.data.local.TableDao
 import com.razstudio.pos.data.local.isTakeout
+import com.razstudio.pos.ui.util.LogoPipeline
 import com.razstudio.pos.ui.i18n.LanguageManager
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.util.QrPdfGenerator
@@ -197,8 +198,11 @@ class QrPdfViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(successMessage = null, generatedUri = null)
     }
 
-    /** Decode the bundled built-in default logo (res/raw/qr_default_logo). */
-    private fun loadDefaultLogo(): Bitmap? = try {
+    /**
+     * The café's own uploaded logo (Settings → Café Profile → Change Logo) if one exists, else the
+     * bundled built-in default (res/raw/qr_default_logo).
+     */
+    private fun loadDefaultLogo(): Bitmap? = LogoPipeline.loadJpegFromInternal(context) ?: try {
         BitmapFactory.decodeResource(context.resources, R.raw.qr_default_logo)
     } catch (e: Exception) {
         null

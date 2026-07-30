@@ -84,6 +84,13 @@ object OemKeepAliveHelper {
     fun getWhitelistSteps(context: Context): List<WhitelistStep> {
         val steps = mutableListOf<WhitelistStep>()
 
+        // Same source of truth as the Setup screen / RoleSelectScreen title: the café name the
+        // operator configured, falling back to the static app_name resource (the launcher label)
+        // when unset. Reading it here means these instructions need no per-café source edit —
+        // they always name whatever this device is actually configured/labeled as.
+        val appName = com.razstudio.pos.data.AppConfigStore(context).cafeName()
+            .ifBlank { context.getString(com.razstudio.pos.R.string.app_name) }
+
         // Step 1: Universal — request battery optimization exemption
         if (!isIgnoringBatteryOptimizations(context)) {
             steps.add(WhitelistStep(
@@ -98,17 +105,17 @@ object OemKeepAliveHelper {
             OemType.XIAOMI -> {
                 steps.add(WhitelistStep(
                     title = "Enable AutoStart",
-                    description = "Settings → Apps → Manage apps → RAZ POS → AutoStart → Enable",
+                    description = "Settings → Apps → Manage apps → $appName → AutoStart → Enable",
                     intent = createXiaomiAutoStartIntent()
                 ))
                 steps.add(WhitelistStep(
                     title = "Set battery saver to No restrictions",
-                    description = "Settings → Battery → App battery saver → RAZ POS → No restrictions",
+                    description = "Settings → Battery → App battery saver → $appName → No restrictions",
                     intent = createXiaomiBatteryIntent()
                 ))
                 steps.add(WhitelistStep(
                     title = "Lock app in recents",
-                    description = "Open Recent Apps → Long-press RAZ POS → tap Lock icon",
+                    description = "Open Recent Apps → Long-press $appName → tap Lock icon",
                     intent = null
                 ))
             }
@@ -116,12 +123,12 @@ object OemKeepAliveHelper {
             OemType.SAMSUNG -> {
                 steps.add(WhitelistStep(
                     title = "Add to Never Sleeping Apps",
-                    description = "Settings → Battery → Background usage limits → Never sleeping apps → Add RAZ POS",
+                    description = "Settings → Battery → Background usage limits → Never sleeping apps → Add $appName",
                     intent = createSamsungBatteryIntent()
                 ))
                 steps.add(WhitelistStep(
                     title = "Set battery to Unrestricted",
-                    description = "Settings → Apps → RAZ POS → Battery → Unrestricted",
+                    description = "Settings → Apps → $appName → Battery → Unrestricted",
                     intent = createAppBatterySettingsIntent(context)
                 ))
             }
@@ -129,7 +136,7 @@ object OemKeepAliveHelper {
             OemType.OPPO -> {
                 steps.add(WhitelistStep(
                     title = "Enable Auto Launch",
-                    description = "Settings → Battery → App Launch Management → RAZ POS → Manual → Enable all three toggles",
+                    description = "Settings → Battery → App Launch Management → $appName → Manual → Enable all three toggles",
                     intent = createOppoAutoLaunchIntent()
                 ))
             }
@@ -137,12 +144,12 @@ object OemKeepAliveHelper {
             OemType.VIVO -> {
                 steps.add(WhitelistStep(
                     title = "Allow background activity",
-                    description = "Settings → Battery → Background Power Consumption → RAZ POS → Don't restrict",
+                    description = "Settings → Battery → Background Power Consumption → $appName → Don't restrict",
                     intent = createVivoBackgroundIntent()
                 ))
                 steps.add(WhitelistStep(
                     title = "Enable AutoStart",
-                    description = "i Manager → App Manager → Autostart → Enable RAZ POS",
+                    description = "i Manager → App Manager → Autostart → Enable $appName",
                     intent = createVivoAutoStartIntent()
                 ))
             }
@@ -150,7 +157,7 @@ object OemKeepAliveHelper {
             OemType.HUAWEI -> {
                 steps.add(WhitelistStep(
                     title = "Set App Launch to Manual",
-                    description = "Settings → Battery → App launch → RAZ POS → Manual → Enable all three",
+                    description = "Settings → Battery → App launch → $appName → Manual → Enable all three",
                     intent = createHuaweiProtectedAppsIntent()
                 ))
             }

@@ -25,6 +25,7 @@ object LogoPipeline {
     private const val MAX_JPEG_SIZE_BYTES = 200 * 1024 // 200 KB
     private const val PRINT_MAX_WIDTH = 384            // 58mm printer width in pixels
     private const val MONO_FILENAME = "print_logo.bin"
+    private const val JPEG_FILENAME = "custom_logo.jpg"
 
     /**
      * Result of the logo pipeline processing.
@@ -247,5 +248,30 @@ object LogoPipeline {
         } catch (e: Exception) {
             null
         }
+    }
+
+    /**
+     * Persist the full-quality JPEG so the café's own uploaded logo — not just the bundled
+     * placeholder — is what prints on receipts and renders on QR-card PDFs. Called only after the
+     * backend confirms the branding save succeeded (matches this screen's staged-edit contract:
+     * nothing takes effect until Save), so a picked-but-cancelled logo never lingers here.
+     */
+    fun saveJpegToInternal(context: Context, jpegBytes: ByteArray) {
+        try {
+            File(context.filesDir, JPEG_FILENAME).writeBytes(jpegBytes)
+        } catch (e: Exception) {
+            // Non-fatal: printed/generated output just falls back to the bundled default logo
+        }
+    }
+
+    /**
+     * Load the café's uploaded logo for printing/PDF generation. Returns null if the café hasn't
+     * uploaded one yet, so callers fall back to the bundled default (res/raw/qr_default_logo).
+     */
+    fun loadJpegFromInternal(context: Context): Bitmap? = try {
+        val file = File(context.filesDir, JPEG_FILENAME)
+        if (file.exists()) BitmapFactory.decodeFile(file.absolutePath) else null
+    } catch (e: Exception) {
+        null
     }
 }
