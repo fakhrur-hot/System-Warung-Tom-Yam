@@ -30,6 +30,10 @@ jobs:
           # Client-safe values (publishable key ships in the bundle by design).
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # AdSense client ID (ca-pub-...) is not secret — publisher IDs are meant to be public,
+          # visible in any page's source — so this is a repo VARIABLE, not a secret. Optional:
+          # blank/unset builds ship with no ads (loadAdSense() no-ops cleanly).
+          VITE_ADSENSE_CLIENT_ID: ${{ vars.VITE_ADSENSE_CLIENT_ID }}
         run: npm run build
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

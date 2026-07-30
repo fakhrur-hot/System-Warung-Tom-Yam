@@ -11,6 +11,7 @@ import MenuView from './components/MenuView'
 import StatusView from './components/StatusView'
 import ConfirmDialog from './components/ConfirmDialog'
 import QrScanner from './components/QrScanner'
+import { loadAdSense } from './lib/adsense'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -146,6 +147,12 @@ export default function App() {
 
   const tableId = getTableFromUrl()
   const browserId = getBrowserId()
+
+  // Load AdSense auto ads — only from this component, which the router renders solely for
+  // customer-facing paths (/order and the unmatched-path fallback), never any /admin/* route.
+  useEffect(() => {
+    loadAdSense()
+  }, [])
 
   // Clean up realtime subscription on unmount
   useEffect(() => {
