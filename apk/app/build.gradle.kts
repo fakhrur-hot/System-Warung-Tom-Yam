@@ -39,8 +39,8 @@ android {
         applicationId = cafeApplicationId
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.1.6"
+        versionCode = 9
+        versionName = "0.1.8"
         vectorDrawables.useSupportLibrary = true
         // English is the base locale; Malay is dictionary-generated (values-ms).
         resourceConfigurations += listOf("en", "ms")
