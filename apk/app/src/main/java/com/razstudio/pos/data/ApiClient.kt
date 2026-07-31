@@ -1574,7 +1574,10 @@ class ApiClient @Inject constructor(
      */
     override suspend fun putBranding(
         cafeName: String,
-        logoBase64: String?
+        logoBase64: String?,
+        paymentQrBase64: String?,
+        paymentQrHash: String?,
+        removePaymentQr: Boolean,
     ): ApiResult<BrandingResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.putBranding(cafeName)
         try {
@@ -1584,6 +1587,15 @@ class ApiClient @Inject constructor(
             val body = JSONObject().apply {
                 put("cafeName", cafeName)
                 if (logoBase64 != null) put("logoBase64", logoBase64)
+                // Three intents, deliberately distinguishable by the server: send bytes to set,
+                // send an explicit JSON null to remove, omit the key entirely to leave alone.
+                when {
+                    paymentQrBase64 != null -> {
+                        put("paymentQrBase64", paymentQrBase64)
+                        if (paymentQrHash != null) put("paymentQrHash", paymentQrHash)
+                    }
+                    removePaymentQr -> put("paymentQrBase64", JSONObject.NULL)
+                }
             }.toString()
 
             val request = Request.Builder()

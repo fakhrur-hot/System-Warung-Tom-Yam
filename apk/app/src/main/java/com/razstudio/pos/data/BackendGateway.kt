@@ -80,7 +80,25 @@ interface BackendGateway {
     suspend fun getSettings(): ApiResult<SettingsResponse>
     suspend fun putSettings(body: JSONObject): ApiResult<Unit>
     suspend fun getBranding(): ApiResult<BrandingResponse>
-    suspend fun putBranding(cafeName: String, logoBase64: String? = null): ApiResult<BrandingResponse>
+    /**
+     * Updates branding, and optionally the café's Payment QR (task 16.2).
+     *
+     * The Payment QR has three distinct intents, which is why [removePaymentQr] exists rather than
+     * relying on a null [paymentQrBase64]: Kotlin cannot distinguish "argument omitted" from
+     * "argument passed as null", but the server must. Omitting leaves an existing QR untouched (the
+     * admin is only renaming the café); [removePaymentQr] deletes it, which is what makes the Show QR
+     * button disappear on every device (Requirement 14.5).
+     *
+     * [paymentQrHash] is the SHA-256 of the uploaded bytes. Devices cache on that hash rather than the
+     * URL, because the object key is stable across replacements — see `PaymentQrResolver`.
+     */
+    suspend fun putBranding(
+        cafeName: String,
+        logoBase64: String? = null,
+        paymentQrBase64: String? = null,
+        paymentQrHash: String? = null,
+        removePaymentQr: Boolean = false,
+    ): ApiResult<BrandingResponse>
     suspend fun getTables(): ApiResult<List<Pair<String, String>>>
     suspend fun getTableTokens(): ApiResult<Map<String, String>>
     suspend fun putTables(tables: List<Pair<String, String>>): ApiResult<List<String>>

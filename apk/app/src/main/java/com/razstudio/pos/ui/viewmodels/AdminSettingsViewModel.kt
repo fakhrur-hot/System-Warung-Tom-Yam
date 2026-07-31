@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
+import android.util.Log
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.InviteResponse
 import com.razstudio.pos.data.local.SettingsDao
@@ -638,10 +639,28 @@ class AdminSettingsViewModel @Inject constructor(
                             context, outcome.qrResult, url, appConfigStore
                         )
                     }
+                    // Push to the backend so ordering-staff devices can pick it up (task 16.2).
+                    // Best-effort and deliberately non-fatal: the local save has already succeeded, so
+                    // a network failure here must not discard the admin's upload. Staff devices simply
+                    // keep whatever they had until the next successful branding write.
+                    val hash = appConfigStore.paymentQrHash()
+                    val b64 = withContext(Dispatchers.IO) {
+                        outcome.qrResult.storedFile.readBytes().let {
+                            android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
+                        }
+                    }
+                    val push = apiClient.putBranding(
+                        cafeName = _uiState.value.cafeName.ifBlank { appConfigStore.cafeName() },
+                        paymentQrBase64 = b64,
+                        paymentQrHash = hash,
+                    )
+                    if (push is ApiResult.Error) {
+                        Log.w("AdminSettingsVM", "Payment QR saved locally but not pushed: ${push.message}")
+                    }
                     _uiState.value.copy(
                         paymentQrBusy = false,
                         paymentQrError = null,
-                        paymentQrHash = appConfigStore.paymentQrHash(),
+                        paymentQrHash = hash,
                         paymentQrPreview = withContext(Dispatchers.IO) {
                             com.razstudio.pos.ui.util.PaymentQrPipeline.loadFromInternal(context)
                         },
@@ -663,6 +682,14 @@ class AdminSettingsViewModel @Inject constructor(
                 com.razstudio.pos.ui.util.PaymentQrPipeline.deleteFromInternal(context)
                 appConfigStore.setPaymentQrHash(null)
                 appConfigStore.setPaymentQrUrl(null)
+            }
+            // Clear it on the backend too, so staff devices stop offering Show QR (Requirement 14.5).
+            val cleared = apiClient.putBranding(
+                cafeName = _uiState.value.cafeName.ifBlank { appConfigStore.cafeName() },
+                removePaymentQr = true,
+            )
+            if (cleared is ApiResult.Error) {
+                Log.w("AdminSettingsVM", "Payment QR removed locally but not on the server: ${cleared.message}")
             }
             _uiState.value = _uiState.value.copy(
                 paymentQrBusy = false,
