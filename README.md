@@ -30,10 +30,9 @@ folder's own `README.md` for its specifics.
    owner through provisioning their own Supabase project + Cloudflare Pages site (schema,
    Edge Functions, hosting, optional custom domain), then hands the resulting low-privilege
    values to the tablet's Setup screen. High-privilege tokens never touch the APK — see
-   `provisioning/README.md` and `.kiro/specs/cafe-provisioning-wizard/`.
+   `provisioning/README.md`.
 2. **Manual** — apply `supabase/migrations/*.sql`, deploy `supabase/functions/*`, build and
-   deploy `website/` to Cloudflare Pages yourself, then fill in the Setup screen. See
-   [`DEPLOYMENT.md`](DEPLOYMENT.md).
+   deploy `website/` to Cloudflare Pages yourself, then fill in the Setup screen.
 
 ---
 
@@ -134,10 +133,6 @@ Ordering Staff during connect, based on which credential it scans/enters.
 ├── supabase/      Postgres schema migrations + Edge Functions + provisioning notes
 ├── shared/        API contract (endpoints, Realtime channels, enums)
 ├── spikes/        Phase 0 de-risk harnesses (Bluetooth printing, background/latency)
-├── docs/          Audit reports and operational notes
-├── specs/         Original product spec (requirements.md · designs.md · tasks.md)
-├── .kiro/specs/   Working specs for individual features/fixes (EARS requirements, design,
-│                  phased tasks) — the current source of truth for in-flight work
 ├── tani-tom-yam/  Git worktree: the Tani café's own deployment (separate branch, shared history)
 └── .github/       CI (website + APK) and signed-release workflows
 ```
@@ -162,8 +157,7 @@ identity and update path.
 - ✅ CI + signed-release GitHub Actions
 - ⏳ [Café Provisioning Wizard](provisioning/) — Phase 1 (scaffold, Cloudflare Pages/DNS) is
   built and locally verified; the Postgres-schema and Edge-Function-deploy endpoints are
-  code-complete but await a live test account before being trusted for a real café — see
-  `.kiro/specs/cafe-provisioning-wizard/tasks.md` for the exact checkpoint.
+  code-complete but await a live test account before being trusted for a real café.
 
 ## Getting started (build the APK)
 
@@ -202,13 +196,11 @@ npm run build                # regenerates bundled migrations/functions, then bu
 
 ## Documentation
 
-- 📋 [Original requirements](requirements.md) / [design](designs.md) / [tasks](tasks.md) —
-  the initial product spec (historical; most recent feature work lives in `.kiro/specs/`).
-- 🧭 [Deployment guide](DEPLOYMENT.md) — manually standing up a new café's accounts.
 - 🧙 [Setup Wizard](provisioning/README.md) — the guided BYOI provisioning path.
-- 🗂️ `.kiro/specs/` — per-feature specs (requirements/design/tasks) for everything built
-  after the initial MVP: printing reliability, RBAC, demo mode, ambient display, the
-  provisioning wizard, and more.
+- ⚖️ [Third-party notices](THIRD-PARTY-NOTICES.md) — every dependency, its licence, and the
+  copyleft audit behind this project's proprietary licence.
+
+Design records, per-feature specs, and operational runbooks are internal and not published.
 
 ## License
 
