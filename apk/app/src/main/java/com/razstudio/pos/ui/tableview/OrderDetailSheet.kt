@@ -5,6 +5,7 @@ package com.razstudio.pos.ui.tableview
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -112,31 +119,44 @@ fun OrderDetailSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .padding(bottom = 32.dp),
-        ) {
-            // ── Header ───────────────────────────────────────────────────────────
-            Text(
-                text = "${strings.tableWord}: $tableLabel",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // ── No active order ───────────────────────────────────────────────────
-            val order = state.order
-            if (order == null) {
+        // ── No active order — nothing to arrange in two panes ────────────────────────
+        val order = state.order
+        if (order == null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(bottom = 32.dp),
+            ) {
+                Text(
+                    text = "${strings.tableWord}: $tableLabel",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = strings.noActiveOrder,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(16.dp))
-                return@ModalBottomSheet
             }
+            return@ModalBottomSheet
+        }
+
+        // ── The two panes, as local lambdas ──────────────────────────────────────────
+        // Local lambdas rather than extracted composables, deliberately: every block below
+        // closes over a dozen locals (state, order, permissions, strings, the callbacks, and the
+        // pendingPaymentMethod / showCancelDialog setters). Threading those through parameter
+        // lists is precisely where a behaviour change sneaks into a layout refactor, so the
+        // bodies below are left byte-for-byte alone — only their arrangement changes.
+        val receiptPane: @Composable ColumnScope.() -> Unit = {
+            Text(
+                text = "${strings.tableWord}: $tableLabel",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
 
             // ── Order info ────────────────────────────────────────────────────────
             // The internal order UUID is intentionally not shown — it's a database id with
@@ -379,6 +399,12 @@ fun OrderDetailSheet(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // ── Actions pane ─────────────────────────────────────────────────────────────
+        // (Kitchen reprint is per-session, rendered under each session block in the
+        // receipt pane, so the kitchen can reprint one round at a time.)
+        val actionsPane: @Composable ColumnScope.() -> Unit = {
 
             // ── Action buttons ────────────────────────────────────────────────────
             // (Kitchen reprint is now per-session, rendered under each session block above,
@@ -456,6 +482,66 @@ fun OrderDetailSheet(
                 }
             }
         }
+
+        // ── Orientation decides the arrangement ───────────────────────────────────────
+        // Landscape on this hardware is 2720x1224 — only ~1224px tall. A single stacked column
+        // pushed Pay Cash / Pay QR / Show QR / Cancel below the fold, and because that column had
+        // no verticalScroll they were not merely hidden but UNREACHABLE: an order simply could not
+        // be paid in landscape. Landscape now splits into receipt on the left and actions on the
+        // right, each scrolling independently, so the payment buttons stay put however many items
+        // or sessions the order grows to.
+        //
+        // Both branches scroll now. Portrait was unscrollable too and clipped long multi-session
+        // orders the same way — just rarely enough that it went unnoticed.
+        val isLandscape =
+            LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        if (isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(end = 16.dp),
+                ) { receiptPane() }
+
+                VerticalDivider(modifier = Modifier.fillMaxHeight())
+
+                // Actions sit at the BOTTOM of their column, under the cashier's thumb.
+                //
+                // A Box wrapper rather than `verticalArrangement = Arrangement.Bottom` on the Column:
+                // once a Column has verticalScroll it is measured with unbounded height, so fillMaxHeight
+                // does not apply inside it and Bottom silently does nothing. Aligning in a
+                // fixed-height Box works in both cases — content shorter than the pane is pushed down,
+                // and content taller than it fills the pane and scrolls as before.
+                Box(
+                    modifier = Modifier
+                        .width(ACTIONS_PANE_WIDTH)
+                        .fillMaxHeight()
+                        .padding(start = 16.dp),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) { actionsPane() }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(bottom = 32.dp),
+            ) {
+                receiptPane()
+                actionsPane()
+            }
+        }
     }
 
     // ── Cancel confirmation dialog ────────────────────────────────────────────────
@@ -499,6 +585,13 @@ private fun categoryLabel(category: String, strings: UiStrings): String = when (
     "SIDE_DISHES", "SIDE DISHES" -> strings.catSideDishes
     else -> strings.catOthers
 }
+
+/**
+ * Width of the landscape actions column. Wide enough that Pay Cash and Pay QR sit side by
+ * side without their labels wrapping in any of the five supported languages, and narrow
+ * enough to leave the receipt the majority of a 2720px-wide screen.
+ */
+private val ACTIONS_PANE_WIDTH = 300.dp
 
 @Composable
 private fun OrderItemRow(item: OrderItem, displayName: String) {
