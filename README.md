@@ -212,7 +212,21 @@ npm run build                # regenerates bundled migrations/functions, then bu
 
 ## License
 
-To be decided before public release.
+**Proprietary — Copyright (c) 2026 RAZStudio. All Rights Reserved.** See [LICENSE](LICENSE).
+
+This is commercial software, not open source. It is licensed, not sold, and redistribution requires a
+written agreement.
+
+It is nonetheless *built on* open-source components, all of which are permissively licensed (MIT and
+Apache 2.0) and therefore permit inclusion in a proprietary product. Those licences carry one
+obligation we must meet: their copyright notices and licence texts have to be reproduced in anything
+we distribute. The app does that from an in-app "Open source licences" screen, generated from the
+actual dependency set at build time rather than hand-maintained.
+
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) is the audit of record — every dependency, its
+licence, and a copyleft scan confirming nothing in the stack compels us to disclose our own source.
+Re-run that audit when adding a dependency; a GPL or AGPL component is the one change that would
+break the proprietary licence.
 
 ---
 

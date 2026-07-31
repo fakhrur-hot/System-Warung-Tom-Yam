@@ -90,18 +90,28 @@ Persisted in `AppConfigStore` (EncryptedSharedPreferences, file `app_config_pref
 
 Feature suppression is resolved in exactly one place rather than scattered `if (mode == …)` checks:
 
-```kotlin
-data class ModeCapabilities(
-    val customerQrOrdering: Boolean,  val printableQrSheets: Boolean,
-    val tables: Boolean,             val staffDevices: Boolean,
-    val secondaryAdmin: Boolean,     val websiteInvites: Boolean,
-    val cloudImageHosting: Boolean,  val realtimeWebSocket: Boolean,
-)
-```
+**Exactly eight fields — all of them, spelled out, so none is dropped in implementation:**
 
-`CLOUD` = all true. `LAN` = tables/staffDevices true, everything cloud-shaped false. `KIOSK` = all
-false. Navigation, menus, and settings read this object, so adding a fourth mode later touches one
-table (Requirement 1.3, 7.5).
+| Field | CLOUD | LAN | KIOSK | Gates |
+|---|:--:|:--:|:--:|---|
+| `customerQrOrdering` | ✅ | ❌ | ❌ | The customer web ordering flow |
+| `printableQrSheets` | ✅ | ❌ | ❌ | `QrPdfScreen` / `QrPdfViewModel` |
+| `tables` | ✅ | ✅ | ❌ | Table grid, table selection, table management |
+| `staffDevices` | ✅ | ✅ | ❌ | Devices screen, pairing, approval |
+| `secondaryAdmin` | ✅ | ❌ | ❌ | The `ADMIN_SECONDARY` role — see below |
+| `websiteInvites` | ✅ | ❌ | ❌ | `https://…/join?invite=` deep-link invitations |
+| `cloudImageHosting` | ✅ | ❌ | ❌ | Object-storage upload vs local file storage |
+| `realtimeWebSocket` | ✅ | ❌ | ❌ | Supabase Realtime socket startup |
+
+So: `CLOUD` = all eight true. `LAN` = **only** `tables` and `staffDevices` true. `KIOSK` = all eight
+false. Navigation, menus, and settings read this one object, so adding a fourth mode later touches a
+single table (Requirements 1.3, 7.5).
+
+`secondaryAdmin` earns a flag rather than being silently unsupported: `ADMIN_SECONDARY` is a real role
+today (`SecureStorage.kt:41`) with its own UI gating, and it is **out of scope for LAN and Kiosk in this
+spec**. Making that a capability makes the exclusion visible and enforceable in one place instead of an
+undocumented gap someone rediscovers mid-implementation. LAN Mode is one `ADMIN` server plus N
+`ORDERING` clients — nothing else.
 
 **The Payment QR is deliberately absent from `ModeCapabilities`.** It is available in all three modes
 (Requirement 14.7), so making it a capability flag would invite someone to suppress it in LAN or Kiosk
@@ -281,6 +291,124 @@ De-duplication reuses the existing in-memory `printedKitchenIds` / `notifiedItem
 (`RealtimeService.kt:135-154`), which already guard against a poll re-returning a seen order
 (Requirement 6.4).
 
+### Printing and reporting: the parts that must actively *not* change
+
+This section exists because "unchanged" is the easiest thing to leave out of a plan — there is no new
+component to build, so it silently gets no task, and then nothing verifies it. Requirement 9 and
+Property 5 are entirely about behaviour that must survive three topologies untouched, and Kiosk Mode's
+whole reason to exist is printing slips and receipts and producing reports.
+
+**Nothing here becomes mode-aware. That is the design.** Specifically:
+
+- `printing/PrintService.kt`, `printing/PrinterConnectionManager.kt`, `printing/PrinterDispatcher.kt`,
+  `printing/documents/*` and `BitmapTicketRenderer` are **not** modified by this spec. They already
+  work with no network, over Bluetooth SPP, gated to `Role.ADMIN`.
+- The `Role.ADMIN` printing gate stays exactly as it is. A LAN Client Device must **not** gain printing
+  by virtue of the topology change (Requirement 9.3) — it is `ORDERING`, and `ORDERING` does not print.
+- Print-time localization stays: `PrintService.localizeItemNames:47-53` re-resolves item names from the
+  live menu because the backend freezes English name snapshots. In LAN and Kiosk the "live menu" is
+  Room instead of a server response, but the call site does not change (Requirement 9.4).
+- `ReportsViewModel.kt:141-179` already queries `OrderDao` directly. It needs **no** change, because
+  the orders it reads are in the same tables whether they arrived from Supabase, from a Client Device
+  over the LAN, or from the admin's own hand (Requirement 9.2).
+
+The one genuine difference: Kiosk Mode has no tables, so anything a slip or receipt renders as a table
+label uses the running order number instead (Requirement 3.5). That is a data substitution at the call
+site, not a change to the rendering path.
+
+**Verification, not inspection.** Because the code is unchanged, the risk is not that someone edits it
+— it is that the *inputs* differ per mode and nobody notices until a café prints a blank table field.
+So Property 5 is proven by generating a real slip, a real receipt, and a real report in each mode and
+comparing them, not by observing that the printing package has no diff.
+
+### Network provisioning in LAN Mode: who creates the wireless network
+
+Requirement 4.3 allows either an existing WiFi router or a hotspot hosted by the Server Device. The
+second case has a constraint that must be settled here rather than discovered during implementation:
+
+> ⚠️ **Android does not let an app turn on normal hotspot tethering.** There is no public API. The
+> `WifiManager.LocalOnlyHotspot` API that *is* public creates an AP with a system-generated SSID and
+> password, no internet path, and a lifetime tied to the requesting app — it is designed for
+> peer-to-peer accessory use, not for running a café.
+
+So the design does **not** attempt to create the AP programmatically. Instead:
+
+- **The operator enables the hotspot from Android system settings**, as they would to share internet.
+  The Setup Wizard's LAN path tells them to do this and links straight to the system settings screen
+  rather than pretending the app can do it.
+- **The app detects rather than controls.** It reads the device's current IP on the active interface and
+  shows it, so the operator can confirm the network is up and the pairing QR carries a reachable
+  address. If no usable interface is found, that is reported plainly instead of producing a pairing QR
+  pointing at nothing.
+- **A hotspot needs no internet.** Both cases work with the mobile data off; the AP is only a local
+  link. This is worth stating because "hotspot" colloquially implies sharing a mobile connection, and
+  here it explicitly does not.
+- **Address instability is expected, not exceptional.** A hotspot reassigns addresses when it restarts,
+  which is exactly why Requirement 5.5's re-discovery ladder exists rather than being an optional
+  refinement.
+
+#### Prior art: this exact problem is already solved in-house
+
+RAZStudio's StudioRoom project ships a Canon camera sync feature over **PTP/IP** with the same two
+topologies — phone joins the camera's AP, or both sit on a home LAN. Its `NetworkBinder`
+(`feature/canon-sync/.../net/NetworkBinder.kt`) is device-verified against Canon's own Camera Connect
+app via `dumpsys connectivity`, and its findings are directly transferable here because the hard part
+is not the protocol — PTP/IP is raw TCP, ours is HTTP — but **which interface the socket leaves by**.
+Four findings change this design:
+
+**1. Joining a no-internet AP is not enough; unbound traffic silently goes out over cellular.**
+Android keeps a validated network (mobile data) as the process default even while the phone is
+associated with the AP. A Client Device would appear connected and every request would still miss the
+Server. The fix is `ConnectivityManager.bindProcessToNetwork(wifiNetwork)`, and for individual sockets
+`network.bindSocket(...)` — for OkHttp, `OkHttpClient.Builder().socketFactory(network.socketFactory)`.
+Release **must** call `bindProcessToNetwork(null)`, or the phone stays cut off from mobile data until
+the process dies.
+
+**2. Android 11+ auto-drops a Wi-Fi network with no validated internet after roughly 30–90 seconds.**
+This is the field failure that looks like "it worked for a minute then stopped." Holding it requires a
+`NetworkRequest` with a specific and non-obvious combination:
+
+```
+addTransportType(TRANSPORT_WIFI)
+addCapability(NET_CAPABILITY_INTERNET)        // we do route IP traffic
+removeCapability(NET_CAPABILITY_VALIDATED)    // but the captive-portal probe will fail
+```
+
+`removeCapability(INTERNET)` alone is *not* sufficient — the prior project measured the OS tearing the
+network down anyway.
+
+**3. Do not use `WifiNetworkSpecifier` / `requestNetwork` with an SSID matcher.** It forces a
+disconnect-and-re-associate, which killed legacy Canon bodies mid-handshake, and it requires
+`ACCESS_FINE_LOCATION` at runtime even on Android 13+ — a permission users routinely refuse. The
+capability-only request above needs no location permission. Canon's own app does not use a specifier
+either; it relies on the user having joined the AP in Settings, which is precisely the flow adopted
+above.
+
+**4. `activeNetwork` is the wrong handle.** With mobile data on, the active network is cellular even
+when the phone is correctly on the AP. The prior project scans all connected networks for a
+`TRANSPORT_WIFI` one instead of trusting `activeNetwork`.
+
+**Which side needs which.** The two roles are not symmetric:
+
+| Role | Situation | What it needs |
+|---|---|---|
+| Client (staff) | Joined someone else's AP | All four findings — bind, keep-alive, no specifier, scan for the Wi-Fi network |
+| Server (admin) | *Is* the AP | Nothing. When the device hosts the AP it has no Wi-Fi network of its own to bind; the kernel routes `192.168.x.x` out of the AP interface automatically. Detect this case and skip binding entirely — the prior project does so via `WifiManager.isWifiApEnabled()`, hidden since API 26 and reached by reflection, failing closed to `false` |
+
+**5. Re-discovery is nearly free in the hotspot case, which simplifies Requirement 5.5.** When a staff
+device joins the admin's hotspot, `WifiManager.getDhcpInfo().gateway` **is the admin device** — that is
+what "the AP" means. So after a hotspot restart the Client can recover its address by reading the
+gateway, with no mDNS round trip and no re-scan. The discovery ladder becomes: last known address →
+**DHCP gateway** → NSD/mDNS (needed only for the home-router case, where the Server is an ordinary peer
+rather than the gateway) → prompt for re-scan. The prior project also keeps an informed subnet sweep,
+bounded by the DHCP netmask and skipping its own IP and the gateway, as a final fallback.
+
+**A welcome side effect.** Process-binding the Client to the LAN network enforces Requirement 11 at the
+OS level: while bound, the app *cannot* reach the internet, because every socket in the process is
+routed out of a link that has no upstream. That is a stronger guarantee than an application-level
+interceptor, though the interceptor still earns its place for Kiosk Mode, where there is no network
+binding at all.
+
 ### Setup Wizard and the restructured entry screen
 
 The entry screen is rebuilt to the specified layout (Requirement 2.1): a prominent **Join as Ordering
@@ -311,12 +439,28 @@ receipt.
 **New Room entities.** `PairedDevice` (LAN Server: device id, name, model, role, status, credential
 hash, last seen) and `OrderNumberSequence` (business day, next number).
 
-**Payment QR state.** The image itself is a file, never a database blob or a base64 column: app-private
-storage on the device, plus object storage in Cloud Mode. What is stored as data is small — the content
-hash and the resolved URL, carried on `branding` and cached per device so a staff device can tell
-"unchanged" from "replaced" without downloading the image to find out. Absence of a hash *is* the
-"not configured" state that hides the **Show QR** button, so there is no separate enabled flag to fall
-out of sync with the image's actual presence.
+**Payment QR state — and an explicit warning about where it does *not* live.**
+
+> ⚠️ **`branding` is an API endpoint, not a database table. There is no `Branding` Room entity and no
+> `BrandingDao`, and this design does not add one.** `AppDatabase` registers exactly eight entities:
+> `MenuItem`, `Order`, `OrderItem`, `SystemSettings`, `Table`, `PendingOrder`, `PrinterConfig`,
+> `PrintJob`. `Branding` exists only as `BrandingResponse`, a network DTO inside `ApiClient`. Anyone
+> reading "the hash is carried on `branding`" as "add a column to the branding table" will go looking
+> for a table that does not exist. It travels **on the branding API payload**; where each device
+> *persists* it is a separate question, answered next.
+
+Three distinct places hold Payment QR state, and conflating them is the easy mistake:
+
+| What | Where it lives | Why there |
+|---|---|---|
+| The image bytes | A file in app-private storage; additionally object storage in Cloud Mode | Images do not belong in Room as blobs, and never as base64 columns |
+| The content hash + resolved URL, **in transit** | Fields on the `branding` GET/PUT payload | `branding` is fetched rarely, unlike the 30 s-polled `settings` |
+| The content hash + resolved URL, **at rest on a device** | `AppConfigStore` | It is device-scoped cache state, and `AppConfigStore` already holds the café name that arrives on the same payload |
+
+Because none of that is a Room table, **the Payment QR feature requires no Room migration.**
+
+Absence of a hash *is* the "not configured" state that hides the **Show QR** button, so there is no
+separate enabled flag that could fall out of sync with whether the image actually exists.
 
 **Room becomes authoritative.** `menu_items`, `settings`, and `branding` are written by admin edits
 directly in LAN and Kiosk rather than being refreshed from a server response.
@@ -352,6 +496,19 @@ behaviour is mode-independent, and the staff feature set needs no per-mode imple
 ### Property 3: No internet traffic originates in LAN or Kiosk Mode
 Demonstrated by observation of the running app's network activity, not by code reading alone, and no
 Supabase credential remains stored after the mode is applied.
+
+> ⚠️ **A guard placed inside the backend gateway is not sufficient and will produce a false pass.**
+> `RemoteBackend` is not the app's only HTTP client, and in Kiosk Mode it is not used at all. Every one
+> of these can independently reach the network and must be covered:
+> - `ApiClient`'s OkHttp instance (`RemoteBackend`) — absent entirely in Kiosk
+> - `RealtimeService`'s own OkHttp **WebSocket** client
+> - `OrderingForegroundService`'s own OkHttp **WebSocket** client (a separate instance)
+> - **Coil** (`io.coil-kt:coil-compose`), which fetches menu-item and logo images by URL and would
+>   happily load a leftover `https://` image URL in an offline mode
+>
+> The check therefore belongs at a level all of them share — a shared OkHttp `Dns` or `Interceptor`
+> applied app-wide — not bolted onto one call site.
+
 **Validates: Requirements 11.1, 11.2, 11.3**
 
 ### Property 4: The café's data survives an app upgrade
@@ -369,10 +526,19 @@ Retried submissions and repeated polls cannot produce a duplicate kitchen slip o
 in any mode.
 **Validates: Requirements 6.4**
 
-### Property 7: Order ids cannot collide
-The Server Device is the sole assigner of order identity in LAN Mode, making cross-device collision
-structurally impossible.
-**Validates: Requirements 8.4**
+### Property 7: Order identity is unique — both the id and the Kiosk order number
+Two distinct identifiers, one property, because both are "an order must be unambiguously identifiable":
+
+- **Order id (LAN).** The Server Device is the sole assigner, making cross-device collision structurally
+  impossible rather than merely improbable.
+- **Kiosk order number (Requirement 3.5).** Drawn from a dedicated sequence inside a single Room
+  transaction, so it is unique and monotonic within a business day and resets at the next one. A
+  `COUNT(*)`-derived number would reuse a number after a cancellation and put two different orders on
+  two slips bearing the same number — which is why the sequence table exists.
+
+Note this is *not* Property 6. Property 6 is about printing and alerting an order exactly once; this is
+about an order having exactly one identity. They are easy to conflate and are verified separately.
+**Validates: Requirements 3.5, 8.4**
 
 ### Property 8: A displayed Payment QR is scannable, current, and unaltered
 Scannable: an image is only ever stored after ZXing confirms it decodes. Unaltered: a re-encoded copy is
@@ -422,26 +588,42 @@ is exempt from Requirement 7's Cloud-Only suppression despite being an image.
 Requirement 12 is the binding constraint: this feature's real failure modes are physical, so device
 testing is a prerequisite rather than a follow-up.
 
-- **Two-device LAN, on a hotspot hosted by the Server Device.** Pair, approve, place an order from the
-  Client, confirm it appears and auto-prints on the Server. Then restart the hotspot to change the
-  address and confirm the Client re-attaches without re-approval.
-- **Kiosk with networking fully disabled** (airplane mode, WiFi and mobile data off). Order entry,
-  kitchen slip, receipt, and report — proving no path silently depends on a reachable host.
-- **Cloud regression.** Re-verify Cloud Mode after the work, since this spec edits `ApiClient`,
-  `AppDatabase`, and the realtime services, all of which Cloud Mode also uses.
-- **Release build, not just debug** (Requirement 12.4). This is not theoretical: adding the AdMob SDK
-  produced a `VerifyError` that crashed only the R8 release build and was invisible in debug. An
-  embedded HTTP server plus reflection-using serialization is exactly the shape of code a minifier
-  breaks, so keep-rules must be verified against an installed release APK.
-- **Network observation** for Property 3, using logcat or a proxy against the running app rather than
-  a code audit.
-- **Migration tests** over a populated database, since Property 4 is about not losing data that is
-  already there.
-- **Payment QR scanned by a real banking app on a second phone**, in all three modes (Requirement 12.5).
-  A rendered-looking QR and a scannable QR are not the same thing, and no amount of unit testing on the
-  decode path substitutes for one phone reading another phone's screen at arm's length in room light.
-- **Payment QR replacement propagation**: upload QR A, confirm a staff device shows A, replace with B on
-  the admin device, confirm the staff device shows B and never A again. This is Property 8's staleness
-  half and the highest-consequence path in the feature.
-- **Payment QR with the network cut** after caching, confirming display still works (Requirement 13.9),
-  and with no cache present, confirming the button is absent rather than broken.
+> ⚠️ **Read this section as a task list, not as advice.** Every numbered item below is work that has to
+> be scheduled and done by a person with hardware in their hands. None of it is satisfied by unit
+> tests, and none of it can be inferred from a green build. An implementation plan that omits these has
+> omitted the part of the spec most likely to catch a real defect.
+
+**V1. Two physical devices on a Server-hosted hotspot** *(Requirement 12.1)* — pair, approve, place an
+order from the Client, confirm it appears and auto-prints on the Server; then restart the hotspot so the
+address changes and confirm the Client re-attaches without re-approval.
+**V2. Kiosk with networking fully off** *(Requirement 12.2)* — airplane mode, WiFi and mobile data
+disabled: order entry, kitchen slip, receipt, report.
+**V3. Cloud Mode regression** *(Requirement 12.3)* — this spec edits `ApiClient`, `AppDatabase`, and
+both realtime services, all of which Cloud Mode uses.
+**V4. Release build on a device** *(Requirement 12.4)* — not debug. Precedent: adding the AdMob SDK
+produced a `VerifyError` that crashed only the R8 release build and was invisible in debug. An embedded
+HTTP server plus reflection-based serialization is exactly the shape of code a minifier breaks, so
+keep-rules must be proven against an installed release APK.
+**V5. Payment QR scanned by a real banking app on a second phone** *(Requirement 12.5)* — in all three
+modes. A rendered QR and a scannable QR are not the same thing, and no amount of decode-path unit
+testing substitutes for one phone reading another's screen in room light.
+**V6. Payment QR replacement propagation** — upload A, confirm a staff device shows A, replace with B,
+confirm the staff device shows B and never A again. Property 8's staleness half, and the
+highest-consequence path in that feature.
+**V7. Payment QR with the network cut** after caching (display still works, Requirement 13.9), and with
+no cache present (button absent, not broken).
+**V8. Migration over a populated database** *(Property 4)* — install the previous version, create real
+orders, upgrade, confirm every order survives. Property 4 is about not losing data that is *already
+there*, so a migration test on an empty database proves nothing.
+**V9. Printing and reporting compared across modes** *(Property 5, Requirement 9)* — generate a kitchen
+slip, a receipt, and a report in each of the three modes and compare them. The printing code is
+unchanged, so the risk is not a bad edit; it is that the inputs differ per mode and nobody notices.
+
+Alongside V1–V9, the ordinary automated layer — unit and property tests for the sequence counter, the
+capability table, the `LocalBackend` order lifecycle, `LanServer` route dispatch, poll de-duplication,
+`PaymentQrPipeline` decode/payload-equality, and hash-keyed cache invalidation; plus an instrumented
+test for Property 3's network guard, which needs a real Android runtime to observe real sockets.
+
+**Where the automated layer stops.** It can prove a QR decodes; it cannot prove a phone camera reads it
+off a screen. It can prove a poll de-duplicates; it cannot prove two devices on a flaky hotspot
+converge. Everything in V1–V9 exists precisely because it lives past that boundary.

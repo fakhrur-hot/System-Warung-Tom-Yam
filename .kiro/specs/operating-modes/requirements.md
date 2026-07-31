@@ -132,6 +132,29 @@ no monthly cloud cost.
    depend on which mode it is running in.
 3. IN LAN Mode, THE app SHALL support the Wireless LAN being either an existing WiFi network both
    devices join, or a hotspot hosted by the Server Device itself.
+   1. THE app SHALL NOT attempt to switch on hotspot tethering programmatically, because Android
+      provides no public API to do so; it SHALL instead instruct the operator to enable the hotspot in
+      Android's own settings and SHALL offer to open that settings screen for them.
+   2. THE app SHALL detect and display the Server Device's current address on the active network
+      interface, so the operator can confirm the network is up before pairing.
+   3. WHEN no usable network interface is present, THE app SHALL say so plainly and SHALL NOT produce a
+      pairing code containing an unreachable address.
+   4. THE app SHALL work with mobile data switched off in both cases, since the wireless network here
+      carries only local traffic and never needs an internet path.
+   5. WHEN a Client Device is joined to a wireless network that has no internet, THE app SHALL route
+      its traffic over that network explicitly rather than relying on the operating system's default
+      route — with mobile data enabled, an unbound request travels over cellular and never reaches the
+      Server Device, while the app still appears connected.
+   6. THE app SHALL hold a no-internet wireless network against the operating system's tendency to
+      disconnect it once its connectivity check fails, so a Client Device does not lose the Server
+      partway through service.
+   7. WHEN the app releases such a network, IT SHALL restore the device's normal routing, so the
+      operator's phone is not left without mobile data afterwards.
+   8. THE app SHALL NOT request a specific wireless network by name in a way that forces the device to
+      disconnect and re-associate, and SHALL NOT require location permission in order to connect to the
+      Server Device.
+   9. WHEN the Server Device is itself hosting the wireless network, THE app SHALL detect this and skip
+      the client-side routing steps above, which do not apply to the device that *is* the network.
 4. THE app SHALL implement, on the Local Backend, every endpoint the Ordering-staff and admin flows
    actually call, and SHALL NOT be required to implement endpoints that exist server-side only for
    cloud-specific purposes (the email report jobs, the metrics endpoint, the rotating-key endpoint,
@@ -159,6 +182,11 @@ without typing an IP address, because the website deep-link invitations do not e
    the operator without re-pairing already-approved devices.
 5. WHEN the Server Device's address changes — as it will when a hotspot or router restarts — THE
    Client Device SHALL be able to re-establish contact without being fully re-paired and re-approved.
+   1. WHERE the Server Device is hosting the wireless network, THE Client Device SHALL resolve it from
+      the network's own gateway address, since the device hosting an access point *is* the gateway —
+      no search or re-scan is required in this case.
+   2. WHERE the Server Device is an ordinary peer on a shared router, THE Client Device SHALL fall back
+      to local network service discovery, and only then to asking the operator to re-scan.
 6. THE Server Device SHALL let the operator see paired Client Devices and revoke any of them, as the
    Devices screen does today.
 
@@ -229,6 +257,14 @@ regardless of topology, so switching modes does not retrain my staff or change m
    Device SHALL NOT acquire printing capability by virtue of the mode change.
 4. Item names on printed output SHALL continue to be localized from the live menu at print time in
    all three modes.
+5. THE printing subsystem SHALL NOT become mode-aware: no component under `printing/` SHALL branch on
+   the operating mode. Mode differences SHALL be confined to the data handed to it — in Kiosk Mode, the
+   running order number where a table label would otherwise appear.
+6. THE reporting subsystem SHALL NOT become mode-aware, and SHALL continue to read from the local
+   database as it does today, regardless of how the orders in that database arrived.
+7. Requirements 9.1–9.6 SHALL be verified by comparing real printed and reported output across the
+   three modes (Requirement 12.7), not by observing that the printing and reporting code is unchanged —
+   unchanged code fed different inputs is exactly how this requirement fails in practice.
 
 ### Requirement 10: Changing mode is deliberate and never silently destructive
 
@@ -256,6 +292,10 @@ reaching the internet, because I may be on a metered hotspot or have no connecti
    as part of its normal operation.
 2. THE absence in 11.1 SHALL be demonstrable by inspection of the running app's network activity, not
    asserted only in code review.
+   1. THE check SHALL cover every HTTP client in the app, not only the backend gateway — which in Kiosk
+      Mode is not even in use. At minimum this includes the gateway's own client, the two realtime
+      services' separate WebSocket clients, and the image loader used for menu and logo images. A guard
+      applied to one call site would report success while another quietly reached the internet.
 3. IN LAN and Kiosk Mode, THE app SHALL NOT hold or require a Supabase anon key or session token, and
    SHALL NOT retain a previously configured one after the mode is applied.
 
@@ -280,6 +320,16 @@ single device.
 5. THE Payment QR feature SHALL be verified by scanning the on-screen image with a real banking app on
    a separate physical phone, in each of the three modes, because an image that renders correctly but
    does not scan is indistinguishable from a working one by inspection alone.
+6. THE database migration SHALL be verified over a **populated** database — install the prior version,
+   create real orders, upgrade, and confirm every order survives. A migration exercised only against an
+   empty database demonstrates nothing about the property it is meant to protect.
+7. Printing and reporting SHALL be verified by producing a real kitchen slip, a real customer receipt,
+   and a real report in each of the three modes and comparing them. Because the printing code is
+   deliberately unmodified, the risk is not a bad edit but a difference in the inputs each mode feeds
+   it, which only comparing real output will reveal.
+8. THE verification items in this requirement SHALL be planned as explicit, scheduled work with
+   hardware, and SHALL NOT be treated as satisfied by a passing automated test suite or a successful
+   build.
 
 ### Requirement 13: "Show QR" — displaying the café's static payment QR
 
