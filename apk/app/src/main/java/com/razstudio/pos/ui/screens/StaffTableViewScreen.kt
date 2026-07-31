@@ -249,6 +249,7 @@ fun StaffTableViewScreen(
             onReprintSession = { orderId, sessionNumber -> viewModel.reprintSession(orderId, sessionNumber) },
             onConfirmSession = { orderId, sessionNumber -> viewModel.confirmSession(orderId, sessionNumber) },
             onPayment = { orderId, method, printReceipt -> viewModel.processPayment(orderId, method, printReceipt) },
+            onVoidItems = { orderId, itemIds, reason -> viewModel.voidItems(orderId, itemIds, reason) },
             onCancel = { orderId, reason -> viewModel.cancelOrder(orderId, reason) },
             onDismiss = {
                 showOrderSheet = false

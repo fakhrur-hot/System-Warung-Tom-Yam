@@ -419,6 +419,7 @@ fun AdminHomeScreen(
             onReprintSession = { orderId, sessionNumber -> tableViewModel.reprintSession(orderId, sessionNumber) },
             onConfirmSession = { orderId, sessionNumber -> tableViewModel.confirmSession(orderId, sessionNumber) },
             onPayment = { orderId, method, printReceipt -> tableViewModel.processPayment(orderId, method, printReceipt) },
+            onVoidItems = { orderId, itemIds, reason -> tableViewModel.voidItems(orderId, itemIds, reason) },
             onCancel = { orderId, reason -> tableViewModel.cancelOrder(orderId, reason) },
             onDismiss = {
                 showOrderSheet = false

@@ -58,12 +58,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdSize
-import com.google.android.gms.ads.AdView
 import com.razstudio.pos.data.local.MenuCategory
 import com.razstudio.pos.ui.components.HoldCountdownOverlay
 import com.razstudio.pos.ui.i18n.LanguageViewModel
@@ -197,8 +193,17 @@ fun ManualDineInScreen(
     )
 }
 
-private val AD_BANNER_HEIGHT = 50.dp
-
+/**
+ * No ad banner on this screen — see [com.razstudio.pos.ui.components.AdBanner].
+ *
+ * A banner used to be overlaid on the grid below with `align(Alignment.BottomCenter)`. Two separate
+ * AdMob rules made that placement wrong, and only one of them was about the overlay: a banner may
+ * not sit over scrolling content the user taps (the tiles scroll beneath it), and it may not be
+ * immediately next to interactive elements on a screen the user is continuously interacting with.
+ * Table selection is step 1 of order entry and the whole screen is tappable tiles, so re-stacking
+ * the banner below the grid would have fixed the overlay and left the adjacency. It was removed
+ * instead; the compliant surfaces are the read-only and idle screens listed on [AdBanner].
+ */
 @Composable
 private fun TableSelectGrid(
     tables: List<ManualDineInViewModel.TableItem>,
@@ -215,12 +220,7 @@ private fun TableSelectGrid(
     Box(modifier = Modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 100.dp),
-            contentPadding = PaddingValues(
-                start = 12.dp,
-                end = 12.dp,
-                top = 12.dp,
-                bottom = 12.dp + AD_BANNER_HEIGHT
-            ),
+            contentPadding = PaddingValues(all = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxSize()
@@ -255,20 +255,6 @@ private fun TableSelectGrid(
                 }
             }
         }
-
-        AndroidView(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .height(AD_BANNER_HEIGHT),
-            factory = { context ->
-                AdView(context).apply {
-                    setAdSize(AdSize.BANNER)
-                    adUnitId = "ca-app-pub-8323843054100465/6611158260"
-                    loadAd(AdRequest.Builder().build())
-                }
-            }
-        )
     }
 }
 

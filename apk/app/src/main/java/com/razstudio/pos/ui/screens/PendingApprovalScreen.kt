@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
@@ -25,6 +26,7 @@ import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.SecureStorage
+import com.razstudio.pos.ui.components.AdBannerFooter
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.UiStrings
 import com.razstudio.pos.ui.i18n.uiStrings
@@ -125,51 +127,58 @@ fun PendingApprovalScreen(
     }
 
     Surface(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            CircularProgressIndicator()
+        // The most policy-safe surface in the app: there is not a single interactive element here,
+        // and the device waits on this screen indefinitely while it polls for approval every 10s.
+        Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                CircularProgressIndicator()
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-            Text(
-                text = strings.waitingApprovalTitle,
-                style = MaterialTheme.typography.headlineSmall
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            val isSecAdmin = viewModel.isSecondaryAdmin
-            val descText = if (isSecAdmin) {
-                when (language) {
-                    com.razstudio.pos.ui.i18n.AppLanguage.MY -> "Peranti admin pembantu anda telah didaftarkan. Admin utama akan meluluskan sambungan anda tidak lama lagi."
-                    com.razstudio.pos.ui.i18n.AppLanguage.ZH -> "您的副管理员设备已注册。主管理员将很快批准您的连接。"
-                    com.razstudio.pos.ui.i18n.AppLanguage.TA -> "உங்கள் துணை நிர்வாகி சாதனம் பதிவு செய்யப்பட்டுள்ளது. முதன்மை நிர்வாகி விரைவில் உங்கள் இணைப்பை அங்கீகரிப்பார்."
-                    com.razstudio.pos.ui.i18n.AppLanguage.TH -> "อุปกรณ์ผู้ดูแลระบบสำรองของคุณได้รับการลงทะเบียนแล้ว ผู้ดูแลระบบหลักจะอนุมัติการเชื่อมต่อของคุณในไม่ช้า"
-                    else -> "Your secondary admin device has been registered. The main admin will approve your connection shortly."
-                }
-            } else {
-                strings.waitingApprovalDesc
-            }
-
-            Text(
-                text = descText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            if (viewModel.errorMessage != null) {
-                Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = viewModel.errorMessage!!,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                    text = strings.waitingApprovalTitle,
+                    style = MaterialTheme.typography.headlineSmall
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val isSecAdmin = viewModel.isSecondaryAdmin
+                val descText = if (isSecAdmin) {
+                    when (language) {
+                        com.razstudio.pos.ui.i18n.AppLanguage.MY -> "Peranti admin pembantu anda telah didaftarkan. Admin utama akan meluluskan sambungan anda tidak lama lagi."
+                        com.razstudio.pos.ui.i18n.AppLanguage.ZH -> "您的副管理员设备已注册。主管理员将很快批准您的连接。"
+                        com.razstudio.pos.ui.i18n.AppLanguage.TA -> "உங்கள் துணை நிர்வாகி சாதனம் பதிவு செய்யப்பட்டுள்ளது. முதன்மை நிர்வாகி விரைவில் உங்கள் இணைப்பை அங்கீகரிப்பார்."
+                        com.razstudio.pos.ui.i18n.AppLanguage.TH -> "อุปกรณ์ผู้ดูแลระบบสำรองของคุณได้รับการลงทะเบียนแล้ว ผู้ดูแลระบบหลักจะอนุมัติการเชื่อมต่อของคุณในไม่ช้า"
+                        else -> "Your secondary admin device has been registered. The main admin will approve your connection shortly."
+                    }
+                } else {
+                    strings.waitingApprovalDesc
+                }
+
+                Text(
+                    text = descText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (viewModel.errorMessage != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = viewModel.errorMessage!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
             }
+
+            AdBannerFooter()
         }
     }
 }

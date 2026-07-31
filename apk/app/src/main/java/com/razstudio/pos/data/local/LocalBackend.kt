@@ -12,6 +12,7 @@ import com.razstudio.pos.data.KitchenResponse
 import com.razstudio.pos.data.MenuImageUploadResponse
 import com.razstudio.pos.data.MenuResponse
 import com.razstudio.pos.data.NewOrderItem
+import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.OrderDto
 import com.razstudio.pos.data.OrdersSyncResponse
 import com.razstudio.pos.data.RegisterResponse
@@ -100,6 +101,9 @@ class LocalBackend @Inject constructor() : BackendGateway {
     override suspend fun addItemsToOrder(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto> =
         notImplemented("addItemsToOrder")
 
+    override suspend fun voidOrderItems(orderId: String, lines: List<VoidLine>, reason: String): ApiResult<OrderDto> =
+        notImplemented("voidOrderItems")
+
     override suspend fun updateOrderStatus(orderId: String, status: String): ApiResult<OrderDto> =
         notImplemented("updateOrderStatus")
 
@@ -120,6 +124,9 @@ class LocalBackend @Inject constructor() : BackendGateway {
 
     override suspend fun addItemsToOrderAsStaff(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto> =
         notImplemented("addItemsToOrderAsStaff")
+
+    override suspend fun voidOrderItemsAsStaff(orderId: String, lines: List<VoidLine>, reason: String): ApiResult<OrderDto> =
+        notImplemented("voidOrderItemsAsStaff")
 
     override suspend fun processPaymentAsStaff(orderId: String, method: String): ApiResult<OrderDto> =
         notImplemented("processPaymentAsStaff")

@@ -10,6 +10,7 @@ import com.razstudio.pos.data.MenuCategoryDto
 import com.razstudio.pos.data.MenuItemDto
 import com.razstudio.pos.data.MenuResponse
 import com.razstudio.pos.data.NewOrderItem
+import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.OrderDto
 import com.razstudio.pos.data.OrderItemDto
 import com.razstudio.pos.data.OrdersSyncResponse
@@ -229,6 +230,47 @@ class DemoBackend @Inject constructor(
             ?: return ApiResult.Error("NOT_FOUND", "Order not found")
         db.orderDao().insertOrder(order.copy(total = total))
         return ApiResult.Success(order.copy(total = total).toDto(all))
+    }
+
+    /**
+     * Demo-mode void. Mirrors the server's rules — keep-quantities rather than whole lines, no
+     * increases, refuses to empty the order, recomputes the total from what survives — so the demo
+     * exercises the same failures the real cashier can hit. There is no audit column locally; the
+     * demo database is thrown away with the session.
+     */
+    suspend fun voidOrderItems(orderId: String, lines: List<VoidLine>, reason: String): ApiResult<OrderDto> {
+        val existing = db.orderDao().getItemsForOrder(orderId)
+        val keepById = mutableMapOf<String, Int>()
+        for (line in lines) {
+            val item = existing.firstOrNull { it.id == line.itemId }
+                ?: return ApiResult.Error("ALREADY_VOIDED", "")
+            if (line.keepQuantity < 0) return ApiResult.Error("VALIDATION", "")
+            if (line.keepQuantity > item.quantity) return ApiResult.Error("CANNOT_INCREASE", "")
+            keepById[line.itemId] = line.keepQuantity
+        }
+
+        val kept = existing.mapNotNull { item ->
+            val keep = keepById[item.id] ?: return@mapNotNull item
+            when {
+                keep == item.quantity -> item
+                keep > 0 -> item.copy(quantity = keep)
+                else -> null
+            }
+        }
+        if (kept.size == existing.size && kept.zip(existing).all { (a, b) -> a.quantity == b.quantity }) {
+            return ApiResult.Error("ALREADY_VOIDED", "")
+        }
+        if (kept.isEmpty()) return ApiResult.Error("WOULD_EMPTY_ORDER", "")
+
+        val order = db.orderDao().getOrderById(orderId)
+            ?: return ApiResult.Error("NOT_FOUND", "Order not found")
+
+        db.orderDao().deleteItemsForOrder(orderId)
+        db.orderDao().insertOrderItems(kept)
+        val total = kept.sumOf { it.unitPriceSnapshot * it.quantity }
+        val updated = order.copy(total = total)
+        db.orderDao().insertOrder(updated)
+        return ApiResult.Success(updated.toDto(kept))
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

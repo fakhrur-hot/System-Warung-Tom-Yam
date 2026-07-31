@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.razstudio.pos.ui.components.AdBannerFooter
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.UiStrings
 import com.razstudio.pos.ui.i18n.uiStrings
@@ -121,146 +122,67 @@ fun ReportsScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
+        // The report body scrolls inside the weighted region; the banner owns a fixed row below
+        // it. Export PDF is the last child of the scroll, so it must not be the outer Column's
+        // final child — that would put a navigational-weight button flush against the ad.
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Period selection chips
-            PeriodSelector(
-                selectedPeriod = uiState.selectedPeriod,
-                strings = strings,
-                onPeriodSelected = { period ->
-                    if (period == ReportsViewModel.ReportPeriod.CUSTOM) {
-                        showStartDatePicker = true
-                    } else {
-                        viewModel.selectPeriod(period)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Period selection chips
+                PeriodSelector(
+                    selectedPeriod = uiState.selectedPeriod,
+                    strings = strings,
+                    onPeriodSelected = { period ->
+                        if (period == ReportsViewModel.ReportPeriod.CUSTOM) {
+                            showStartDatePicker = true
+                        } else {
+                            viewModel.selectPeriod(period)
+                        }
                     }
-                }
-            )
+                )
 
-            // Custom date range display
-            if (uiState.selectedPeriod == ReportsViewModel.ReportPeriod.CUSTOM) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedButton(onClick = { showStartDatePicker = true }) {
-                        Text(uiState.customStartDate ?: strings.startDateLabel)
-                    }
-                    Text(strings.toLabel)
-                    OutlinedButton(onClick = { showEndDatePicker = true }) {
-                        Text(uiState.customEndDate ?: strings.endDateLabel)
-                    }
-                }
-            }
-
-            // Loading state
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            }
-
-            // Report data display
-            uiState.reportData?.let { report ->
-                // Summary card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                // Custom date range display
+                if (uiState.selectedPeriod == ReportsViewModel.ReportPeriod.CUSTOM) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = strings.summaryTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${report.startDate} ${strings.toLabel} ${report.endDate}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        HorizontalDivider()
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            StatItem(label = strings.totalOrdersLabel, value = "${report.totalOrders}")
-                            StatItem(label = strings.grossTotalLabel, value = "RM %.2f".format(report.totalRevenue))
-                            StatItem(label = strings.avgOrderLabel, value = "RM %.2f".format(report.avgOrderValue))
+                        OutlinedButton(onClick = { showStartDatePicker = true }) {
+                            Text(uiState.customStartDate ?: strings.startDateLabel)
+                        }
+                        Text(strings.toLabel)
+                        OutlinedButton(onClick = { showEndDatePicker = true }) {
+                            Text(uiState.customEndDate ?: strings.endDateLabel)
                         }
                     }
                 }
 
-                // Payment split card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                // Loading state
+                if (uiState.isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = strings.paymentSplitTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        HorizontalDivider()
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(
-                                    text = strings.cashLabel,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "${report.paymentSplit.cashCount} ${strings.ordersSuffix}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                                Text(
-                                    text = "RM %.2f".format(report.paymentSplit.cashTotal),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Column {
-                                Text(
-                                    text = strings.qrLabel,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "${report.paymentSplit.qrCount} ${strings.ordersSuffix}",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                                Text(
-                                    text = "RM %.2f".format(report.paymentSplit.qrTotal),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                        CircularProgressIndicator()
                     }
                 }
 
-                // Per-table breakdown card
-                if (report.perTableBreakdown.isNotEmpty()) {
+                // Report data display
+                uiState.reportData?.let { report ->
+                    // Summary card
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -270,109 +192,199 @@ fun ReportsScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = strings.perTableBreakdownTitle,
+                                text = strings.summaryTitle,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
-                            HorizontalDivider()
-                            for (tb in report.perTableBreakdown) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = tb.tableLabel,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    Text(
-                                        text = "${tb.orderCount} ${strings.ordersSuffix} • RM %.2f".format(tb.revenue),
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Top items per category
-                for ((category, items) in report.topNPerCategory) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
                             Text(
-                                text = "${strings.topItemsPrefix} $category",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                text = "${report.startDate} ${strings.toLabel} ${report.endDate}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             HorizontalDivider()
-                            for (item in items) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = item.name,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                    Text(
-                                        text = "${item.quantity} ${strings.soldSuffix} • RM %.2f".format(item.revenue),
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Cancelled summary card
-                if (report.cancelledSummary.totalCount > 0) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = strings.cancelledOrdersTitle,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            HorizontalDivider()
-                            Text(
-                                text = "${strings.totalPrefix} ${report.cancelledSummary.totalCount} ${strings.ordersSuffix} (RM %.2f)".format(
-                                    report.cancelledSummary.totalValue
-                                ),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                StatItem(label = strings.adminLabel, value = "${report.cancelledSummary.byAdmin}")
-                                StatItem(label = strings.customerLabel, value = "${report.cancelledSummary.byCustomer}")
-                                StatItem(label = strings.staffLabel, value = "${report.cancelledSummary.byStaff}")
+                                StatItem(label = strings.totalOrdersLabel, value = "${report.totalOrders}")
+                                StatItem(label = strings.grossTotalLabel, value = "RM %.2f".format(report.totalRevenue))
+                                StatItem(label = strings.avgOrderLabel, value = "RM %.2f".format(report.avgOrderValue))
                             }
                         }
                     }
-                }
 
-                // Export button (PDF only — CSV export removed)
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { viewModel.exportPdf(context) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(strings.exportPdfButton)
+                    // Payment split card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = strings.paymentSplitTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            HorizontalDivider()
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = strings.cashLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${report.paymentSplit.cashCount} ${strings.ordersSuffix}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        text = "RM %.2f".format(report.paymentSplit.cashTotal),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = strings.qrLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${report.paymentSplit.qrCount} ${strings.ordersSuffix}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        text = "RM %.2f".format(report.paymentSplit.qrTotal),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Per-table breakdown card
+                    if (report.perTableBreakdown.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = strings.perTableBreakdownTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                HorizontalDivider()
+                                for (tb in report.perTableBreakdown) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = tb.tableLabel,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = "${tb.orderCount} ${strings.ordersSuffix} • RM %.2f".format(tb.revenue),
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Top items per category
+                    for ((category, items) in report.topNPerCategory) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "${strings.topItemsPrefix} $category",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                HorizontalDivider()
+                                for (item in items) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = item.name,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Text(
+                                            text = "${item.quantity} ${strings.soldSuffix} • RM %.2f".format(item.revenue),
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Cancelled summary card
+                    if (report.cancelledSummary.totalCount > 0) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = strings.cancelledOrdersTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                HorizontalDivider()
+                                Text(
+                                    text = "${strings.totalPrefix} ${report.cancelledSummary.totalCount} ${strings.ordersSuffix} (RM %.2f)".format(
+                                        report.cancelledSummary.totalValue
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    StatItem(label = strings.adminLabel, value = "${report.cancelledSummary.byAdmin}")
+                                    StatItem(label = strings.customerLabel, value = "${report.cancelledSummary.byCustomer}")
+                                    StatItem(label = strings.staffLabel, value = "${report.cancelledSummary.byStaff}")
+                                }
+                            }
+                        }
+                    }
+
+                    // Export button (PDF only — CSV export removed)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { viewModel.exportPdf(context) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(strings.exportPdfButton)
+                    }
                 }
             }
+
+            AdBannerFooter()
         }
     }
 
