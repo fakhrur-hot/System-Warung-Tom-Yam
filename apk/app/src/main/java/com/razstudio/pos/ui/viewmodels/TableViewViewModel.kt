@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.NewOrderItem
+import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.OrderDto
 import com.razstudio.pos.data.json.toEntity
 import com.razstudio.pos.data.local.MenuDao
@@ -461,6 +462,49 @@ class TableViewViewModel @Inject constructor(
                         isLoading = false,
                         error = str().failedToAddItems.format(result.message)
                     )
+                }
+                is ApiResult.NetworkError -> {
+                    _orderDetail.value = _orderDetail.value.copy(
+                        isLoading = false,
+                        error = str().msgNetworkError.format(result.message)
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Void lines the customer never received, so they can settle for what actually arrived.
+     *
+     * Room is reconciled destructively — every line for the order is deleted and re-inserted from the
+     * server's response — because [reconcileOrderFromDto] only inserts. A voided line would otherwise
+     * survive locally, and the receipt printed from Room seconds later would still bill for it.
+     */
+    fun voidItems(orderId: String, lines: List<VoidLine>, reason: String) {
+        if (lines.isEmpty()) return
+        viewModelScope.launch {
+            _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null)
+
+            when (val result = apiClient.voidOrderItems(orderId, lines, reason)) {
+                is ApiResult.Success -> {
+                    orderDao.deleteItemsForOrder(orderId)
+                    reconcileOrderFromDto(result.data)
+                    refreshOrderDetail(orderId)
+                    _orderDetail.value = _orderDetail.value.copy(
+                        isLoading = false,
+                        successMessage = str().itemsVoidedMsg
+                    )
+                }
+                is ApiResult.Error -> {
+                    // These three are states the cashier can act on, so they get their own wording
+                    // instead of a raw server code in front of a waiting customer.
+                    val message = when (result.code) {
+                        "WOULD_EMPTY_ORDER" -> str().voidWouldEmptyOrderMsg
+                        "ALREADY_VOIDED" -> str().voidAlreadyGoneMsg
+                        "CANNOT_INCREASE" -> str().voidCannotIncreaseMsg
+                        else -> str().failedToVoidItems.format(result.message)
+                    }
+                    _orderDetail.value = _orderDetail.value.copy(isLoading = false, error = message)
                 }
                 is ApiResult.NetworkError -> {
                     _orderDetail.value = _orderDetail.value.copy(

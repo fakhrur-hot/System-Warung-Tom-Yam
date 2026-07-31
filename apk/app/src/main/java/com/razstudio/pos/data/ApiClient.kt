@@ -493,6 +493,102 @@ class ApiClient @Inject constructor(
             }
         }
 
+
+    /**
+     * Void lines on an active order (admin bearer). See [BackendGateway.voidOrderItems].
+     */
+    override suspend fun voidOrderItems(
+        orderId: String,
+        lines: List<VoidLine>,
+        reason: String
+    ): ApiResult<OrderDto> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.voidOrderItems(orderId, lines, reason)
+            try {
+                val token = adminBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+                voidRequest(orderId, lines, reason, token)
+            } catch (e: IOException) {
+                ApiResult.NetworkError(e.message ?: "Network error")
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    /**
+     * Void lines on an active order using the ordering API key (staff).
+     */
+    override suspend fun voidOrderItemsAsStaff(
+        orderId: String,
+        lines: List<VoidLine>,
+        reason: String
+    ): ApiResult<OrderDto> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.voidOrderItems(orderId, lines, reason)
+            try {
+                val token = orderingBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
+                voidRequest(orderId, lines, reason, token)
+            } catch (e: IOException) {
+                ApiResult.NetworkError(e.message ?: "Network error")
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    /**
+     * The shared body of both void calls — identical apart from which credential is presented, so
+     * the error mapping (which is the part worth getting right) exists once.
+     */
+    private fun voidRequest(
+        orderId: String,
+        lines: List<VoidLine>,
+        reason: String,
+        bearer: String
+    ): ApiResult<OrderDto> {
+        val linesArray = JSONArray()
+        lines.forEach { line ->
+            linesArray.put(JSONObject().apply {
+                put("id", line.itemId)
+                put("quantity", line.keepQuantity)
+            })
+        }
+        val body = JSONObject().apply {
+            put("lines", linesArray)
+            put("reason", reason)
+        }.toString()
+
+        val request = Request.Builder()
+            .url("${baseUrl()}/orders-items-void/$orderId")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("apikey", anonKey())
+            .addHeader("Authorization", "Bearer $bearer")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        val response = client.newCall(request).execute()
+        val responseBody = response.body?.string() ?: ""
+
+        return when (response.code) {
+            200 -> ApiResult.Success(parseOrderDto(JSONObject(responseBody)))
+            401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired credentials")
+            404 -> ApiResult.Error("NOT_FOUND", "Order not found")
+            // 409s are all states the cashier can resolve, so each keeps its own code for the UI to
+            // turn into a specific message rather than a generic failure.
+            409 -> when {
+                responseBody.contains("WOULD_EMPTY_ORDER") -> ApiResult.Error("WOULD_EMPTY_ORDER", "")
+                responseBody.contains("ALREADY_VOIDED") -> ApiResult.Error("ALREADY_VOIDED", "")
+                else -> ApiResult.Error("ORDER_CLOSED", "")
+            }
+            422 -> if (responseBody.contains("CANNOT_INCREASE")) {
+                ApiResult.Error("CANNOT_INCREASE", "")
+            } else {
+                ApiResult.Error("VALIDATION", "No lines selected")
+            }
+            else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+        }
+    }
+
     /**
      * Update order status (PREPARING/READY).
      */
@@ -2032,6 +2128,18 @@ data class OrderItemDto(
 data class KitchenResponse(
     val order: OrderDto,
     val linesToPrint: List<OrderItemDto>
+)
+
+/**
+ * One line's requested keep-quantity when reducing a bill for food that never arrived.
+ *
+ * [keepQuantity] is what STAYS on the order, not what is taken off — the cashier is looking at a row
+ * that says "2×" and turning it down, so the number they land on is the number billed. 0 removes the
+ * line entirely. The server refuses a value above the line's current quantity.
+ */
+data class VoidLine(
+    val itemId: String,
+    val keepQuantity: Int,
 )
 
 data class NewOrderItem(

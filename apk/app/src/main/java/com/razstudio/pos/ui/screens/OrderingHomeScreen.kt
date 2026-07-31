@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.realtime.OrderingForegroundService
 import com.razstudio.pos.ui.i18n.LanguageViewModel
+import com.razstudio.pos.ui.components.AdBannerFooter
 import com.razstudio.pos.ui.i18n.UiStrings
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.viewmodels.OrderingViewModel
@@ -99,30 +101,38 @@ private fun LoadingScreen(strings: UiStrings) {
  */
 @Composable
 private fun CafeClosedScreen(strings: UiStrings) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "🔒",
-            style = MaterialTheme.typography.displayLarge
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = strings.cafeClosedTitle,
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = strings.cafeClosedWaitingDesc,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
+    // Genuinely idle: no controls anywhere on this screen, and a closed café can sit here for
+    // hours. The banner gets its own row at the bottom, well clear of the centred text, and
+    // AdBanner loads once so an unattended device cannot pile up impressions nobody sees.
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "🔒",
+                style = MaterialTheme.typography.displayLarge
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = strings.cafeClosedTitle,
+                style = MaterialTheme.typography.headlineMedium,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = strings.cafeClosedWaitingDesc,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        AdBannerFooter()
     }
 }
 

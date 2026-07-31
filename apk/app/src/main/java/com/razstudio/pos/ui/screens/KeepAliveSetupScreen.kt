@@ -16,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,6 +43,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.razstudio.pos.realtime.OemKeepAliveHelper
+import com.razstudio.pos.ui.components.AdBannerFooter
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.UiStrings
 import com.razstudio.pos.ui.i18n.uiStrings
@@ -83,96 +84,110 @@ fun KeepAliveSetupScreen(
                             contentDescription = strings.commonBack
                         )
                     }
+                },
+                // "Done" lives here rather than at the end of the instructions. It did exactly what
+                // the back arrow beside it already does, and as the last child of the scrolling
+                // column it would have ended up as the control nearest the banner below — the one
+                // adjacency AdMob singles out ("not immediately next to navigational buttons").
+                actions = {
+                    TextButton(onClick = onBack) {
+                        Text(strings.commonDone)
+                    }
                 }
             )
         }
     ) { padding ->
+        // Outer frame does not scroll: the instructions scroll inside the weighted region, and the
+        // banner owns a fixed row beneath it. That is what keeps the step cards — each carrying an
+        // "Open Settings" button — from ever scrolling underneath the ad.
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Explanation header
-            Text(
-                text = strings.keepAliveExplanation,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Explanation header
+                Text(
+                    text = strings.keepAliveExplanation,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-            // Detected OEM
-            Text(
-                text = "${strings.detectedLabel} ${oemDisplayName(oemType)}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
+                // Detected OEM
+                Text(
+                    text = "${strings.detectedLabel} ${oemDisplayName(oemType)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
 
-            // Battery optimization status
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isExempt) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = "Exempt",
-                        tint = Color(0xFF4CAF50),
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
+                // Battery optimization status
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isExempt) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Exempt",
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = strings.batteryOptDisabled,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF4CAF50)
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Not exempt",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = strings.batteryOptActive,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Whitelist steps
+                if (steps.isEmpty()) {
                     Text(
-                        text = strings.batteryOptDisabled,
+                        text = strings.allStepsComplete,
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color(0xFF4CAF50)
                     )
                 } else {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Not exempt",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = strings.batteryOptActive,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Whitelist steps
-            if (steps.isEmpty()) {
-                Text(
-                    text = strings.allStepsComplete,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF4CAF50)
-                )
-            } else {
-                steps.forEachIndexed { index, step ->
-                    WhitelistStepCard(
-                        stepNumber = index + 1,
-                        step = step,
-                        strings = strings,
-                        onOpenSettings = {
-                            step.intent?.let { intent ->
-                                OemKeepAliveHelper.launchSafely(context, intent)
+                    steps.forEachIndexed { index, step ->
+                        WhitelistStepCard(
+                            stepNumber = index + 1,
+                            step = step,
+                            strings = strings,
+                            onOpenSettings = {
+                                step.intent?.let { intent ->
+                                    OemKeepAliveHelper.launchSafely(context, intent)
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
+
+                // Trailing gap so the last step card's "Open Settings" button cannot come to rest
+                // flush against the banner's divider when the list is scrolled to the bottom.
+                Spacer(Modifier.height(24.dp))
             }
 
-            Spacer(Modifier.height(16.dp))
-
-            // Done button
-            Button(
-                onClick = onBack,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(strings.commonDone)
-            }
+            AdBannerFooter()
         }
     }
 }

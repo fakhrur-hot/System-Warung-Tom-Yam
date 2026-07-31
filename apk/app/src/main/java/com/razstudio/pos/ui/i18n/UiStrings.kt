@@ -319,6 +319,20 @@ data class UiStringsGroup5(
     val receiptPrintYes: String,
     val receiptPrintSkip: String,
     val receiptAutoCloseLabel: String,
+    // ── Order Detail: void unserved lines before payment ──
+    val editItemsButton: String,
+    val voidItemsTitle: String,
+    val voidItemsDesc: String,
+    val voidItemsConfirm: String,
+    val voidReasonHint: String,
+    val voidDefaultReason: String,
+    val newTotalLabel: String,
+    val itemsVoidedMsg: String,
+    val failedToVoidItems: String,
+    val voidWouldEmptyOrderMsg: String,
+    val voidAlreadyGoneMsg: String,
+    val voidCannotIncreaseMsg: String,
+    val remainingLabel: String,
 )
 
 data class UiStringsGroup6(
@@ -819,6 +833,19 @@ class UiStrings(
     val receiptPrintYes: String get() = g5.receiptPrintYes
     val receiptPrintSkip: String get() = g5.receiptPrintSkip
     val receiptAutoCloseLabel: String get() = g5.receiptAutoCloseLabel
+    val editItemsButton: String get() = g5.editItemsButton
+    val voidItemsTitle: String get() = g5.voidItemsTitle
+    val voidItemsDesc: String get() = g5.voidItemsDesc
+    val voidItemsConfirm: String get() = g5.voidItemsConfirm
+    val voidReasonHint: String get() = g5.voidReasonHint
+    val voidDefaultReason: String get() = g5.voidDefaultReason
+    val newTotalLabel: String get() = g5.newTotalLabel
+    val itemsVoidedMsg: String get() = g5.itemsVoidedMsg
+    val failedToVoidItems: String get() = g5.failedToVoidItems
+    val voidWouldEmptyOrderMsg: String get() = g5.voidWouldEmptyOrderMsg
+    val voidAlreadyGoneMsg: String get() = g5.voidAlreadyGoneMsg
+    val voidCannotIncreaseMsg: String get() = g5.voidCannotIncreaseMsg
+    val remainingLabel: String get() = g5.remainingLabel
     val moreOptions: String get() = g6.moreOptions
     val pendingKitchenPrints: String get() = g6.pendingKitchenPrints
     val recentPrints: String get() = g6.recentPrints
@@ -1286,6 +1313,20 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             receiptPrintYes = "Ya, Cetak",
             receiptPrintSkip = "Langkau",
             receiptAutoCloseLabel = "Tutup automatik dalam",
+            // ── Order Detail: void unserved lines before payment ──
+            editItemsButton = "Edit Item",
+            voidItemsTitle = "Buang Item Tidak Dihidang",
+            voidItemsDesc = "Pilih item yang pelanggan tidak terima. Item itu akan dikeluarkan daripada bil.",
+            voidItemsConfirm = "Buang & Kemas Kini Jumlah",
+            voidReasonHint = "Sebab (pilihan)",
+            voidDefaultReason = "Tidak dihidang",
+            newTotalLabel = "Jumlah Baharu",
+            itemsVoidedMsg = "Bil dikemas kini",
+            failedToVoidItems = "Gagal membuang item: %s",
+            voidWouldEmptyOrderMsg = "Itu semua item — batalkan pesanan ini sebaliknya.",
+            voidAlreadyGoneMsg = "Item itu tiada lagi dalam pesanan ini.",
+            voidCannotIncreaseMsg = "Tidak boleh menambah di sini — guna Tambah ke Pesanan.",
+            remainingLabel = "kekal",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "Lagi pilihan",
@@ -1761,6 +1802,20 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             receiptPrintYes = "Yes, Print",
             receiptPrintSkip = "Skip",
             receiptAutoCloseLabel = "Closing automatically in",
+            // ── Order Detail: void unserved lines before payment ──
+            editItemsButton = "Edit Items",
+            voidItemsTitle = "Remove Unserved Items",
+            voidItemsDesc = "Select the items the customer did not receive. They will be taken off the bill.",
+            voidItemsConfirm = "Remove & Update Total",
+            voidReasonHint = "Reason (optional)",
+            voidDefaultReason = "Not served",
+            newTotalLabel = "New Total",
+            itemsVoidedMsg = "Bill updated",
+            failedToVoidItems = "Could not remove items: %s",
+            voidWouldEmptyOrderMsg = "That is every item — cancel the order instead.",
+            voidAlreadyGoneMsg = "Those items are no longer on this order.",
+            voidCannotIncreaseMsg = "Cannot increase here — use Add to Order instead.",
+            remainingLabel = "stay",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "More options",
@@ -2236,6 +2291,20 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             receiptPrintYes = "是，打印",
             receiptPrintSkip = "跳过",
             receiptAutoCloseLabel = "自动关闭倒计时",
+            // ── Order Detail: void unserved lines before payment ──
+            editItemsButton = "编辑项目",
+            voidItemsTitle = "移除未送达的项目",
+            voidItemsDesc = "选择顾客未收到的项目。这些项目将从账单中扣除。",
+            voidItemsConfirm = "移除并更新总额",
+            voidReasonHint = "原因（可选）",
+            voidDefaultReason = "未送达",
+            newTotalLabel = "新总额",
+            itemsVoidedMsg = "账单已更新",
+            failedToVoidItems = "无法移除项目：%s",
+            voidWouldEmptyOrderMsg = "这是全部项目 — 请改为取消订单。",
+            voidAlreadyGoneMsg = "这些项目已不在此订单中。",
+            voidCannotIncreaseMsg = "此处无法增加 — 请使用「添加到订单」。",
+            remainingLabel = "保留",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "更多选项",
@@ -2709,6 +2778,20 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             receiptPrintYes = "ஆம், அச்சிடு",
             receiptPrintSkip = "தவிர்",
             receiptAutoCloseLabel = "தானாக மூடும் நேரம்",
+            // ── Order Detail: void unserved lines before payment ──
+            editItemsButton = "பொருட்களைத் திருத்து",
+            voidItemsTitle = "வழங்கப்படாத பொருட்களை நீக்கு",
+            voidItemsDesc = "வாடிக்கையாளர் பெறாத பொருட்களைத் தேர்ந்தெடுக்கவும். அவை பில்லிலிருந்து நீக்கப்படும்.",
+            voidItemsConfirm = "நீக்கி மொத்தத்தைப் புதுப்பி",
+            voidReasonHint = "காரணம் (விருப்பம்)",
+            voidDefaultReason = "வழங்கப்படவில்லை",
+            newTotalLabel = "புதிய மொத்தம்",
+            itemsVoidedMsg = "பில் புதுப்பிக்கப்பட்டது",
+            failedToVoidItems = "பொருட்களை நீக்க முடியவில்லை: %s",
+            voidWouldEmptyOrderMsg = "அவை அனைத்துப் பொருட்களும் — மாற்றாக ஆர்டரை ரத்துசெய்யவும்.",
+            voidAlreadyGoneMsg = "அந்தப் பொருட்கள் இந்த ஆர்டரில் இல்லை.",
+            voidCannotIncreaseMsg = "இங்கு அதிகரிக்க முடியாது — 'ஆர்டரில் சேர்' பயன்படுத்தவும்.",
+            remainingLabel = "உள்ளன",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "மேலும் விருப்பங்கள்",
@@ -3184,6 +3267,20 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             receiptPrintYes = "ใช่ พิมพ์",
             receiptPrintSkip = "ข้าม",
             receiptAutoCloseLabel = "ปิดอัตโนมัติใน",
+            // ── Order Detail: void unserved lines before payment ──
+            editItemsButton = "แก้ไขรายการ",
+            voidItemsTitle = "ลบรายการที่ยังไม่ได้เสิร์ฟ",
+            voidItemsDesc = "เลือกรายการที่ลูกค้าไม่ได้รับ รายการเหล่านั้นจะถูกหักออกจากบิล",
+            voidItemsConfirm = "ลบและอัปเดตยอดรวม",
+            voidReasonHint = "เหตุผล (ไม่บังคับ)",
+            voidDefaultReason = "ไม่ได้เสิร์ฟ",
+            newTotalLabel = "ยอดรวมใหม่",
+            itemsVoidedMsg = "อัปเดตบิลแล้ว",
+            failedToVoidItems = "ไม่สามารถลบรายการได้: %s",
+            voidWouldEmptyOrderMsg = "นั่นคือทุกรายการ — กรุณายกเลิกออเดอร์แทน",
+            voidAlreadyGoneMsg = "รายการเหล่านั้นไม่อยู่ในออเดอร์นี้แล้ว",
+            voidCannotIncreaseMsg = "ไม่สามารถเพิ่มที่นี่ — กรุณาใช้ 'เพิ่มลงในออเดอร์'",
+            remainingLabel = "คงไว้",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "ตัวเลือกเพิ่มเติม",

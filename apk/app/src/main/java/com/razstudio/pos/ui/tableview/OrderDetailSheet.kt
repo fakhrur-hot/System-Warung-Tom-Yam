@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -63,11 +64,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.razstudio.pos.data.NewOrderItem
+import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.local.MenuItem
 import com.razstudio.pos.data.local.OrderActions
 import com.razstudio.pos.data.local.OrderItem
@@ -106,6 +111,7 @@ fun OrderDetailSheet(
     onConfirmSession: (orderId: String, sessionNumber: Int) -> Unit = { _, _ -> },
     onReprintSession: (orderId: String, sessionNumber: Int) -> Unit = { _, _ -> },
     onPayment: (orderId: String, method: String, printReceipt: Boolean) -> Unit,
+    onVoidItems: (orderId: String, lines: List<VoidLine>, reason: String) -> Unit = { _, _, _ -> },
     onCancel: (String, String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -114,6 +120,24 @@ fun OrderDetailSheet(
     var showAddItemPicker by remember(state.order?.id) { mutableStateOf(false) }
     var stagedCart by remember(state.order?.id) { mutableStateOf(listOf<StagedCartLine>()) }
     var pendingPaymentMethod by remember { mutableStateOf<String?>(null) }
+
+    // ── Voiding unserved lines at payment time ─────────────────────────────────────
+    // The café's actual counter situation: the customer is leaving, says a dish never came, and wants
+    // to pay for what they got. Both are keyed on the order id so switching tables cannot carry a
+    // half-made selection onto a different bill.
+    var editItemsMode by remember(state.order?.id) { mutableStateOf(false) }
+    // itemId -> quantity the cashier wants to KEEP. Absent means untouched (keep all of it), which
+    // is why this starts empty rather than pre-filled: only lines actually adjusted are ever sent.
+    var keepQuantities by remember(state.order?.id) { mutableStateOf(mapOf<String, Int>()) }
+    var showVoidDialog by remember { mutableStateOf(false) }
+
+    /** Quantity that would remain on a line, defaulting to its current quantity. */
+    fun keptQty(item: OrderItem): Int = keepQuantities[item.id] ?: item.quantity
+
+    /** Lines the cashier actually changed — both the payload and the "is there anything to do" test. */
+    val adjustedLines = state.items
+        .filter { keptQty(it) != it.quantity }
+        .map { VoidLine(itemId = it.id, keepQuantity = keptQty(it)) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -311,7 +335,12 @@ fun OrderDetailSheet(
                                     displayName = language.localizedSnapshotName(
                                         item.nameSnapshot,
                                         menuItems.find { it.id == item.menuItemId }
-                                    )
+                                    ),
+                                    editable = editItemsMode,
+                                    keepQuantity = keptQty(item),
+                                    onKeepQuantityChange = { q ->
+                                        keepQuantities = keepQuantities + (item.id to q)
+                                    },
                                 )
                             }
                         }
@@ -356,7 +385,14 @@ fun OrderDetailSheet(
                                 displayName = language.localizedSnapshotName(
                                     item.nameSnapshot,
                                     menuItems.find { it.id == item.menuItemId }
-                                )
+                                ),
+                                // Pending lines are reducible too, and are the safest case: the
+                                // kitchen never received them, so nothing was cooked.
+                                editable = editItemsMode,
+                                keepQuantity = keptQty(item),
+                                onKeepQuantityChange = { q ->
+                                    keepQuantities = keepQuantities + (item.id to q)
+                                },
                             )
                         }
                         item {
@@ -389,6 +425,33 @@ fun OrderDetailSheet(
             ReceiptTotal(label = strings.subtotal, amount = subtotal, bold = false)
             ReceiptTotal(label = strings.grandTotal, amount = order.total, bold = true)
 
+            // While marking unserved lines, show what the customer would actually pay. The server
+            // recomputes this from the surviving lines, so it is a preview of that same arithmetic —
+            // the cashier can read the figure out loud before committing to it.
+            if (editItemsMode && adjustedLines.isNotEmpty()) {
+                val projected = state.items.sumOf { it.unitPriceSnapshot * keptQty(it) }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = strings.newTotalLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = "RM %.2f".format(projected),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
             // ── Loading indicator ─────────────────────────────────────────────────
             if (state.isLoading) {
                 CircularProgressIndicator(
@@ -406,6 +469,23 @@ fun OrderDetailSheet(
         // receipt pane, so the kitchen can reprint one round at a time.)
         val actionsPane: @Composable ColumnScope.() -> Unit = {
 
+            // ── Errors, shown inside the sheet ────────────────────────────────────
+            // The host screen already pushes these to a Scaffold snackbar, but that snackbar renders
+            // BEHIND this ModalBottomSheet, so while the sheet is open it is invisible. Voiding made
+            // that gap matter: a refusal ("that would remove every line") looked exactly like nothing
+            // happening — the dialog closed and the bill was unchanged with no explanation. The host
+            // clears the error only after its snackbar finishes, so this shows for the same window.
+            state.error?.let { message ->
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                )
+            }
+
             // ── Action buttons ────────────────────────────────────────────────────
             // (Kitchen reprint is now per-session, rendered under each session block above,
             // so the kitchen can reprint one round at a time rather than the whole ticket.)
@@ -413,7 +493,41 @@ fun OrderDetailSheet(
             // Payment buttons — Cash and QR, side by side. Tapping either opens the
             // print-receipt confirm dialog below; the actual payment call only fires
             // once that dialog resolves (Yes/Skip/timeout).
-            if (permissions.canTakePayment && OrderActions.canTakePayment(order.status)) {
+            // ── Marking unserved lines ────────────────────────────────────────────
+            // While in this mode the payment buttons are deliberately replaced rather than merely
+            // disabled: a half-made selection must not be payable, and putting Pay Cash next to a
+            // live checkbox list is how the wrong amount gets taken.
+            if (editItemsMode) {
+                Text(
+                    text = strings.voidItemsDesc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { showVoidDialog = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.isLoading && adjustedLines.isNotEmpty(),
+                ) {
+                    Text("${strings.voidItemsConfirm} (${adjustedLines.size})")
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedButton(
+                    onClick = {
+                        editItemsMode = false
+                        keepQuantities = emptyMap()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.isLoading,
+                ) {
+                    Text(strings.commonBack)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (!editItemsMode &&
+                permissions.canTakePayment && OrderActions.canTakePayment(order.status)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -470,6 +584,26 @@ fun OrderDetailSheet(
                             qr = paymentQrBitmap,
                             onDismiss = { showPaymentQr = false },
                         )
+                    }
+                }
+
+                // ── Edit Items — the "pay for what you got" entry point ───────────────────────
+                // Sits in the payment area, directly under Pay Cash / Pay QR, because that is the
+                // moment it is needed: the customer is at the counter settling up and says a dish
+                // never arrived. Gated on canCancel rather than a new permission — voiding a line is
+                // a partial cancellation, so anyone trusted to void the whole order can drop a line
+                // from it, and no café has to configure anything to get this.
+                if (permissions.canCancel && state.items.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = {
+                            editItemsMode = true
+                            keepQuantities = emptyMap()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !state.isLoading,
+                    ) {
+                        Text(strings.editItemsButton)
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -574,6 +708,33 @@ fun OrderDetailSheet(
             },
         )
     }
+
+    // ── Void confirmation ─────────────────────────────────────────────────────────
+    if (showVoidDialog && state.order != null) {
+        VoidItemsDialog(
+            strings = strings,
+            // Spelled out as "taking 1 off, 1 of 2 stays", because "1× Teh Tarik" on its own is
+            // ambiguous about whether one is coming off or one is being kept.
+            lines = state.items
+                .filter { keptQty(it) != it.quantity }
+                .map { item ->
+                    val name = language.localizedSnapshotName(
+                        item.nameSnapshot,
+                        menuItems.find { it.id == item.menuItemId },
+                    )
+                    val off = item.quantity - keptQty(item)
+                    "-${off}× $name  (${keptQty(item)}/${item.quantity} ${strings.remainingLabel})"
+                },
+            newTotal = state.items.sumOf { it.unitPriceSnapshot * keptQty(it) },
+            onConfirm = { reason ->
+                onVoidItems(state.order.id, adjustedLines, reason)
+                showVoidDialog = false
+                editItemsMode = false
+                keepQuantities = emptyMap()
+            },
+            onDismiss = { showVoidDialog = false },
+        )
+    }
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────────
@@ -600,23 +761,94 @@ private fun categoryLabel(category: String, strings: UiStrings): String = when (
  */
 private val ACTIONS_PANE_WIDTH = 300.dp
 
+/**
+ * One receipt line.
+ *
+ * In [editable] mode the cashier is reducing the bill for food that never arrived, so the row grows a
+ * `− n +` stepper where **n is the quantity that stays on the bill**. A "2× Teh Tarik" line at RM 3.00
+ * each steps down to 1× / RM 3.00, then to 0 — which strikes the line through and takes it off
+ * entirely. Stepping above the original quantity is not offered: more food has to be priced and sent
+ * to the kitchen, which is what "Add items to order" does.
+ *
+ * The money shown always follows the stepper, and the per-unit rate is spelled out beneath it
+ * whenever the line is more than one, so the arithmetic the customer is being asked to accept
+ * ("RM 3.00 each") is on screen rather than in the cashier's head.
+ */
 @Composable
-private fun OrderItemRow(item: OrderItem, displayName: String) {
+private fun OrderItemRow(
+    item: OrderItem,
+    displayName: String,
+    editable: Boolean = false,
+    keepQuantity: Int = item.quantity,
+    onKeepQuantityChange: (Int) -> Unit = {},
+) {
+    val effectiveQty = if (editable) keepQuantity else item.quantity
+    val removed = editable && keepQuantity == 0
+    val struck = if (removed) TextDecoration.LineThrough else null
+    val dimmed = if (removed) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 3.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (editable) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { onKeepQuantityChange((keepQuantity - 1).coerceAtLeast(0)) },
+                    enabled = keepQuantity > 0,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Remove,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Text(
+                    text = "$keepQuantity",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.width(24.dp),
+                )
+                IconButton(
+                    // Capped at what was actually ordered — this control only ever reduces a bill.
+                    onClick = { onKeepQuantityChange((keepQuantity + 1).coerceAtMost(item.quantity)) },
+                    enabled = keepQuantity < item.quantity,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "${item.quantity}× $displayName",
+                text = "${effectiveQty}× $displayName",
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
+                textDecoration = struck,
+                color = dimmed,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (editable && item.quantity > 1) {
+                Text(
+                    text = "  RM %.2f × %d".format(item.unitPriceSnapshot, effectiveQty),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (!item.note.isNullOrBlank()) {
                 Text(
                     text = "  + ${item.note}",
@@ -627,9 +859,11 @@ private fun OrderItemRow(item: OrderItem, displayName: String) {
             }
         }
         Text(
-            text = "RM %.2f".format(item.unitPriceSnapshot * item.quantity),
+            text = "RM %.2f".format(item.unitPriceSnapshot * effectiveQty),
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
+            textDecoration = struck,
+            color = dimmed,
         )
     }
 }
@@ -709,6 +943,74 @@ private fun CancelReasonDialog(
                 onClick = { onConfirm(reason.ifBlank { strings.noReasonGiven }) },
             ) {
                 Text(strings.confirmCancelButton, color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(strings.commonBack)
+            }
+        },
+    )
+}
+
+/**
+ * Last stop before the bill changes. Lists exactly which lines are coming off and what the customer
+ * will pay instead, so the figure is confirmed against the person standing there rather than inferred
+ * from a set of checkboxes. The reason is optional — a cashier mid-rush should not be blocked by a
+ * text field — and defaults to "Not served", which is the case this exists for.
+ */
+@Composable
+private fun VoidItemsDialog(
+    strings: UiStrings,
+    lines: List<String>,
+    newTotal: Double,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var reason by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(strings.voidItemsTitle) },
+        text = {
+            Column {
+                lines.forEach { line ->
+                    Text(
+                        text = "• $line",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = strings.newTotalLabel,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "RM %.2f".format(newTotal),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it },
+                    placeholder = { Text(strings.voidReasonHint) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(reason.ifBlank { strings.voidDefaultReason }) }) {
+                Text(strings.voidItemsConfirm)
             }
         },
         dismissButton = {

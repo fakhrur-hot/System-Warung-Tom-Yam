@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.razstudio.pos.ui.components.AdBannerFooter
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.viewmodels.BackupViewModel
@@ -105,109 +106,121 @@ fun BackupScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        Box(
+        // The two cards are top-anchored and this screen does not scroll, so the banner takes the
+        // bottom row of a Column rather than being aligned inside the Box — the Box stays only to
+        // centre the progress indicator over the cards. Restore, the one destructive control here,
+        // sits in the upper card, a long way from the ad.
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            Column(
+            Box(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Export Card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    // Export Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        Text(
-                            text = strings.exportDatabaseTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = strings.exportDatabaseDesc,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Button(
-                                onClick = {
-                                    viewModel.prepareExport()
-                                },
-                                enabled = !state.isLoading
+                            Text(
+                                text = strings.exportDatabaseTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = strings.exportDatabaseDesc,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(Icons.Default.Upload, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(strings.exportButton)
-                            }
-                            // Share button (visible after export)
-                            if (state.exportUri != null) {
-                                OutlinedButton(
+                                Button(
                                     onClick = {
-                                        state.exportUri?.let { uri ->
-                                            val shareIntent = viewModel.createShareIntent(uri)
-                                            context.startActivity(
-                                                Intent.createChooser(shareIntent, strings.shareBackupTitle)
-                                            )
-                                        }
-                                    }
+                                        viewModel.prepareExport()
+                                    },
+                                    enabled = !state.isLoading
                                 ) {
-                                    Icon(Icons.Default.Share, contentDescription = null)
+                                    Icon(Icons.Default.Upload, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(strings.shareButton)
+                                    Text(strings.exportButton)
+                                }
+                                // Share button (visible after export)
+                                if (state.exportUri != null) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            state.exportUri?.let { uri ->
+                                                val shareIntent = viewModel.createShareIntent(uri)
+                                                context.startActivity(
+                                                    Intent.createChooser(shareIntent, strings.shareBackupTitle)
+                                                )
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Share, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(strings.shareButton)
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // Import Card
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    // Import Card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        Text(
-                            text = strings.importDatabaseTitle,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = strings.importDatabaseDesc,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Button(
-                            onClick = {
-                                importLauncher.launch(arrayOf("application/json"))
-                            },
-                            enabled = !state.isLoading
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(strings.selectBackupFileButton)
+                            Text(
+                                text = strings.importDatabaseTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = strings.importDatabaseDesc,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Button(
+                                onClick = {
+                                    importLauncher.launch(arrayOf("application/json"))
+                                },
+                                enabled = !state.isLoading
+                            ) {
+                                Text(strings.selectBackupFileButton)
+                            }
                         }
                     }
                 }
+
+                // Loading overlay
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
-            // Loading overlay
-            if (state.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            }
+            AdBannerFooter()
         }
     }
 

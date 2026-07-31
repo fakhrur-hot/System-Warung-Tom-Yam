@@ -64,6 +64,14 @@ interface BackendGateway {
     suspend fun getOrdersSince(since: String): ApiResult<OrdersSyncResponse>
     suspend fun sendToKitchen(orderId: String, sessionNumber: Int? = null): ApiResult<KitchenResponse>
     suspend fun addItemsToOrder(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto>
+    /**
+     * Reduce or remove lines on an active order before payment — the customer never received part of
+     * the order and is settling only for what arrived. Each [VoidLine] carries the quantity to KEEP,
+     * so a "2× Teh Tarik" line can come down to 1 rather than only all-or-nothing. Voided quantities
+     * are kept server-side for audit and excluded from the recomputed total. Refused if it would
+     * empty the order (that is a cancellation) or if a quantity would increase (use [addItemsToOrder]).
+     */
+    suspend fun voidOrderItems(orderId: String, lines: List<VoidLine>, reason: String): ApiResult<OrderDto>
     suspend fun updateOrderStatus(orderId: String, status: String): ApiResult<OrderDto>
     suspend fun processPayment(orderId: String, method: String): ApiResult<OrderDto>
     suspend fun cancelOrder(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit>
@@ -73,6 +81,7 @@ interface BackendGateway {
     suspend fun getOrdersSinceAsStaff(since: String): ApiResult<OrdersSyncResponse>
     suspend fun sendToKitchenAsStaff(orderId: String, sessionNumber: Int? = null): ApiResult<KitchenResponse>
     suspend fun addItemsToOrderAsStaff(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto>
+    suspend fun voidOrderItemsAsStaff(orderId: String, lines: List<VoidLine>, reason: String): ApiResult<OrderDto>
     suspend fun processPaymentAsStaff(orderId: String, method: String): ApiResult<OrderDto>
     suspend fun cancelOrderAsStaff(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit>
 
