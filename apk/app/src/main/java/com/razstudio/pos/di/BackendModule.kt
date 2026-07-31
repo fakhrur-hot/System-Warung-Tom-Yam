@@ -2,39 +2,63 @@ package com.razstudio.pos.di
 
 import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.BackendGateway
-import dagger.Binds
+import com.razstudio.pos.data.ModeRepository
+import com.razstudio.pos.data.OperatingMode
+import com.razstudio.pos.data.SecureStorage
+import com.razstudio.pos.data.local.LocalBackend
+import dagger.Lazy
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Binds [BackendGateway] to its implementation (task 3.1, Requirement 4.2).
+ * Chooses the [BackendGateway] implementation for this device (task 3.3, Requirement 4.2).
  *
- * Today there is exactly one implementation, [ApiClient], so this is a plain `@Binds`. It is a
- * deliberate no-behaviour-change step: nothing injects `BackendGateway` yet — every existing call site
- * still asks for `ApiClient` directly — so Cloud Mode is bit-for-bit unaffected. What this buys is the
- * ability to introduce a second implementation without touching consumers.
+ * | Mode    | Device         | Implementation                                              |
+ * |---------|----------------|-------------------------------------------------------------|
+ * | `CLOUD` | any            | [ApiClient] — HTTPS to Supabase, exactly as before          |
+ * | `LAN`   | Server (admin) | [LocalBackend] — in-process, Room-backed                    |
+ * | `LAN`   | Client (staff) | [ApiClient], base URL pointed at `http://<server>:<port>`   |
+ * | `KIOSK` | admin          | [LocalBackend]                                              |
  *
- * **This binding becomes mode-aware in task 3.3**, at which point it selects between:
- *
- * - `CLOUD`, and a LAN **Client** device → [ApiClient] (HTTP; the LAN client differs only in base URL)
- * - `LAN` **Server** device, and `KIOSK`  → `LocalBackend` (in-process, Room-backed; task 4)
- *
- * At that point `@Binds` is no longer enough — selecting an implementation at runtime needs a
- * `@Provides` that reads `ModeRepository.currentMode()`. Left as `@Binds` until then rather than
- * pre-building the switch, because a `@Provides` returning one of two implementations while the second
- * does not exist yet would be dead code that reads as if the feature were finished.
- *
- * `@Singleton` matches [ApiClient]'s own scope, so injecting the interface and injecting the class
- * yield the same instance — important while both styles coexist during the migration, since
- * [ApiClient] holds a shared OkHttp client and 401-handling state that must not be duplicated.
+ * The LAN split is by **role**, and that asymmetry is the point: a Client reuses the HTTP
+ * implementation verbatim against a different host, so the whole ordering-staff feature set works in
+ * LAN Mode with no client-side changes. Only the Server device swaps its backend for a local one.
  */
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class BackendModule {
+object BackendModule {
 
-    @Binds
+    /**
+     * Note this resolves **once**, when the singleton is first requested — a mode change therefore
+     * takes effect on the next app start, not immediately. That is not a limitation to work around:
+     * Requirement 10.1 already makes a mode change a deliberate, confirmed operation, and the Setup
+     * flow prompts for a restart afterwards (the same restart-required dialog the café-rename feature
+     * uses). Re-resolving live would mean tearing down the OkHttp client, the realtime services and
+     * every ViewModel's captured reference mid-session, for no benefit.
+     *
+     * [LocalBackend] is injected as a [Lazy] so Cloud Mode never constructs it. Today it is a stub
+     * whose every method throws; without `Lazy` that stub would still be instantiated on every
+     * existing install, which is harmless but pointless — and once it owns Room handles and an
+     * embedded HTTP server it would stop being harmless.
+     */
+    @Provides
     @Singleton
-    abstract fun bindBackendGateway(impl: ApiClient): BackendGateway
+    fun provideBackendGateway(
+        modeRepository: ModeRepository,
+        remote: ApiClient,
+        local: Lazy<LocalBackend>,
+        secureStorage: SecureStorage,
+    ): BackendGateway = when (modeRepository.currentMode()) {
+        OperatingMode.CLOUD -> remote
+
+        // Only the admin device is the LAN Server. Ordering staff are Clients and keep speaking HTTP,
+        // just to a phone on the local network instead of Supabase.
+        OperatingMode.LAN ->
+            if (secureStorage.getRole() == SecureStorage.Role.ADMIN) local.get() else remote
+
+        OperatingMode.KIOSK -> local.get()
+    }
 }

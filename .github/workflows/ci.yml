@@ -43,6 +43,24 @@ jobs:
       - run: chmod +x ./gradlew
       # ANDROID_SDK_ROOT is set by setup-android, so no local.properties is needed.
       - run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      # Unit tests. These were previously never run in CI at all — the job built the APK and linted
+      # it, so a broken test could merge unnoticed. That is not hypothetical: task 1.4's tests were
+      # once reported complete while all four of them failed, because only compilation had been
+      # checked.
+      #
+      # No JDK_JAVA_OPTIONS workaround is needed here. The unquoted -Djava.library.path that breaks
+      # test workers on Windows is harmless on this runner, because Linux paths contain no spaces —
+      # see apk/run-tests.sh for the full explanation and the local remedy.
+      - name: Unit tests
+        working-directory: apk
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+      - name: Upload test report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: apk/app/build/reports/tests/testDebugUnitTest/
       - uses: actions/upload-artifact@v4
         with:
           name: app-debug
