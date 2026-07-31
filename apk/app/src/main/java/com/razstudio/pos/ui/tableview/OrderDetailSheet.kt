@@ -571,7 +571,20 @@ fun OrderDetailSheet(
                 }
                 var showPaymentQr by remember { mutableStateOf(false) }
 
-                if (paymentQrHash != null && paymentQrBitmap != null) {
+                // Routed through OrderActions so the rule that runs here is the same one
+                // OrderActionsPaymentQrTest pins, rather than a duplicate of it that can drift.
+                // Bound to a local first: the rule already requires a non-null image, but a function
+                // call cannot smart-cast, and this keeps the dialog's argument provably non-null
+                // instead of reaching for !!.
+                val qrToShow = paymentQrBitmap
+                if (qrToShow != null &&
+                    OrderActions.canShowPaymentQr(
+                        hasPaymentPermission = permissions.canTakePayment,
+                        status = order.status,
+                        paymentQrHash = paymentQrHash,
+                        hasStoredImage = true,
+                    )
+                ) {
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedButton(
                         onClick = { showPaymentQr = true },
@@ -581,7 +594,7 @@ fun OrderDetailSheet(
                     }
                     if (showPaymentQr) {
                         PaymentQrDialog(
-                            qr = paymentQrBitmap,
+                            qr = qrToShow,
                             onDismiss = { showPaymentQr = false },
                         )
                     }

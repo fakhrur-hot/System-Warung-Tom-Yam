@@ -26,6 +26,16 @@
 #
 # Export JDK_JAVA_OPTIONS in CI and in your IDE's Gradle settings and you will not need this script;
 # it exists so that a fresh clone can run the tests without knowing any of the above.
+#
+# ── Why this also restarts the daemon (found again 2026-08-01) ────────────────────────────────────
+# Setting the variable is necessary but not sufficient. Gradle REUSES a running daemon, and the
+# daemon's java.library.path is fixed at ITS startup — so if any earlier command started the daemon
+# without this variable (a plain `./gradlew assembleRelease`, a pre-commit `lintDebug` hook, or the
+# IDE), AGP copies that daemon's polluted value into every test worker and the tests fail exactly as
+# described above, even though this script set the variable correctly.
+#
+# So: run, and if the tell-tale error appears, stop the daemons and retry once against a fresh one.
+# The fast path is unaffected when the daemon is already clean, which is the common case.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -34,7 +44,34 @@ cd "$(dirname "$0")"
 export JDK_JAVA_OPTIONS="-Djava.library.path=C:\Windows\System32"
 
 if [ "$#" -eq 0 ]; then
-  exec ./gradlew :app:testDebugUnitTest
-else
+  set -- :app:testDebugUnitTest
+fi
+
+# The marker is the JVM launcher failing to parse the unquoted -Djava.library.path, which surfaces as
+# whichever PATH fragment followed a space being treated as the main class.
+POLLUTED_DAEMON='Could not find or load main class'
+
+log="$(mktemp)"
+trap 'rm -f "$log"' EXIT
+
+# PIPESTATUS[0] rather than the pipeline's own status: `tee` succeeds regardless, and relying on
+# pipefail here is exactly the sort of thing that silently stops working.
+set +e
+./gradlew "$@" 2>&1 | tee "$log"
+status="${PIPESTATUS[0]}"
+set -e
+
+if [ "$status" -eq 0 ]; then
+  exit 0
+fi
+
+if grep -q "$POLLUTED_DAEMON" "$log"; then
+  echo
+  echo "run-tests.sh: the reused Gradle daemon has a polluted java.library.path."
+  echo "run-tests.sh: stopping daemons and retrying once against a fresh one..."
+  ./gradlew --stop
   exec ./gradlew "$@"
 fi
+
+# A genuine test or compile failure — surface it unchanged rather than retrying and hiding it.
+exit 1

@@ -100,6 +100,19 @@ interface OrderDao {
 
     // --- Aggregation queries for reports ---
 
+    /**
+     * Fetch all orders whose [Order.createdAt] is strictly greater than [sinceTimestamp].
+     * Used by `LocalBackend.getOrdersSince` to serve the `?since=` catch-up poll that
+     * `RealtimeService` runs in place of the Supabase Realtime WebSocket in LAN and Kiosk Mode.
+     *
+     * This compares timestamps as TEXT, so it is only chronologically correct while every value
+     * written is the same width. `LocalBackend` guarantees that with a fixed 6-fractional-digit
+     * formatter; do not switch it to `Instant.toString()`, whose fraction is variable-width and
+     * makes `…:05.5Z` compare as less than `…:05Z` — which silently skips orders.
+     */
+    @Query("SELECT * FROM orders WHERE createdAt > :sinceTimestamp ORDER BY createdAt ASC")
+    suspend fun getOrdersSince(sinceTimestamp: String): List<Order>
+
     @Query("SELECT COUNT(*) FROM orders WHERE createdAt >= :since AND status = 'COMPLETED'")
     suspend fun getCompletedOrderCount(since: String): Int
 
