@@ -53,7 +53,8 @@ class TableViewViewModel @Inject constructor(
     private val menuDao: MenuDao,
     private val categoryStore: com.razstudio.pos.data.local.MenuCategoryStore,
     private val printService: PrintService,
-    private val languageManager: LanguageManager
+    private val languageManager: LanguageManager,
+    private val paymentQrResolver: com.razstudio.pos.data.PaymentQrResolver,
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
@@ -149,7 +150,24 @@ class TableViewViewModel @Inject constructor(
     private fun loadCafeName() {
         viewModelScope.launch {
             when (val result = apiClient.getBranding()) {
-                is ApiResult.Success -> _cafeName.value = result.data.cafeName
+                is ApiResult.Success -> {
+                    _cafeName.value = result.data.cafeName
+                    // Task 16.3 — reconcile this device's cached Payment QR against the café's current
+                    // one (Requirements 14.5, 14.6). Hooked here because Table View is the screen every
+                    // payment-taking device opens and keeps open, so a replacement propagates without a
+                    // dedicated sync path.
+                    //
+                    // The resolver is a no-op when the hashes already agree, and it treats the admin
+                    // device as the origin of its own upload rather than letting the server overwrite
+                    // it. Best-effort: a failure here must not disturb the header it was called for.
+                    val outcome = paymentQrResolver.reconcile(
+                        remoteHash = result.data.paymentQrHash,
+                        remoteUrl = result.data.paymentQrUrl,
+                    )
+                    if (outcome != com.razstudio.pos.data.PaymentQrResolver.Outcome.NO_CHANGE) {
+                        android.util.Log.i("TableViewVM", "Payment QR reconcile: $outcome")
+                    }
+                }
                 else -> { /* leave blank */ }
             }
         }

@@ -30,6 +30,7 @@ import com.razstudio.pos.data.AuthEventBus
 import com.razstudio.pos.data.local.AmbientSettingsStore
 import com.razstudio.pos.realtime.RealtimeService
 import com.razstudio.pos.ui.ambient.AmbientOverlay
+import com.razstudio.pos.ui.components.AmbientSuppressor
 import com.razstudio.pos.ui.components.DemoModeOverlay
 import com.razstudio.pos.ui.components.DemoRole
 import com.razstudio.pos.ui.viewmodels.AuthViewModel
@@ -129,7 +130,13 @@ fun AppNavGraph(
             ambientEnabled = ambientStore.isEnabled()
             val route = routeState.value
             val idleHere = route == NavRoutes.ADMIN_HOME || route == NavRoutes.ORDERING_HOME
+            // AmbientSuppressor is the task-17.2 wiring (Requirement 13.7). Without this check the
+            // idle watcher would replace the Payment QR with the ambient table board while a customer
+            // is mid-scan — the QR dialog holds FLAG_KEEP_SCREEN_ON, which stops the display sleeping
+            // but does nothing to stop THIS timer from firing. Reference-counted rather than a
+            // boolean so overlapping holders cannot cancel each other out.
             if (ambientEnabled && idleHere && !ambientActive &&
+                !AmbientSuppressor.isSuppressed &&
                 System.currentTimeMillis() - lastInteractionAt >= ambientStore.getTimeoutMillis()
             ) {
                 ambientActive = true

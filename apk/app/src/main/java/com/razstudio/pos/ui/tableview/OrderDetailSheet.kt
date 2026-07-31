@@ -444,7 +444,14 @@ fun OrderDetailSheet(
                 // ABSENT rather than shown-and-disabled or shown-then-failing (Requirement 13.3) —
                 // a control that dies in front of a waiting customer is worse than no control.
                 val qrContext = LocalContext.current
-                val paymentQrHash = remember { AppConfigStore(qrContext).paymentQrHash() }
+                // Keyed on the order id so the hash is re-read each time the sheet is opened for a
+                // different order, rather than being captured once for the lifetime of the composition.
+                // That is what makes task 16.3's ordering hold: PaymentQrResolver runs when Table View
+                // loads its branding, which is strictly before any sheet can be opened from it, so by
+                // the time this reads the hash the cache is already reconciled. An unkeyed remember
+                // would have pinned whatever value existed at first composition — on a staff device
+                // that is null, and the Show QR button would stay hidden even after the download.
+                val paymentQrHash = remember(order.id) { AppConfigStore(qrContext).paymentQrHash() }
                 val paymentQrBitmap = remember(paymentQrHash) {
                     if (paymentQrHash == null) null else PaymentQrPipeline.loadFromInternal(qrContext)
                 }
