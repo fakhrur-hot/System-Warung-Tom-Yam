@@ -20,25 +20,34 @@ project could be in violation.
 generates an in-app "Open source licences" screen. It is generated rather than hand-maintained
 deliberately: a hand-written list silently goes stale the first time someone adds a dependency.
 
-### ⚠️ OPEN ISSUE — the notices are stripped from the release APK
+### RESOLVED — the release APK does carry the notices (and how to check correctly)
 
-**Status as of 2026-07-31: this obligation is NOT yet met in a shipping build.** Verified by unzipping
-both APKs:
+An earlier revision of this file claimed the notices were stripped from the release build. **That was
+wrong, and the mistake is worth recording because anyone auditing this will hit it too.**
 
-| Build | `res/raw/third_party_licenses` |
-|---|---|
-| Debug | present, together with the plugin's own `keep_third_party_licenses.xml` |
-| **Release** | **absent — stripped** |
+The release APK contains no `res/raw/` entries at all — not even `qr_default_logo.jpg`, an asset the
+app plainly uses. That is not stripping: AGP's `optimizeReleaseResources` step **shortens resource
+file paths**, so `res/raw/third_party_licenses` is repackaged as something like `res/7Y`. Searching a
+release APK for the original filename will always come up empty and looks exactly like a compliance
+breach.
 
-The release build sets `isShrinkResources = true`, and the resource shrinker is discarding the
-generated raw resources even though the plugin emits a keep rule for them. Until this is resolved, a
-released APK contains no third-party notices and the app is in breach of the MIT and Apache-2.0
-attribution terms, regardless of what the settings screen offers to open.
+**Check by content, not by name:**
 
-Recorded here rather than quietly fixed later because it is exactly the class of problem that looks
-finished — plugin applied, screen wired, debug build correct — while the artifact customers actually
-receive is non-compliant. Do not treat the licence work as done until an unzipped **release** APK
-shows these entries.
+```bash
+# Wrong — always returns nothing on a release APK, regardless of compliance
+unzip -l app-release.apk | grep third_party
+
+# Right — find the blob by what is inside it
+python -c "
+import zipfile; z = zipfile.ZipFile('app-release.apk')
+print([(n, len(z.read(n))) for n in z.namelist()
+       if n.startswith('res/') and b'apache.org/licenses/LICENSE-2.0' in z.read(n)])"
+```
+
+Verified 2026-07-31 with `isShrinkResources = true` (i.e. as shipped): the licence blob is present at
+`res/7Y`, **436,581 bytes** — byte-identical in size to the generated `third_party_licenses`. The
+oss-licenses plugin's own `keep_third_party_licenses.xml` keeps it safe from the shrinker; no
+hand-written `res/raw/keep.xml` is needed, and `isShrinkResources` should stay on.
 
 ### What the generator actually produces (verified 2026-07-31)
 

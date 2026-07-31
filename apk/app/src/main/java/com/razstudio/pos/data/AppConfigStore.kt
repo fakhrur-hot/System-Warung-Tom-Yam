@@ -40,6 +40,14 @@ class AppConfigStore @Inject constructor(
         private const val KEY_WEBSITE_URL = "website_url"
         private const val KEY_CAFE_NAME = "cafe_name"
 
+        // Operating mode (Requirement 1.1 / 1.2)
+        private const val KEY_OPERATING_MODE = "operating_mode"
+
+        // Payment QR content-hash and resolved URL (Requirements 14.8, 14.9)
+        // Absent = not configured = Show QR button hidden (no separate enabled flag needed)
+        private const val KEY_PAYMENT_QR_HASH = "payment_qr_hash"
+        private const val KEY_PAYMENT_QR_URL = "payment_qr_url"
+
         // Stored vault (not consumed by the app at runtime)
         private const val KEY_CF_ACCOUNT_ID = "cloudflare_account_id"
         private const val KEY_CF_DNS_ZONE = "cloudflare_dns_zone"
@@ -108,6 +116,71 @@ class AppConfigStore @Inject constructor(
      */
     fun setCafeName(name: String) {
         write(KEY_CAFE_NAME, name)
+    }
+
+    /**
+     * Returns the persisted [OperatingMode], defaulting to [OperatingMode.CLOUD] when absent.
+     * The CLOUD default ensures existing installs are unaffected — a device with no stored
+     * `operating_mode` key continues to operate exactly as it did before this key existed
+     * (Requirement 1.2).
+     */
+    fun operatingMode(): OperatingMode {
+        val stored = read(KEY_OPERATING_MODE)
+        return OperatingMode.entries.firstOrNull { it.name == stored } ?: OperatingMode.CLOUD
+    }
+
+    /** Persists the given [OperatingMode] as its enum name string. */
+    fun setOperatingMode(mode: OperatingMode) {
+        write(KEY_OPERATING_MODE, mode.name)
+    }
+
+    // --- Payment QR persistence (Requirements 14.8, 14.9) ---
+
+    /**
+     * Returns the SHA-256 hex digest of the stored Payment QR image, or null when absent.
+     * Null means the Payment QR is not configured — the Show QR button should be hidden.
+     */
+    fun paymentQrHash(): String? = read(KEY_PAYMENT_QR_HASH).ifEmpty { null }
+
+    /**
+     * Persists [hash] (SHA-256 hex of the stored image file) or removes the key when null.
+     * Removing the key hides the Show QR button on this device.
+     */
+    fun setPaymentQrHash(hash: String?) {
+        if (hash == null) {
+            try {
+                (prefs ?: createEncryptedPrefs().also { prefs = it })
+                    ?.edit()?.remove(KEY_PAYMENT_QR_HASH)?.apply()
+            } catch (e: Exception) {
+                Log.e(TAG, "Config remove failed ($KEY_PAYMENT_QR_HASH); clearing", e)
+                clearCorruptedPrefs(); prefs = null
+            }
+        } else {
+            write(KEY_PAYMENT_QR_HASH, hash)
+        }
+    }
+
+    /**
+     * Returns the resolved URL for the Payment QR image (used for distribution to staff
+     * devices), or null when absent.
+     */
+    fun paymentQrUrl(): String? = read(KEY_PAYMENT_QR_URL).ifEmpty { null }
+
+    /**
+     * Persists [url] or removes the key when null.
+     */
+    fun setPaymentQrUrl(url: String?) {
+        if (url == null) {
+            try {
+                (prefs ?: createEncryptedPrefs().also { prefs = it })
+                    ?.edit()?.remove(KEY_PAYMENT_QR_URL)?.apply()
+            } catch (e: Exception) {
+                Log.e(TAG, "Config remove failed ($KEY_PAYMENT_QR_URL); clearing", e)
+                clearCorruptedPrefs(); prefs = null
+            }
+        } else {
+            write(KEY_PAYMENT_QR_URL, url)
+        }
     }
 
     // --- Stored vault ---

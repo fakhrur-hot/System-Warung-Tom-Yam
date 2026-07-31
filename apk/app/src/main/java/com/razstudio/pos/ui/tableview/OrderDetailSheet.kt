@@ -19,6 +19,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.razstudio.pos.ui.components.PaymentQrDialog
+import com.razstudio.pos.ui.util.PaymentQrPipeline
+import com.razstudio.pos.data.AppConfigStore
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
@@ -397,6 +405,38 @@ fun OrderDetailSheet(
                         enabled = !state.isLoading,
                     ) {
                         Text(strings.payQR)
+                    }
+                }
+
+                // ── Show QR (task 17.3, Requirements 13.1-13.3) ──────────────────────────────
+                // Small outlined button directly under the two payment buttons, deliberately
+                // subordinate to them. Shown under exactly the same condition as those buttons, so
+                // any device permitted to take payment can present the code — admin or staff alike.
+                //
+                // Visibility is `hash != null`, never mode-dependent: the Payment QR exists in all
+                // three operating modes (Requirement 14.7). When nothing is configured the button is
+                // ABSENT rather than shown-and-disabled or shown-then-failing (Requirement 13.3) —
+                // a control that dies in front of a waiting customer is worse than no control.
+                val qrContext = LocalContext.current
+                val paymentQrHash = remember { AppConfigStore(qrContext).paymentQrHash() }
+                val paymentQrBitmap = remember(paymentQrHash) {
+                    if (paymentQrHash == null) null else PaymentQrPipeline.loadFromInternal(qrContext)
+                }
+                var showPaymentQr by remember { mutableStateOf(false) }
+
+                if (paymentQrHash != null && paymentQrBitmap != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = { showPaymentQr = true },
+                        enabled = !state.isLoading,
+                    ) {
+                        Text(strings.showQrButton)
+                    }
+                    if (showPaymentQr) {
+                        PaymentQrDialog(
+                            qr = paymentQrBitmap,
+                            onDismiss = { showPaymentQr = false },
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))

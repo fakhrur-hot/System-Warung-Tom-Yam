@@ -125,4 +125,18 @@
     <string name="search_hint">Cari…</string>
     <string name="total_label">Jumlah</string>
     <string name="quantity_label">Bil</string>
+
+    <!-- Third-party licence notices (see THIRD-PARTY-NOTICES.md). Required by the MIT and
+         Apache-2.0 components this proprietary app is built on. -->
+    <string name="about_section">Perihal</string>
+    <string name="open_source_licenses">Lesen sumber terbuka</string>
+
+    <!-- Payment QR settings section (Requirement 14.1). Screen-only; never printed. -->
+    <string name="payment_qr_section">QR Pembayaran</string>
+    <string name="payment_qr_help">Dipaparkan apabila pelanggan meminta bayaran QR. Muat naik foto QR pembayaran anda (JPEG atau PNG).</string>
+    <string name="payment_qr_upload">Muat Naik QR Pembayaran</string>
+    <string name="payment_qr_replace">Ganti</string>
+    <string name="payment_qr_remove">Buang</string>
+    <string name="payment_qr_none">Tiada QR Pembayaran — butang Tunjuk QR kekal tersembunyi.</string>
+    <string name="payment_qr_close">Tutup</string>
 </resources>

@@ -54,3 +54,7 @@ Thumbs.db
 docs/
 DEPLOYMENT.md
 *_planner.md
+# The original product spec — same internal-only class as .kiro/specs/ above. Untracked 2026-07-31.
+specs/
+# Dev screenshots taken while verifying on-device behaviour; not shipping artefacts.
+screenshot*.png

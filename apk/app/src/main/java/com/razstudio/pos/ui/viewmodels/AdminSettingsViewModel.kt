@@ -139,6 +139,13 @@ class AdminSettingsViewModel @Inject constructor(
         val existingLogoUrl: String? = null,
         val logoPreview: Bitmap? = null,
         val logoBase64: String? = null,
+        // Payment QR (Requirement 14.1). paymentQrPreview doubles as the "configured" signal for the
+        // settings thumbnail; paymentQrHash is what actually gates the Show QR button elsewhere, so a
+        // null hash means not-configured no matter what the preview holds.
+        val paymentQrPreview: Bitmap? = null,
+        val paymentQrHash: String? = null,
+        val paymentQrBusy: Boolean = false,
+        val paymentQrError: String? = null,
         val brandingLoading: Boolean = false,
         val brandingSaved: Boolean = false,
         // Set after a save that renamed the café — several screens (RoleSelectScreen, the OEM
@@ -189,6 +196,8 @@ class AdminSettingsViewModel @Inject constructor(
             // returned branding data. loadBranding() overwrites this with the backend's value
             // (the multi-device source of truth) as soon as that call succeeds.
             cafeName = appConfigStore.cafeName(),
+            paymentQrHash = appConfigStore.paymentQrHash(),
+            paymentQrPreview = com.razstudio.pos.ui.util.PaymentQrPipeline.loadFromInternal(context),
             savedSnapshot = Snapshot(cafeName = appConfigStore.cafeName())
         )
     )
@@ -606,6 +615,68 @@ class AdminSettingsViewModel @Inject constructor(
      * Process picked image through the logo pipeline.
      * Produces JPEG ≤ 200 KB + monochrome 1-bit raster for ESC/POS printing.
      */
+    /**
+     * Task 16.1 — accept an uploaded Payment QR (Requirements 14.1, 14.2, 14.3).
+     *
+     * The pipeline is what enforces the hard part: it rejects an image that carries no readable QR
+     * rather than storing a picture nobody's bank app can scan, and it refuses to keep a re-encoded
+     * copy whose payload no longer matches the original. Both failures surface here as a message the
+     * admin can act on, and neither disturbs a previously working QR.
+     */
+    fun processPaymentQr(imageUri: Uri, mimeType: String? = null) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(paymentQrBusy = true, paymentQrError = null)
+            val outcome = withContext(Dispatchers.IO) {
+                com.razstudio.pos.ui.util.PaymentQrPipeline.process(context, imageUri, mimeType)
+            }
+            _uiState.value = when (outcome) {
+                is com.razstudio.pos.ui.util.PaymentQrPipeline.PipelineResult.Success -> {
+                    // URL is a local file reference for now; LAN/Cloud distribution is task 16.2.
+                    val url = outcome.qrResult.storedFile.toURI().toString()
+                    withContext(Dispatchers.IO) {
+                        com.razstudio.pos.ui.util.PaymentQrPipeline.saveAndPersist(
+                            context, outcome.qrResult, url, appConfigStore
+                        )
+                    }
+                    _uiState.value.copy(
+                        paymentQrBusy = false,
+                        paymentQrError = null,
+                        paymentQrHash = appConfigStore.paymentQrHash(),
+                        paymentQrPreview = withContext(Dispatchers.IO) {
+                            com.razstudio.pos.ui.util.PaymentQrPipeline.loadFromInternal(context)
+                        },
+                    )
+                }
+                is com.razstudio.pos.ui.util.PaymentQrPipeline.PipelineResult.NoQrFound ->
+                    _uiState.value.copy(paymentQrBusy = false, paymentQrError = outcome.message)
+                is com.razstudio.pos.ui.util.PaymentQrPipeline.PipelineResult.Error ->
+                    _uiState.value.copy(paymentQrBusy = false, paymentQrError = outcome.message)
+            }
+        }
+    }
+
+    /** Removes the Payment QR entirely, which hides the Show QR button (Requirement 14.5). */
+    fun removePaymentQr() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(paymentQrBusy = true, paymentQrError = null)
+            withContext(Dispatchers.IO) {
+                com.razstudio.pos.ui.util.PaymentQrPipeline.deleteFromInternal(context)
+                appConfigStore.setPaymentQrHash(null)
+                appConfigStore.setPaymentQrUrl(null)
+            }
+            _uiState.value = _uiState.value.copy(
+                paymentQrBusy = false,
+                paymentQrPreview = null,
+                paymentQrHash = null,
+            )
+        }
+    }
+
+    /** Clears only the inline error, so a failed upload can be retried without leaving a stale message. */
+    fun clearPaymentQrError() {
+        _uiState.value = _uiState.value.copy(paymentQrError = null)
+    }
+
     fun processLogo(imageUri: Uri) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(brandingLoading = true)
