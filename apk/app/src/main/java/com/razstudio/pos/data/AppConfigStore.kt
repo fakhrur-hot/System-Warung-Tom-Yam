@@ -59,6 +59,26 @@ class AppConfigStore @Inject constructor(
 
     private var prefs: SharedPreferences? = createEncryptedPrefs()
 
+    /**
+     * Test-only seam. Substitutes the backing store so this class's logic can be unit-tested.
+     *
+     * It is needed because [EncryptedSharedPreferences] requires the Android Keystore, which
+     * Robolectric does not provide: under test [createEncryptedPrefs] fails, the store takes its
+     * documented degrade-to-unconfigured path, and every write is silently dropped. That made
+     * everything persisted here — `operating_mode`, the Payment QR hash, the Supabase settings —
+     * impossible to cover, and a regression in any of it would have passed CI unnoticed.
+     *
+     * Deliberately NOT solved by falling back to plain [SharedPreferences] in production. This store
+     * holds Supabase keys and Cloudflare tokens; silently writing those in plaintext when the keystore
+     * misbehaves would be a far worse outcome than reporting "unconfigured". The fallback to `null`
+     * stays exactly as it is, and only tests swap the implementation.
+     *
+     * Hilt is unaffected: it uses the `@Inject` primary constructor and never sees this one.
+     */
+    internal constructor(context: Context, backingStoreForTest: SharedPreferences) : this(context) {
+        prefs = backingStoreForTest
+    }
+
     private fun createEncryptedPrefs(): SharedPreferences? = try {
         val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
         EncryptedSharedPreferences.create(
