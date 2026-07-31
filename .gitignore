@@ -42,3 +42,15 @@ yarn-error.log*
 *.swp
 .DS_Store
 Thumbs.db
+
+# ── Internal-only material (proprietary project — see LICENSE) ────────────────
+# Kept in the working tree, deliberately out of the published repo: these are the
+# design record and operational runbooks, not shipping artefacts. Removed from
+# tracking on 2026-07-31 when the project licence was settled as proprietary.
+# NOTE: removal stops future publication only — earlier revisions remain in the
+# pushed history and are still retrievable. Verified at the time of removal that
+# none of these files ever contained real credentials.
+.kiro/specs/
+docs/
+DEPLOYMENT.md
+*_planner.md
