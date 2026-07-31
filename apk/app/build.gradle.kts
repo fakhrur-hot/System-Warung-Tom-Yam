@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.oss.licenses)
 }
 
 val keystoreProps = Properties().apply {
@@ -91,6 +92,27 @@ android {
         buildConfig = true
     }
 
+    // Room schema export: KSP writes schema JSON files here so MigrationTestHelper can validate
+    // post-migration schema structures in instrumented migration tests (Requirement 8.1, 12.6).
+    // The schemas/ directory is committed to source control as a migration audit trail.
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
+    // MigrationTestHelper reads the exported schema JSON (app/schemas/<db>/<version>.json) through
+    // the instrumentation context's assets. Under Robolectric that resolves to the assets of the
+    // VARIANT being tested, not the `test` source set — pointing it at `test` still fails with
+    // "Cannot find the schema file in the assets folder. Missing file: ...AppDatabase/11.json".
+    // Attaching to `debug` works (unit tests run against the debug variant) and keeps the schema
+    // JSON out of the release APK, which would otherwise ship a few KB it has no use for.
+    sourceSets {
+        getByName("debug") { assets.srcDirs("$projectDir/schemas") }
+    }
+
     lint {
         // Fails the build on any lint ERROR (not warning) — safe to enable now that the 5
         // pre-existing errors are cleared (2 fixed real gaps in OrderingForegroundService's
@@ -165,6 +187,16 @@ dependencies {
     // Image loading for compose
     implementation("io.coil-kt:coil-compose:2.4.0")
 
+    // Third-party licence notices. MIT and Apache-2.0 require their copyright notices and
+    // licence texts to be reproduced in a distributed binary — including a proprietary one, which
+    // this is (see LICENSE / THIRD-PARTY-NOTICES.md). The companion Gradle plugin enumerates the
+    // real dependency set at build time, so the screen cannot silently go stale when a dependency
+    // is added. This is the project's only hard open-source obligation; do not remove it.
+    // Pinned to 17.1.0 deliberately: 17.2.2+ pulls androidx.navigation3, which requires AGP 8.9.1
+    // while this project is on 8.7.2 (verified — checkDebugAarMetadata fails on 7 transitive deps).
+    // Revisit when AGP is upgraded; the licence screen needs nothing newer.
+    implementation("com.google.android.gms:play-services-oss-licenses:17.1.0")
+
     // Google Mobile Ads SDK — for native in-app banner ads (Table View)
     implementation("com.google.android.gms:play-services-ads:23.2.0")
 
@@ -176,4 +208,11 @@ dependencies {
 
     // Unit tests (JVM) — org.json is already on the classpath for the parser tests
     testImplementation("junit:junit:4.13.2")
+
+    // Room in-memory database testing (JVM via Robolectric)
+    testImplementation("androidx.room:room-testing:2.6.1")
+    testImplementation("org.robolectric:robolectric:4.13")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 }
+

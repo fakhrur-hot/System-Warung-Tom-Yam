@@ -50,6 +50,7 @@ data class UiStringsGroup1(
     val sendToKitchen: String,
     val payCash: String,
     val payQR: String,
+    val showQrButton: String,
     val cancelOrder: String,
     val status: String,
     val emptyCart: String,
@@ -582,6 +583,7 @@ class UiStrings(
     val sendToKitchen: String get() = g1.sendToKitchen
     val payCash: String get() = g1.payCash
     val payQR: String get() = g1.payQR
+    val showQrButton: String get() = g1.showQrButton
     val cancelOrder: String get() = g1.cancelOrder
     val status: String get() = g1.status
     val emptyCart: String get() = g1.emptyCart
@@ -1040,6 +1042,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sendToKitchen = "Hantar ke Dapur",
             payCash = "Bayar Tunai",
             payQR = "Bayar QR",
+            showQrButton = "Tunjuk QR",
             cancelOrder = "Batal Pesanan",
             status = "Status",
             emptyCart = "Troli kosong — pilih barangan menu",
@@ -1514,6 +1517,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sendToKitchen = "Send to Kitchen",
             payCash = "Pay Cash",
             payQR = "Pay QR",
+            showQrButton = "Show QR",
             cancelOrder = "Cancel Order",
             status = "Status",
             emptyCart = "Cart is empty — pick menu items",
@@ -1988,6 +1992,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sendToKitchen = "送往厨房",
             payCash = "现金支付",
             payQR = "扫码支付",
+            showQrButton = "显示二维码",
             cancelOrder = "取消订单",
             status = "状态",
             emptyCart = "购物车是空的 — 请选择菜单项目",
@@ -2460,6 +2465,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sendToKitchen = "சமையலறைக்கு அனுப்பு",
             payCash = "பணம் செலுத்து",
             payQR = "QR செலுத்து",
+            showQrButton = "QR காட்டு",
             cancelOrder = "ஆர்டரை ரத்து செய்",
             status = "நிலை",
             emptyCart = "வண்டி காலியாக உள்ளது — மெனுவைத் தேர்ந்தெடுக்கவும்",
@@ -2934,6 +2940,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sendToKitchen = "ส่งไปยังครัว",
             payCash = "ชำระด้วยเงินสด",
             payQR = "ชำระด้วย QR",
+            showQrButton = "แสดง QR",
             cancelOrder = "ยกเลิกออเดอร์",
             status = "สถานะ",
             emptyCart = "ตะกร้าว่างเปล่า — เลือกรายการเมนู",

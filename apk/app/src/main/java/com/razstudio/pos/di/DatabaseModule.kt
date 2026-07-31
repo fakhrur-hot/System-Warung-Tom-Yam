@@ -2,11 +2,15 @@ package com.razstudio.pos.di
 
 import android.content.Context
 import androidx.room.Room
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.razstudio.pos.data.local.AppDatabase
+import com.razstudio.pos.data.local.MIGRATION_10_11
+import com.razstudio.pos.data.local.MIGRATION_11_12
+import com.razstudio.pos.data.local.MIGRATION_8_9
+import com.razstudio.pos.data.local.MIGRATION_9_10
 import com.razstudio.pos.data.local.MenuDao
 import com.razstudio.pos.data.local.OrderDao
+import com.razstudio.pos.data.local.OrderNumberSequenceDao
+import com.razstudio.pos.data.local.PairedDeviceDao
 import com.razstudio.pos.data.local.PendingOrderDao
 import com.razstudio.pos.data.local.PrintJobDao
 import com.razstudio.pos.data.local.PrinterConfigDao
@@ -23,36 +27,21 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
-    /**
-     * v8 -> v9: add MenuItem.code and MenuItem.marketPrice columns for the dynamic-menu revamp.
-     */
-    private val MIGRATION_8_9 = object : Migration(8, 9) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("ALTER TABLE menu_items ADD COLUMN code TEXT NOT NULL DEFAULT ''")
-            db.execSQL("ALTER TABLE menu_items ADD COLUMN marketPrice INTEGER NOT NULL DEFAULT 0")
-        }
-    }
-
-    /**
-     * v9 -> v10: add MenuItem.extraCategories so an item can appear under multiple category
-     * pages (primary [category] + comma-separated extras).
-     */
-    private val MIGRATION_9_10 = object : Migration(9, 10) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("ALTER TABLE menu_items ADD COLUMN extraCategories TEXT NOT NULL DEFAULT ''")
-        }
-    }
-
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
+        // Migration chain starts at v8→v9. Versions 1–7 pre-date the migration chain and no
+        // explicit migrations exist for those steps. Any device still carrying a v1–v7 schema
+        // is no longer supported: Room will throw an IllegalStateException rather than silently
+        // destroying data (fallbackToDestructiveMigration has been removed per Requirement 8.1).
+        // In LAN and Kiosk Mode the local database is the café's only copy of its orders and
+        // takings, so a loud failure is far safer than a silent wipe.
         return Room.databaseBuilder(
             context,
             AppDatabase::class.java,
             "warung_tom_yam_db"
         )
-            .addMigrations(MIGRATION_8_9, MIGRATION_9_10)
-            .fallbackToDestructiveMigration()
+            .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
             .build()
     }
 
@@ -89,5 +78,15 @@ object DatabaseModule {
     @Provides
     fun providePrintJobDao(database: AppDatabase): PrintJobDao {
         return database.printJobDao()
+    }
+
+    @Provides
+    fun provideOrderNumberSequenceDao(database: AppDatabase): OrderNumberSequenceDao {
+        return database.orderNumberSequenceDao()
+    }
+
+    @Provides
+    fun providePairedDeviceDao(database: AppDatabase): PairedDeviceDao {
+        return database.pairedDeviceDao()
     }
 }

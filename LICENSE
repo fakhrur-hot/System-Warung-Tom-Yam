@@ -1,0 +1,47 @@
+Copyright (c) 2026 RAZStudio. All Rights Reserved.
+
+PROPRIETARY AND CONFIDENTIAL
+
+This software and its source code, assets, documentation, and design materials
+(collectively, the "Software") are the proprietary property of RAZStudio. The
+Software is licensed, not sold.
+
+No permission is granted to any person obtaining a copy of the Software to use,
+copy, modify, merge, publish, distribute, sublicense, or sell copies of the
+Software, except under a separate written licence agreement signed by RAZStudio.
+
+Specifically, and without limiting the foregoing, the following are prohibited
+absent such an agreement:
+
+  1. Redistribution of the Software or any derivative work, in source or binary
+     form, whether or not for a fee.
+  2. Reverse engineering, decompilation, or disassembly, except where such a
+     right cannot lawfully be excluded.
+  3. Removal or alteration of this notice, of any copyright notice, or of the
+     third-party attribution notices described below.
+  4. Use of the RAZStudio name, or the name or branding of any café or business
+     deployed on the Software, to endorse or promote other products.
+
+THIRD-PARTY COMPONENTS
+
+The Software incorporates third-party open-source components, each of which
+remains subject to its own licence. Those licences are permissive (MIT and
+Apache License 2.0) and permit inclusion in a proprietary work, provided their
+copyright notices and licence texts are reproduced in distributions.
+
+Those notices are reproduced in the application itself, reachable from its
+settings, and are generated from the dependency set at build time. See
+THIRD-PARTY-NOTICES.md for the audit of record. Nothing in this notice
+restricts any right granted to you by the licence of a third-party component,
+and nothing here is a claim of ownership over those components.
+
+NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+RAZSTUDIO BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For licensing enquiries, contact fakhrurr34nismo@gmail.com.

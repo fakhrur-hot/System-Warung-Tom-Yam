@@ -6,7 +6,7 @@ import androidx.room.TypeConverters
 
 /**
  * Room database holding local menu items, orders, tables, settings, pending orders,
- * printer configurations, and print jobs.
+ * printer configurations, print jobs, and (from v11) the operating-mode entities.
  * Version 5 adds PrinterConfig and PrintJob entities for multi-printer support.
  * Version 6 adds MenuItem.imagePath (Storage object path, for deleting superseded images).
  * Version 7 adds MenuItem variable-price fields (hasVariablePrice, variablePriceDailyPrompt,
@@ -15,8 +15,9 @@ import androidx.room.TypeConverters
  * OrderItem.sessionNumber (groups items by which order-placement round they belong to).
  * Version 9 adds MenuItem.code (optional short item code) and MenuItem.marketPrice
  * (market-price items whose price is decided at the counter) for the dynamic-menu revamp.
- * Uses destructive migration fallback (acceptable for local cache), but a proper
- * MIGRATION_8_9 is registered so existing rows survive the upgrade.
+ * Version 10 adds MenuItem.extraCategories (comma-separated secondary category pages).
+ * Version 11 adds OrderNumberSequence (Kiosk Mode running order numbers, keyed by business day).
+ * Version 12 adds PairedDevice (LAN Mode paired Client Device registry, keyed by device id).
  */
 @Database(
     entities = [
@@ -27,10 +28,15 @@ import androidx.room.TypeConverters
         Table::class,
         PendingOrder::class,
         PrinterConfig::class,
-        PrintJob::class
+        PrintJob::class,
+        OrderNumberSequence::class,
+        PairedDevice::class
     ],
-    version = 10,
-    exportSchema = false
+    version = 12,
+    // exportSchema = true so MigrationTestHelper can validate the schema after migration.
+    // Schema JSON files are written to app/schemas/ and committed to source control so that
+    // future migration tests can verify against a stable baseline (Requirement 8.1, 12.6).
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -41,4 +47,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingOrderDao(): PendingOrderDao
     abstract fun printerConfigDao(): PrinterConfigDao
     abstract fun printJobDao(): PrintJobDao
+    abstract fun orderNumberSequenceDao(): OrderNumberSequenceDao
+    abstract fun pairedDeviceDao(): PairedDeviceDao
 }

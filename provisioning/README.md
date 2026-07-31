@@ -3,7 +3,7 @@
 A standalone, RAZStudio-operated Web Setup Wizard that walks a new café owner through provisioning
 their **own** Supabase project and Cloudflare account (Bring-Your-Own-Infrastructure) — no browser
 automation, no scraping, every step is a plain REST call or a direct Postgres connection. See
-`.kiro/specs/cafe-provisioning-wizard/` for the full requirements/design/task history, including
+the internal design record for the full requirements/design/task history, including
 the research that shaped this (Supabase's gated migrations endpoint, Cloudflare's unofficial Direct
 Upload protocol).
 
@@ -49,7 +49,7 @@ the live checks below have actually been run.
 ## Verifying the two unverified steps (Requirement R8)
 
 You'll need one disposable Supabase project and one Cloudflare account/zone — see
-`.kiro/specs/cafe-provisioning-wizard/design.md`'s Testing Strategy.
+the internal design record's Testing Strategy.
 
 1. **Schema**: run the Wizard against that disposable project's real connection string. Confirm all
    6 migrations report `ok`, then check the tables actually exist in the Supabase dashboard.

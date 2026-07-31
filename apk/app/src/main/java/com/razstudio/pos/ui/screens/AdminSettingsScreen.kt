@@ -75,6 +75,9 @@ import com.razstudio.pos.ui.components.rememberPermissionHelper
 import com.razstudio.pos.ui.i18n.AppLanguage
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.uiStrings
+import androidx.compose.ui.res.stringResource
+import com.google.android.gms.oss.licenses.OssLicensesMenuActivity
+import com.razstudio.pos.R
 import com.razstudio.pos.ui.viewmodels.AdminSettingsViewModel
 
 /**
@@ -145,6 +148,16 @@ fun AdminSettingsScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri?.let { viewModel.processLogo(it) }
+    }
+
+    // Payment QR picker (task 16.1). Separate launcher from the logo one so the two uploads cannot be
+    // confused — they go through different pipelines with different rules: the logo is center-cropped
+    // and JPEG-compressed for thermal printing, which would smear a dense QR until it stops scanning.
+    // The MIME type is passed through so PaymentQrPipeline can keep a PNG lossless.
+    val paymentQrPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.processPaymentQr(it, context.contentResolver.getType(it)) }
     }
 
     LaunchedEffect(uiState.error) {
@@ -747,6 +760,103 @@ fun AdminSettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                     }
                     Text(strings.loadPresetTani)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Payment QR (task 16.1, Requirements 14.1–14.3, 14.5) ─────────────────────────────
+            // Available in ALL three operating modes (Requirement 14.7), so this section is never
+            // gated on ModeCapabilities. Visibility of the *Show QR* button elsewhere depends solely
+            // on whether a hash is stored — absence of a hash IS the "not configured" state, so there
+            // is no separate enabled flag that could drift from whether the image really exists.
+            SettingsSection(title = stringResource(R.string.payment_qr_section)) {
+                Text(
+                    text = stringResource(R.string.payment_qr_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val qrPreview = uiState.paymentQrPreview
+                if (qrPreview != null && uiState.paymentQrHash != null) {
+                    Image(
+                        bitmap = qrPreview.asImageBitmap(),
+                        contentDescription = stringResource(R.string.payment_qr_section),
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { paymentQrPickerLauncher.launch("image/*") },
+                            enabled = !uiState.paymentQrBusy,
+                        ) { Text(stringResource(R.string.payment_qr_replace)) }
+                        OutlinedButton(
+                            onClick = { viewModel.removePaymentQr() },
+                            enabled = !uiState.paymentQrBusy,
+                        ) { Text(stringResource(R.string.payment_qr_remove)) }
+                    }
+                } else {
+                    Text(
+                        text = stringResource(R.string.payment_qr_none),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { paymentQrPickerLauncher.launch("image/*") },
+                        enabled = !uiState.paymentQrBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (uiState.paymentQrBusy) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(stringResource(R.string.payment_qr_upload))
+                    }
+                }
+
+                // Rejection reason shown inline rather than as a snackbar: "this image has no QR code
+                // in it" is a correction the admin must act on, and a transient toast is too easy to
+                // miss while they are looking at the picker result (Requirement 14.3).
+                uiState.paymentQrError?.let { err ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = err,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Third-party licence notices. This app ships proprietary (see LICENSE), but it is built
+            // on MIT- and Apache-2.0-licensed components, both of which require their copyright
+            // notices and licence texts to be reproduced in a distributed binary. This screen is that
+            // reproduction, and it is the project's only hard open-source obligation — the generated
+            // resources exist whether or not anything opens them, so removing this entry point would
+            // put the app in breach while still appearing to build correctly.
+            //
+            // Labels come from res/values rather than UiStrings because the licence texts themselves
+            // are English-only; see THIRD-PARTY-NOTICES.md for the audit and the one component
+            // (ZXing) the generator cannot detect.
+            SettingsSection(title = stringResource(R.string.about_section)) {
+                OutlinedButton(
+                    onClick = {
+                        context.startActivity(
+                            Intent(context, OssLicensesMenuActivity::class.java)
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.open_source_licenses))
                 }
             }
 

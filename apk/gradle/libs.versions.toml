@@ -1,4 +1,8 @@
 [versions]
+# Generates the in-app third-party licence screen from the real dependency set. Required because
+# MIT and Apache-2.0 both oblige us to reproduce their notices in a distributed binary, and this
+# project ships proprietary (see THIRD-PARTY-NOTICES.md).
+ossLicenses = "0.13.0"
 agp = "8.7.2"
 kotlin = "2.0.21"
 ksp = "2.0.21-1.0.28"
@@ -29,6 +33,7 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.r
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -36,3 +41,4 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+oss-licenses = { id = "com.google.android.gms.oss-licenses-plugin", version.ref = "ossLicenses" }

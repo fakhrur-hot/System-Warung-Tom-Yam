@@ -125,4 +125,18 @@
     <string name="search_hint">Search…</string>
     <string name="total_label">Total</string>
     <string name="quantity_label">Qty</string>
+
+    <!-- Third-party licence notices (see THIRD-PARTY-NOTICES.md). Required by the MIT and
+         Apache-2.0 components this proprietary app is built on. -->
+    <string name="about_section">About</string>
+    <string name="open_source_licenses">Open source licences</string>
+
+    <!-- Payment QR settings section (Requirement 14.1). Screen-only; never printed. -->
+    <string name="payment_qr_section">Payment QR</string>
+    <string name="payment_qr_help">Shown on screen when a customer asks to pay by QR. Upload a photo of your own payment QR (JPEG or PNG).</string>
+    <string name="payment_qr_upload">Upload Payment QR</string>
+    <string name="payment_qr_replace">Replace</string>
+    <string name="payment_qr_remove">Remove</string>
+    <string name="payment_qr_none">No Payment QR uploaded — the Show QR button stays hidden.</string>
+    <string name="payment_qr_close">Close</string>
 </resources>

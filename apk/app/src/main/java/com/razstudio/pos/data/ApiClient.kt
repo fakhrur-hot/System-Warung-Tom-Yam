@@ -33,7 +33,7 @@ class ApiClient @Inject constructor(
     private val authEventBus: AuthEventBus,
     private val demoBackend: com.razstudio.pos.data.demo.DemoBackend,
     private val appConfig: AppConfigStore
-) {
+) : BackendGateway {
 
     companion object {
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
@@ -93,7 +93,7 @@ class ApiClient @Inject constructor(
      * deployment secret to be set, so this is a no-op (401) against any deployment
      * that hasn't explicitly opted in, release or otherwise.
      */
-    suspend fun adminHandshakeDebug(deviceId: String, cafeName: String): ApiResult<String> =
+    override suspend fun adminHandshakeDebug(deviceId: String, cafeName: String): ApiResult<String> =
         adminHandshakeRequest(deviceId) { put("debugCafeName", cafeName) }
 
     private suspend fun adminHandshakeRequest(
@@ -137,7 +137,7 @@ class ApiClient @Inject constructor(
      * Register an ordering device with an invitation token.
      * @return [ApiResult] with device status on success.
      */
-    suspend fun register(
+    override suspend fun register(
         inviteToken: String,
         deviceId: String,
         deviceModel: String,
@@ -187,7 +187,7 @@ class ApiClient @Inject constructor(
      * Poll device approval status.
      * @return [ApiResult] with device status (PENDING/APPROVED/REVOKED) and optional apiKey.
      */
-    suspend fun pollDeviceStatus(deviceId: String): ApiResult<DeviceStatusResponse> =
+    override suspend fun pollDeviceStatus(deviceId: String): ApiResult<DeviceStatusResponse> =
         withContext(Dispatchers.IO) {
             try {
                 val request = Request.Builder()
@@ -226,10 +226,10 @@ class ApiClient @Inject constructor(
      * Post a session event (OPEN/CLOSE) with optional reason and closing flag.
      * Backend broadcasts CAFE_OPEN or CAFE_CLOSED accordingly.
      */
-    suspend fun postSession(
+    override suspend fun postSession(
         event: String,
-        reason: String? = null,
-        closing: Boolean = false
+        reason: String?,
+        closing: Boolean
     ): ApiResult<SessionResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.postSession(event)
         try {
@@ -277,7 +277,7 @@ class ApiClient @Inject constructor(
     /**
      * Push daily aggregate summary at closing time.
      */
-    suspend fun postAggregates(date: String, body: JSONObject): ApiResult<Unit> =
+    override suspend fun postAggregates(date: String, body: JSONObject): ApiResult<Unit> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext ApiResult.Success(Unit)
             try {
@@ -312,10 +312,7 @@ class ApiClient @Inject constructor(
     /**
      * Push full menu snapshot (availability updates, daily popup changes).
      */
-    suspend fun putMenu(
-        menuItems: JSONArray,
-        categories: JSONArray = JSONArray()
-    ): ApiResult<Unit> =
+    override suspend fun putMenu(menuItems: JSONArray, categories: JSONArray): ApiResult<Unit> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext ApiResult.Success(Unit)
             try {
@@ -356,7 +353,7 @@ class ApiClient @Inject constructor(
      * Catch-up sync: fetch all orders since a given timestamp.
      * Called on every WebSocket (re)connect to reconcile with Room.
      */
-    suspend fun getOrdersSince(since: String): ApiResult<OrdersSyncResponse> =
+    override suspend fun getOrdersSince(since: String): ApiResult<OrdersSyncResponse> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.getOrdersSince()
             try {
@@ -399,7 +396,7 @@ class ApiClient @Inject constructor(
      * When [sessionNumber] is non-null, scopes the operation to just that session's
      * items (B4.3: confirm a single pending round without reprinting everything).
      */
-    suspend fun sendToKitchen(orderId: String, sessionNumber: Int? = null): ApiResult<KitchenResponse> =
+    override suspend fun sendToKitchen(orderId: String, sessionNumber: Int?): ApiResult<KitchenResponse> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.sendToKitchen(orderId)
             try {
@@ -447,7 +444,7 @@ class ApiClient @Inject constructor(
     /**
      * Add items to an existing order (amendment).
      */
-    suspend fun addItemsToOrder(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto> =
+    override suspend fun addItemsToOrder(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.addItemsToOrder(orderId, items)
             try {
@@ -499,7 +496,7 @@ class ApiClient @Inject constructor(
     /**
      * Update order status (PREPARING/READY).
      */
-    suspend fun updateOrderStatus(orderId: String, status: String): ApiResult<OrderDto> =
+    override suspend fun updateOrderStatus(orderId: String, status: String): ApiResult<OrderDto> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.updateOrderStatus(orderId, status)
             try {
@@ -539,7 +536,7 @@ class ApiClient @Inject constructor(
     /**
      * Process payment (Cash/QR). Only valid after SENT_TO_KITCHEN.
      */
-    suspend fun processPayment(orderId: String, method: String): ApiResult<OrderDto> =
+    override suspend fun processPayment(orderId: String, method: String): ApiResult<OrderDto> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.processPayment(orderId, method)
             try {
@@ -580,7 +577,7 @@ class ApiClient @Inject constructor(
     /**
      * Cancel an order with reason and who cancelled it.
      */
-    suspend fun cancelOrder(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit> =
+    override suspend fun cancelOrder(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.cancelOrder(orderId, reason, cancelledBy)
             try {
@@ -629,7 +626,7 @@ class ApiClient @Inject constructor(
     /**
      * Get all registered devices (admin bearer).
      */
-    suspend fun getDevices(): ApiResult<List<DeviceDto>> = withContext(Dispatchers.IO) {
+    override suspend fun getDevices(): ApiResult<List<DeviceDto>> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.getDevices()
         try {
             val token = adminBearerToken()
@@ -678,10 +675,10 @@ class ApiClient @Inject constructor(
     /**
      * Patch a device: approve, reject, revoke, force check-out, or rename.
      */
-    suspend fun patchDevice(
+    override suspend fun patchDevice(
         deviceId: String,
         action: String,
-        label: String? = null
+        label: String?
     ): ApiResult<DeviceDto> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext ApiResult.Success(
             DeviceDto(
@@ -739,7 +736,7 @@ class ApiClient @Inject constructor(
     /**
      * Get the current staff invitation URL (admin bearer).
      */
-    suspend fun getInvite(role: String? = null): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
+    override suspend fun getInvite(role: String?): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.getInvite()
         try {
             val token = adminBearerToken()
@@ -779,7 +776,7 @@ class ApiClient @Inject constructor(
     /**
      * Regenerate the staff invitation token (admin bearer).
      */
-    suspend fun regenerateInvite(role: String? = null): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
+    override suspend fun regenerateInvite(role: String?): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.getInvite()
         try {
             val token = adminBearerToken()
@@ -836,7 +833,7 @@ class ApiClient @Inject constructor(
     }
 
     /** Fetch the permanent owner-recovery token + QR url (admin only) to show the owner. */
-    suspend fun getRecoveryToken(): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
+    override suspend fun getRecoveryToken(): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.getInvite()
         try {
             val token = adminBearerToken()
@@ -864,7 +861,11 @@ class ApiClient @Inject constructor(
     }
 
     /** Recover Main Admin on this device using the permanent owner-recovery token (public). */
-    suspend fun recoverAdmin(recoveryToken: String, deviceId: String, deviceModel: String): ApiResult<String> =
+    override suspend fun recoverAdmin(
+        recoveryToken: String,
+        deviceId: String,
+        deviceModel: String
+    ): ApiResult<String> =
         withContext(Dispatchers.IO) {
             try {
                 val bodyJson = JSONObject().apply {
@@ -896,7 +897,7 @@ class ApiClient @Inject constructor(
      * Create a new order using the ordering API key (staff device).
      * Staff devices submit orders with source=STAFF via their API key.
      */
-    suspend fun createOrderAsStaff(
+    override suspend fun createOrderAsStaff(
         tableId: String,
         items: List<NewOrderItem>
     ): ApiResult<CreateOrderResponse> = withContext(Dispatchers.IO) {
@@ -967,7 +968,10 @@ class ApiClient @Inject constructor(
      * When [sessionNumber] is non-null, scopes to just that session's items (B4.3 confirm),
      * mirroring the admin [sendToKitchen] variant.
      */
-    suspend fun sendToKitchenAsStaff(orderId: String, sessionNumber: Int? = null): ApiResult<KitchenResponse> =
+    override suspend fun sendToKitchenAsStaff(
+        orderId: String,
+        sessionNumber: Int?
+    ): ApiResult<KitchenResponse> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.sendToKitchen(orderId)
             try {
@@ -1016,7 +1020,7 @@ class ApiClient @Inject constructor(
     /**
      * Process payment using ordering API key (staff with TAKE_PAYMENT permission).
      */
-    suspend fun processPaymentAsStaff(orderId: String, method: String): ApiResult<OrderDto> =
+    override suspend fun processPaymentAsStaff(orderId: String, method: String): ApiResult<OrderDto> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.processPayment(orderId, method)
             try {
@@ -1058,7 +1062,11 @@ class ApiClient @Inject constructor(
     /**
      * Cancel order using ordering API key (all staff can cancel).
      */
-    suspend fun cancelOrderAsStaff(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit> =
+    override suspend fun cancelOrderAsStaff(
+        orderId: String,
+        reason: String,
+        cancelledBy: String
+    ): ApiResult<Unit> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.cancelOrder(orderId, reason, cancelledBy)
             try {
@@ -1097,7 +1105,10 @@ class ApiClient @Inject constructor(
     /**
      * Add items to an existing order using ordering API key (staff amendment).
      */
-    suspend fun addItemsToOrderAsStaff(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto> =
+    override suspend fun addItemsToOrderAsStaff(
+        orderId: String,
+        items: List<NewOrderItem>
+    ): ApiResult<OrderDto> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.addItemsToOrder(orderId, items)
             try {
@@ -1149,7 +1160,7 @@ class ApiClient @Inject constructor(
     /**
      * Fetch orders since a timestamp using the ordering API key (staff catch-up sync).
      */
-    suspend fun getOrdersSinceAsStaff(since: String): ApiResult<OrdersSyncResponse> =
+    override suspend fun getOrdersSinceAsStaff(since: String): ApiResult<OrdersSyncResponse> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.getOrdersSince()
             try {
@@ -1195,7 +1206,7 @@ class ApiClient @Inject constructor(
      * persisted (they did — only the read-back was unauthenticated). Ordering devices without
      * an admin token still get the public subset, unchanged.
      */
-    suspend fun getSettings(): ApiResult<SettingsResponse> = withContext(Dispatchers.IO) {
+    override suspend fun getSettings(): ApiResult<SettingsResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.getSettings()
         try {
             val requestBuilder = Request.Builder()
@@ -1248,7 +1259,7 @@ class ApiClient @Inject constructor(
      * Get café GPS location and radius (ordering API key bearer).
      * Used by staff devices for attendance check-in radius validation.
      */
-    suspend fun getCafeLocation(): ApiResult<CafeLocationResponse> =
+    override suspend fun getCafeLocation(): ApiResult<CafeLocationResponse> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext demoBackend.getCafeLocation()
             try {
@@ -1298,11 +1309,11 @@ class ApiClient @Inject constructor(
      * Post attendance event (CHECK_IN/CHECK_OUT) with GPS coordinates.
      * Uses ordering API key for staff devices.
      */
-    suspend fun postAttendance(
+    override suspend fun postAttendance(
         event: String,
         lat: Double,
         lng: Double,
-        forced: Boolean = false
+        forced: Boolean
     ): ApiResult<Unit> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext ApiResult.Success(Unit)
         try {
@@ -1345,7 +1356,7 @@ class ApiClient @Inject constructor(
     /**
      * Save café GPS location and radius (admin bearer).
      */
-    suspend fun putCafeLocation(
+    override suspend fun putCafeLocation(
         lat: Double,
         lng: Double,
         radius: Int
@@ -1394,7 +1405,7 @@ class ApiClient @Inject constructor(
      * they're intact server-side (the phone is normally authoritative, but there's
      * nothing local to be authoritative *over* until this first pull happens).
      */
-    suspend fun getTables(): ApiResult<List<Pair<String, String>>> = withContext(Dispatchers.IO) {
+    override suspend fun getTables(): ApiResult<List<Pair<String, String>>> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.getTables()
         try {
             val request = Request.Builder()
@@ -1429,7 +1440,7 @@ class ApiClient @Inject constructor(
      * Fetch the map of table id → opaque QR token (for generating unguessable table QR
      * codes). Public endpoint. Tables missing a token are simply omitted.
      */
-    suspend fun getTableTokens(): ApiResult<Map<String, String>> = withContext(Dispatchers.IO) {
+    override suspend fun getTableTokens(): ApiResult<Map<String, String>> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.getTableTokens()
         try {
             val request = Request.Builder()
@@ -1467,7 +1478,7 @@ class ApiClient @Inject constructor(
      * phone's local Room table list (the phone is the authoritative source, same
      * pattern as [putMenu]).
      */
-    suspend fun putTables(tables: List<Pair<String, String>>): ApiResult<List<String>> =
+    override suspend fun putTables(tables: List<Pair<String, String>>): ApiResult<List<String>> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext ApiResult.Success(emptyList())
             try {
@@ -1519,7 +1530,7 @@ class ApiClient @Inject constructor(
      * Fetch current café branding (public, no auth required). Returns null cafeName
      * when branding isn't configured yet ({"configured": false}).
      */
-    suspend fun getBranding(): ApiResult<BrandingResponse> = withContext(Dispatchers.IO) {
+    override suspend fun getBranding(): ApiResult<BrandingResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.getBranding()
         try {
             val request = Request.Builder()
@@ -1540,7 +1551,9 @@ class ApiClient @Inject constructor(
                         ApiResult.Success(
                             BrandingResponse(
                                 cafeName = json.optString("cafeName", ""),
-                                logoUrl = json.optString("logoUrl", "")
+                                logoUrl = json.optString("logoUrl", ""),
+                                paymentQrHash = json.optString("paymentQrHash", null),
+                                paymentQrUrl = json.optString("paymentQrUrl", null),
                             )
                         )
                     }
@@ -1559,9 +1572,9 @@ class ApiClient @Inject constructor(
      * Omitting [logoBase64] keeps whatever logo is already stored server-side —
      * e.g. the admin is only renaming the café, not replacing the logo.
      */
-    suspend fun putBranding(
+    override suspend fun putBranding(
         cafeName: String,
-        logoBase64: String? = null
+        logoBase64: String?
     ): ApiResult<BrandingResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.putBranding(cafeName)
         try {
@@ -1590,7 +1603,9 @@ class ApiClient @Inject constructor(
                     ApiResult.Success(
                         BrandingResponse(
                             cafeName = json.getString("cafeName"),
-                            logoUrl = json.getString("logoUrl")
+                            logoUrl = json.getString("logoUrl"),
+                            paymentQrHash = json.optString("paymentQrHash", null),
+                            paymentQrUrl = json.optString("paymentQrUrl", null),
                         )
                     )
                 }
@@ -1609,7 +1624,7 @@ class ApiClient @Inject constructor(
     /**
      * Partially update system settings (admin bearer, merge semantics).
      */
-    suspend fun putSettings(body: JSONObject): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun putSettings(body: JSONObject): ApiResult<Unit> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext ApiResult.Success(Unit)
         try {
             val token = adminBearerToken()
@@ -1644,10 +1659,10 @@ class ApiClient @Inject constructor(
     /**
      * Create a new order (manual dine-in entry with source=STAFF).
      */
-    suspend fun createOrder(
+    override suspend fun createOrder(
         tableId: String,
         items: List<NewOrderItem>,
-        source: String = "STAFF"
+        source: String
     ): ApiResult<CreateOrderResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.createOrder(tableId, items, source)
         try {
@@ -1718,7 +1733,10 @@ class ApiClient @Inject constructor(
      * Returns the public Storage URL and object path (path is kept so the old image
      * can be deleted once the new one is confirmed saved on the menu item).
      */
-    suspend fun uploadMenuImage(menuItemId: String, imageBase64: String): ApiResult<MenuImageUploadResponse> =
+    override suspend fun uploadMenuImage(
+        menuItemId: String,
+        imageBase64: String
+    ): ApiResult<MenuImageUploadResponse> =
         withContext(Dispatchers.IO) {
             if (DemoSession.active) return@withContext ApiResult.Success(MenuImageUploadResponse("", ""))
             try {
@@ -1765,7 +1783,7 @@ class ApiClient @Inject constructor(
     /**
      * Delete a superseded menu item image by its Storage path (best-effort cleanup).
      */
-    suspend fun deleteMenuImage(path: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun deleteMenuImage(path: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext ApiResult.Success(Unit)
         try {
             val token = adminBearerToken()
@@ -1801,7 +1819,7 @@ class ApiClient @Inject constructor(
     /**
      * Fetch current menu state from backend (public, no auth required).
      */
-    suspend fun getMenu(): ApiResult<MenuResponse> = withContext(Dispatchers.IO) {
+    override suspend fun getMenu(): ApiResult<MenuResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.getMenu()
         try {
             val request = Request.Builder()
@@ -2034,7 +2052,9 @@ data class InviteResponse(
 
 data class BrandingResponse(
     val cafeName: String,
-    val logoUrl: String
+    val logoUrl: String,
+    val paymentQrHash: String? = null,
+    val paymentQrUrl: String? = null,
 )
 
 data class MenuImageUploadResponse(
