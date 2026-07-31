@@ -565,6 +565,8 @@ class StaffOrderViewModel @Inject constructor(
                     put("menuItemId", item.menuItemId)
                     put("quantity", item.quantity)
                     if (item.note != null) put("note", item.note)
+                    if (item.unitPrice != null) put("unitPrice", item.unitPrice)
+                    if (item.size != null) put("size", item.size)
                 })
             }
         }.toString()
@@ -612,7 +614,9 @@ class StaffOrderViewModel @Inject constructor(
                     NewOrderItem(
                         menuItemId = obj.getString("menuItemId"),
                         quantity = obj.getInt("quantity"),
-                        note = obj.optStringOrNull("note")
+                        note = obj.optStringOrNull("note"),
+                        unitPrice = if (obj.has("unitPrice")) obj.getDouble("unitPrice") else null,
+                        size = obj.optStringOrNull("size")
                     )
                 )
             }

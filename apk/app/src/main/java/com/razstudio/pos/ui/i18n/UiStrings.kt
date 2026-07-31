@@ -34,6 +34,9 @@ data class UiStringsGroup1(
     val connectAsStaff: String,
     val connectAsAdmin: String,
     val tryDemo: String,
+    val joinAsOrderingMode: String,
+    val reloginAsCafeAdmin: String,
+    val setupWizard: String,
     // ── Table View / order screens ──
     val tableView: String,
     val free: String,
@@ -582,6 +585,9 @@ class UiStrings(
     val connectAsStaff: String get() = g1.connectAsStaff
     val connectAsAdmin: String get() = g1.connectAsAdmin
     val tryDemo: String get() = g1.tryDemo
+    val joinAsOrderingMode: String get() = g1.joinAsOrderingMode
+    val reloginAsCafeAdmin: String get() = g1.reloginAsCafeAdmin
+    val setupWizard: String get() = g1.setupWizard
     val tableView: String get() = g1.tableView
     val free: String get() = g1.free
     val newOrder: String get() = g1.newOrder
@@ -1054,6 +1060,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             connectAsStaff = "Sambung sebagai Kakitangan Pesanan",
             connectAsAdmin = "Sambung sebagai Admin",
             tryDemo = "Cuba Demo (Mod Luar Talian)",
+            joinAsOrderingMode = "Sertai sebagai Mod Pesanan",
+            reloginAsCafeAdmin = "Log Masuk Semula sebagai Admin Kafe",
+            setupWizard = "Wizard Persediaan",
             tableView = "Paparan Meja",
             free = "Kosong",
             newOrder = "Pesanan Baharu",
@@ -1543,6 +1552,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             connectAsStaff = "Connect as Ordering Staff",
             connectAsAdmin = "Connect as Admin",
             tryDemo = "Try Demo (Offline Mode)",
+            joinAsOrderingMode = "Join as Ordering mode",
+            reloginAsCafeAdmin = "Relogin as Café Admin",
+            setupWizard = "Setup Wizard",
             tableView = "Table View",
             free = "Free",
             newOrder = "New Order",
@@ -2032,6 +2044,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             connectAsStaff = "以点餐员身份连接",
             connectAsAdmin = "以管理员身份连接",
             tryDemo = "试用演示（离线模式）",
+            joinAsOrderingMode = "以点餐模式加入",
+            reloginAsCafeAdmin = "重新登录为咖啡馆管理员",
+            setupWizard = "设置向导",
             tableView = "餐桌视图",
             free = "空闲",
             newOrder = "新订单",
@@ -2519,6 +2534,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             connectAsStaff = "ஆர்டர் பணியாளராக இணை",
             connectAsAdmin = "நிர்வாகியாக இணை",
             tryDemo = "டெமோவை முயற்சிக்கவும் (ஆஃப்லைன் பயன்முறை)",
+            joinAsOrderingMode = "ஆர்டர் பயன்முறையில் சேரவும்",
+            reloginAsCafeAdmin = "கஃபே நிர்வாகியாக மீண்டும் உள்நுழைக",
+            setupWizard = "அமைவு வழிகாட்டி",
             tableView = "மேசை காட்சி",
             free = "காலி",
             newOrder = "புதிய ஆர்டர்",
@@ -3008,6 +3026,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             connectAsStaff = "เชื่อมต่อในฐานะพนักงานรับออเดอร์",
             connectAsAdmin = "เชื่อมต่อในฐานะผู้ดูแลระบบ",
             tryDemo = "ทดลองใช้เดโม (โหมดออฟไลน์)",
+            joinAsOrderingMode = "เข้าร่วมในโหมดรับออเดอร์",
+            reloginAsCafeAdmin = "เข้าสู่ระบบใหม่ในฐานะแอดมินคาเฟ่",
+            setupWizard = "ตัวช่วยตั้งค่า",
             tableView = "มุมมองโต๊ะ",
             free = "ว่าง",
             newOrder = "ออเดอร์ใหม่",
