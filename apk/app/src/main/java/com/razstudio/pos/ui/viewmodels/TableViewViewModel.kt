@@ -56,7 +56,17 @@ class TableViewViewModel @Inject constructor(
     private val printService: PrintService,
     private val languageManager: LanguageManager,
     private val paymentQrResolver: com.razstudio.pos.data.PaymentQrResolver,
+    modeRepository: com.razstudio.pos.data.ModeRepository,
 ) : ViewModel() {
+
+    /**
+     * The café's active topology, for the badge in the admin top bar (task 9.4, Requirement 1.4).
+     *
+     * Surfaced from [com.razstudio.pos.data.ModeRepository] rather than read once at construction, so
+     * a mode changed in Setup is reflected the moment the operator returns rather than at next launch
+     * — a badge that can be stale about the one thing it exists to report is worse than none.
+     */
+    val activeMode: StateFlow<com.razstudio.pos.data.OperatingMode> = modeRepository.activeMode
 
     private fun str() = uiStrings(languageManager.language.value)
 

@@ -1,5 +1,9 @@
 package com.razstudio.pos.ui.screens
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +22,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -27,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -102,11 +108,17 @@ fun SetupScreen(
             Field("Café name", "Your Café", state.cafeName,
                 KeyboardType.Text) { v -> viewModel.update { it.copy(cafeName = v) } }
 
+            if (state.operatingMode == OperatingMode.LAN) {
+                // ── Task 21.1: the network the café will actually run on ─────────────────────────
+                SectionHeader("Wi-Fi for staff devices")
+                HotspotGuidance()
+            }
+
             if (state.operatingMode != OperatingMode.CLOUD) {
                 HelpText(
                     "Next: pair the printer from Café Management → Printers. " +
                         if (state.operatingMode == OperatingMode.LAN) {
-                            "Staff devices join over your Wi-Fi from the Devices screen."
+                            "Then add staff devices from the Devices screen."
                         } else {
                             "Kiosk Mode runs on this device alone — no tables, no staff devices, " +
                                 "and orders are identified by a running number instead of a table."
@@ -140,6 +152,76 @@ fun SetupScreen(
             ) {
                 Text(if (state.saved) "Saved ✓" else "Save")
             }
+        }
+    }
+}
+
+/**
+ * Task 21.1 — get the café's Wi-Fi up, by telling the operator how (Requirements 4.3, 4.3.1).
+ *
+ * ### Why this is instructions and a shortcut rather than a switch
+ *
+ * There is deliberately **no** "turn on hotspot" button, because Android offers no way to build one
+ * that works here:
+ *
+ *  - Programmatic tethering has no public API. The methods that exist
+ *    (`ConnectivityManager.startTethering`, the old `WifiManager.setWifiApEnabled`) are hidden or
+ *    system-signature only, so calling them means reflection that breaks between OEM builds — on the
+ *    device a café is relying on to take orders.
+ *  - `WifiManager.startLocalOnlyHotspot` is public, and is the trap. It brings up a **system-named**
+ *    AP with a generated SSID and password the operator cannot choose or write down, carries no
+ *    internet path, and is tied to the lifetime of the requesting app — it dies when the app is
+ *    backgrounded or the process is killed. A café would find its staff devices dropped off the
+ *    network every time the tablet slept.
+ *
+ * So the honest implementation is the one that keeps working: send the operator to the real system
+ * screen, where the AP they create is theirs, named, persistent, and survives the app.
+ *
+ * The action falls back through three intents because `TETHER_SETTINGS` is not present on every
+ * build, and a dead button is worse than a plain instruction.
+ */
+@Composable
+private fun HotspotGuidance() {
+    val context = LocalContext.current
+
+    HelpText(
+        "Staff devices need to be on the same network as this one. Turn on this device's " +
+            "hotspot in Android settings, then connect each staff phone to it. Give it a name " +
+            "and password you can share — the café will use this network every day."
+    )
+
+    OutlinedButton(
+        onClick = { context.openHotspotSettings() },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text("Open hotspot settings")
+    }
+
+    HelpText(
+        "An existing Wi-Fi router works just as well — if the café already has one, connect this " +
+            "device and the staff phones to it and skip the hotspot."
+    )
+}
+
+/**
+ * Open the OEM's hotspot/tethering screen, degrading to progressively broader targets.
+ *
+ * `TETHER_SETTINGS` is undocumented-but-widespread rather than guaranteed, and several OEMs move or
+ * remove it, so an unguarded start would throw [ActivityNotFoundException] and crash the wizard.
+ * Wireless settings, then the top-level settings app, are always present.
+ */
+private fun Context.openHotspotSettings() {
+    val candidates = listOf(
+        Intent("com.android.settings.TETHER_SETTINGS"),
+        Intent(Settings.ACTION_WIRELESS_SETTINGS),
+        Intent(Settings.ACTION_SETTINGS),
+    )
+    for (intent in candidates) {
+        try {
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        } catch (_: ActivityNotFoundException) {
+            // Try the next, broader target.
         }
     }
 }

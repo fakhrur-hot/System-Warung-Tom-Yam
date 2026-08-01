@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import com.razstudio.pos.data.AppConfigStore
 import com.razstudio.pos.data.ModeRepository
 import com.razstudio.pos.data.OperatingMode
+import com.razstudio.pos.data.SecureStorage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +38,7 @@ data class SetupState(
 class SetupViewModel @Inject constructor(
     private val appConfig: AppConfigStore,
     private val modeRepository: ModeRepository,
+    private val secureStorage: SecureStorage,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -96,8 +98,16 @@ class SetupViewModel @Inject constructor(
             githubToken = s.githubToken,
         )
 
-        // Written after the credentials, so a device can never be left in LAN Mode while still
-        // holding a live Supabase URL if the process dies between the two writes.
+        // Task 9.3: the cloud session token and ordering api key go too. Clearing the URL alone is
+        // not enough — SecureStorage.isAuthenticated() answers from whichever credential matches the
+        // stored role, so a device switched to LAN while still holding one keeps reporting itself as
+        // signed in against a backend it no longer talks to, and routes straight past the screens
+        // that are meant to establish the new topology.
+        if (!cloud) secureStorage.clearCloudCredentials()
+
+        // Written last, so a device can never end up flagged as LAN while still holding live cloud
+        // credentials if the process dies mid-save. The reverse ordering leaves it merely
+        // un-switched, which the operator can see and retry.
         modeRepository.setMode(s.operatingMode)
 
         _state.value = s.copy(saved = true)

@@ -674,9 +674,11 @@ class LocalBackend @Inject constructor(
         orderDao.insertOrderItems(newItems)
 
         val all = existing + newItems
-        val updated = order.copy(total = all.sumOf { it.unitPriceSnapshot * it.quantity })
-        orderDao.insertOrder(updated)
-        return ApiResult.Success(updated.toDto(all))
+        val newTotal = all.sumOf { it.unitPriceSnapshot * it.quantity }
+        // updateOrderTotal, never insertOrder: REPLACE on the parent cascades and deletes the very
+        // lines just written. See OrderDao.updateOrderTotal.
+        orderDao.updateOrderTotal(orderId, newTotal)
+        return ApiResult.Success(order.copy(total = newTotal).toDto(all))
     }
 
     /**
@@ -736,9 +738,9 @@ class LocalBackend @Inject constructor(
 
         orderDao.deleteItemsForOrder(orderId)
         orderDao.insertOrderItems(kept)
-        val updated = order.copy(total = kept.sumOf { it.unitPriceSnapshot * it.quantity })
-        orderDao.insertOrder(updated)
-        return ApiResult.Success(updated.toDto(kept))
+        val newTotal = kept.sumOf { it.unitPriceSnapshot * it.quantity }
+        orderDao.updateOrderTotal(orderId, newTotal)
+        return ApiResult.Success(order.copy(total = newTotal).toDto(kept))
     }
 
     /**
