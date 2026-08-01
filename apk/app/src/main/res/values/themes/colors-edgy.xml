@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ⚡ EDGY — Dark charcoal with electric lime-green accents.
+    Sharp, rebellious. Suits underground cafés, late-night spots, and streetwear-adjacent brands.
+
+    Note: 50–700 use a light lime ramp to keep the app readable in light-only mode.
+    The dark charcoal is reserved for 800–900 (headings, text).
+
+    To apply: copy these values into res/values/colors.xml, or supply this file
+    as a café profile source set override.
+-->
+<resources>
+    <!-- Primary ramp (10 shades from 50-900) -->
+    <color name="tom_yam_50">#F0FDF4</color>  <!-- very pale lime background -->
+    <color name="tom_yam_100">#DCFCE7</color> <!-- pale green containers -->
+    <color name="tom_yam_200">#BBF7D0</color>
+    <color name="tom_yam_300">#86EFAC</color>
+    <color name="tom_yam_400">#4ADE80</color>
+    <color name="tom_yam_500">#22C55E</color>
+    <color name="tom_yam_600">#16A34A</color> <!-- neon green primary — buttons, active states -->
+    <color name="tom_yam_700">#15803D</color> <!-- deep green hover -->
+    <color name="tom_yam_800">#1C1C1C</color> <!-- dark charcoal -->
+    <color name="tom_yam_900">#0A0A0A</color> <!-- near-black headings -->
+
+    <color name="tom_yam_muted">#6B7280</color>
+    <color name="tom_yam_outline">#BBF7D0</color>
+</resources>

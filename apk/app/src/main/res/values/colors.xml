@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Neutral template palette (indigo) — the generic vendor default shipped with the template build,
+         with no café branding. A café-specific build overrides these values to its own colors. The
+         resource names (tom_yam_50, etc.) are kept stable so the theme wiring downstream needs no
+         changes. These map to the TomYam* ramp names in Color.kt. -->
+
+    <!-- Primary ramp (10 shades from 50-900) -->
+    <color name="tom_yam_50">#EEF2FF</color>  <!-- page background / input tint -->
+    <color name="tom_yam_100">#E0E7FF</color> <!-- containers, chips -->
+    <color name="tom_yam_200">#C7D2FE</color>
+    <color name="tom_yam_300">#A5B4FC</color>
+    <color name="tom_yam_400">#818CF8</color>
+    <color name="tom_yam_500">#6366F1</color>
+    <color name="tom_yam_600">#4F46E5</color> <!-- primary accent — buttons, active states -->
+    <color name="tom_yam_700">#4338CA</color> <!-- hover / pressed -->
+    <color name="tom_yam_800">#3730A3</color>
+    <color name="tom_yam_900">#312E81</color> <!-- headings / primary text -->
+
+    <!-- Neutral muted slate for secondary text. -->
+    <color name="tom_yam_muted">#6B7280</color>
+    <color name="tom_yam_outline">#C7D2FE</color>
+</resources>

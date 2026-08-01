@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    🌸 SOFT — Blush pink with lavender undertones.
+    Gentle, romantic. Suits dessert cafés, patisseries and brunch spots.
+
+    To apply: copy these values into res/values/colors.xml, or supply this file
+    as a café profile source set override.
+-->
+<resources>
+    <!-- Primary ramp (10 shades from 50-900) -->
+    <color name="tom_yam_50">#FDF2F8</color>  <!-- pale blush background -->
+    <color name="tom_yam_100">#FCE7F3</color> <!-- light pink containers -->
+    <color name="tom_yam_200">#FBCFE8</color>
+    <color name="tom_yam_300">#F9A8D4</color>
+    <color name="tom_yam_400">#F472B6</color>
+    <color name="tom_yam_500">#EC4899</color>
+    <color name="tom_yam_600">#BE185D</color> <!-- deep rose primary — buttons, active states -->
+    <color name="tom_yam_700">#9D174D</color> <!-- dark rose hover -->
+    <color name="tom_yam_800">#831843</color>
+    <color name="tom_yam_900">#500724</color> <!-- deep plum headings -->
+
+    <color name="tom_yam_muted">#9F8595</color>
+    <color name="tom_yam_outline">#FBCFE8</color>
+</resources>

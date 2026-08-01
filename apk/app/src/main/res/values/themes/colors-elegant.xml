@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    💎 ELEGANT — Ivory/champagne backgrounds with rose gold accents.
+    Refined, timeless. Suits upscale cafés and fine dining.
+
+    To apply: copy these values into res/values/colors.xml, or supply this file
+    as a café profile source set override.
+-->
+<resources>
+    <!-- Primary ramp (10 shades from 50-900) -->
+    <color name="tom_yam_50">#FDF8F5</color>  <!-- near-white ivory page background -->
+    <color name="tom_yam_100">#F5EBE0</color> <!-- warm white containers -->
+    <color name="tom_yam_200">#E8D5C4</color>
+    <color name="tom_yam_300">#D4B8A0</color>
+    <color name="tom_yam_400">#BF9880</color>
+    <color name="tom_yam_500">#B07B6A</color>
+    <color name="tom_yam_600">#B5706A</color> <!-- rose gold primary — buttons, active states -->
+    <color name="tom_yam_700">#9C5B55</color> <!-- deep rose hover -->
+    <color name="tom_yam_800">#3D2420</color>
+    <color name="tom_yam_900">#2A1815</color> <!-- rich espresso headings -->
+
+    <color name="tom_yam_muted">#9E7B6E</color>
+    <color name="tom_yam_outline">#E8D5C4</color>
+</resources>

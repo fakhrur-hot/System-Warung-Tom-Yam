@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ⬜ MINIMALIST — Pure white with crisp charcoal.
+    Clean, uncluttered. Suits modern, design-forward cafés.
+
+    To apply: copy these values into res/values/colors.xml, or supply this file
+    as a café profile source set override.
+-->
+<resources>
+    <!-- Primary ramp (10 shades from 50-900) -->
+    <color name="tom_yam_50">#FAFAFA</color>  <!-- near-white background -->
+    <color name="tom_yam_100">#F4F4F5</color> <!-- light grey containers -->
+    <color name="tom_yam_200">#E4E4E7</color>
+    <color name="tom_yam_300">#D1D1D6</color>
+    <color name="tom_yam_400">#A1A1AA</color>
+    <color name="tom_yam_500">#71717A</color>
+    <color name="tom_yam_600">#27272A</color> <!-- charcoal primary — buttons, active states -->
+    <color name="tom_yam_700">#18181B</color> <!-- near-black hover -->
+    <color name="tom_yam_800">#09090B</color>
+    <color name="tom_yam_900">#000000</color> <!-- pure black headings -->
+
+    <color name="tom_yam_muted">#71717A</color>
+    <color name="tom_yam_outline">#E4E4E7</color>
+</resources>

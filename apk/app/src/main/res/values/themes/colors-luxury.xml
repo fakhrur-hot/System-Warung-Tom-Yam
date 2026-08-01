@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    🎩 LUXURY — Warm ivory backgrounds with antique gold accents.
+    Opulent, high-end feel. Suitable for premium dining establishments.
+
+    To apply: copy these values into res/values/colors.xml, or supply this file
+    as a café profile source set override.
+-->
+<resources>
+    <!-- Primary ramp (10 shades from 50-900) -->
+    <color name="tom_yam_50">#F8F4E8</color>  <!-- warm ivory page background -->
+    <color name="tom_yam_100">#EDE4CC</color> <!-- champagne containers -->
+    <color name="tom_yam_200">#D4C4A0</color>
+    <color name="tom_yam_300">#B8A070</color>
+    <color name="tom_yam_400">#9C8448</color>
+    <color name="tom_yam_500">#C9A227</color>
+    <color name="tom_yam_600">#D4AF37</color> <!-- GOLD primary — buttons, active states -->
+    <color name="tom_yam_700">#B8941F</color> <!-- deep gold hover -->
+    <color name="tom_yam_800">#2C1810</color>
+    <color name="tom_yam_900">#1A0F0A</color> <!-- rich dark brown headings -->
+
+    <color name="tom_yam_muted">#8B7355</color>
+    <color name="tom_yam_outline">#D4C4A0</color>
+</resources>
