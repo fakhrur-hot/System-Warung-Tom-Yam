@@ -41,6 +41,14 @@ interface PairedDeviceDao {
     fun getAll(): Flow<List<PairedDevice>>
 
     /**
+     * One-shot read of every paired device, for callers answering a single request rather than
+     * observing. `LocalBackend.getDevices` serves a `devices` GET and returns once; collecting the
+     * Flow above would mean subscribing to a stream only to take its first value.
+     */
+    @Query("SELECT * FROM paired_devices")
+    suspend fun getAllOnce(): List<PairedDevice>
+
+    /**
      * Returns the [PairedDevice] with the given [id], or `null` if no such device is paired.
      * Used during request authentication to look up the device making the request.
      */

@@ -31,10 +31,11 @@ import androidx.room.TypeConverters
         PrintJob::class,
         OrderNumberSequence::class,
         PairedDevice::class,
+        PairingToken::class,
         CafeSession::class,
         DailyAggregate::class
     ],
-    version = 13,
+    version = 14,
     // exportSchema = true so MigrationTestHelper can validate the schema after migration.
     // Schema JSON files are written to app/schemas/ and committed to source control so that
     // future migration tests can verify against a stable baseline (Requirement 8.1, 12.6).
@@ -51,6 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun printJobDao(): PrintJobDao
     abstract fun orderNumberSequenceDao(): OrderNumberSequenceDao
     abstract fun pairedDeviceDao(): PairedDeviceDao
+    abstract fun pairingTokenDao(): PairingTokenDao
     abstract fun cafeSessionDao(): CafeSessionDao
     abstract fun dailyAggregateDao(): DailyAggregateDao
 }

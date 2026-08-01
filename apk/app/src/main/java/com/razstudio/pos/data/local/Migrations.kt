@@ -124,3 +124,28 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
         db.execSQL("ALTER TABLE system_settings ADD COLUMN defaultLangCustomer TEXT NOT NULL DEFAULT 'BM'")
     }
 }
+/**
+ * v13 -> v14: LAN Mode device pairing (Requirements 5.1, 5.3, 5.4).
+ *
+ * Adds `pairing_tokens` — single-use, time-limited codes a Client Device presents to register — and
+ * one nullable column on `paired_devices` holding the raw credential until the client collects it.
+ *
+ * `pendingCredential` is nullable with no default precisely because it should be absent for every
+ * existing row: devices paired before this migration already hold their credential, and inventing
+ * one for them would be issuing a second, unknown secret against a device that is working.
+ */
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS pairing_tokens (
+                token        TEXT NOT NULL PRIMARY KEY,
+                expiresAtMs  INTEGER NOT NULL,
+                usedAtMs     INTEGER,
+                createdAtMs  INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL("ALTER TABLE paired_devices ADD COLUMN pendingCredential TEXT")
+    }
+}

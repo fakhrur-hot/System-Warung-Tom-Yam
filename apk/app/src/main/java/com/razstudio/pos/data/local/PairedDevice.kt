@@ -30,5 +30,19 @@ data class PairedDevice(
     /** BCrypt/SHA-256 hash of the pairing credential accepted for this device. Never the raw value. */
     val credentialHash: String,
     /** Epoch-millisecond timestamp of the most recent successful request from this device. */
-    val lastSeenMs: Long
+    val lastSeenMs: Long,
+    /**
+     * The raw credential, held ONLY until the client collects it once (task 5.1).
+     *
+     * The client learns its credential the same way it does in Cloud Mode: it polls
+     * `devices-status` while waiting on the approval screen, and the api key arrives in that
+     * response. So the Server Device has to be able to hand the value over exactly once, which a
+     * hash cannot do — hence this column alongside [credentialHash].
+     *
+     * It is cleared the moment it is delivered, so the window is from registration to the paired
+     * device's first poll after approval, and only ever on the Server Device's own app-private
+     * storage. After that this is null and [credentialHash] is the only record, which is the state
+     * Requirement 5.4 describes.
+     */
+    val pendingCredential: String? = null
 )

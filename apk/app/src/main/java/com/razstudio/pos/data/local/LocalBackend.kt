@@ -47,11 +47,15 @@ import javax.inject.Singleton
  *   via [com.razstudio.pos.data.ModeCapabilities] rather than a mode comparison here.
  * - **Sessions, aggregates, tables** (task 4.5) — the café's open/close log and daily aggregate are
  *   written straight to Room, because off-cloud this device is the only place they exist.
+ * - **Pairing and devices** (tasks 5.1, 5.2) — single-use time-limited pairing codes, registration,
+ *   the approval poll, the device list, and approve/reject/revoke/rename. A Client's credential is
+ *   minted at registration and handed over exactly once, on its first poll after approval, which is
+ *   the contract `PendingApprovalScreen` already expects.
  *
  * ### Not implemented, and why the rest still throw
  *
- * Pairing, invites, devices, branding and attendance belong to later tasks. They still throw, which
- * is deliberate and preferable to returning plausible empty values: a stub answering
+ * Admin recovery, branding and attendance belong to later tasks. They still throw, which is
+ * deliberate and preferable to returning plausible empty values: a stub answering
  * `ApiResult.Success(emptyList())` would let a half-built LAN Mode look like it was working while
  * silently losing data. Throwing means the first unimplemented call site is impossible to miss, and
  * the exception names the method so it is obvious which task owns it.
@@ -77,6 +81,8 @@ class LocalBackend @Inject constructor(
     private val modeRepository: ModeRepository,
     private val menuCategoryStore: MenuCategoryStore,
     private val localImageStore: LocalImageStore,
+    private val pairedDeviceDao: PairedDeviceDao,
+    private val pairingTokenDao: PairingTokenDao,
 ) : BackendGateway {
 
     private companion object {
@@ -90,16 +96,130 @@ class LocalBackend @Inject constructor(
         /** Fixed-width ISO-8601 UTC, always 6 fractional digits — see [nowTimestamp]. */
         private val TIMESTAMP_FORMAT: DateTimeFormatter =
             DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSSSS'Z'").withZone(ZoneOffset.UTC)
+
+        /**
+         * The device-status and role vocabulary, matching what the Cloud `devices` endpoint returns
+         * and what `DevicesViewModel` / `PendingApprovalViewModel` compare against. String literals
+         * scattered across the methods below would let a typo silently create a fourth status that
+         * nothing matches, leaving a device stuck on the approval screen forever.
+         */
+        private const val STATUS_PENDING = "PENDING"
+        private const val STATUS_APPROVED = "APPROVED"
+        private const val STATUS_REVOKED = "REVOKED"
+        private const val ROLE_ORDERING = "ORDERING"
+
+        /**
+         * Hashes a credential string using SHA-256.
+         * The raw credential is never stored in the database — only the hash (Requirement 5.4).
+         */
+        private fun hashCredential(credential: String): String {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            val hashBytes = digest.digest(credential.toByteArray(Charsets.UTF_8))
+            return hashBytes.joinToString("") { "%02x".format(it) }
+        }
     }
 
     override suspend fun adminHandshakeDebug(deviceId: String, cafeName: String): ApiResult<String> =
         notImplemented("adminHandshakeDebug")
 
-    override suspend fun register(inviteToken: String, deviceId: String, deviceModel: String, androidId: String, appVersion: String): ApiResult<RegisterResponse> =
-        notImplemented("register")
+    /**
+     * Register a Client Device against a pairing code (task 5.1, Requirements 5.1, 5.3).
+     *
+     * The token must exist, be unexpired and unused; consuming it is what makes a code single-use, so
+     * a photographed pairing screen cannot enrol a second device later.
+     *
+     * The device lands as `PENDING` and its credential is minted now but withheld — see
+     * [pollDeviceStatus], which hands it over once the admin approves. Nothing a PENDING device can
+     * present is accepted in the meantime, so an early credential grants nothing.
+     *
+     * Re-registering an already-approved device is refused rather than silently re-issuing. That path
+     * would otherwise rotate a working device's credential out from under it, and the symptom — a
+     * staff phone that suddenly cannot take orders mid-service — gives no hint of the cause.
+     */
+    override suspend fun register(
+        inviteToken: String,
+        deviceId: String,
+        deviceModel: String,
+        androidId: String,
+        appVersion: String,
+    ): ApiResult<RegisterResponse> {
+        val nowMs = System.currentTimeMillis()
 
-    override suspend fun pollDeviceStatus(deviceId: String): ApiResult<DeviceStatusResponse> =
-        notImplemented("pollDeviceStatus")
+        val existing = pairedDeviceDao.getById(deviceId)
+        if (existing != null && existing.status == STATUS_APPROVED) {
+            return ApiResult.Error(
+                "ALREADY_PAIRED",
+                "This device is already paired and approved",
+            )
+        }
+
+        pairingTokenDao.getValidToken(inviteToken, nowMs)
+            ?: return ApiResult.Error(
+                "INVALID_TOKEN",
+                "Pairing code is invalid, expired, or already used",
+            )
+
+        val credential = UUID.randomUUID().toString()
+
+        pairedDeviceDao.insert(
+            PairedDevice(
+                id = deviceId,
+                // The model, not the androidId. This string is what the admin reads on the Devices
+                // screen when deciding whether to approve; a 16-char opaque hex id tells them nothing
+                // about which phone on the counter is asking, so they cannot approve safely.
+                name = deviceModel.ifBlank { androidId },
+                model = deviceModel,
+                // LAN Mode is one ADMIN Server plus N ORDERING Clients — ModeCapabilities.secondaryAdmin
+                // is false off-cloud, so ORDERING is the only role a pairing can produce here. This is
+                // the design, not a placeholder: a second admin would need its own approval path and a
+                // session token, neither of which exists off-cloud.
+                role = ROLE_ORDERING,
+                status = STATUS_PENDING,
+                credentialHash = hashCredential(credential),
+                lastSeenMs = nowMs,
+                pendingCredential = credential,
+            )
+        )
+
+        pairingTokenDao.markUsed(inviteToken, nowMs)
+
+        return ApiResult.Success(RegisterResponse(deviceId = deviceId, status = STATUS_PENDING))
+    }
+
+    /**
+     * Approval state for a waiting Client Device (task 5.1, Requirement 5.3).
+     *
+     * This is also where a newly approved device **receives its credential**, matching the Cloud
+     * contract that `PendingApprovalScreen` already polls against: it reads `apiKey` from this
+     * response and hands it to `SecureStorage`. Returning null here — as an earlier draft did — pairs
+     * the device, shows it as approved, and leaves it permanently unable to authenticate, with no
+     * error anywhere to explain why.
+     *
+     * Delivery is once. The raw value is cleared as it is handed over, so the hash becomes the only
+     * remaining record (Requirement 5.4). A device that loses its credential afterwards has to be
+     * revoked and paired again, which is the correct outcome: re-issuing on demand to anyone who
+     * knows a device id would be a way to mint credentials.
+     */
+    override suspend fun pollDeviceStatus(deviceId: String): ApiResult<DeviceStatusResponse> {
+        val device = pairedDeviceDao.getById(deviceId)
+            ?: return ApiResult.Error("NOT_FOUND", "Device not found")
+
+        val deliverNow = device.status == STATUS_APPROVED && device.pendingCredential != null
+        if (deliverNow) {
+            pairedDeviceDao.update(device.copy(pendingCredential = null, lastSeenMs = System.currentTimeMillis()))
+        }
+
+        return ApiResult.Success(
+            DeviceStatusResponse(
+                status = device.status,
+                role = device.role,
+                apiKey = if (deliverNow) device.pendingCredential else null,
+                // Off-cloud there is no ADMIN_SECONDARY role and so no admin session token to issue;
+                // ModeCapabilities.secondaryAdmin is false for both LAN and Kiosk.
+                sessionToken = null,
+            )
+        )
+    }
 
     override suspend fun recoverAdmin(recoveryToken: String, deviceId: String, deviceModel: String): ApiResult<String> =
         notImplemented("recoverAdmin")
@@ -107,17 +227,95 @@ class LocalBackend @Inject constructor(
     override suspend fun getRecoveryToken(): ApiResult<InviteResponse> =
         notImplemented("getRecoveryToken")
 
-    override suspend fun getInvite(role: String?): ApiResult<InviteResponse> =
-        notImplemented("getInvite")
+    /**
+     * The current pairing code, minting one if none is live (task 5.2, Requirement 5.4).
+     *
+     * Idempotent on purpose: the admin opens the Devices screen, shows the code to a staff phone, the
+     * screen recomposes, and the same code must still be on it. Minting per call would invalidate the
+     * code the moment the admin looked away from it.
+     *
+     * The `url` is blank rather than a `https://…/join?invite=` link. Deep-link invitations need a
+     * website ([ModeCapabilities.websiteInvites] is false off-cloud), so a URL here would be one that
+     * resolves nowhere — the Devices screen renders the token as a QR, which is what a Client scans.
+     */
+    override suspend fun getInvite(role: String?): ApiResult<InviteResponse> {
+        val nowMs = System.currentTimeMillis()
+        val live = pairingTokenDao.getCurrentToken(nowMs)
+        if (live != null) return ApiResult.Success(InviteResponse(token = live.token, url = ""))
 
-    override suspend fun regenerateInvite(role: String?): ApiResult<InviteResponse> =
-        notImplemented("regenerateInvite")
+        val minted = pairingTokenDao.generateToken()
+        return ApiResult.Success(InviteResponse(token = minted.token, url = ""))
+    }
 
+    /**
+     * Rotate the pairing code (task 5.2, Requirement 5.6).
+     *
+     * Only unused tokens are discarded. Already-approved devices are untouched — they authenticate
+     * with their own credential, which was never derived from the token — so rotating after a code
+     * leaks locks out the leak without knocking every staff phone in the café off the system.
+     */
+    override suspend fun regenerateInvite(role: String?): ApiResult<InviteResponse> {
+        val nowMs = System.currentTimeMillis()
+        pairingTokenDao.getCurrentToken(nowMs)?.let { pairingTokenDao.deleteToken(it.token) }
+
+        val minted = pairingTokenDao.generateToken()
+        return ApiResult.Success(InviteResponse(token = minted.token, url = ""))
+    }
+
+    /**
+     * Every paired Client Device, for the Devices screen (task 5.2, Requirement 5.4).
+     *
+     * `isCheckedIn` is reported false throughout: attendance is a GPS check-in feature that belongs to
+     * the cloud `attendance` endpoint and has no off-cloud equivalent. False is the honest answer —
+     * the alternative would be a screen showing staff as on shift based on nothing.
+     */
     override suspend fun getDevices(): ApiResult<List<DeviceDto>> =
-        notImplemented("getDevices")
+        ApiResult.Success(pairedDeviceDao.getAllOnce().map { it.toDto() })
 
-    override suspend fun patchDevice(deviceId: String, action: String, label: String?): ApiResult<DeviceDto> =
-        notImplemented("patchDevice")
+    /**
+     * Approve, reject, revoke or rename a device (task 5.2, Requirements 5.4, 5.6).
+     *
+     * REJECT and REVOKE both end in `REVOKED` and clear any undelivered credential, so a device
+     * refused while still waiting cannot pick one up afterwards by continuing to poll. The row is
+     * kept rather than deleted: the admin needs to see *that* a device was refused, and a deleted row
+     * would simply let the same device register again into a fresh PENDING state, which looks
+     * identical to a first attempt.
+     */
+    override suspend fun patchDevice(
+        deviceId: String,
+        action: String,
+        label: String?,
+    ): ApiResult<DeviceDto> {
+        val device = pairedDeviceDao.getById(deviceId)
+            ?: return ApiResult.Error("NOT_FOUND", "Device not found")
+
+        val updated = when (action.uppercase()) {
+            "APPROVE" -> device.copy(status = STATUS_APPROVED)
+
+            // The credential is dropped here, not just the status changed — see the KDoc above.
+            "REJECT", "REVOKE" -> device.copy(status = STATUS_REVOKED, pendingCredential = null)
+
+            "RENAME" -> {
+                val trimmed = label?.trim().orEmpty()
+                if (trimmed.isBlank()) {
+                    return ApiResult.Error("VALIDATION", "A device label cannot be blank")
+                }
+                device.copy(name = trimmed)
+            }
+
+            // Attendance has no off-cloud implementation, so there is no check-in to force. Reported
+            // rather than silently succeeding, which would leave the admin believing it worked.
+            "FORCE_CHECKOUT" -> return ApiResult.Error(
+                "UNSUPPORTED",
+                "Attendance check-in is not available off-cloud",
+            )
+
+            else -> return ApiResult.Error("VALIDATION", "Unknown action '$action'")
+        }
+
+        pairedDeviceDao.update(updated)
+        return ApiResult.Success(updated.toDto())
+    }
 
     /**
      * Record a café open/close event (task 4.5, Requirement 3.2).
@@ -862,6 +1060,23 @@ class LocalBackend @Inject constructor(
         cancelledBy = cancelledBy,
         createdAt = createdAt,
         items = items.map { it.toDto() },
+    )
+
+    /**
+     * Room row -> wire DTO for the Devices screen.
+     *
+     * `deviceIdentifier` and `id` are the same value off-cloud: the Cloud backend has its own row id
+     * distinct from the device's self-generated identifier, whereas here the device identifier IS the
+     * primary key, so there is no second id to report.
+     */
+    private fun PairedDevice.toDto(): DeviceDto = DeviceDto(
+        id = id,
+        deviceIdentifier = id,
+        label = name,
+        role = role,
+        status = status,
+        lastSeenAt = TIMESTAMP_FORMAT.format(java.time.Instant.ofEpochMilli(lastSeenMs)),
+        isCheckedIn = false,
     )
 
     /** Room row -> wire DTO. The wire's `image` field is this row's [MenuItem.imageUrl]. */

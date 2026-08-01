@@ -200,4 +200,41 @@ class AppDatabaseMigrationTest {
             assertEquals("daily_aggregates should be created empty", 0, c.getInt(0))
         }
     }
+
+    @Test
+    fun migrate13To14_addsPairingTablesAndLeavesPairedDevicesUsable() {
+        // ── v13: a café with a staff phone already paired and working ────────────────────────────
+        helper.createDatabase(DB_NAME, 13).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO paired_devices
+                    (id, name, model, role, status, credentialHash, lastSeenMs)
+                VALUES
+                    ('dev-1', 'Counter phone', 'Pixel 6a', 'ORDERING', 'APPROVED', 'abc123', 1754000000000)
+                """.trimIndent()
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(DB_NAME, 14, true, MIGRATION_13_14)
+
+        // ── the working device survived, still APPROVED and still holding its credential hash ────
+        db.query(
+            "SELECT name, role, status, credentialHash, pendingCredential FROM paired_devices WHERE id = 'dev-1'"
+        ).use { c ->
+            assertTrue("the paired device was lost by the migration", c.moveToFirst())
+            assertEquals("Counter phone", c.getString(0))
+            assertEquals("ORDERING", c.getString(1))
+            assertEquals("APPROVED", c.getString(2))
+            assertEquals("abc123", c.getString(3))
+            // Must be NULL, not an invented value: this device already holds its credential, and
+            // materialising a second unknown secret for it would be issuing a credential nobody asked
+            // for against a phone that is working.
+            assertTrue("an already-paired device must not gain a pending credential", c.isNull(4))
+        }
+
+        db.query("SELECT count(*) FROM pairing_tokens").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("pairing_tokens should be created empty", 0, c.getInt(0))
+        }
+    }
 }
