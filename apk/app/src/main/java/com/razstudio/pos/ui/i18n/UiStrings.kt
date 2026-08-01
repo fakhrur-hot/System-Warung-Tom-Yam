@@ -357,6 +357,7 @@ data class UiStringsGroup5(
     val savePngAgain: String,
     val makeMainAdmin: String,
     val invalidOwnerKeyError: String,
+    val noBackendConfiguredError: String,
     val adminAlreadyRegisteredError: String,
     val notAValidKeyOrInvite: String,
     val notAValidInviteQr: String,
@@ -899,6 +900,7 @@ class UiStrings(
     val savePngAgain: String get() = g5.savePngAgain
     val makeMainAdmin: String get() = g5.makeMainAdmin
     val invalidOwnerKeyError: String get() = g5.invalidOwnerKeyError
+    val noBackendConfiguredError: String get() = g5.noBackendConfiguredError
     val adminAlreadyRegisteredError: String get() = g5.adminAlreadyRegisteredError
     val notAValidKeyOrInvite: String get() = g5.notAValidKeyOrInvite
     val notAValidInviteQr: String get() = g5.notAValidInviteQr
@@ -1410,6 +1412,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             savePngAgain = "Simpan PNG semula",
             makeMainAdmin = "Jadikan Utama",
             invalidOwnerKeyError = "Kunci pemilik tidak sah.",
+            noBackendConfiguredError = "Kunci pemilik betul, tetapi apl ini belum disambungkan ke mana-mana kafe. Jalankan Wizard Persediaan dahulu, atau sambung ke Pelayan LAN kafe.",
             adminAlreadyRegisteredError = "Peranti admin telah didaftarkan. Hanya satu peranti admin dibenarkan.",
             notAValidKeyOrInvite = "Itu tidak kelihatan seperti kunci pemilik atau jemputan yang sah.",
             notAValidInviteQr = "Itu tidak kelihatan seperti QR atau kod jemputan yang sah.",
@@ -1929,6 +1932,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             savePngAgain = "Save PNG again",
             makeMainAdmin = "Make Main",
             invalidOwnerKeyError = "Invalid owner key.",
+            noBackendConfiguredError = "The owner key is fine, but this app isn't connected to any café yet. Run the Setup Wizard first, or connect to the café's LAN Server.",
             adminAlreadyRegisteredError = "An admin device is already registered. Only one admin device is allowed.",
             notAValidKeyOrInvite = "That doesn't look like a valid owner key or invite.",
             notAValidInviteQr = "That doesn't look like a valid invite QR or code.",
@@ -2448,6 +2452,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             savePngAgain = "再次保存 PNG",
             makeMainAdmin = "设为主要",
             invalidOwnerKeyError = "店主密钥无效。",
+            noBackendConfiguredError = "店主密钥没有问题，但本应用尚未连接到任何店铺。请先运行设置向导，或连接到店铺的局域网服务器。",
             adminAlreadyRegisteredError = "已注册管理设备。仅允许一台管理设备。",
             notAValidKeyOrInvite = "这看起来不是有效的店主密钥或邀请。",
             notAValidInviteQr = "这看起来不是有效的邀请二维码或代码。",
@@ -2965,6 +2970,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             savePngAgain = "PNG ஐ மீண்டும் சேமி",
             makeMainAdmin = "முதன்மையாக்கு",
             invalidOwnerKeyError = "தவறான உரிமையாளர் விசை.",
+            noBackendConfiguredError = "உரிமையாளர் விசை சரியானது, ஆனால் இந்தச் செயலி இன்னும் எந்தக் கேப்புடனும் இணைக்கப்படவில்லை. முதலில் அமைப்பு விருதுவை இயக்கவும்.",
             adminAlreadyRegisteredError = "நிர்வாக சாதனம் ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது. ஒரு நிர்வாக சாதனம் மட்டுமே அனுமதிக்கப்படும்.",
             notAValidKeyOrInvite = "அது சரியான உரிமையாளர் விசை அல்லது அழைப்பாகத் தெரியவில்லை.",
             notAValidInviteQr = "அது சரியான அழைப்பு QR அல்லது குறியீடாகத் தெரியவில்லை.",
@@ -3484,6 +3490,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             savePngAgain = "บันทึก PNG อีกครั้ง",
             makeMainAdmin = "ตั้งเป็นหลัก",
             invalidOwnerKeyError = "กุญแจเจ้าของไม่ถูกต้อง",
+            noBackendConfiguredError = "กุญแจเจ้าของถูกต้อง แต่แอปนี้ยังไม่ได้เชื่อมต่อกับร้านใด กรุณาเรียกใช้ตัวช่วยตั้งค่าก่อน",
             adminAlreadyRegisteredError = "มีอุปกรณ์ผู้ดูแลระบบลงทะเบียนแล้ว อนุญาตเพียงเครื่องเดียว",
             notAValidKeyOrInvite = "นั่นไม่ใช่กุญแจเจ้าของหรือคำเชิญที่ถูกต้อง",
             notAValidInviteQr = "นั่นไม่ใช่ QR หรือรหัสคำเชิญที่ถูกต้อง",

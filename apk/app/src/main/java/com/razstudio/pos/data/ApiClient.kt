@@ -41,6 +41,17 @@ class ApiClient @Inject constructor(
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 
+    /**
+     * No backend has been configured on this device, so there is nothing to call.
+     *
+     * An [IOException] on purpose: every request path in this class already funnels `IOException`
+     * into [ApiResult.NetworkError], so this reaches the UI as a handled failure rather than as
+     * whatever raw exception text happened to be thrown deeper down.
+     */
+    class BackendNotConfiguredException : IOException(
+        "No backend configured on this device — run Setup, or pair with a LAN Server.",
+    )
+
     // Supabase config is resolved at RUNTIME so one template APK can serve any café: prefer the
     // in-app Setup value, fall back to a compile-time BuildConfig value (set for café-specific
     // builds via local.properties). The Functions base is derived from whichever URL wins.
@@ -68,7 +79,35 @@ class ApiClient @Inject constructor(
         val lan = appConfig.lanServerUrl()
         val useLan = modeRepository.currentMode() == OperatingMode.LAN && lan.isNotBlank()
         val base = if (useLan) lan else supabaseUrl()
+
+        // A blank base used to sail straight through to `Request.Builder().url("/functions/v1/…")`,
+        // where OkHttp threw IllegalArgumentException("Expected URL scheme 'http' or 'https' but no
+        // scheme was found for /funct…"). The generic `catch (e: Exception)` below then handed that
+        // string to the café owner verbatim. It is not a wrong URL — there is no URL at all, because
+        // this device has never been pointed at a backend: the template APK ships with an empty
+        // BuildConfig.SUPABASE_URL, and Setup was either skipped or never completed.
+        //
+        // Failing here, with a typed exception, keeps that diagnosis intact all the way to the UI.
+        // BackendNotConfiguredException is an IOException so every existing call site's
+        // `catch (e: IOException)` already maps it to ApiResult.NetworkError — no new catch blocks,
+        // and no path can regress to the OkHttp message.
+        if (base.isBlank()) throw BackendNotConfiguredException()
+
         return base.trimEnd('/') + "/functions/v1"
+    }
+
+    /**
+     * Is this device pointed at a backend at all?
+     *
+     * For screens that must not start a flow they cannot finish. The admin sign-in screen is the
+     * one that matters: a café owner scanning the owner key on an unconfigured build deserves
+     * "this app isn't connected to a café yet", not a failed round trip. Mirrors [baseUrl]'s rule
+     * exactly, so the two cannot drift.
+     */
+    fun isBackendConfigured(): Boolean {
+        val lan = appConfig.lanServerUrl()
+        if (modeRepository.currentMode() == OperatingMode.LAN && lan.isNotBlank()) return true
+        return supabaseUrl().isNotBlank()
     }
 
     private fun anonKey(): String =
