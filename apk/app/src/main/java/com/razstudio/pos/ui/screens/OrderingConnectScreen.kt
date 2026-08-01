@@ -180,9 +180,26 @@ class OrderingConnectViewModel @Inject constructor(
                     SecureStorage.Role.ORDERING
                 }
                 secureStorage.setRole(resolvedRole)
-                true
+
+                // Task 8.3 — a device the admin already rejected or revoked is told so, rather than
+                // being parked on a waiting screen that can never resolve.
+                //
+                // Task 8.4 — everything else proceeds to the waiting screen. A *failed* status poll
+                // is deliberately not treated as a failed join: registration already succeeded, and
+                // returning false here would send the operator back to the form to register a second
+                // time, creating a duplicate row the admin then has to tell apart.
+                val status = (statusResult as? ApiResult.Success)?.data?.status
+                when (status) {
+                    "REJECTED" -> { errorMessage = strings.deviceRejected; false }
+                    "REVOKED" -> { errorMessage = strings.deviceRevoked; false }
+                    else -> true
+                }
             }
             is ApiResult.Error -> {
+                // Task 8.3 — four outcomes, four messages. `unexpectedStatus` already turns every
+                // unmapped status into an actionable sentence, so `result.message` can no longer be
+                // a bare number; the explicit branch exists so the one the operator can actually fix
+                // is phrased for them.
                 errorMessage = when (result.code) {
                     "INVALID_INVITE" -> strings.invalidInviteError
                     else -> result.message
@@ -190,7 +207,13 @@ class OrderingConnectViewModel @Inject constructor(
                 false
             }
             is ApiResult.NetworkError -> {
-                errorMessage = strings.networkError
+                // "This device has no café at all" and "the café is unreachable" send the operator
+                // in opposite directions, and both used to read "network error".
+                errorMessage = if (!apiClient.isBackendConfigured()) {
+                    strings.noBackendConfiguredError
+                } else {
+                    strings.networkError
+                }
                 false
             }
         }

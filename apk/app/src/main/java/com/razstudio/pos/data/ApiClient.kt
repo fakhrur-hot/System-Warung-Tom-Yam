@@ -47,6 +47,53 @@ class ApiClient @Inject constructor(
          */
         const val QR_PARAM_API = "api"
         const val QR_PARAM_KEY = "key"
+
+        /**
+         * Turn an unmapped HTTP status into an error a café owner can act on (task 8.2).
+         *
+         * This replaced `unexpectedStatus(response.code)` at 39 call
+         * sites. That fallback was on **every** endpoint, so any status nobody had thought about
+         * reached the counter as a bare number — which is precisely how the staff-join defect was
+         * reported: "error 404 straight after scanning". The number was true and told nobody
+         * anything, and it hid a device-id bug for as long as it took to read the source.
+         *
+         * The status is still named, because support conversations need it, but it is never the
+         * whole message: every branch says what happened and what to do next. Requirement 8.2 forbids
+         * a raw status *as the message*, not the mention of one.
+         */
+        fun unexpectedStatus(code: Int): ApiResult.Error = when (code) {
+            404 -> ApiResult.Error(
+                "NOT_FOUND",
+                "The café's server didn't recognise that request (404). This device may be pointed " +
+                    "at the wrong address, or the café's backend needs updating.",
+            )
+            408, 504 -> ApiResult.Error(
+                "TIMEOUT",
+                "The café's server took too long to answer ($code). Check the connection and try again.",
+            )
+            429 -> ApiResult.Error(
+                "RATE_LIMITED",
+                "Too many requests too quickly (429). Wait a moment and try again.",
+            )
+            502, 503 -> ApiResult.Error(
+                "UNAVAILABLE",
+                "The café's server is temporarily unavailable ($code). Try again shortly.",
+            )
+            in 500..599 -> ApiResult.Error(
+                "SERVER_ERROR",
+                "Something went wrong on the café's server ($code). Try again; if it keeps " +
+                    "happening the café's backend needs attention.",
+            )
+            in 400..499 -> ApiResult.Error(
+                "REJECTED",
+                "The café's server refused that request ($code). This device may need to be " +
+                    "re-registered, or the app may be out of date.",
+            )
+            else -> ApiResult.Error(
+                "UNEXPECTED",
+                "Unexpected reply from the café's server ($code). Try again.",
+            )
+        }
     }
 
     /**
@@ -176,6 +223,26 @@ class ApiClient @Inject constructor(
 
     private fun adminBearerToken(): String? = secureStorage.getSessionToken()
 
+    /**
+     * Log enough to diagnose a failed join from a device in the field (task 8.5).
+     *
+     * The staff-join defect was reported as "error 404 straight after scanning" and took a source
+     * read to explain, because nothing recorded *which URL* answered 404 or *which id* was sent. The
+     * two facts that would have settled it in seconds are the resolved base URL and the id — a
+     * client UUID where a server row key was required.
+     *
+     * Logged at WARN so `adb logcat` picks it up on a release build without a debug flag. No
+     * credential is logged: the base URL is a public address, the device id is not a secret, and the
+     * bearer token is never touched.
+     */
+    private fun logJoinFailure(endpoint: String, code: Int, deviceId: String) {
+        android.util.Log.w(
+            "ApiClient",
+            "join failed: $endpoint -> HTTP $code | base=${baseUrl()} | deviceId=$deviceId | " +
+                "mode=${modeRepository.currentMode()}",
+        )
+    }
+
     /** Consume and discard a response body so OkHttp can reuse the connection. */
     private fun Response.consumeBody(): String = use { body?.string() ?: "" }
 
@@ -224,7 +291,7 @@ class ApiClient @Inject constructor(
                 }
                 409 -> ApiResult.Error("ADMIN_EXISTS", "An admin device is already registered")
                 401 -> ApiResult.Error("INVALID_KEY", "Invalid or expired rotating key")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -273,8 +340,14 @@ class ApiClient @Inject constructor(
                         )
                     )
                 }
-                403 -> ApiResult.Error("INVALID_INVITE", "Invalid or expired invitation")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                403 -> {
+                    logJoinFailure("register", response.code, deviceId)
+                    ApiResult.Error("INVALID_INVITE", "Invalid or expired invitation")
+                }
+                else -> {
+                    logJoinFailure("register", response.code, deviceId)
+                    unexpectedStatus(response.code)
+                }
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -311,7 +384,13 @@ class ApiClient @Inject constructor(
                             )
                         )
                     }
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> {
+                        // The exact call that produced the reported "404 straight after scanning".
+                        // Logging the id beside the status is what makes the two-device-ids
+                        // conflation visible from a field device rather than only from the source.
+                        logJoinFailure("devices-status", response.code, deviceId)
+                        unexpectedStatus(response.code)
+                    }
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -365,7 +444,7 @@ class ApiClient @Inject constructor(
                     )
                 }
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -400,7 +479,7 @@ class ApiClient @Inject constructor(
                 when (response.code) {
                     200 -> ApiResult.Success(Unit)
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -438,7 +517,7 @@ class ApiClient @Inject constructor(
                 when (response.code) {
                     200 -> ApiResult.Success(Unit)
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -482,7 +561,7 @@ class ApiClient @Inject constructor(
                         ApiResult.Success(OrdersSyncResponse(orders = orders, serverTime = serverTime))
                     }
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -532,7 +611,7 @@ class ApiClient @Inject constructor(
                         ApiResult.Success(KitchenResponse(order = order, linesToPrint = lines))
                     }
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -584,7 +663,7 @@ class ApiClient @Inject constructor(
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
                     422 -> ApiResult.Error("VALIDATION", "Item unavailable or unknown")
                     409 -> ApiResult.Error("SESSION_LIMIT", "This table has reached the maximum order rounds — pay out and free it first")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -685,7 +764,7 @@ class ApiClient @Inject constructor(
             } else {
                 ApiResult.Error("VALIDATION", "No lines selected")
             }
-            else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+            else -> unexpectedStatus(response.code)
         }
     }
 
@@ -720,7 +799,7 @@ class ApiClient @Inject constructor(
                         ApiResult.Success(parseOrderDto(json))
                     }
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -761,7 +840,7 @@ class ApiClient @Inject constructor(
                     }
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
                     409 -> ApiResult.Error("NOT_SENT_TO_KITCHEN", "Order not yet sent to kitchen")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -800,7 +879,7 @@ class ApiClient @Inject constructor(
                     200 -> ApiResult.Success(Unit)
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
                     403 -> ApiResult.Error("CANCEL_NOT_ALLOWED", "Cannot cancel this order")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -859,7 +938,7 @@ class ApiClient @Inject constructor(
                     ApiResult.Success(devices)
                 }
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -918,7 +997,7 @@ class ApiClient @Inject constructor(
                     )
                 }
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -960,7 +1039,7 @@ class ApiClient @Inject constructor(
                     )
                 }
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1001,7 +1080,7 @@ class ApiClient @Inject constructor(
                     )
                 }
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1052,7 +1131,7 @@ class ApiClient @Inject constructor(
                     )
                 }
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1085,7 +1164,7 @@ class ApiClient @Inject constructor(
                 when (response.code) {
                     200 -> ApiResult.Success(JSONObject(responseBody).getString("sessionToken"))
                     403 -> ApiResult.Error("INVALID_RECOVERY", "Invalid recovery key")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -1155,7 +1234,7 @@ class ApiClient @Inject constructor(
                 }
                 429 -> ApiResult.Error("RATE_LIMITED", "Too many requests")
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired API key")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1209,7 +1288,7 @@ class ApiClient @Inject constructor(
                     }
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired API key")
                     403 -> ApiResult.Error("FORBIDDEN", "Permission denied")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -1251,7 +1330,7 @@ class ApiClient @Inject constructor(
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired API key")
                     403 -> ApiResult.Error("FORBIDDEN", "Permission denied")
                     409 -> ApiResult.Error("NOT_SENT_TO_KITCHEN", "Order not yet sent to kitchen")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -1294,7 +1373,7 @@ class ApiClient @Inject constructor(
                     200 -> ApiResult.Success(Unit)
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired API key")
                     403 -> ApiResult.Error("CANCEL_NOT_ALLOWED", "Cannot cancel this order")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -1349,7 +1428,7 @@ class ApiClient @Inject constructor(
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired API key")
                     422 -> ApiResult.Error("VALIDATION", "Item unavailable or unknown")
                     409 -> ApiResult.Error("SESSION_LIMIT", "This table has reached the maximum order rounds — pay out and free it first")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -1390,7 +1469,7 @@ class ApiClient @Inject constructor(
                         ApiResult.Success(OrdersSyncResponse(orders = orders, serverTime = serverTime))
                     }
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired API key")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -1447,7 +1526,7 @@ class ApiClient @Inject constructor(
                         )
                     )
                 }
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1497,7 +1576,7 @@ class ApiClient @Inject constructor(
                         }
                     }
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired API key")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -1543,7 +1622,7 @@ class ApiClient @Inject constructor(
                 200 -> ApiResult.Success(Unit)
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired API key")
                 403 -> ApiResult.Error("OUTSIDE_RADIUS", "Device GPS outside café radius")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1587,7 +1666,7 @@ class ApiClient @Inject constructor(
             when (response.code) {
                 200 -> ApiResult.Success(Unit)
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1628,7 +1707,7 @@ class ApiClient @Inject constructor(
                     }
                     ApiResult.Success(tables)
                 }
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code} $responseBody")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1663,7 +1742,7 @@ class ApiClient @Inject constructor(
                     }
                     ApiResult.Success(map)
                 }
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1716,7 +1795,7 @@ class ApiClient @Inject constructor(
                         ApiResult.Success(skipped)
                     }
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code} $responseBody")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -1759,7 +1838,7 @@ class ApiClient @Inject constructor(
                         )
                     }
                 }
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1823,7 +1902,7 @@ class ApiClient @Inject constructor(
                     )
                 }
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1858,7 +1937,7 @@ class ApiClient @Inject constructor(
                 200 -> ApiResult.Success(Unit)
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
                 422 -> ApiResult.Error("VALIDATION", "Invalid settings value")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1930,7 +2009,7 @@ class ApiClient @Inject constructor(
                 }
                 429 -> ApiResult.Error("RATE_LIMITED", "Too many requests")
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -1984,7 +2063,7 @@ class ApiClient @Inject constructor(
                     }
                     401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
                     422 -> ApiResult.Error("VALIDATION", "Invalid image data")
-                    else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                    else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
                 ApiResult.NetworkError(e.message ?: "Network error")
@@ -2020,7 +2099,7 @@ class ApiClient @Inject constructor(
             when (response.code) {
                 200 -> ApiResult.Success(Unit)
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
@@ -2121,7 +2200,7 @@ class ApiClient @Inject constructor(
                         )
                     }
                 }
-                else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")
+                else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
             ApiResult.NetworkError(e.message ?: "Network error")
