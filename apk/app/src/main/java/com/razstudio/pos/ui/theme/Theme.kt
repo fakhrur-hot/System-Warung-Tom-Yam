@@ -52,6 +52,7 @@ fun WarungTomYamTheme(content: @Composable () -> Unit) {
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = activePreset.toTypography(),
         content = content,
     )
 }

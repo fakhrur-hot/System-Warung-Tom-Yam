@@ -1,8 +1,12 @@
 package com.razstudio.pos.ui.theme
 
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import com.razstudio.pos.R
 
 /**
  * Runtime-swappable colour presets. Each preset provides a complete 10-shade ramp that maps
@@ -31,6 +35,20 @@ enum class ThemePreset(
     val shade900: Color,   // headings
     val muted: Color,
     val outline: Color,
+
+    /**
+     * The preset's display typeface, applied to **headings only** — never to body text.
+     *
+     * Two reasons, and the second is the one that matters in a café. First, these six faces are
+     * Latin-only by construction: none contains CJK, Tamil or Thai glyphs, so on four of the app's
+     * five languages Android would fall back per-glyph anyway. Confining them to headings keeps that
+     * fallback where it is least visible. Second, a POS is read under time pressure — setting prices
+     * and menu rows in Dancing Script or Impact would trade legibility for branding at exactly the
+     * moment legibility is worth most.
+     *
+     * `null` means "use the system face throughout", which is what TOM_YAM and MINIMALIST want.
+     */
+    val displayFont: FontFamily? = null,
 ) {
 
     /** 🌶 Tom Yam — deep red. The build-time default and the house identity. */
@@ -67,6 +85,8 @@ enum class ThemePreset(
         shade900 = Color(0xFF1A0F0A),
         muted    = Color(0xFF8B7355),
         outline  = Color(0xFFD4C4A0),
+        // Playfair Display — high-contrast didone, the classic luxury serif
+        displayFont = FontFamily(Font(R.font.playfair_display)),
     ),
 
     /** 💎 Elegant — champagne and rose gold. Refined, timeless. */
@@ -85,6 +105,8 @@ enum class ThemePreset(
         shade900 = Color(0xFF2A1815),
         muted    = Color(0xFF9E7B6E),
         outline  = Color(0xFFE8D5C4),
+        // Cormorant Garamond — a refined old-style serif
+        displayFont = FontFamily(Font(R.font.cormorant_garamond)),
     ),
 
     /** ⬜ Minimalist — pure white and charcoal. Clean, uncluttered. */
@@ -103,6 +125,8 @@ enum class ThemePreset(
         shade900 = Color(0xFF000000),
         muted    = Color(0xFF71717A),
         outline  = Color(0xFFE4E4E7),
+        // Inter — a neutral grotesque, and the open stand-in for Helvetica Neue (proprietary)
+        displayFont = FontFamily(Font(R.font.inter)),
     ),
 
     /** 🔥 Bold — cobalt blue and electric. High contrast, energetic. */
@@ -121,6 +145,8 @@ enum class ThemePreset(
         shade900 = Color(0xFF0F172A),
         muted    = Color(0xFF64748B),
         outline  = Color(0xFFBFDBFE),
+        // Anton — heavy condensed poster face; the open stand-in for Impact (proprietary)
+        displayFont = FontFamily(Font(R.font.anton)),
     ),
 
     /** 🌸 Soft — blush pink and lavender. Gentle, romantic. */
@@ -139,6 +165,8 @@ enum class ThemePreset(
         shade900 = Color(0xFF500724),
         muted    = Color(0xFF9F8595),
         outline  = Color(0xFFFBCFE8),
+        // Dancing Script — a soft script
+        displayFont = FontFamily(Font(R.font.dancing_script)),
     ),
 
     /** ⚡ Edgy — charcoal and electric lime. Sharp, rebellious. */
@@ -157,7 +185,34 @@ enum class ThemePreset(
         shade900 = Color(0xFF0A0A0A),
         muted    = Color(0xFF6B7280),
         outline  = Color(0xFFBBF7D0),
+        // Oswald — tall condensed grotesque
+        displayFont = FontFamily(Font(R.font.oswald)),
     );
+
+    /**
+     * Material3 typography with this preset's face applied to **display and headline styles only**.
+     *
+     * Body, label and title styles keep the platform default deliberately. A POS is read under time
+     * pressure — a menu row or a price in Dancing Script or Anton trades legibility for branding at
+     * the moment legibility is worth most — and these six faces carry Latin only, so on the Chinese,
+     * Tamil and Thai locales Android would fall back per-glyph anyway. Confining them to headings
+     * puts that fallback where it shows least.
+     *
+     * A preset with no [displayFont] returns the defaults untouched, so the colour-only presets
+     * (Tom Yam, and any future one) need no special case anywhere.
+     */
+    fun toTypography(): Typography {
+        val face = displayFont ?: return Typography()
+        val base = Typography()
+        return base.copy(
+            displayLarge  = base.displayLarge.copy(fontFamily = face),
+            displayMedium = base.displayMedium.copy(fontFamily = face),
+            displaySmall  = base.displaySmall.copy(fontFamily = face),
+            headlineLarge = base.headlineLarge.copy(fontFamily = face),
+            headlineMedium = base.headlineMedium.copy(fontFamily = face),
+            headlineSmall = base.headlineSmall.copy(fontFamily = face),
+        )
+    }
 
     /** Build a Material3 [ColorScheme] from this preset's ramp, using the same role map as
      *  [TomYamLightColors] so every screen recolours consistently without component changes. */
