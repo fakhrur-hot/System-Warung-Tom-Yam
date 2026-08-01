@@ -43,8 +43,11 @@ class PaymentQrResolver @Inject constructor(
     @ApplicationContext private val context: Context,
     private val appConfigStore: AppConfigStore,
     private val secureStorage: SecureStorage,
+    private val noInternetGuard: com.razstudio.pos.data.net.NoInternetGuard,
 ) {
-    private val http by lazy { OkHttpClient() }
+    // Task 18.1 — the client task 18.1 did not list, and the riskiest of them: it fetches an
+    // image over HTTPS from cloud storage and does not look like an API call.
+    private val http by lazy { OkHttpClient.Builder().dns(noInternetGuard).build() }
 
     /** What [reconcile] did, so callers (and tests) can assert on the decision rather than guess. */
     enum class Outcome { NO_CHANGE, UPDATED, CLEARED, ADMIN_IS_AUTHORITATIVE, FETCH_FAILED }

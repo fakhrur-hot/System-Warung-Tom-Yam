@@ -18,7 +18,7 @@ import javax.inject.Inject
  * DependencyProvider service-locator has been retired.
  */
 @HiltAndroidApp
-class PosApp : Application() {
+class PosApp : Application(), coil.ImageLoaderFactory {
 
     companion object {
         private const val MAINTENANCE_PREFS = "app_maintenance"
@@ -28,11 +28,38 @@ class PosApp : Application() {
     // Retained only for the one-time legacy cleanup below.
     @Inject lateinit var orderDao: OrderDao
 
+    /** Task 18.1 — see [newImageLoader]. */
+    @Inject lateinit var noInternetGuard: com.razstudio.pos.data.net.NoInternetGuard
+
     override fun onCreate() {
         super.onCreate()
         BackupReminderWorker.schedule(this)
         cleanupLegacyNullStringsOnce()
     }
+
+    /**
+     * Coil's image loader, guarded like every HTTP client in the app
+     * (task 18.1 — Requirement 11.2.1, Property 3).
+     *
+     * This is the hole the requirement calls out by name, and the reason it matters is that it does
+     * not look like network code. Menu rows carry an `imageUrl`, and a café that ran in Cloud Mode
+     * before switching has rows still holding `https://…supabase.co/storage/…/x.jpg`. Coil fetches
+     * those the moment someone opens the menu — a real request to a real server, carrying the café's
+     * IP, from a device that is supposed to have no internet traffic at all. A guard applied only to
+     * the API clients would never see it.
+     *
+     * Implemented as [coil.ImageLoaderFactory] on the Application, which is how Coil finds a custom
+     * loader for `AsyncImage` without every call site passing one — so a screen added later is
+     * covered automatically rather than needing to remember.
+     */
+    override fun newImageLoader(): coil.ImageLoader =
+        coil.ImageLoader.Builder(this)
+            .okHttpClient {
+                okhttp3.OkHttpClient.Builder()
+                    .dns(noInternetGuard)
+                    .build()
+            }
+            .build()
 
     /**
      * One-time repair: earlier builds parsed JSON nulls with `optString(name, null)`,

@@ -48,6 +48,7 @@ import javax.inject.Singleton
 class LanServerLocator @Inject constructor(
     @ApplicationContext private val context: Context,
     private val appConfig: AppConfigStore,
+    private val noInternetGuard: com.razstudio.pos.data.net.NoInternetGuard,
 ) {
 
     sealed interface Result {
@@ -58,7 +59,10 @@ class LanServerLocator @Inject constructor(
         data object NotFound : Result
     }
 
+    // Task 18.1. A no-op in practice — this only ever probes local addresses — but wired so
+    // the rule "every client is guarded" has no exceptions to remember.
     private val probeClient = OkHttpClient.Builder()
+        .dns(noInternetGuard)
         .connectTimeout(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .readTimeout(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         .build()

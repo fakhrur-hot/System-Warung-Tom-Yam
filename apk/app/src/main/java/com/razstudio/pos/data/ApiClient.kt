@@ -32,7 +32,8 @@ class ApiClient @Inject constructor(
     private val secureStorage: SecureStorage,
     private val authEventBus: AuthEventBus,
     private val demoBackend: com.razstudio.pos.data.demo.DemoBackend,
-    private val appConfig: AppConfigStore
+    private val appConfig: AppConfigStore,
+    private val noInternetGuard: com.razstudio.pos.data.net.NoInternetGuard,
 ) : BackendGateway {
 
     companion object {
@@ -66,7 +67,9 @@ class ApiClient @Inject constructor(
     private fun anonKey(): String =
         appConfig.supabaseAnonKey().ifBlank { BuildConfig.SUPABASE_ANON_KEY }
 
+    // Task 18.1: guarded first, so no later builder call can be added "above" it.
     private val client = OkHttpClient.Builder()
+        .dns(noInternetGuard)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
