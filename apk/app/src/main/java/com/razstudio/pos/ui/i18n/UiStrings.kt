@@ -336,6 +336,7 @@ data class UiStringsGroup5(
     val voidAlreadyGoneMsg: String,
     val voidCannotIncreaseMsg: String,
     val remainingLabel: String,
+    val lanServerNotFoundMsg: String,
 )
 
 data class UiStringsGroup6(
@@ -852,6 +853,7 @@ class UiStrings(
     val voidAlreadyGoneMsg: String get() = g5.voidAlreadyGoneMsg
     val voidCannotIncreaseMsg: String get() = g5.voidCannotIncreaseMsg
     val remainingLabel: String get() = g5.remainingLabel
+    val lanServerNotFoundMsg: String get() = g5.lanServerNotFoundMsg
     val moreOptions: String get() = g6.moreOptions
     val pendingKitchenPrints: String get() = g6.pendingKitchenPrints
     val recentPrints: String get() = g6.recentPrints
@@ -1336,6 +1338,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             voidAlreadyGoneMsg = "Item itu tiada lagi dalam pesanan ini.",
             voidCannotIncreaseMsg = "Tidak boleh menambah di sini — guna Tambah ke Pesanan.",
             remainingLabel = "kekal",
+            lanServerNotFoundMsg = "Pelayan kafe tidak dijumpai. Imbas semula kod berpasangan daripada peranti admin.",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "Lagi pilihan",
@@ -1828,6 +1831,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             voidAlreadyGoneMsg = "Those items are no longer on this order.",
             voidCannotIncreaseMsg = "Cannot increase here — use Add to Order instead.",
             remainingLabel = "stay",
+            lanServerNotFoundMsg = "Cannot find the café server. Re-scan the pairing code from the admin device.",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "More options",
@@ -2320,6 +2324,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             voidAlreadyGoneMsg = "这些项目已不在此订单中。",
             voidCannotIncreaseMsg = "此处无法增加 — 请使用「添加到订单」。",
             remainingLabel = "保留",
+            lanServerNotFoundMsg = "找不到咖啡馆服务器。请从管理设备重新扫描配对码。",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "更多选项",
@@ -2810,6 +2815,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             voidAlreadyGoneMsg = "அந்தப் பொருட்கள் இந்த ஆர்டரில் இல்லை.",
             voidCannotIncreaseMsg = "இங்கு அதிகரிக்க முடியாது — 'ஆர்டரில் சேர்' பயன்படுத்தவும்.",
             remainingLabel = "உள்ளன",
+            lanServerNotFoundMsg = "கஃபே சேவையகம் கிடைக்கவில்லை. நிர்வாக சாதனத்திலிருந்து இணைப்புக் குறியீட்டை மீண்டும் ஸ்கேன் செய்யவும்.",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "மேலும் விருப்பங்கள்",
@@ -3302,6 +3308,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             voidAlreadyGoneMsg = "รายการเหล่านั้นไม่อยู่ในออเดอร์นี้แล้ว",
             voidCannotIncreaseMsg = "ไม่สามารถเพิ่มที่นี่ — กรุณาใช้ 'เพิ่มลงในออเดอร์'",
             remainingLabel = "คงไว้",
+            lanServerNotFoundMsg = "ไม่พบเซิร์ฟเวอร์ของร้าน กรุณาสแกนรหัสจับคู่จากอุปกรณ์ผู้ดูแลอีกครั้ง",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "ตัวเลือกเพิ่มเติม",

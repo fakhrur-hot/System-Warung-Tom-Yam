@@ -50,8 +50,47 @@ import javax.inject.Inject
 @HiltViewModel
 class OrderingConnectViewModel @Inject constructor(
     private val apiClient: ApiClient,
-    private val secureStorage: SecureStorage
+    private val secureStorage: SecureStorage,
+    private val appConfig: com.razstudio.pos.data.AppConfigStore,
 ) : ViewModel() {
+
+    /**
+     * Point this device at a LAN Server before registering (task 7.2, Requirement 5.1).
+     *
+     * Writing the address first is what makes the subsequent `apiClient.register` reach the phone on
+     * the counter instead of a Supabase project — `ApiClient.baseUrl()` prefers this value whenever
+     * it is set. Persisted rather than passed along, because every later call needs it too, and
+     * because `LanServerLocator` starts its recovery from exactly this stored value (task 7.3).
+     */
+    fun useLanServer(host: String, port: Int) {
+        appConfig.setLanServerUrl("http://$host:$port")
+    }
+
+    /**
+     * Accept a hand-typed address (task 7.2).
+     *
+     * The fallback exists because the camera is the single most likely thing to fail at the counter
+     * — a cracked lens, a dim corner, a screen too bright to focus on — and without it a café whose
+     * scanner will not lock has no route to pairing at all. Accepts `192.168.43.1`,
+     * `192.168.43.1:8765` or a full `http://…`, because an operator reading the pairing screen aloud
+     * will type whichever they saw.
+     */
+    fun useManualAddress(raw: String): Boolean {
+        val cleaned = raw.trim().removePrefix("http://").removePrefix("https://").trimEnd('/')
+        if (cleaned.isBlank()) return false
+
+        val host = cleaned.substringBefore(':').trim()
+        val port = cleaned.substringAfter(':', "").trim().toIntOrNull() ?: DEFAULT_LAN_PORT
+        if (host.isBlank() || port !in 1..65535) return false
+
+        useLanServer(host, port)
+        return true
+    }
+
+    private companion object {
+        /** Matches LanServer.PORT; used when the operator types a bare address. */
+        const val DEFAULT_LAN_PORT = 8765
+    }
 
     var inviteInput by mutableStateOf("")
         private set
@@ -179,6 +218,9 @@ fun OrderingConnectScreen(
                 PackageManager.PERMISSION_GRANTED
         )
     }
+    var showManualAddress by remember { mutableStateOf(false) }
+    var manualAddress by remember { mutableStateOf("") }
+
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted -> hasCameraPermission = granted }
@@ -190,8 +232,22 @@ fun OrderingConnectScreen(
             onRequestPermission = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
             onQrDecoded = { text ->
                 showScanner = false
-                viewModel.onInputChanged(text)
+                // A LAN pairing code carries where the server IS, not just a token, so the address
+                // has to be stored before registering. Anything else falls through to the cloud
+                // invite path unchanged — the scanner is shared, and a café QR or a payment code
+                // landing in frame must not be mistaken for a pairing.
+                val lan = com.razstudio.pos.data.lan.PairingQrPayload.decode(text)
+                if (lan != null) {
+                    viewModel.useLanServer(lan.host, lan.port)
+                    viewModel.onInputChanged(lan.pairingToken)
+                } else {
+                    viewModel.onInputChanged(text)
+                }
                 scope.launch {
+                    // A typed address must be stored before register() picks a base URL.
+                    if (showManualAddress && manualAddress.isNotBlank()) {
+                        viewModel.useManualAddress(manualAddress)
+                    }
                     if (viewModel.register(androidId, strings)) {
                         onRegistered()
                     }
@@ -259,6 +315,32 @@ fun OrderingConnectScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !viewModel.isLoading
             )
+
+            // ── Task 7.2: manual address, for when the camera will not cooperate ─────────────
+            // Collapsed by default: a Cloud café never needs it, and an always-visible host/port
+            // field on the first screen a staff device sees invites someone to fill it in and break
+            // a working cloud pairing.
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = { showManualAddress = !showManualAddress }) {
+                Text(if (showManualAddress) "Hide server address" else "Enter address manually")
+            }
+            if (showManualAddress) {
+                OutlinedTextField(
+                    value = manualAddress,
+                    onValueChange = { manualAddress = it },
+                    label = { Text("Server address") },
+                    placeholder = { Text("192.168.43.1:8765") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !viewModel.isLoading,
+                )
+                Text(
+                    text = "Shown on the admin device under Pair a staff device.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             if (viewModel.errorMessage != null) {
                 Spacer(modifier = Modifier.height(8.dp))

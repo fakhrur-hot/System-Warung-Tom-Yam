@@ -45,7 +45,23 @@ class ApiClient @Inject constructor(
     private fun supabaseUrl(): String =
         appConfig.supabaseUrl().ifBlank { BuildConfig.SUPABASE_URL }
 
-    private fun baseUrl(): String = supabaseUrl().trimEnd('/') + "/functions/v1"
+    /**
+     * Where this device's API calls go.
+     *
+     * A LAN Client stores its Server's address (task 7.2) and it wins, because on such a device the
+     * Supabase URL is blank by construction — task 9.3 clears it on the mode switch — and falling
+     * through to `BuildConfig.SUPABASE_URL` would send a staff phone's orders to whatever cloud
+     * project the APK happened to be built against. Empty on the Server Device and in Cloud Mode,
+     * so this changes nothing for either.
+     *
+     * `/functions/v1` is appended in both cases; `LanServer` serves the same prefix precisely so
+     * this one line is the only difference between the two topologies.
+     */
+    private fun baseUrl(): String {
+        val lan = appConfig.lanServerUrl()
+        val base = if (lan.isNotBlank()) lan else supabaseUrl()
+        return base.trimEnd('/') + "/functions/v1"
+    }
 
     private fun anonKey(): String =
         appConfig.supabaseAnonKey().ifBlank { BuildConfig.SUPABASE_ANON_KEY }

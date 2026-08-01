@@ -87,7 +87,7 @@ class LocalBackend @Inject constructor(
     private val lanAddress: com.razstudio.pos.data.lan.LanAddress,
 ) : BackendGateway {
 
-    private companion object {
+    internal companion object {
         /**
          * Rounds of items one order may accumulate, matching the `orders-items` Edge Function's cap.
          * The limit exists because each round is a separate kitchen slip and a separate line-item
@@ -121,6 +121,14 @@ class LocalBackend @Inject constructor(
          * Hashes a credential string using SHA-256.
          * The raw credential is never stored in the database — only the hash (Requirement 5.4).
          */
+        /**
+         * Exposed for [com.razstudio.pos.data.lan.LanServer], which authenticates an incoming
+         * request by hashing the presented credential and matching it against the stored hash. It
+         * has to use the *same* function — two hashers that drift would reject every device, and the
+         * symptom (every staff phone 401s at once) points nowhere near the cause.
+         */
+        fun hashCredentialForLan(credential: String): String = hashCredential(credential)
+
         private fun hashCredential(credential: String): String {
             val digest = java.security.MessageDigest.getInstance("SHA-256")
             val hashBytes = digest.digest(credential.toByteArray(Charsets.UTF_8))
