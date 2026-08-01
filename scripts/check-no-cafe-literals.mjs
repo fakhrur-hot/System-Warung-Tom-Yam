@@ -61,7 +61,11 @@ const ALLOWED = [
   /^spikes\//,                         // research notes, historical
   /^docs?\//,
   /\.md$/,                             // prose generally: docs describe, they do not configure
-  /^scripts\/check-no-cafe-literals\.mjs$/,  // this file lists them by necessity
+  // This checker and its self-test both contain the forbidden strings by necessity — one as
+  // the pattern list, the other as the fixtures proving the patterns still match. Excluding
+  // them is not a hole: neither file configures a build, and the self-test is the thing that
+  // proves the exclusions above have not quietly swallowed everything.
+  /^scripts\/check-no-cafe-literals(\.test)?\.mjs$/,
   /^supabase\/functions\/tests\//,     // cors_test.ts asserts the strings are absent
   /^apk\/app\/src\/test\//,            // fixtures may use a realistic name
   /(^|\/)(dist|build|node_modules)\//, // generated, not source
