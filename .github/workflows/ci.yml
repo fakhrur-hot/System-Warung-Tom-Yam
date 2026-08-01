@@ -49,9 +49,10 @@ jobs:
       # once reported complete while all four of them failed, because only compilation had been
       # checked.
       #
-      # No JDK_JAVA_OPTIONS workaround is needed here. The unquoted -Djava.library.path that breaks
-      # test workers on Windows is harmless on this runner, because Linux paths contain no spaces —
-      # see apk/run-tests.sh for the full explanation and the local remedy.
+      # Nothing extra is needed here. The unquoted -Djava.library.path that breaks test workers on
+      # Windows is harmless on this runner, because Linux paths contain no spaces — and `gradlew`
+      # only applies its remedy on Windows anyway. See the comment block in apk/gradlew for the
+      # defect, the measurements, and why it cannot be fixed from the Test task or gradle.properties.
       - name: Unit tests
         working-directory: apk
         run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace

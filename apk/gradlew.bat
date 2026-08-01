@@ -33,6 +33,21 @@ set APP_HOME=%DIRNAME%
 @rem Resolve any "." and ".." in APP_HOME to make it shorter.
 for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
 
+@rem ── Project addition: keep java.library.path free of spaces ─────────────────────────────────────
+@rem NOT part of the stock Gradle wrapper. If you regenerate the wrapper with `gradle wrapper`,
+@rem re-apply this block and its twin in the `gradlew` shell script. See that file for the full
+@rem measurements; the short version:
+@rem
+@rem Gradle launches each unit-test worker with an UNQUOTED -Djava.library.path=<value> taken from the
+@rem DAEMON's own java.library.path, which the JVM derives from PATH. With "C:\Program Files\..." on
+@rem PATH the argument splits at the first space and java treats the rest as the main class, so no
+@rem unit test runs at all. It cannot be fixed from the Test task (the bad token is added by Gradle's
+@rem worker launcher and comes first) nor from org.gradle.jvmargs (Gradle strips the property).
+@rem JDK_JAVA_OPTIONS is applied by the java launcher itself, so Gradle cannot filter it, and setting
+@rem it here means every invocation starts a clean daemon rather than leaving a poisoned one behind
+@rem for the next test run to reuse.
+if not defined JDK_JAVA_OPTIONS set JDK_JAVA_OPTIONS=-Djava.library.path=C:\Windows\System32
+
 @rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
 
