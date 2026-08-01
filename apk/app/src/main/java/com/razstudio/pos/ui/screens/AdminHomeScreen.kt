@@ -56,6 +56,7 @@ import com.razstudio.pos.printing.PrintAlert
 import com.razstudio.pos.realtime.RealtimeService
 import com.razstudio.pos.ui.viewmodels.PrintAlertsViewModel
 import com.razstudio.pos.ui.i18n.LanguageButton
+import com.razstudio.pos.ui.theme.ThemeButton
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.tableview.CartLine
@@ -236,6 +237,8 @@ fun AdminHomeScreen(
                 },
                 actions = {
                     LanguageButton()
+                    Spacer(modifier = Modifier.width(4.dp))
+                    ThemeButton()
                     Box {
                         // The PIN gate now guards the whole overflow menu (not just Settings),
                         // so no management screen inside it is reachable without the PIN.

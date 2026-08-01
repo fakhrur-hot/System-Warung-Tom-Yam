@@ -59,6 +59,7 @@ import com.razstudio.pos.data.local.Table
 import com.razstudio.pos.ui.components.BlockingLoadingOverlay
 import com.razstudio.pos.ui.components.HoldCountdownOverlay
 import com.razstudio.pos.ui.i18n.LanguageButton
+import com.razstudio.pos.ui.theme.ThemeButton
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.tableview.CartLine
@@ -150,6 +151,8 @@ fun StaffTableViewScreen(
                 },
                 actions = {
                     LanguageButton()
+                    Spacer(modifier = Modifier.width(4.dp))
+                    ThemeButton()
                     Spacer(modifier = Modifier.width(8.dp))
                     OutlinedButton(
                         onClick = onCheckOut,

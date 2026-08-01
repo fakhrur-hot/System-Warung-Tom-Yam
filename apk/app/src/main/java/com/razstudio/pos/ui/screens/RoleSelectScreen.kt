@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.R
 import com.razstudio.pos.ui.i18n.LanguageButton
+import com.razstudio.pos.ui.theme.ThemeButton
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.viewmodels.SetupViewModel
@@ -63,13 +64,18 @@ fun RoleSelectScreen(
 
     Surface(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Language selector — top-end corner, visible from first open
-            LanguageButton(
+            // Language + theme selectors — top-end corner, visible from first open
+            Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(16.dp)
-            )
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LanguageButton()
+                ThemeButton()
+            }
 
             // Main content column — fills the screen so weight(1f) can push Setup Wizard down
             Column(
