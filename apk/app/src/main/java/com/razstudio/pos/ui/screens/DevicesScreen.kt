@@ -98,6 +98,26 @@ fun DevicesScreen(
     var showAdminInvite by remember { mutableStateOf(false) }
     // Reveals the permanent owner-recovery QR (loaded on demand).
     var showRecovery by remember { mutableStateOf(false) }
+    // Requests already approved, rejected, or dismissed here — so one popup does not reappear.
+    var handledRequestIds by remember { mutableStateOf(setOf<String>()) }
+    val pendingRequests by viewModel.pendingRequests.collectAsState()
+
+    // Keep this screen live while it is open.
+    //
+    // `loadDevices()` previously ran only once, from the ViewModel's `init`. An admin who opened
+    // Devices & Staff and then asked a staff member to scan the invite — which is exactly when this
+    // screen is open — watched a list that could never show the device arriving, and got no popup
+    // either: the approve/reject prompt existed solely on the admin home screen, whose own comment
+    // claimed it was there "not only when the Devices page is open". It was.
+    //
+    // Same 8s cadence as the home screen, so approving from either place feels identical.
+    LaunchedEffect(Unit) {
+        while (true) {
+            viewModel.refreshPendingRequests()
+            viewModel.loadDevices()
+            delay(8_000)
+        }
+    }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
@@ -435,6 +455,38 @@ fun DevicesScreen(
             loading = settingsState.recoveryLoading,
             strings = strings,
             onDismiss = { showRecovery = false }
+        )
+    }
+
+    // New device requesting to connect → the same approve/reject popup the admin home screen shows.
+    // Duplicated deliberately rather than hoisted: the two screens own their own dialog state, and a
+    // shared holder would have to outlive both. The selection rule below must stay identical to
+    // AdminHomeScreen's — a Secondary Admin may approve staff, never another admin.
+    val deviceRequest = pendingRequests.firstOrNull {
+        it.id !in handledRequestIds &&
+            !(isSecondaryAdmin && (it.role == "ADMIN" || it.role == "ADMIN_SECONDARY"))
+    }
+    if (deviceRequest != null) {
+        LaunchedEffect(deviceRequest.id) {
+            delay(30_000)
+            handledRequestIds = handledRequestIds + deviceRequest.id
+        }
+        AlertDialog(
+            onDismissRequest = { handledRequestIds = handledRequestIds + deviceRequest.id },
+            title = { Text(strings.newDeviceRequestTitle) },
+            text = { Text(strings.newDeviceRequestBody.format(deviceRequest.label)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.approveDevice(deviceRequest.id)
+                    handledRequestIds = handledRequestIds + deviceRequest.id
+                }) { Text(strings.approveButton) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.rejectDevice(deviceRequest.id)
+                    handledRequestIds = handledRequestIds + deviceRequest.id
+                }) { Text(strings.rejectButton, color = MaterialTheme.colorScheme.error) }
+            }
         )
     }
 }
