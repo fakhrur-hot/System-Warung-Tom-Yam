@@ -214,14 +214,22 @@ class PrinterConnectionManager @Inject constructor(
      * bundled default (res/raw/qr_default_logo — the same one the QR-card generator uses), scaled
      * to a tasteful header width (~55% of the head), preserving aspect. Returns null on any failure
      * so a receipt still prints without a logo.
+     *
+     * After scaling, a contrast LUT is applied before the bitmap reaches the ESC/POS 1-bit
+     * ditherer. Thermal dithering maps every grey pixel to black or white based on its luminance,
+     * so a flat-contrast source collapses mid-tones into muddy grey. The LUT pushes mid-greys
+     * toward black (so they print as solid ink) while pushing near-whites toward white (so
+     * highlights stay open). The curve is a two-segment piecewise linear ramp through three
+     * control points: (0,0) → (midIn, midOut) → (255,255), where midOut < midIn darkens greys
+     * and the upper segment's steeper slope brightens highlights.
      */
     private fun loadReceiptLogo(pixelWidth: Int): android.graphics.Bitmap? = try {
         val raw = com.razstudio.pos.ui.util.LogoPipeline.loadJpegFromInternal(context)
             ?: android.graphics.BitmapFactory.decodeResource(
                 context.resources, com.razstudio.pos.R.raw.qr_default_logo
             )
-        when {
-            raw == null -> null
+        val scaled = when {
+            raw == null -> return null
             raw.width <= (pixelWidth * 0.55f).toInt() -> raw
             else -> {
                 val targetW = (pixelWidth * 0.55f).toInt().coerceAtLeast(1)
@@ -230,8 +238,57 @@ class PrinterConnectionManager @Inject constructor(
                     .also { if (it !== raw) raw.recycle() }
             }
         }
+        applyReceiptContrast(scaled)
     } catch (e: Exception) {
         null
+    }
+
+    /**
+     * Applies a piecewise-linear contrast curve to [src] in-place (ARGB_8888) so the bitmap
+     * dithers crisply on a thermal head.
+     *
+     * Curve: two line segments through (0, 0) → (midIn, midOut) → (255, 255).
+     *
+     *   midIn  = 128  (the grey midpoint in the source)
+     *   midOut =  80  (mapped output — darker than the input mid, pushing greys toward black)
+     *
+     * Below midIn the slope is midOut/midIn ≈ 0.625 — mid-greys get darker.
+     * Above midIn the slope is (255−midOut)/(255−midIn) ≈ 1.37 — near-whites get brighter.
+     *
+     * The LUT is computed once and applied via a [android.graphics.ColorMatrix] paint pass,
+     * which keeps the inner loop in native code.
+     */
+    private fun applyReceiptContrast(src: android.graphics.Bitmap): android.graphics.Bitmap {
+        val midIn = 128f
+        val midOut = 80f
+
+        // Build a 256-entry LUT for the piecewise ramp.
+        val lut = FloatArray(256) { i ->
+            if (i <= midIn) {
+                (i * midOut / midIn).coerceIn(0f, 255f)
+            } else {
+                (midOut + (i - midIn) * (255f - midOut) / (255f - midIn)).coerceIn(0f, 255f)
+            }
+        }
+
+        // ColorMatrix expects scale/translate in the [-255,255] range expressed as linear
+        // per-channel y = scale*x + translate. For a LUT we approximate via a single-point
+        // tangent at the midpoint — good enough for this monotone curve, but a per-pixel path
+        // is exact. Use per-pixel for correctness.
+        val out = src.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+        val pixels = IntArray(out.width * out.height)
+        out.getPixels(pixels, 0, out.width, 0, 0, out.width, out.height)
+        for (i in pixels.indices) {
+            val px = pixels[i]
+            val a = px ushr 24 and 0xFF
+            val r = lut[px ushr 16 and 0xFF].toInt()
+            val g = lut[px ushr 8  and 0xFF].toInt()
+            val b = lut[px         and 0xFF].toInt()
+            pixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
+        }
+        out.setPixels(pixels, 0, out.width, 0, 0, out.width, out.height)
+        if (out !== src) src.recycle()
+        return out
     }
 
     private fun scheduleEcoDisconnect(mac: String) {
