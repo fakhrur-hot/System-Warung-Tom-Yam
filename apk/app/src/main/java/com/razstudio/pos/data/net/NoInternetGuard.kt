@@ -87,7 +87,12 @@ class NoInternetGuard @Inject constructor(
          * hole. Kept as documentation because there is no way to enforce it at compile time — the
          * whole failure mode of this task is a client somebody forgot.
          *
-         *  1. `ApiClient` — the REST/gateway client.
+         *  1. `ApiClient` — the REST/gateway client. Note it holds a **second, unguarded** client for the
+ *     six calls that *establish* a connection (owner-key recovery, admin handshake, invite
+ *     registration, the approval poll, branding). Those are exempt by design: each is user-initiated
+ *     from a connect screen, and guarding them made a Kiosk or LAN device unable to sign in with its
+ *     own owner key — the one credential Property 9 says must always work. Everything operational
+ *     stays guarded.
          *  2. `RealtimeService` — the admin device's Supabase WebSocket client.
          *  3. `OrderingForegroundService` — the staff device's separate WebSocket client.
          *  4. `PaymentQrResolver` — downloads the payment QR image. **Not listed in task 18.1**, and

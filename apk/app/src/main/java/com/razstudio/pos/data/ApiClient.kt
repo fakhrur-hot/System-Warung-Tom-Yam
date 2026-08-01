@@ -221,6 +221,44 @@ class ApiClient @Inject constructor(
         }
         .build()
 
+    /**
+     * The same client **without** [NoInternetGuard], for the calls that *establish* a connection.
+     *
+     * Found on a device: a café stored as LAN or Kiosk could not sign in with its owner key. The
+     * guard reads the persisted mode, so `recoverAdmin` was refused before it left the phone —
+     *
+     *     BLOCKED: <project>.supabase.co … which is off-LAN, and this device is in KIOSK
+     *
+     * — and the screen said "Network error. Check your connection and try again", which is wrong on
+     * both counts. The same block silently emptied the debug quick-connect list, because
+     * `getBranding` never completed.
+     *
+     * That state is not exotic. It is every device mid-transition: a Kiosk or LAN till that now
+     * needs to become a Cloud till, or an admin taking over a device that was set up off-cloud. The
+     * owner QR is the café's only key, and Property 9 says it must remain sufficient throughout — a
+     * guard that makes it fail in a recoverable state defeats the one credential the owner keeps.
+     *
+     * ### Why this does not weaken Property 3
+     *
+     * The property is "no internet traffic **originates** in LAN or Kiosk Mode", and it exists to
+     * stop traffic nobody asked for: background sync, leftover `https://` image URLs, telemetry. The
+     * calls below are the opposite — each is the direct result of someone tapping Scan, Sign in, or
+     * Register on a connect screen, and each exists to put the device into a known topology.
+     *
+     * Note also that a *genuinely* off-cloud café cannot reach these at all: with no Supabase URL
+     * stored, [baseUrl] throws [BackendNotConfiguredException] first. Reaching this client requires a
+     * cloud URL to be configured while the mode says otherwise — which is precisely the contradiction
+     * an operator is here to resolve.
+     *
+     * Everything operational — orders, menu, settings, images, realtime — stays on the guarded
+     * [client].
+     */
+    private val connectClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
+        .build()
+
     private fun adminBearerToken(): String? = secureStorage.getSessionToken()
 
     /**
@@ -280,7 +318,7 @@ class ApiClient @Inject constructor(
                 .post(body.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = connectClient.newCall(request).execute()
             val responseBody = response.body?.string() ?: ""
 
             when (response.code) {
@@ -327,7 +365,7 @@ class ApiClient @Inject constructor(
                 .post(body.toRequestBody(JSON_MEDIA_TYPE))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = connectClient.newCall(request).execute()
             val responseBody = response.body?.string() ?: ""
 
             when (response.code) {
@@ -369,7 +407,7 @@ class ApiClient @Inject constructor(
                     .get()
                     .build()
 
-                val response = client.newCall(request).execute()
+                val response = connectClient.newCall(request).execute()
                 val responseBody = response.body?.string() ?: ""
 
                 when (response.code) {
@@ -1159,7 +1197,7 @@ class ApiClient @Inject constructor(
                     .addHeader("apikey", anonKey())
                     .post(bodyJson.toString().toRequestBody(JSON_MEDIA_TYPE))
                     .build()
-                val response = client.newCall(request).execute()
+                val response = connectClient.newCall(request).execute()
                 val responseBody = response.body?.string() ?: ""
                 when (response.code) {
                     200 -> ApiResult.Success(JSONObject(responseBody).getString("sessionToken"))
@@ -1819,7 +1857,7 @@ class ApiClient @Inject constructor(
                 .get()
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = connectClient.newCall(request).execute()
             val responseBody = response.body?.string() ?: ""
 
             when (response.code) {

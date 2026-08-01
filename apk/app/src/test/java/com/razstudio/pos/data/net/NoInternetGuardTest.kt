@@ -152,4 +152,27 @@ class NoInternetGuardTest {
             NoInternetGuard.PROTECTED_CLIENTS.contains("AppConfigFetcher"),
         )
     }
+
+    @Test
+    fun theGuardMustNotStandBetweenACafeAndItsOwnOwnerKey() {
+        // Regression, found on a device. A café stored as KIOSK could not sign in with its owner
+        // key: the guard blocked recoverAdmin before it left the phone, and the screen reported
+        // "Network error. Check your connection" — wrong on both counts. It also silently emptied
+        // the debug quick-connect list, because getBranding never completed.
+        //
+        // The guard itself is correct here and must stay correct: a public host in KIOSK is blocked.
+        // The fix is above it — ApiClient routes the six connection-*establishing* calls through a
+        // second, unguarded client. This test pins the guard's own behaviour so that fix stays
+        // necessary and visible rather than being "simplified" into weakening the guard.
+        mode(OperatingMode.KIOSK)
+        assertTrue(
+            "the guard must still block a public host off-cloud",
+            runCatching { guard.lookup("8.8.8.8") }.exceptionOrNull() is UnknownHostException,
+        )
+        assertTrue(
+            "and its message must name itself, so a field log identifies the cause",
+            runCatching { guard.lookup("8.8.8.8") }.exceptionOrNull()!!
+                .message!!.contains("NoInternetGuard"),
+        )
+    }
 }
