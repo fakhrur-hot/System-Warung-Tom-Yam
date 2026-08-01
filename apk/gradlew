@@ -198,6 +198,48 @@ if "$cygwin" || "$msys" ; then
 fi
 
 
+# ── Project addition: keep java.library.path free of spaces (Windows) ─────────────────────────────
+# NOT part of the stock Gradle wrapper. If you regenerate the wrapper with `gradle wrapper`, re-apply
+# this block and its twin in gradlew.bat.
+#
+# Gradle launches each unit-test worker with an UNQUOTED `-Djava.library.path=<value>`, and that value
+# is the DAEMON JVM's own java.library.path, which on Windows the JVM derives from PATH. With
+# "C:\Program Files\..." on PATH, java.exe splits the argument at the first space and treats the
+# remainder as the main class:
+#
+#   Error: Could not find or load main class Files\Git\bin;C:\Program
+#
+# Net effect: no unit test runs at all, and the reported class name changes per run because it is
+# whichever PATH fragment happened to follow a space.
+#
+# Measured, not assumed (2026-08-01) — the fix has to go here because nothing else reaches it:
+#   * The Test task sets nothing. `systemProperties["java.library.path"]`, `jvmArgs` and `allJvmArgs`
+#     are all empty at execution time; the bad token is added by Gradle's worker launcher from the
+#     daemon's value, so there is no task-level property to override.
+#   * Setting it on the Test task anyway does not help. The property is then genuinely present, and
+#     the worker still dies — the inherited token comes FIRST and has already broken the command line.
+#   * `org.gradle.jvmargs` in gradle.properties is silently discarded: Gradle strips
+#     -Djava.library.path from it. Verified by printing the daemon's own value afterwards; unchanged.
+#
+# JDK_JAVA_OPTIONS is prepended by the `java` launcher itself (JDK 9+), so Gradle cannot filter it and
+# the daemon starts with a clean path that its workers then inherit. Setting it HERE rather than
+# asking developers to export it is what makes the fix hold: the daemon's java.library.path is fixed
+# at ITS startup, and Gradle REUSES daemons, so a single `./gradlew assembleRelease` or a pre-commit
+# `lintDebug` run in a shell without the variable would otherwise leave a poisoned daemon behind that
+# breaks the next test run.
+#
+# Only exported when unset, so an explicit value from CI or a developer's shell still wins. Any
+# space-free directory works — the value only has to be well-formed. Native libraries the tests
+# genuinely need are appended separately by AGP as jniLibs paths.
+if [ -z "${JDK_JAVA_OPTIONS:-}" ]; then
+    case "$( uname )" in                                    #(
+      MINGW* | MSYS* | CYGWIN* | Windows_NT )
+        JDK_JAVA_OPTIONS="-Djava.library.path=C:\\Windows\\System32"
+        export JDK_JAVA_OPTIONS
+        ;;
+    esac
+fi
+
 # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 
