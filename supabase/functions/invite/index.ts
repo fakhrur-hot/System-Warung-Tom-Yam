@@ -4,7 +4,7 @@
  * POST /api/invite/regenerate — rotate the invite token
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { handleCors } from "../_shared/cors.ts";
+import { handleCors, requireWebsiteOrigin } from "../_shared/cors.ts";
 import { verifyAdminToken, generateToken } from "../_shared/auth.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
 import { errorResponse, jsonResponse } from "../_shared/errors.ts";
@@ -39,7 +39,14 @@ serve(async (req) => {
     return errorResponse(405, "METHOD_NOT_ALLOWED", "Use GET or POST /regenerate");
   }
 
-  const base = (Deno.env.get("WEBSITE_ORIGIN") ?? "https://your-site.pages.dev").replace(/\/+$/, "");
+  // An invite QR built on a placeholder origin encodes a link to a site that does not exist, and
+  // fails in a café with a phone already scanning it. Refuse to mint one instead.
+  let base: string;
+  try {
+    base = requireWebsiteOrigin();
+  } catch (e) {
+    return errorResponse(500, "WEBSITE_ORIGIN_UNSET", (e as Error).message);
+  }
 
   if (isRegenerate) {
     // Generate a new invite token and replace the target role's row
