@@ -67,6 +67,8 @@ data class MenuUiState(
 class MenuViewModel @Inject constructor(
     private val menuDao: MenuDao,
     private val apiClient: ApiClient,
+    private val modeRepository: com.razstudio.pos.data.ModeRepository,
+    private val localImageStore: com.razstudio.pos.data.local.LocalImageStore,
     private val categoryStore: MenuCategoryStore,
     private val languageManager: LanguageManager
 ) : ViewModel() {
@@ -402,6 +404,25 @@ class MenuViewModel @Inject constructor(
         imageBase64: String,
         previousImagePath: String?
     ): ApiResult<MenuImageUploadResponse> {
+        // Task 11.3 / Requirement 7.3: off-cloud there is no Supabase Storage to upload to.
+        //
+        // This ViewModel injects ApiClient directly rather than BackendGateway, so without this
+        // branch a LAN or Kiosk café would POST its menu photos at a cloud project it is not using —
+        // failing if the URL was cleared on the mode switch, or worse, succeeding against a stale
+        // one. The image is written to app-private storage instead, which is where LocalBackend
+        // already serves menu images from, so both paths agree on where a photo lives.
+        if (!modeRepository.currentCapabilities().cloudImageHosting) {
+            return try {
+                if (!previousImagePath.isNullOrBlank()) localImageStore.delete(previousImagePath)
+                val stored = localImageStore.save(menuItemId, imageBase64, System.currentTimeMillis())
+                ApiResult.Success(MenuImageUploadResponse(imageUrl = stored.url, path = stored.path))
+            } catch (e: IllegalArgumentException) {
+                ApiResult.Error("VALIDATION", e.message ?: "Image data could not be decoded")
+            } catch (e: java.io.IOException) {
+                ApiResult.Error("STORAGE_ERROR", e.message ?: "Could not write the image to storage")
+            }
+        }
+
         val result = apiClient.uploadMenuImage(menuItemId, imageBase64)
         if (result is ApiResult.Success && !previousImagePath.isNullOrBlank()) {
             apiClient.deleteMenuImage(previousImagePath)
