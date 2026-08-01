@@ -72,3 +72,12 @@
     *** Companion;
     kotlinx.serialization.KSerializer serializer(...);
 }
+-keepclasseswithmembers class * {
+    @kotlinx.serialization.Serializable *;
+}
+# ── SLF4J (pulled in transitively by Ktor) ──────────────────────────────────────
+# Ktor uses SLF4J for logging. The StaticLoggerBinder is a service provider
+# that log implementations (e.g., logback) provide. Since we're not bundling
+# a logging impl, we suppress the missing class warning.
+-dontwarn org.slf4j.impl.**
+-keep class org.slf4j.impl.** { *; }
