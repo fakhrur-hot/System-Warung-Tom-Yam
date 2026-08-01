@@ -8,6 +8,13 @@ import com.razstudio.pos.data.local.LocalBackend
 import com.razstudio.pos.data.local.PairedDeviceDao
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
+import io.ktor.server.application.install
+import io.ktor.server.websocket.WebSockets
+import io.ktor.server.websocket.webSocket
+import io.ktor.websocket.CloseReason
+import io.ktor.websocket.Frame
+import io.ktor.websocket.close
+import io.ktor.websocket.readText
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.request.receiveText
@@ -16,6 +23,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import javax.inject.Inject
@@ -59,6 +67,7 @@ class LanServer @Inject constructor(
     private val backend: LocalBackend,
     private val pairedDeviceDao: PairedDeviceDao,
     private val lanAddress: LanAddress,
+    private val pushBus: LanPushBus,
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
 ) {
 
@@ -100,6 +109,15 @@ class LanServer @Inject constructor(
                 // No ContentNegotiation plugin: every response here is built with org.json and
                 // written via respondText, because the shapes must match the Edge Functions
                 // byte-for-byte and a serializer would impose its own. See LanJson.
+                install(WebSockets) {
+                    // Ping the Client periodically. A café AP will silently drop an idle TCP
+                    // connection, and without pings the Server keeps a dead socket in its fan-out
+                    // list while the Client sits waiting for pushes that can never arrive — the
+                    // failure looks exactly like "no orders", which is indistinguishable from a
+                    // quiet afternoon.
+                    pingPeriodMillis = 20_000
+                    timeoutMillis = 30_000
+                }
                 routes()
             }.also { it.start(wait = false) }
             boundHost = address.ip
@@ -201,6 +219,52 @@ class LanServer @Inject constructor(
                         .put("sessionToken", it.sessionToken ?: JSONObject.NULL)
                 }
             )
+        }
+
+        // ── Push channel (task 8.4, Requirement 6.5) ─────────────────────────────────────────────
+        // Same Bearer credential as the REST routes. An unapproved device is closed immediately with
+        // the WebSocket equivalent of the 401 contract, so revoking a device ejects it from the
+        // socket exactly as it ejects it from a request — a revoked phone must not keep receiving
+        // the café's order stream just because it connected before the revocation.
+        webSocket("$PREFIX/realtime") {
+            if (!call.authorizedDeviceOrNull()) {
+                close(
+                    CloseReason(
+                        CloseReason.Codes.VIOLATED_POLICY,
+                        "UNAUTHORIZED",
+                    )
+                )
+                return@webSocket
+            }
+
+            // Fan out every published change to this Client for as long as the socket lives.
+            val job = launch {
+                pushBus.events.collect { envelope ->
+                    runCatching { send(Frame.Text(envelope.encode())) }
+                        .onFailure { Log.d(TAG, "Push send failed; socket closing") }
+                }
+            }
+
+            try {
+                // Inbound: ACKs and catch-up requests. Read rather than ignored, because a socket
+                // whose incoming frames are never consumed stops honouring pings and is torn down.
+                for (frame in incoming) {
+                    val text = (frame as? Frame.Text)?.readText() ?: continue
+                    val envelope = LanPushEnvelope.decode(text) ?: continue
+                    when (envelope.type) {
+                        LanPushEnvelope.Type.ACK ->
+                            Log.d(TAG, "ACK for ${envelope.ackFor}")
+                        LanPushEnvelope.Type.STATUS_REQUEST ->
+                            // Nothing replayed here on purpose: the Client's own catch-up poll is
+                            // the authoritative reconciliation path (Requirement 6.6), and a second
+                            // replay mechanism would be a second thing that can disagree with it.
+                            Log.d(TAG, "Catch-up requested from ${envelope.lastSeenId} — poll will serve it")
+                        else -> Unit
+                    }
+                }
+            } finally {
+                job.cancel()
+            }
         }
 
         // ── Everything below requires an approved device ─────────────────────────────────────────

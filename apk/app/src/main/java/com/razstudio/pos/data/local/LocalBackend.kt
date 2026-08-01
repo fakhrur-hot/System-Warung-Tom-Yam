@@ -85,6 +85,7 @@ class LocalBackend @Inject constructor(
     private val pairedDeviceDao: PairedDeviceDao,
     private val pairingTokenDao: PairingTokenDao,
     private val lanAddress: com.razstudio.pos.data.lan.LanAddress,
+    private val pushBus: com.razstudio.pos.data.lan.LanPushBus,
 ) : BackendGateway {
 
     internal companion object {
@@ -581,6 +582,7 @@ class LocalBackend @Inject constructor(
             )
         )
         orderDao.insertOrderItems(orderItems)
+        pushOrderChanged(orderId, OrderStatus.RECEIVED.name, tableId = tableId, total = total)
         return ApiResult.Success(
             CreateOrderResponse(orderId = orderId, total = total, status = "RECEIVED")
         )
@@ -705,6 +707,7 @@ class LocalBackend @Inject constructor(
         // updateOrderTotal, never insertOrder: REPLACE on the parent cascades and deletes the very
         // lines just written. See OrderDao.updateOrderTotal.
         orderDao.updateOrderTotal(orderId, newTotal)
+        pushOrderChanged(orderId, order.status.name, tableId = order.tableId, total = newTotal)
         return ApiResult.Success(order.copy(total = newTotal).toDto(all))
     }
 
@@ -767,6 +770,7 @@ class LocalBackend @Inject constructor(
         orderDao.insertOrderItems(kept)
         val newTotal = kept.sumOf { it.unitPriceSnapshot * it.quantity }
         orderDao.updateOrderTotal(orderId, newTotal)
+        pushOrderChanged(orderId, order.status.name, tableId = order.tableId, total = newTotal)
         return ApiResult.Success(order.copy(total = newTotal).toDto(kept))
     }
 
@@ -790,6 +794,7 @@ class LocalBackend @Inject constructor(
         }
 
         orderDao.updateOrderStatus(orderId, target.name)
+        pushOrderChanged(orderId, target.name, tableId = order.tableId, total = order.total)
         val updated = order.copy(status = target)
         return ApiResult.Success(updated.toDto(orderDao.getItemsForOrder(orderId)))
     }
@@ -812,6 +817,7 @@ class LocalBackend @Inject constructor(
         }
 
         orderDao.completePayment(orderId, method)
+        pushOrderChanged(orderId, OrderStatus.COMPLETED.name, tableId = order.tableId, total = order.total)
         val updated = order.copy(status = OrderStatus.COMPLETED, paymentMethod = method)
         return ApiResult.Success(updated.toDto(orderDao.getItemsForOrder(orderId)))
     }
@@ -827,6 +833,7 @@ class LocalBackend @Inject constructor(
         }
 
         orderDao.cancelOrder(orderId, reason, cancelledBy)
+        pushOrderChanged(orderId, OrderStatus.CANCELLED.name, tableId = order.tableId, total = order.total)
         return ApiResult.Success(Unit)
     }
 
@@ -1041,6 +1048,33 @@ class LocalBackend @Inject constructor(
      * than they should, and they are in the past relative to any `since` a LAN poll supplies.
      */
     private fun nowTimestamp(): String = TIMESTAMP_FORMAT.format(Instant.now())
+
+    /**
+     * Announce a change to connected Clients (task 8.6, Requirement 6.5).
+     *
+     * Called at the **mutation sites** rather than from something watching Room. A Room observer
+     * would fire after the fact and would have to diff to work out what changed; here the code that
+     * performed the change already knows, which is what makes a real delta possible instead of a
+     * "something happened, go re-read everything" ping.
+     *
+     * Fire-and-forget by construction — [com.razstudio.pos.data.lan.LanPushBus.publish] never blocks
+     * and never throws, so taking a payment cannot fail because a staff phone's socket is wedged. A
+     * push that is dropped is reconciled by the catch-up poll within one interval (Requirement 6.6),
+     * which is the guarantee that makes not blocking here the right trade.
+     *
+     * Harmless in Cloud and Kiosk Mode: nothing subscribes, so the emission goes nowhere.
+     */
+    private fun pushOrderChanged(orderId: String, status: String, tableId: String? = null, total: Double? = null) {
+        pushBus.publish(
+            delta = com.razstudio.pos.data.lan.LanPushEnvelope.orderDelta(
+                orderId = orderId,
+                status = status,
+                tableId = tableId,
+                total = total,
+            ),
+            nowIso = nowTimestamp(),
+        )
+    }
 
     private fun notImplemented(method: String): Nothing = throw NotImplementedError(
         "LocalBackend.$method is not implemented yet — LAN/Kiosk backend arrives in task 4 onwards. " +
