@@ -55,3 +55,29 @@
 # Tink (via androidx.security.crypto) references these annotations, which are compile-time
 # only and absent at runtime. Safe to suppress — R8 flagged them as missing classes.
 -dontwarn com.google.errorprone.annotations.**
+
+# ── Ktor ───────────────────────────────────────────────────────────────────────
+# Ktor uses reflection for content negotiation, routing, and serialization.
+# Keep Ktor's core classes and serialization introspectors.
+-keep class io.ktor.** { *; }
+-keepclassmembers class io.ktor.** { *; }
+-dontwarn io.ktor.**
+
+# kotlinx.serialization uses reflection to discover serializers at runtime.
+-keepattributes *Annotation*, InnerClasses
+-dontnote kotlinx.serialization.AnnotationsKt
+
+# Keep serializable classes used in JSON serialization
+-keepclassmembers @kotlinx.serialization.Serializable class * {
+    *** Companion;
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keepclasseswithmembers class * {
+    @kotlinx.serialization.Serializable *;
+}
+# ── SLF4J (pulled in transitively by Ktor) ──────────────────────────────────────
+# Ktor uses SLF4J for logging. The StaticLoggerBinder is a service provider
+# that log implementations (e.g., logback) provide. Since we're not bundling
+# a logging impl, we suppress the missing class warning.
+-dontwarn org.slf4j.impl.**
+-keep class org.slf4j.impl.** { *; }
