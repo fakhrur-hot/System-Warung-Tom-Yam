@@ -95,7 +95,9 @@ class NoInternetGuard @Inject constructor(
          *     does not look like an API call.
          *  5. `LanServerLocator` — the LAN reachability probe. Always targets a local address, so the
          *     guard is a no-op for it, but it is wired anyway so the rule has no exceptions.
-         *  6. Coil's `ImageLoader` — menu photos. A leftover `https://` URL on a menu row is a real
+         *  6. `AppConfigFetcher` — reads a café's `/app-config.json` during Setup. A café off-cloud
+         *     has no website to read, so a request leaving the premises is always wrong there.
+         *  7. Coil's `ImageLoader` — menu photos. A leftover `https://` URL on a menu row is a real
          *     request to a real server, carrying the café's IP, triggered by simply opening the menu.
          */
         val PROTECTED_CLIENTS = listOf(
@@ -104,6 +106,7 @@ class NoInternetGuard @Inject constructor(
             "OrderingForegroundService",
             "PaymentQrResolver",
             "LanServerLocator",
+            "AppConfigFetcher",
             "Coil ImageLoader",
         )
     }

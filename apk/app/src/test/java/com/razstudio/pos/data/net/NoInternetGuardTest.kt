@@ -141,11 +141,15 @@ class NoInternetGuardTest {
     fun theProtectedClientListNamesEveryHttpClientInTheApp() {
         // Documentation with a test behind it: the whole failure mode of 18.1 is a client nobody
         // wired. If one is added, this list should grow with it.
-        assertEquals(6, NoInternetGuard.PROTECTED_CLIENTS.size)
+        assertEquals(7, NoInternetGuard.PROTECTED_CLIENTS.size)
         assertTrue(NoInternetGuard.PROTECTED_CLIENTS.contains("Coil ImageLoader"))
         assertTrue(
             "PaymentQrResolver is not in task 18.1's list but is the riskiest client of the five",
             NoInternetGuard.PROTECTED_CLIENTS.contains("PaymentQrResolver"),
+        )
+        assertTrue(
+            "AppConfigFetcher was added later and shipped unguarded — this list is what caught it",
+            NoInternetGuard.PROTECTED_CLIENTS.contains("AppConfigFetcher"),
         )
     }
 }

@@ -196,6 +196,22 @@ class AppConfigStore @Inject constructor(
     }
 
     /**
+     * Update ONLY the Supabase publishable (anon) key, leaving every other stored value untouched.
+     *
+     * Called exclusively by the background config re-fetch on launch (Task 4.5 / Requirement 3.5).
+     * Only the anon key is allowed to rotate silently — the Supabase URL identifies *which project*
+     * this device talks to, and updating that silently would be equivalent to pointing the till at
+     * a different café's database. A URL change requires explicit operator action via Setup.
+     *
+     * No-op when [key] is blank: a network blip that returns an empty payload must never clear a
+     * working credential.
+     */
+    fun supabaseAnonKeyRefresh(key: String) {
+        if (key.isBlank()) return
+        write(KEY_SUPABASE_ANON_KEY, key)
+    }
+
+    /**
      * Returns the persisted [OperatingMode], defaulting to [OperatingMode.CLOUD] when absent.
      * The CLOUD default ensures existing installs are unaffected — a device with no stored
      * `operating_mode` key continues to operate exactly as it did before this key existed

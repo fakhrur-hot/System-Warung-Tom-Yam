@@ -4,6 +4,9 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,10 +55,16 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.ui.viewmodels.SetupViewModel
 
 /**
- * In-app deployment setup, reached from the three-dots menu on the login screen. Lets an operator
- * point this template build at their own backend (Supabase + website) and store their Cloudflare /
- * GitHub credentials. Connection fields take effect immediately on save (read at runtime by the API
- * client and realtime services); Cloudflare/GitHub are stored encrypted for reference.
+ * In-app deployment setup, reached from the three-dots menu on the login screen.
+ *
+ * **Connection section** (Cloud mode):
+ * The primary input is one "Café website URL" field.  Tapping "Connect" fetches
+ * `/app-config.json` from that URL and populates the three connection values atomically.
+ * The three manual fields are retained behind an "Enter manually" toggle for cafés whose
+ * site is not yet deployed (Requirement 3.2).
+ *
+ * On fetch failure the error is shown and the manual fields are revealed automatically
+ * (Requirement 3.4 / Design Property 2).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,13 +109,94 @@ fun SetupScreen(
 
             SectionHeader("Connection")
             if (state.operatingMode == OperatingMode.CLOUD) {
-                HelpText("Point this app at your café's backend. Applied as soon as you save.")
-                Field("Supabase URL", "https://your-project.supabase.co", state.supabaseUrl,
-                    KeyboardType.Uri) { v -> viewModel.update { it.copy(supabaseUrl = v) } }
-                Field("Supabase anon key", "eyJhbGci…", state.supabaseAnonKey,
-                    KeyboardType.Text, secret = true) { v -> viewModel.update { it.copy(supabaseAnonKey = v) } }
-                Field("Website URL", "https://your-site.pages.dev", state.websiteUrl,
-                    KeyboardType.Uri) { v -> viewModel.update { it.copy(websiteUrl = v) } }
+                // ── Task 4.2: single website URL field as the primary input ──────────────────────
+                HelpText("Enter the café's website address and tap Connect to fill in the backend details automatically.")
+
+                Field(
+                    label = "Café website URL",
+                    placeholder = "https://your-cafe.pages.dev",
+                    value = state.websiteUrl,
+                    keyboardType = KeyboardType.Uri,
+                    onChange = { v -> viewModel.update { it.copy(websiteUrl = v) } },
+                )
+
+                // Fetch button and in-progress indicator
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Button(
+                        onClick = { viewModel.fetchFromWebsite() },
+                        enabled = !state.isFetching,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(if (state.isFetching) "Connecting…" else "Connect")
+                    }
+                    if (state.isFetching) {
+                        CircularProgressIndicator(modifier = Modifier.width(24.dp))
+                    }
+                }
+
+                // Fetch error message (non-null after a failed attempt)
+                state.fetchError?.let { errorMsg ->
+                    Text(
+                        text = errorMsg,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+
+                // Success banner — shown only when fetch succeeded and manual fields are hidden
+                if (state.fetchError == null && !state.isFetching && !state.showManualFields
+                    && state.supabaseUrl.isNotBlank()
+                ) {
+                    Text(
+                        text = "✓ Connected — tap Save to apply.",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+
+                // ── Task 4.2: "Enter manually" toggle ─────────────────────────────────────────
+                TextButton(
+                    onClick = { viewModel.toggleManualFields() },
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Text(
+                        if (state.showManualFields) "▲ Hide manual fields"
+                        else "▼ Enter manually"
+                    )
+                }
+
+                // Three manual fields, hidden by default, animated into view
+                AnimatedVisibility(
+                    visible = state.showManualFields,
+                    enter = expandVertically(),
+                    exit = shrinkVertically(),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        HelpText(
+                            "Enter the details from your Supabase project dashboard. " +
+                                "Use this if your website isn't deployed yet."
+                        )
+                        Field(
+                            label = "Supabase URL",
+                            placeholder = "https://your-project.supabase.co",
+                            value = state.supabaseUrl,
+                            keyboardType = KeyboardType.Uri,
+                            onChange = { v -> viewModel.update { it.copy(supabaseUrl = v) } },
+                        )
+                        Field(
+                            label = "Supabase anon key",
+                            placeholder = "eyJhbGci…",
+                            value = state.supabaseAnonKey,
+                            keyboardType = KeyboardType.Text,
+                            secret = true,
+                            onChange = { v -> viewModel.update { it.copy(supabaseAnonKey = v) } },
+                        )
+                    }
+                }
             } else {
                 // Requirement 2.4: an off-cloud café is never asked for a Supabase URL. Not merely
                 // optional — absent. A field that can be filled in and then ignored is how an owner
