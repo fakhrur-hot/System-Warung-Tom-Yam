@@ -136,9 +136,18 @@ class AdminConnectViewModel @Inject constructor(
      * Main Admin, whether it arrives by camera scan, saved QR image, or manual entry.
      */
     suspend fun recover(recoveryToken: String): Boolean {
-        isLoading = true
         errorMessage = null
         errorKey = null
+
+        // Checked before the round trip, not after. On a build with no backend configured the call
+        // cannot succeed for any key, and reporting the generic network failure here would send the
+        // owner off hunting for a bad QR — the key is fine; the app simply has nowhere to send it.
+        if (!apiClient.isBackendConfigured()) {
+            errorKey = "NO_BACKEND"
+            return false
+        }
+
+        isLoading = true
         val deviceId = secureStorage.getDeviceId()
         val deviceModel = android.os.Build.MODEL ?: "Phone"
         val result = apiClient.recoverAdmin(recoveryToken, deviceId, deviceModel)
@@ -178,13 +187,21 @@ class AdminConnectViewModel @Inject constructor(
     suspend fun registerViaInvite(androidId: String, raw: String): Boolean {
         val token = extractInviteToken(raw)
         if (token == null) {
+            // Was `errorKey = "NOT_INVITE"` immediately followed by `errorKey = null`, which cleared
+            // the key it had just set and left the screen showing nothing at all — the scan looked
+            // like it had silently succeeded. The second line was meant to clear errorMessage.
             errorKey = "NOT_INVITE"
-            errorKey = null
+            errorMessage = null
             return false
         }
-        isLoading = true
         errorMessage = null
         errorKey = null
+        if (!apiClient.isBackendConfigured()) {
+            errorKey = "NO_BACKEND"
+            return false
+        }
+
+        isLoading = true
         val deviceId = secureStorage.getDeviceId()
         val deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}"
         val result = apiClient.register(
@@ -428,6 +445,7 @@ fun AdminConnectScreen(
         "NOT_KEY_OR_INVITE" -> strings.notAValidKeyOrInvite
         "NOT_INVITE" -> strings.notAValidInviteQr
         "QR_UNREADABLE" -> strings.couldNotReadQrFromImage
+        "NO_BACKEND" -> strings.noBackendConfiguredError
         else -> viewModel.errorMessage
     }
 
