@@ -24,18 +24,23 @@ import javax.inject.Singleton
  * paired last week is still holding the old one. Without recovery the only fix is to re-pair every
  * device, and re-pairing means the admin approving each one again during service.
  *
- * ### The credential survives all three branches
+ * ### The credential survives every branch
  *
  * That is the point of Requirement 5.5. The credential was issued to the *device*, not to an
  * address, so moving the server does not invalidate it — only the URL is relearned. Nothing here
  * touches [AppConfigStore]'s stored credential or asks for re-approval.
  *
- * ### Three branches, cheapest first
+ * ### Four rungs, cheapest first (task 21.9 — supersedes the mDNS-first ladder in 7.3)
  *
  * 1. **Last known address.** Usually still right — the server moved only if something changed.
- * 2. **mDNS.** [NsdManager] discovery for [SERVICE_TYPE]. Works when both devices are on the same
- *    link, which is exactly the situation this recovers from.
- * 3. **Give up and say so.** Reported to the caller so the UI can offer a re-scan. Deliberately not
+ * 2. **The DHCP gateway.** In the topology this café actually runs — Server Device hosting the
+ *    hotspot — the gateway **is** the Server. So one cheap, synchronous, permission-free lookup
+ *    recovers the single most common failure (hotspot restarted on a different subnet) without
+ *    touching multicast at all. This rung is why 21.9 supersedes 7.3: mDNS-first meant paying a
+ *    5 s discovery timeout for a case a `getDhcpInfo()` call answers instantly.
+ * 3. **mDNS.** [NsdManager] discovery for [SERVICE_TYPE]. Covers the shared-router case, where the
+ *    gateway is the router rather than the Server.
+ * 4. **Give up and say so.** Reported to the caller so the UI can offer a re-scan. Deliberately not
  *    a silent retry loop: a staff phone quietly failing to find the server looks identical to one
  *    with nothing to send, and the shift discovers it when orders never reach the kitchen.
  */
@@ -70,7 +75,16 @@ class LanServerLocator @Inject constructor(
                 Log.i(TAG, "Last known address still reachable")
                 return@withContext Result.Reachable(last, viaDiscovery = false)
             }
-            Log.i(TAG, "Last known address unreachable — starting mDNS discovery")
+            Log.i(TAG, "Last known address unreachable — trying the DHCP gateway")
+        }
+
+        gatewayCandidate()?.let { url ->
+            if (probe(url)) {
+                appConfig.setLanServerUrl(url)
+                Log.i(TAG, "Recovered server address from the DHCP gateway: $url")
+                return@withContext Result.Reachable(url, viaDiscovery = true)
+            }
+            Log.i(TAG, "Gateway is not our server — falling through to mDNS")
         }
 
         discoverViaMdns()?.let { url ->
@@ -83,6 +97,34 @@ class LanServerLocator @Inject constructor(
 
         Log.w(TAG, "Server not found — a re-scan is needed")
         Result.NotFound
+    }
+
+    /**
+     * The default gateway as a candidate server address (task 21.9, Requirement 5.5.1).
+     *
+     * When the Server Device hosts the hotspot, every Client's gateway **is** the Server — so this
+     * one lookup recovers a hotspot restart that moved the subnet, which is the failure this ladder
+     * exists for. It is synchronous, needs no permission, and costs nothing when it guesses wrong,
+     * because [probe] rejects a gateway that is merely a router.
+     *
+     * `getDhcpInfo` is deprecated and returns 0 on modern Android for some configurations; treated
+     * as "no candidate" rather than special-cased, since the mDNS rung below covers it.
+     */
+    @Suppress("DEPRECATION")
+    private fun gatewayCandidate(): String? {
+        val wifi = context.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+            ?: return null
+        val gateway = runCatching { wifi.dhcpInfo?.gateway ?: 0 }.getOrDefault(0)
+        if (gateway == 0) return null
+
+        // DhcpInfo packs IPv4 little-endian on all supported devices.
+        val ip = listOf(
+            gateway and 0xFF,
+            gateway shr 8 and 0xFF,
+            gateway shr 16 and 0xFF,
+            gateway shr 24 and 0xFF,
+        ).joinToString(".")
+        return "http://$ip:$LAN_PORT"
     }
 
     /**
@@ -163,6 +205,9 @@ class LanServerLocator @Inject constructor(
         const val SERVICE_TYPE = "_warungpos._tcp."
         const val SERVICE_TYPE_BARE = "_warungpos._tcp"
         const val PROBE_TIMEOUT_MS = 2_500L
+
+        /** Must match LanServer.PORT. */
+        const val LAN_PORT = 8765
         const val DISCOVERY_TIMEOUT_MS = 5_000L
     }
 }

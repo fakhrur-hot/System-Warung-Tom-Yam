@@ -18,6 +18,7 @@ import io.ktor.websocket.readText
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.request.receiveText
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -68,13 +69,21 @@ class LanServer @Inject constructor(
     private val pairedDeviceDao: PairedDeviceDao,
     private val lanAddress: LanAddress,
     private val pushBus: LanPushBus,
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) {
 
     private var nsdRegistration: android.net.nsd.NsdManager.RegistrationListener? = null
 
     @Volatile
     private var engine: io.ktor.server.engine.ApplicationEngine? = null
+
+    /**
+     * Why the last [start] failed, for the pairing screen to show (task 14.2). Null when the server
+     * is running or has never been started.
+     */
+    @Volatile
+    var lastStartError: String? = null
+        private set
 
     /** Where the server ended up listening, for the pairing QR. Null when stopped. */
     @Volatile
@@ -100,9 +109,11 @@ class LanServer @Inject constructor(
 
         val address = lanAddress.resolve()
         if (address !is LanAddress.Result.Found) {
-            Log.w(TAG, "Not starting: ${(address as LanAddress.Result.Unavailable).reason}")
+            lastStartError = (address as LanAddress.Result.Unavailable).reason
+            Log.w(TAG, "Not starting: $lastStartError")
             return false
         }
+        lastStartError = null
 
         return try {
             engine = embeddedServer(CIO, port = PORT, host = "0.0.0.0") {
@@ -125,7 +136,16 @@ class LanServer @Inject constructor(
             Log.i(TAG, "Listening on ${address.ip}:$PORT (${address.interfaceName})")
             true
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to start", t)
+            // Task 14.2 / Requirement 4.5 — name the port. "Server failed to start" sends an
+            // operator nowhere; "port 8765 is already in use" tells them another copy of the app,
+            // or another app, is holding it, which is something they can act on.
+            lastStartError = if (t is java.net.BindException) {
+                "Port $PORT is already in use on this device. Close any other copy of the app, or " +
+                    "restart the device, then try again."
+            } else {
+                "The café server could not start: ${t.message ?: t.javaClass.simpleName}"
+            }
+            Log.e(TAG, "Failed to start: $lastStartError", t)
             engine = null
             boundHost = null
             false
@@ -156,7 +176,7 @@ class LanServer @Inject constructor(
      */
     private fun advertiseOverMdns() {
         if (nsdRegistration != null) return
-        val nsd = context.getSystemService(android.content.Context.NSD_SERVICE)
+        val nsd = appContext.getSystemService(android.content.Context.NSD_SERVICE)
             as? android.net.nsd.NsdManager ?: return
 
         val info = android.net.nsd.NsdServiceInfo().apply {
@@ -184,7 +204,7 @@ class LanServer @Inject constructor(
     private fun withdrawMdns() {
         val listener = nsdRegistration ?: return
         nsdRegistration = null
-        val nsd = context.getSystemService(android.content.Context.NSD_SERVICE)
+        val nsd = appContext.getSystemService(android.content.Context.NSD_SERVICE)
             as? android.net.nsd.NsdManager ?: return
         runCatching { nsd.unregisterService(listener) }
             .onFailure { Log.w(TAG, "mDNS unregister failed", it) }
@@ -265,6 +285,32 @@ class LanServer @Inject constructor(
             } finally {
                 job.cancel()
             }
+        }
+
+        // ── The Payment QR image (task 15.3, Requirement 14.8) ───────────────────────────────────
+        // Authenticated like everything else: the payee code identifies where the café's money goes,
+        // so it is not left readable by anything that can reach the port.
+        //
+        // Served as raw bytes straight from the stored file, never re-encoded. A dense QR pushed
+        // through a lossy round-trip can smear until a scanner fails on it, and the failure appears
+        // at the counter with a customer waiting.
+        get("/media/payment-qr") {
+            if (!call.authorizedDeviceOrNull()) return@get call.unauthorized()
+
+            val file = com.razstudio.pos.ui.util.PaymentQrPipeline.storedFileOrNull(appContext)
+            if (file == null) {
+                call.respondText(
+                    JSONObject().put("error", "NOT_FOUND").put("message", "No payment QR configured").toString(),
+                    contentType = JSON_CT,
+                    status = HttpStatusCode.NotFound,
+                )
+                return@get
+            }
+            call.respondBytes(
+                bytes = file.readBytes(),
+                contentType = io.ktor.http.ContentType.Image.PNG,
+                status = HttpStatusCode.OK,
+            )
         }
 
         // ── Everything below requires an approved device ─────────────────────────────────────────

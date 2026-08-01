@@ -86,6 +86,8 @@ class LocalBackend @Inject constructor(
     private val pairingTokenDao: PairingTokenDao,
     private val lanAddress: com.razstudio.pos.data.lan.LanAddress,
     private val pushBus: com.razstudio.pos.data.lan.LanPushBus,
+    private val appConfigStore: com.razstudio.pos.data.AppConfigStore,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : BackendGateway {
 
     internal companion object {
@@ -952,11 +954,93 @@ class LocalBackend @Inject constructor(
         return ApiResult.Success(Unit)
     }
 
-    override suspend fun getBranding(): ApiResult<BrandingResponse> =
-        notImplemented("getBranding")
+    /**
+     * Café branding, including the Payment QR (task 15.3, Requirement 14.8).
+     *
+     * The café name comes from [AppConfigStore] — the same place the Setup Wizard writes it — so a
+     * LAN café's name survives without a branding table.
+     *
+     * The Payment QR is served from disk rather than from a cloud bucket. **In LAN Mode the URL is an
+     * HTTP one** pointing at this Server's own `/media/payment-qr`, because a Client Device cannot
+     * open the Server's `file://` path — a URL that only resolves on the device that produced it
+     * would leave staff phones with a Show QR button that opens an empty dialog in front of a paying
+     * customer. In Kiosk Mode there are no peers, so the local `file://` path is correct and cheaper.
+     */
+    override suspend fun getBranding(): ApiResult<BrandingResponse> {
+        val hash = appConfigStore.paymentQrHash()
+        val stored = com.razstudio.pos.ui.util.PaymentQrPipeline.storedFileOrNull(appContext)
 
-    override suspend fun putBranding(cafeName: String, logoBase64: String?, paymentQrBase64: String?, paymentQrHash: String?, removePaymentQr: Boolean): ApiResult<BrandingResponse> =
-        notImplemented("putBranding")
+        val qrUrl: String? = when {
+            hash == null || stored == null -> null
+            modeRepository.currentCapabilities().staffDevices -> {
+                // LAN: peers exist, so the URL has to be reachable from another device.
+                val addr = lanAddress.resolve()
+                if (addr is LanAddress.Result.Found) {
+                    "http://${addr.ip}:$LAN_PORT/media/payment-qr"
+                } else {
+                    // No address means no Client could fetch it anyway; the local path at least
+                    // lets the Server Device itself still display the code.
+                    "file://${stored.absolutePath}"
+                }
+            }
+            else -> "file://${stored.absolutePath}"
+        }
+
+        return ApiResult.Success(
+            BrandingResponse(
+                cafeName = appConfigStore.cafeName(),
+                logoUrl = "",
+                paymentQrHash = hash,
+                paymentQrUrl = qrUrl,
+            )
+        )
+    }
+
+    /**
+     * Update branding (task 15.3).
+     *
+     * The uploaded QR is **decoded before it is stored**, not after. An image that ZXing cannot read
+     * is rejected here rather than being written and discovered later by a customer holding up their
+     * banking app — and because the code carries no amount and the app records no transaction, a
+     * silently unreadable or wrong QR leaves no trace to reconstruct from.
+     */
+    override suspend fun putBranding(
+        cafeName: String,
+        logoBase64: String?,
+        paymentQrBase64: String?,
+        paymentQrHash: String?,
+        removePaymentQr: Boolean,
+    ): ApiResult<BrandingResponse> {
+        if (cafeName.isNotBlank()) appConfigStore.setCafeName(cafeName)
+
+        if (removePaymentQr) {
+            com.razstudio.pos.ui.util.PaymentQrPipeline.deleteFromInternal(appContext)
+            appConfigStore.setPaymentQrHash(null)
+            appConfigStore.setPaymentQrUrl(null)
+            return getBranding()
+        }
+
+        if (paymentQrBase64 != null) {
+            val bytes = runCatching {
+                android.util.Base64.decode(
+                    paymentQrBase64.substringAfter("base64,", paymentQrBase64),
+                    android.util.Base64.DEFAULT,
+                )
+            }.getOrElse { return ApiResult.Error("VALIDATION", "Image data could not be decoded") }
+
+            // Verify it is a readable QR before it becomes the café's payee code.
+            if (com.razstudio.pos.ui.util.PaymentQrPipeline.decodeQrPayloadFromBytes(bytes) == null) {
+                return ApiResult.Error("VALIDATION", "That image does not contain a scannable QR code")
+            }
+
+            val file = com.razstudio.pos.ui.util.PaymentQrPipeline.saveBytesToInternal(appContext, bytes)
+            appConfigStore.setPaymentQrHash(
+                com.razstudio.pos.ui.util.PaymentQrPipeline.computeSha256Hex(file)
+            )
+        }
+
+        return getBranding()
+    }
 
     /**
      * The café's tables as `(id, displayName)` (task 4.5, Requirement 3.2).
