@@ -1,6 +1,7 @@
 package com.razstudio.pos.data.local
 
 import com.razstudio.pos.data.BackendGateway
+import com.razstudio.pos.data.ModeRepository
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.BrandingResponse
 import com.razstudio.pos.data.CafeLocationResponse
@@ -10,6 +11,8 @@ import com.razstudio.pos.data.DeviceStatusResponse
 import com.razstudio.pos.data.InviteResponse
 import com.razstudio.pos.data.KitchenResponse
 import com.razstudio.pos.data.MenuImageUploadResponse
+import com.razstudio.pos.data.MenuCategoryDto
+import com.razstudio.pos.data.MenuItemDto
 import com.razstudio.pos.data.MenuResponse
 import com.razstudio.pos.data.NewOrderItem
 import com.razstudio.pos.data.VoidLine
@@ -32,27 +35,58 @@ import javax.inject.Singleton
  * The in-process, Room-backed [BackendGateway] used by a LAN **Server** device and by Kiosk Mode
  * (task 3.3 wires the binding; the implementations land in task 4 onwards).
  *
- * Methods that are implemented:
- * - [createOrder] / [createOrderAsStaff] — task 4.1: insert an [Order] via [OrderDao]; the Server
- *   Device assigns the id as a UUID so no Client can mint one. (Requirement 8.4)
- * - [getOrdersSince] / [getOrdersSinceAsStaff] — task 4.1: delegate to
- *   [OrderDao.getOrdersSince], converting Room entities to [OrderDto].
+ * ### Implemented
  *
- * All other methods still throw. That is deliberate and preferable to returning plausible empty
- * values: a stub that answers `ApiResult.Success(emptyList())` would let a half-built LAN Mode look
- * like it was working while silently losing orders. Throwing means the first unimplemented call site
- * is impossible to miss, and the exception names the method so it is obvious which task owns it.
+ * - **Orders** (tasks 4.1, 4.2) — create, `?since=` catch-up poll, kitchen slips, amendments,
+ *   voiding unserved lines, status, payment, cancellation. Every transition is gated by the same
+ *   [OrderActions] predicates the order-detail sheets use, so an endpoint and the button that calls
+ *   it cannot disagree about what is permitted.
+ * - **Menu** (task 4.3) — read, whole-snapshot replace, and image upload/delete backed by
+ *   [LocalImageStore] instead of Supabase Storage (Requirement 7.3).
+ * - **Settings** (task 4.4) — read/partial-write against Room, with cloud-web-only keys suppressed
+ *   via [com.razstudio.pos.data.ModeCapabilities] rather than a mode comparison here.
+ * - **Sessions, aggregates, tables** (task 4.5) — the café's open/close log and daily aggregate are
+ *   written straight to Room, because off-cloud this device is the only place they exist.
  *
- * Cloud Mode never constructs this class — `BackendModule` provides it lazily, so the stub cannot
+ * ### Not implemented, and why the rest still throw
+ *
+ * Pairing, invites, devices, branding and attendance belong to later tasks. They still throw, which
+ * is deliberate and preferable to returning plausible empty values: a stub answering
+ * `ApiResult.Success(emptyList())` would let a half-built LAN Mode look like it was working while
+ * silently losing data. Throwing means the first unimplemented call site is impossible to miss, and
+ * the exception names the method so it is obvious which task owns it.
+ *
+ * ### Errors, not exceptions, for things a café can hit
+ *
+ * Anything a user can provoke — a closed order, an amendment that would empty a bill, a menu item
+ * that no longer exists — returns [ApiResult.Error] with the same error codes the Edge Functions use.
+ * The two backends are meant to be interchangeable, so a screen must not need to know which one
+ * answered it.
+ *
+ * Cloud Mode never constructs this class — `BackendModule` provides it lazily, so none of this can
  * affect an existing install.
  */
 @Singleton
 class LocalBackend @Inject constructor(
     private val orderDao: OrderDao,
     private val menuDao: MenuDao,
+    private val settingsDao: SettingsDao,
+    private val tableDao: TableDao,
+    private val cafeSessionDao: CafeSessionDao,
+    private val dailyAggregateDao: DailyAggregateDao,
+    private val modeRepository: ModeRepository,
+    private val menuCategoryStore: MenuCategoryStore,
+    private val localImageStore: LocalImageStore,
 ) : BackendGateway {
 
     private companion object {
+        /**
+         * Rounds of items one order may accumulate, matching the `orders-items` Edge Function's cap.
+         * The limit exists because each round is a separate kitchen slip and a separate line-item
+         * group on the receipt; past ten the slip stops being readable at the pass.
+         */
+        private const val MAX_SESSIONS = 10
+
         /** Fixed-width ISO-8601 UTC, always 6 fractional digits — see [nowTimestamp]. */
         private val TIMESTAMP_FORMAT: DateTimeFormatter =
             DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss.SSSSSS'Z'").withZone(ZoneOffset.UTC)
@@ -85,23 +119,211 @@ class LocalBackend @Inject constructor(
     override suspend fun patchDevice(deviceId: String, action: String, label: String?): ApiResult<DeviceDto> =
         notImplemented("patchDevice")
 
-    override suspend fun postSession(event: String, reason: String?, closing: Boolean): ApiResult<SessionResponse> =
-        notImplemented("postSession")
+    /**
+     * Record a café open/close event (task 4.5, Requirement 3.2).
+     *
+     * Off-cloud this row is the café's only record that it traded on a given day, so it is written
+     * before the response is returned rather than being fire-and-forget. The log is append-only —
+     * see [CafeSession] for why a CLOSE does not update its OPEN.
+     */
+    override suspend fun postSession(
+        event: String,
+        reason: String?,
+        closing: Boolean,
+    ): ApiResult<SessionResponse> {
+        val id = UUID.randomUUID().toString()
+        val timestamp = nowTimestamp()
+        cafeSessionDao.insert(
+            CafeSession(
+                id = id,
+                event = event,
+                reason = reason?.trim()?.ifBlank { null },
+                closing = closing,
+                timestamp = timestamp,
+            )
+        )
+        return ApiResult.Success(SessionResponse(sessionId = id, event = event, timestamp = timestamp))
+    }
 
-    override suspend fun postAggregates(date: String, body: JSONObject): ApiResult<Unit> =
-        notImplemented("postAggregates")
+    /**
+     * Store a business day's closing aggregate (task 4.5, Requirement 3.3).
+     *
+     * The payload is kept verbatim — see [DailyAggregate] for why it is not exploded into columns.
+     * Upserted, so closing the same day twice replaces rather than duplicating; the café owner who
+     * re-runs a close after fixing a mistake gets one row, not two disagreeing ones.
+     */
+    override suspend fun postAggregates(date: String, body: JSONObject): ApiResult<Unit> {
+        dailyAggregateDao.upsert(
+            DailyAggregate(
+                date = date,
+                payloadJson = body.toString(),
+                updatedAt = nowTimestamp(),
+            )
+        )
+        return ApiResult.Success(Unit)
+    }
 
-    override suspend fun getMenu(): ApiResult<MenuResponse> =
-        notImplemented("getMenu")
+    /**
+     * The café's menu, straight from Room (task 4.3).
+     *
+     * `configured` is false when there are no rows, which is how the admin screens tell "not set up
+     * yet" from "set up and deliberately empty" — the same distinction the Cloud endpoint draws.
+     *
+     * Category order and translations come from [MenuCategoryStore] rather than the item rows,
+     * because ordering is a property of the menu as a whole and there is nowhere on an item to hang
+     * it. That is also where the Cloud path reads them from, so the two agree.
+     */
+    override suspend fun getMenu(): ApiResult<MenuResponse> {
+        val items = menuDao.getAll()
+        val translations = menuCategoryStore.getTranslations()
+        val categories = menuCategoryStore.get().mapIndexed { index, name ->
+            MenuCategoryDto(
+                name = name,
+                sortOrder = index,
+                nameI18n = translations[name] ?: emptyMap(),
+            )
+        }
+        return ApiResult.Success(
+            MenuResponse(
+                configured = items.isNotEmpty(),
+                items = items.map { it.toDto() },
+                categories = categories,
+            )
+        )
+    }
 
-    override suspend fun putMenu(menuItems: JSONArray, categories: JSONArray): ApiResult<Unit> =
-        notImplemented("putMenu")
+    /**
+     * Replace the whole menu (task 4.3).
+     *
+     * Whole-snapshot semantics, like the Cloud endpoint: the arrays are the complete menu, so items
+     * absent from [menuItems] are deleted. That is what makes a deletion in the admin screen actually
+     * remove the item rather than leaving an orphan that keeps appearing in order entry.
+     *
+     * Images are preserved across the replace. The menu JSON the admin screens build does not always
+     * carry `image`, and a snapshot round-trip must not be able to silently detach every photo — so
+     * an item that arrives without one keeps whatever it already had.
+     */
+    override suspend fun putMenu(menuItems: JSONArray, categories: JSONArray): ApiResult<Unit> {
+        val existingById = menuDao.getAll().associateBy { it.id }
+        val parsed = mutableListOf<MenuItem>()
 
-    override suspend fun uploadMenuImage(menuItemId: String, imageBase64: String): ApiResult<MenuImageUploadResponse> =
-        notImplemented("uploadMenuImage")
+        for (i in 0 until menuItems.length()) {
+            val obj = menuItems.optJSONObject(i) ?: continue
+            val id = obj.optString("id", "")
+            if (id.isBlank()) continue
+            val nameObj = obj.optJSONObject("name")
+            val prior = existingById[id]
 
-    override suspend fun deleteMenuImage(path: String): ApiResult<Unit> =
-        notImplemented("deleteMenuImage")
+            // `categories[]` minus the primary becomes extraCategories — the same reduction
+            // ApiClient.getMenu performs, kept identical so a snapshot survives either backend.
+            val extras = obj.optJSONArray("categories")?.let { arr ->
+                (0 until arr.length())
+                    .map { arr.optString(it, "").trim() }
+                    .filter { it.isNotBlank() && it != obj.optString("category", "") }
+                    .joinToString(",")
+            } ?: prior?.extraCategories ?: ""
+
+            val incomingImage = obj.optString("image", "")
+
+            parsed += MenuItem(
+                id = id,
+                category = obj.optString("category", prior?.category ?: ""),
+                extraCategories = extras,
+                code = obj.optString("code", prior?.code ?: ""),
+                price = obj.optDouble("price", prior?.price ?: 0.0),
+                marketPrice = obj.optBoolean("marketPrice", prior?.marketPrice ?: false),
+                available = obj.optBoolean("available", prior?.available ?: true),
+                askMeDaily = obj.optBoolean("askMeDaily", prior?.askMeDaily ?: false),
+                imageUrl = incomingImage.ifBlank { prior?.imageUrl ?: "" },
+                imagePath = if (incomingImage.isBlank()) prior?.imagePath ?: "" else prior?.imagePath ?: "",
+                nameEn = nameObj?.optString("en", "") ?: prior?.nameEn ?: "",
+                nameBm = nameObj?.optString("bm", "") ?: prior?.nameBm ?: "",
+                nameZh = nameObj?.optString("zh", "") ?: prior?.nameZh ?: "",
+                nameTa = nameObj?.optString("ta", "") ?: prior?.nameTa ?: "",
+                nameTh = nameObj?.optString("th", "") ?: prior?.nameTh ?: "",
+                doNotTranslate = nameObj?.optBoolean("doNotTranslate", false) ?: false,
+                hasVariablePrice = obj.optBoolean("hasVariablePrice", false),
+                variablePriceDailyPrompt = obj.optBoolean("variablePriceDailyPrompt", false),
+                // has() is true for an explicit JSON null (the preset emits "priceOption1": null),
+                // so guard with !isNull or getDouble throws and the whole menu fails to save.
+                priceOption1 = if (obj.has("priceOption1") && !obj.isNull("priceOption1")) obj.getDouble("priceOption1") else null,
+                priceOption2 = if (obj.has("priceOption2") && !obj.isNull("priceOption2")) obj.getDouble("priceOption2") else null,
+                priceOption3 = if (obj.has("priceOption3") && !obj.isNull("priceOption3")) obj.getDouble("priceOption3") else null,
+            )
+        }
+
+        // Delete images belonging to items that are going away, before the rows are replaced —
+        // otherwise the path is gone and the file is stranded in app-private storage forever.
+        val keptIds = parsed.map { it.id }.toSet()
+        existingById.values
+            .filter { it.id !in keptIds && it.imagePath.isNotBlank() }
+            .forEach { localImageStore.delete(it.imagePath) }
+
+        menuDao.deleteAll()
+        menuDao.upsertAll(parsed)
+
+        if (categories.length() > 0) {
+            val names = (0 until categories.length()).mapNotNull { i ->
+                categories.optJSONObject(i)?.optString("name", "")?.ifBlank { null }
+            }
+            menuCategoryStore.set(names)
+
+            val translations = mutableMapOf<String, Map<String, String>>()
+            for (i in 0 until categories.length()) {
+                val cat = categories.optJSONObject(i) ?: continue
+                val name = cat.optString("name", "")
+                if (name.isBlank()) continue
+                val i18n = cat.optJSONObject("nameI18n") ?: continue
+                translations[name] = i18n.keys().asSequence()
+                    .associateWith { i18n.optString(it, "") }
+                    .filterValues { it.isNotBlank() }
+            }
+            if (translations.isNotEmpty()) menuCategoryStore.setTranslations(translations)
+        }
+
+        return ApiResult.Success(Unit)
+    }
+
+    /**
+     * Store a menu photo on the device instead of in Supabase Storage (task 4.3, Requirement 7.3).
+     *
+     * The previous image for the item is deleted first — without that, every replacement leaves its
+     * predecessor behind in app-private storage, and a café that re-photographs its menu each season
+     * slowly fills the tablet with files nothing references.
+     */
+    override suspend fun uploadMenuImage(
+        menuItemId: String,
+        imageBase64: String,
+    ): ApiResult<MenuImageUploadResponse> {
+        val item = menuDao.getAll().firstOrNull { it.id == menuItemId }
+            ?: return ApiResult.Error("NOT_FOUND", "Menu item not found")
+
+        return try {
+            if (item.imagePath.isNotBlank()) localImageStore.delete(item.imagePath)
+
+            val stored = localImageStore.save(menuItemId, imageBase64, System.currentTimeMillis())
+            menuDao.upsertAll(listOf(item.copy(imageUrl = stored.url, imagePath = stored.path)))
+            ApiResult.Success(MenuImageUploadResponse(imageUrl = stored.url, path = stored.path))
+        } catch (e: IllegalArgumentException) {
+            // Base64.decode on a malformed payload. Reported rather than thrown so the admin screen
+            // shows "upload failed" instead of the app dying on a bad pick.
+            ApiResult.Error("VALIDATION", e.message ?: "Image data could not be decoded")
+        } catch (e: java.io.IOException) {
+            ApiResult.Error("STORAGE_ERROR", e.message ?: "Could not write the image to storage")
+        }
+    }
+
+    /**
+     * Remove a stored menu photo (task 4.3), clearing the pointer on any item that referenced it so a
+     * row cannot be left holding a `file://` URL for a file that no longer exists.
+     */
+    override suspend fun deleteMenuImage(path: String): ApiResult<Unit> {
+        localImageStore.delete(path)
+        menuDao.getAll()
+            .filter { it.imagePath == path }
+            .forEach { menuDao.upsertAll(listOf(it.copy(imageUrl = "", imagePath = ""))) }
+        return ApiResult.Success(Unit)
+    }
 
     /**
      * Create a new order on behalf of the admin device.
@@ -171,23 +393,215 @@ class LocalBackend @Inject constructor(
         )
     }
 
-    override suspend fun sendToKitchen(orderId: String, sessionNumber: Int?): ApiResult<KitchenResponse> =
-        notImplemented("sendToKitchen")
+    /**
+     * Kitchen slip data for an order (task 4.2).
+     *
+     * Two shapes, matching the `orders-kitchen` Edge Function exactly so the two backends stay
+     * interchangeable:
+     *  - **no [sessionNumber]** — a reprint. Returns the order and ALL its lines, and mutates
+     *    nothing. The kitchen printer failed or the slip was lost; nothing about the order changed.
+     *  - **a [sessionNumber]** — a first send for that round. Marks only that round's lines
+     *    `sentToKitchen`, persists, and returns only those lines.
+     *
+     * The guard is `isTerminal`, not [OrderActions.canSendToKitchen]. Those answer different
+     * questions and conflating them would break reprinting: `canSendToKitchen` is the UI's
+     * "is this a fresh order awaiting its first send" rule (RECEIVED only), whereas a paid-but-not-yet
+     * -collected order must still be reprintable. A COMPLETED or CANCELLED order must not be.
+     */
+    override suspend fun sendToKitchen(orderId: String, sessionNumber: Int?): ApiResult<KitchenResponse> {
+        val order = orderDao.getOrderById(orderId)
+            ?: return ApiResult.Error("NOT_FOUND", "Order not found")
+        if (order.status.isTerminal) {
+            return ApiResult.Error("ORDER_CLOSED", "Cannot print a completed or cancelled order")
+        }
 
-    override suspend fun addItemsToOrder(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto> =
-        notImplemented("addItemsToOrder")
+        val items = orderDao.getItemsForOrder(orderId)
 
-    override suspend fun voidOrderItems(orderId: String, lines: List<VoidLine>, reason: String): ApiResult<OrderDto> =
-        notImplemented("voidOrderItems")
+        if (sessionNumber == null) {
+            return ApiResult.Success(
+                KitchenResponse(
+                    order = order.toDto(items),
+                    linesToPrint = items.map { it.toDto() },
+                )
+            )
+        }
 
-    override suspend fun updateOrderStatus(orderId: String, status: String): ApiResult<OrderDto> =
-        notImplemented("updateOrderStatus")
+        // Lines written before sessions existed carry 0/absent; the client shows them as round 1, so
+        // resolve them the same way here rather than letting them fall out of every session filter.
+        val sessionOf = { item: OrderItem -> if (item.sessionNumber <= 0) 1 else item.sessionNumber }
+        val sessionItems = items.filter { sessionOf(it) == sessionNumber }
+        if (sessionItems.isEmpty()) {
+            return ApiResult.Error("NOT_FOUND", "No items found for session $sessionNumber")
+        }
 
-    override suspend fun processPayment(orderId: String, method: String): ApiResult<OrderDto> =
-        notImplemented("processPayment")
+        val marked = sessionItems.map { it.copy(sentToKitchen = true) }
+        orderDao.insertOrderItems(marked)
 
-    override suspend fun cancelOrder(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit> =
-        notImplemented("cancelOrder")
+        val allAfter = items.map { item -> marked.firstOrNull { it.id == item.id } ?: item }
+        return ApiResult.Success(
+            KitchenResponse(
+                order = order.toDto(allAfter),
+                linesToPrint = marked.map { it.toDto() },
+            )
+        )
+    }
+
+    /**
+     * Append a round of items to an open order (task 4.2).
+     *
+     * Mirrors `orders-items`: one call is one round, so the whole batch shares the next
+     * [OrderItem.sessionNumber] and prints as a single kitchen slip rather than one slip per tap.
+     * Prices are snapshotted from the current menu here, not taken from the caller.
+     */
+    override suspend fun addItemsToOrder(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto> {
+        if (items.isEmpty()) return ApiResult.Error("VALIDATION", "items[] is required")
+
+        val order = orderDao.getOrderById(orderId)
+            ?: return ApiResult.Error("NOT_FOUND", "Order not found")
+        if (order.status.isTerminal) {
+            return ApiResult.Error("ORDER_CLOSED", "Cannot amend a completed or cancelled order")
+        }
+
+        val existing = orderDao.getItemsForOrder(orderId)
+        val nextSession = (existing.maxOfOrNull { it.sessionNumber } ?: 0) + 1
+        if (nextSession > MAX_SESSIONS) {
+            return ApiResult.Error(
+                "SESSION_LIMIT",
+                "This table has reached the maximum of $MAX_SESSIONS order rounds — pay out and free it first",
+            )
+        }
+
+        val menuIndex = menuDao.getAll().associateBy { it.id }
+        val newItems = items.map { it.toEntity(orderId, menuIndex, sessionNumber = nextSession) }
+        orderDao.insertOrderItems(newItems)
+
+        val all = existing + newItems
+        val updated = order.copy(total = all.sumOf { it.unitPriceSnapshot * it.quantity })
+        orderDao.insertOrder(updated)
+        return ApiResult.Success(updated.toDto(all))
+    }
+
+    /**
+     * Reduce or remove lines on an open order before payment (task 4.2).
+     *
+     * Same rules the `orders-items-void` Edge Function enforces — keep-quantities rather than whole
+     * lines, no increases, and never empty the order — so a café behaves identically whichever
+     * backend it is on.
+     *
+     * One deliberate difference: there is no local audit trail. The cloud path moves voided
+     * quantities into `orders.voided_items_json`; Room has no such column, so off-cloud the reduced
+     * quantity is simply gone. Recorded here rather than silently: adding the column is a schema
+     * migration, and LAN/Kiosk cafés are single-site with the cashier physically present, so the
+     * reconstruction value is much lower than it is for a multi-device cloud café.
+     */
+    override suspend fun voidOrderItems(
+        orderId: String,
+        lines: List<VoidLine>,
+        reason: String,
+    ): ApiResult<OrderDto> {
+        if (lines.isEmpty()) return ApiResult.Error("VALIDATION", "lines[] is required")
+
+        val order = orderDao.getOrderById(orderId)
+            ?: return ApiResult.Error("NOT_FOUND", "Order not found")
+        if (order.status.isTerminal) {
+            return ApiResult.Error("ORDER_CLOSED", "Cannot amend a completed or cancelled order")
+        }
+
+        val existing = orderDao.getItemsForOrder(orderId)
+        val keepById = mutableMapOf<String, Int>()
+        for (line in lines) {
+            val item = existing.firstOrNull { it.id == line.itemId }
+                ?: return ApiResult.Error("ALREADY_VOIDED", "Line is not on this order any more")
+            if (line.keepQuantity < 0) return ApiResult.Error("VALIDATION", "quantity must be >= 0")
+            if (line.keepQuantity > item.quantity) {
+                return ApiResult.Error("CANNOT_INCREASE", "Use Add items to order to increase a quantity")
+            }
+            keepById[line.itemId] = line.keepQuantity
+        }
+
+        var changed = false
+        val kept = existing.mapNotNull { item ->
+            val keep = keepById[item.id] ?: return@mapNotNull item
+            when {
+                keep == item.quantity -> item
+                keep > 0 -> { changed = true; item.copy(quantity = keep) }
+                else -> { changed = true; null }
+            }
+        }
+        if (!changed) return ApiResult.Error("ALREADY_VOIDED", "Nothing on this order would change")
+        if (kept.isEmpty()) {
+            return ApiResult.Error(
+                "WOULD_EMPTY_ORDER",
+                "That would remove every line — cancel the order instead so it is recorded as one",
+            )
+        }
+
+        orderDao.deleteItemsForOrder(orderId)
+        orderDao.insertOrderItems(kept)
+        val updated = order.copy(total = kept.sumOf { it.unitPriceSnapshot * it.quantity })
+        orderDao.insertOrder(updated)
+        return ApiResult.Success(updated.toDto(kept))
+    }
+
+    /**
+     * Move an order along the kitchen workflow (task 4.2) — `orders-status`, PREPARING/READY.
+     *
+     * Only these two are accepted. COMPLETED belongs to [processPayment] and CANCELLED to
+     * [cancelOrder], both of which record more than a status; letting this endpoint set either would
+     * be a way to close an order with no payment method and no cancellation reason.
+     */
+    override suspend fun updateOrderStatus(orderId: String, status: String): ApiResult<OrderDto> {
+        val target = OrderStatus.fromWire(status)
+        if (target != OrderStatus.PREPARING && target != OrderStatus.READY) {
+            return ApiResult.Error("VALIDATION", "Only PREPARING and READY can be set here")
+        }
+
+        val order = orderDao.getOrderById(orderId)
+            ?: return ApiResult.Error("NOT_FOUND", "Order not found")
+        if (order.status.isTerminal) {
+            return ApiResult.Error("ORDER_CLOSED", "Cannot change the status of a closed order")
+        }
+
+        orderDao.updateOrderStatus(orderId, target.name)
+        val updated = order.copy(status = target)
+        return ApiResult.Success(updated.toDto(orderDao.getItemsForOrder(orderId)))
+    }
+
+    /**
+     * Take payment and close the order (task 4.2).
+     *
+     * Gated by [OrderActions.canTakePayment] — the same predicate the two order-detail sheets use to
+     * decide whether to show the Pay buttons, so the button and the endpoint cannot disagree about
+     * what is payable.
+     */
+    override suspend fun processPayment(orderId: String, method: String): ApiResult<OrderDto> {
+        val order = orderDao.getOrderById(orderId)
+            ?: return ApiResult.Error("NOT_FOUND", "Order not found")
+        if (order.status == OrderStatus.COMPLETED) {
+            return ApiResult.Error("ALREADY_PAID", "This order has already been paid")
+        }
+        if (!OrderActions.canTakePayment(order.status)) {
+            return ApiResult.Error("PAYMENT_CONFLICT", "Order cannot be paid in its current status")
+        }
+
+        orderDao.completePayment(orderId, method)
+        val updated = order.copy(status = OrderStatus.COMPLETED, paymentMethod = method)
+        return ApiResult.Success(updated.toDto(orderDao.getItemsForOrder(orderId)))
+    }
+
+    /**
+     * Cancel an order (task 4.2). Gated by [OrderActions.canCancel] — any non-terminal order.
+     */
+    override suspend fun cancelOrder(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit> {
+        val order = orderDao.getOrderById(orderId)
+            ?: return ApiResult.Error("NOT_FOUND", "Order not found")
+        if (!OrderActions.canCancel(order.status)) {
+            return ApiResult.Error("ORDER_CLOSED", "Order is already closed")
+        }
+
+        orderDao.cancelOrder(orderId, reason, cancelledBy)
+        return ApiResult.Success(Unit)
+    }
 
     /**
      * Create a new order on behalf of an ordering-staff (Client) device.
@@ -209,26 +623,100 @@ class LocalBackend @Inject constructor(
     override suspend fun getOrdersSinceAsStaff(since: String): ApiResult<OrdersSyncResponse> =
         getOrdersSince(since)
 
+    // The staff variants delegate to the admin ones: the Room rows are identical, and per-role
+    // permission is enforced one layer up at the LanServer HTTP boundary (task 6) using the same
+    // StaffPermissions flags the Cloud path enforces in its Edge Functions. Duplicating the
+    // permission logic here would give LAN Mode a second, drifting copy of the RBAC rules.
+
     override suspend fun sendToKitchenAsStaff(orderId: String, sessionNumber: Int?): ApiResult<KitchenResponse> =
-        notImplemented("sendToKitchenAsStaff")
+        sendToKitchen(orderId, sessionNumber)
 
     override suspend fun addItemsToOrderAsStaff(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto> =
-        notImplemented("addItemsToOrderAsStaff")
+        addItemsToOrder(orderId, items)
 
     override suspend fun voidOrderItemsAsStaff(orderId: String, lines: List<VoidLine>, reason: String): ApiResult<OrderDto> =
-        notImplemented("voidOrderItemsAsStaff")
+        voidOrderItems(orderId, lines, reason)
 
     override suspend fun processPaymentAsStaff(orderId: String, method: String): ApiResult<OrderDto> =
-        notImplemented("processPaymentAsStaff")
+        processPayment(orderId, method)
 
     override suspend fun cancelOrderAsStaff(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit> =
-        notImplemented("cancelOrderAsStaff")
+        cancelOrder(orderId, reason, cancelledBy)
 
-    override suspend fun getSettings(): ApiResult<SettingsResponse> =
-        notImplemented("getSettings")
+    /**
+     * Read café settings from Room (task 4.4, Requirements 4.4 / 7.4).
+     *
+     * Cloud-web-only keys are suppressed by returning their *inert* value rather than whatever
+     * happens to be stored, because [SettingsResponse] is a fixed-shape data class with no way to
+     * omit a field. Suppression is driven by [ModeCapabilities], never by a mode comparison here —
+     * that is the whole reason the capability type exists, and it means adding a fourth mode does not
+     * require revisiting this method.
+     *
+     * Today only `customerOrderHoldSeconds` and `customerOrderAutoPrint` qualify: both exist purely
+     * to pace the customer-facing web ordering flow, and off-cloud there is no such flow. Reporting
+     * them as configured would put controls in the settings screen that do nothing.
+     */
+    override suspend fun getSettings(): ApiResult<SettingsResponse> {
+        val s = settingsDao.get() ?: SystemSettings()
+        val caps = modeRepository.currentCapabilities()
 
-    override suspend fun putSettings(body: JSONObject): ApiResult<Unit> =
-        notImplemented("putSettings")
+        return ApiResult.Success(
+            SettingsResponse(
+                printLanguage = s.printLanguage,
+                timezone = s.timezone,
+                topN = s.topN,
+                staffCanSendKitchen = s.staffCanSendKitchen,
+                staffCanTakePayment = s.staffCanTakePayment,
+                // Customer-web pacing — meaningless without customer QR ordering.
+                customerOrderHoldSeconds = if (caps.customerQrOrdering) s.customerOrderHoldSeconds else 0,
+                customerOrderAutoPrint = if (caps.customerQrOrdering) s.customerOrderAutoPrint else false,
+                todaysSpecial = s.todaysSpecial,
+                reportEmail = s.reportEmail,
+                businessDayStartHour = s.businessDayStartHour,
+                defaultLangAdmin = s.defaultLangAdmin,
+                defaultLangOrdering = s.defaultLangOrdering,
+                // The customer surface does not exist off-cloud, but the stored preference is still
+                // returned verbatim: it costs nothing, and blanking it would lose the café's choice
+                // if they later switch back to Cloud Mode.
+                defaultLangCustomer = s.defaultLangCustomer,
+            )
+        )
+    }
+
+    /**
+     * Persist café settings to Room (task 4.4).
+     *
+     * A **partial** update, matching the Cloud `settings` endpoint: callers send only the keys they
+     * changed (`AdminSettingsViewModel` posts one key at a time), so any key absent from [body] must
+     * keep its current value rather than being reset to a default. That is why every read below goes
+     * through the stored row as its fallback.
+     *
+     * Cloud-only keys are accepted and stored rather than rejected. A café that switches LAN → Cloud
+     * should find its customer-web settings as it left them, and silently dropping a write the caller
+     * believes succeeded is worse than storing a value that is currently unused.
+     */
+    override suspend fun putSettings(body: JSONObject): ApiResult<Unit> {
+        val cur = settingsDao.get() ?: SystemSettings()
+        settingsDao.upsert(
+            cur.copy(
+                printLanguage = body.optString("printLanguage", cur.printLanguage),
+                timezone = body.optString("timezone", cur.timezone),
+                topN = body.optInt("topN", cur.topN),
+                staffCanSendKitchen = body.optBoolean("staffCanSendKitchen", cur.staffCanSendKitchen),
+                staffCanTakePayment = body.optBoolean("staffCanTakePayment", cur.staffCanTakePayment),
+                customerOrderHoldSeconds = body.optInt("customerOrderHoldSeconds", cur.customerOrderHoldSeconds),
+                customerOrderAutoPrint = body.optBoolean("customerOrderAutoPrint", cur.customerOrderAutoPrint),
+                todaysSpecial = body.optString("todaysSpecial", cur.todaysSpecial),
+                reportEmail = body.optString("reportEmail", cur.reportEmail),
+                businessDayStartHour = body.optInt("businessDayStartHour", cur.businessDayStartHour)
+                    .coerceIn(0, 23),
+                defaultLangAdmin = body.optString("defaultLangAdmin", cur.defaultLangAdmin),
+                defaultLangOrdering = body.optString("defaultLangOrdering", cur.defaultLangOrdering),
+                defaultLangCustomer = body.optString("defaultLangCustomer", cur.defaultLangCustomer),
+            )
+        )
+        return ApiResult.Success(Unit)
+    }
 
     override suspend fun getBranding(): ApiResult<BrandingResponse> =
         notImplemented("getBranding")
@@ -236,14 +724,64 @@ class LocalBackend @Inject constructor(
     override suspend fun putBranding(cafeName: String, logoBase64: String?, paymentQrBase64: String?, paymentQrHash: String?, removePaymentQr: Boolean): ApiResult<BrandingResponse> =
         notImplemented("putBranding")
 
-    override suspend fun getTables(): ApiResult<List<Pair<String, String>>> =
-        notImplemented("getTables")
+    /**
+     * The café's tables as `(id, displayName)` (task 4.5, Requirement 3.2).
+     *
+     * Kiosk Mode has no tables at all — it is one counter with a running order number — so it returns
+     * an empty list. Empty rather than an error on purpose: "this café has no tables" is a legitimate
+     * answer that the table grid already renders (it shows its no-tables-configured state), whereas an
+     * error would surface as a failure banner for something that is working as designed.
+     *
+     * No `qrToken` is produced in either mode: tokens exist to address a table from the customer web
+     * flow, which needs a website. [ModeCapabilities.customerQrOrdering] is false off-cloud, and
+     * [getTableTokens] stays unimplemented rather than inventing tokens nothing can resolve.
+     */
+    override suspend fun getTables(): ApiResult<List<Pair<String, String>>> {
+        if (!modeRepository.currentCapabilities().tables) {
+            return ApiResult.Success(emptyList())
+        }
+        return ApiResult.Success(tableDao.getAll().map { it.id to it.label })
+    }
 
     override suspend fun getTableTokens(): ApiResult<Map<String, String>> =
         notImplemented("getTableTokens")
 
-    override suspend fun putTables(tables: List<Pair<String, String>>): ApiResult<List<String>> =
-        notImplemented("putTables")
+    /**
+     * Replace the table registry (task 4.5). Returns the ids that were **skipped**, matching the
+     * Cloud endpoint's `skippedInUse` contract.
+     *
+     * A table with a live order is never deleted. Deleting it would orphan that order — the grid
+     * looks up labels by table id, so the order would still exist, still be payable, and show a raw
+     * id where its table name should be. Those ids come back in the result so the caller can tell the
+     * admin which tables it refused to remove, rather than silently keeping them.
+     */
+    override suspend fun putTables(tables: List<Pair<String, String>>): ApiResult<List<String>> {
+        if (!modeRepository.currentCapabilities().tables) {
+            return ApiResult.Error("UNSUPPORTED", "Kiosk Mode has no tables")
+        }
+
+        val desiredIds = tables.map { it.first }.toSet()
+        val existing = tableDao.getAll()
+        val busyIds = orderDao.getActiveOrders().map { it.tableId }.toSet()
+
+        val skipped = mutableListOf<String>()
+        for (table in existing) {
+            if (table.id in desiredIds) continue
+            if (table.id in busyIds) {
+                skipped += table.id
+                continue
+            }
+            tableDao.delete(table.id)
+        }
+
+        // Preserve the caller's ordering as sortOrder so the grid renders in the order the admin
+        // arranged, which is how the Cloud path behaves.
+        tables.forEachIndexed { index, (id, label) ->
+            tableDao.insert(Table(id = id, label = label, sortOrder = index))
+        }
+
+        return ApiResult.Success(skipped)
+    }
 
     override suspend fun getCafeLocation(): ApiResult<CafeLocationResponse> =
         notImplemented("getCafeLocation")
@@ -324,6 +862,30 @@ class LocalBackend @Inject constructor(
         cancelledBy = cancelledBy,
         createdAt = createdAt,
         items = items.map { it.toDto() },
+    )
+
+    /** Room row -> wire DTO. The wire's `image` field is this row's [MenuItem.imageUrl]. */
+    private fun MenuItem.toDto(): MenuItemDto = MenuItemDto(
+        id = id,
+        category = category,
+        extraCategories = extraCategories,
+        code = code,
+        price = price,
+        marketPrice = marketPrice,
+        available = available,
+        askMeDaily = askMeDaily,
+        imageUrl = imageUrl,
+        hasVariablePrice = hasVariablePrice,
+        variablePriceDailyPrompt = variablePriceDailyPrompt,
+        priceOption1 = priceOption1,
+        priceOption2 = priceOption2,
+        priceOption3 = priceOption3,
+        nameEn = nameEn,
+        nameBm = nameBm,
+        nameZh = nameZh,
+        nameTa = nameTa,
+        nameTh = nameTh,
+        doNotTranslate = doNotTranslate,
     )
 
     private fun OrderItem.toDto(): OrderItemDto = OrderItemDto(

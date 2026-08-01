@@ -120,4 +120,84 @@ class AppDatabaseMigrationTest {
             assertEquals("paired_devices should be created empty", 0, c.getInt(0))
         }
     }
+
+    @Test
+    fun migrate12To13_addsSessionsAggregatesAndSettingsColumnsWithoutTouchingExistingRows() {
+        // ── v12: a café mid-life — a settings row it has customised, and takings on the books ────
+        helper.createDatabase(DB_NAME, 12).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO system_settings
+                    (id, printLanguage, timezone, topN, staffCanSendKitchen,
+                     staffCanTakePayment, nextTableNumber)
+                VALUES (1, 'ZH', 'Asia/Kuala_Lumpur', 7, 1, 0, 23)
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO orders
+                    (id, tableId, source, status, paymentMethod, total,
+                     sentToKitchenAt, cancelReason, cancelledBy, createdAt)
+                VALUES
+                    ('$ORDER_ID', 'table-3', 'STAFF', 'COMPLETED', 'CASH', $ORDER_TOTAL,
+                     '2026-07-31T12:00:00Z', NULL, NULL, '2026-07-31T11:58:00Z')
+                """.trimIndent()
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(DB_NAME, 13, true, MIGRATION_12_13)
+
+        // ── the customised settings row survived UNCHANGED ───────────────────────────────────────
+        // The migration adds eight columns to this table; the whole risk is that it recreates the
+        // row instead of altering it and quietly resets the café's configuration.
+        db.query(
+            "SELECT printLanguage, timezone, topN, staffCanSendKitchen, nextTableNumber " +
+                "FROM system_settings WHERE id = 1"
+        ).use { c ->
+            assertTrue("the settings row was lost by the migration", c.moveToFirst())
+            assertEquals("ZH", c.getString(0))
+            assertEquals("Asia/Kuala_Lumpur", c.getString(1))
+            assertEquals(7, c.getInt(2))
+            assertEquals(1, c.getInt(3))
+            assertEquals(23, c.getInt(4))
+            assertEquals("migration duplicated the settings row", 1, c.count)
+        }
+
+        // ── and the new columns arrived pre-filled with the documented defaults ───────────────────
+        // Not merely present: an existing row must come out matching SettingsResponse's defaults, or
+        // an upgraded café silently changes behaviour — businessDayStartHour in particular decides
+        // which trading day every report covers.
+        db.query(
+            "SELECT customerOrderHoldSeconds, customerOrderAutoPrint, todaysSpecial, reportEmail, " +
+                "businessDayStartHour, defaultLangAdmin, defaultLangOrdering, defaultLangCustomer " +
+                "FROM system_settings WHERE id = 1"
+        ).use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(15, c.getInt(0))
+            assertEquals(1, c.getInt(1))
+            assertEquals("", c.getString(2))
+            assertEquals("", c.getString(3))
+            assertEquals(15, c.getInt(4))
+            assertEquals("BM", c.getString(5))
+            assertEquals("BM", c.getString(6))
+            assertEquals("BM", c.getString(7))
+        }
+
+        // ── the completed order is untouched, so the day's takings still reconcile ───────────────
+        db.query("SELECT total, paymentMethod FROM orders WHERE id = '$ORDER_ID'").use { c ->
+            assertTrue("order row was lost by the migration", c.moveToFirst())
+            assertEquals(ORDER_TOTAL, c.getDouble(0), 0.001)
+            assertEquals("CASH", c.getString(1))
+        }
+
+        // ── both new tables exist and are empty ──────────────────────────────────────────────────
+        db.query("SELECT count(*) FROM cafe_sessions").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("cafe_sessions should be created empty", 0, c.getInt(0))
+        }
+        db.query("SELECT count(*) FROM daily_aggregates").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("daily_aggregates should be created empty", 0, c.getInt(0))
+        }
+    }
 }

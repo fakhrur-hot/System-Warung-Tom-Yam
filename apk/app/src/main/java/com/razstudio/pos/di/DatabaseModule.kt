@@ -5,8 +5,11 @@ import androidx.room.Room
 import com.razstudio.pos.data.local.AppDatabase
 import com.razstudio.pos.data.local.MIGRATION_10_11
 import com.razstudio.pos.data.local.MIGRATION_11_12
+import com.razstudio.pos.data.local.MIGRATION_12_13
 import com.razstudio.pos.data.local.MIGRATION_8_9
 import com.razstudio.pos.data.local.MIGRATION_9_10
+import com.razstudio.pos.data.local.CafeSessionDao
+import com.razstudio.pos.data.local.DailyAggregateDao
 import com.razstudio.pos.data.local.MenuDao
 import com.razstudio.pos.data.local.OrderDao
 import com.razstudio.pos.data.local.OrderNumberSequenceDao
@@ -41,8 +44,24 @@ object DatabaseModule {
             AppDatabase::class.java,
             "warung_tom_yam_db"
         )
-            .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(
+                MIGRATION_8_9,
+                MIGRATION_9_10,
+                MIGRATION_10_11,
+                MIGRATION_11_12,
+                MIGRATION_12_13,
+            )
             .build()
+    }
+
+    @Provides
+    fun provideCafeSessionDao(database: AppDatabase): CafeSessionDao {
+        return database.cafeSessionDao()
+    }
+
+    @Provides
+    fun provideDailyAggregateDao(database: AppDatabase): DailyAggregateDao {
+        return database.dailyAggregateDao()
     }
 
     @Provides
