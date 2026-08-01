@@ -57,7 +57,8 @@ class PendingApprovalViewModel @Inject constructor(
         if (pollingJob?.isActive == true) return
 
         pollingJob = viewModelScope.launch {
-            val deviceId = secureStorage.getDeviceId()
+            // The server knows this device by the id `register` returned, not by our local UUID.
+            val deviceId = secureStorage.getServerDeviceId()
             while (true) {
                 val result = apiClient.pollDeviceStatus(deviceId)
                 when (result) {

@@ -256,7 +256,9 @@ class AdminConnectViewModel @Inject constructor(
         isLoading = false
         return when (result) {
             is ApiResult.Success -> {
-                val statusResult = apiClient.pollDeviceStatus(deviceId)
+                // See OrderingConnectScreen: the returned id is the server's row key, not ours.
+                secureStorage.setServerDeviceId(result.data.deviceId)
+                val statusResult = apiClient.pollDeviceStatus(result.data.deviceId)
                 val resolvedRole = if (statusResult is ApiResult.Success &&
                     statusResult.data.role == "ADMIN_SECONDARY"
                 ) {
