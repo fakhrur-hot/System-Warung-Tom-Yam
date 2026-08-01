@@ -1,4 +1,5 @@
 [versions]
+ktor = "2.3.12"
 # Generates the in-app third-party licence screen from the real dependency set. Required because
 # MIT and Apache-2.0 both oblige us to reproduce their notices in a distributed binary, and this
 # project ships proprietary (see THIRD-PARTY-NOTICES.md).
@@ -17,6 +18,9 @@ hiltNavigationCompose = "1.2.0"
 securityCrypto = "1.1.0-alpha06"
 
 [libraries]
+ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
+ktor-server-cio = { group = "io.ktor", name = "ktor-server-cio", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }

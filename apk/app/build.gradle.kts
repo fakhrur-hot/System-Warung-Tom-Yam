@@ -200,6 +200,12 @@ dependencies {
     // Google Mobile Ads SDK — for native in-app banner ads (Table View)
     implementation("com.google.android.gms:play-services-ads:23.2.0")
 
+    // LAN Mode HTTP server (task 6.1). CIO engine: pure Kotlin/coroutines, no Netty,
+    // which keeps the APK and the method count down on a phone-hosted server.
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.serialization.kotlinx.json)
+
     // Guava — required for CameraX and Google Mobile Ads SDK
     implementation("com.google.guava:guava:33.0.0-android")
 
