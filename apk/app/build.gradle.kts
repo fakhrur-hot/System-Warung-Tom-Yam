@@ -212,6 +212,12 @@ dependencies {
     // WorkManager: periodic backup reminders
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
+    // Ktor server: embedded HTTP listener for LanServer (Requirement 4.2)
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.server.websockets)
+    implementation(libs.ktor.serialization.kotlinx.json)
+
     // Unit tests (JVM) — org.json is already on the classpath for the parser tests
     testImplementation("junit:junit:4.13.2")
 

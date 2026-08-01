@@ -69,6 +69,7 @@ class LocalBackendOrderLifecycleTest {
             pairedDeviceDao = db.pairedDeviceDao(),
             pairingTokenDao = db.pairingTokenDao(),
             lanAddress = com.razstudio.pos.data.lan.LanAddress(context),
+            pushBus = com.razstudio.pos.data.lan.LanPushBus(),
         )
     }
 
