@@ -169,7 +169,11 @@ class OrderingConnectViewModel @Inject constructor(
 
         return when (result) {
             is ApiResult.Success -> {
-                val statusResult = apiClient.pollDeviceStatus(deviceId)
+                // `register` returns `devices.id` under the name `deviceId` — the server's row key,
+                // NOT the local UUID just sent. Every device-scoped poll must use it, or
+                // `devices-status` looks up a primary key that will never match and answers 404.
+                secureStorage.setServerDeviceId(result.data.deviceId)
+                val statusResult = apiClient.pollDeviceStatus(result.data.deviceId)
                 val resolvedRole = if (statusResult is ApiResult.Success && statusResult.data.role == "ADMIN_SECONDARY") {
                     SecureStorage.Role.ADMIN_SECONDARY
                 } else {
