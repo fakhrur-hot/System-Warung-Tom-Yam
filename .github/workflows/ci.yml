@@ -43,6 +43,8 @@ jobs:
           cache-dependency-path: website/package-lock.json
       - run: npm ci
       - run: npm run build
+      - name: app-config.json contract (task 3.4)
+        run: node scripts/app-config.test.mjs
 
   apk:
     name: APK (assembleDebug)
