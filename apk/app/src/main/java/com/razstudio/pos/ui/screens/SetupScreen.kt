@@ -46,6 +46,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import com.razstudio.pos.data.OperatingMode
+import com.razstudio.pos.data.toCapabilities
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.ui.viewmodels.SetupViewModel
 
@@ -205,25 +206,55 @@ private fun ModeChangeConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val losses = buildList {
+    // Task 10.2 / Requirement 10.3 — derived from ModeCapabilities, not hardcoded per mode.
+    //
+    // The point is that a fourth mode gets correct messaging by adding one row to toCapabilities()
+    // and nothing else. Hardcoding a `when (to)` block, as the first version did, means the day
+    // someone adds a mode the dialog confidently tells the operator the wrong things — and this is
+    // the one dialog whose whole job is to be accurate about what is about to be lost.
+    val fromCaps = from.toCapabilities()
+    val toCaps = to.toCapabilities()
+
+    // Only capabilities being LOST are listed. Gaining one needs no warning.
+    val losing = buildList {
+        fun lost(before: Boolean, after: Boolean, text: String) {
+            if (before && !after) add(text)
+        }
+        lost(fromCaps.customerQrOrdering, toCaps.customerQrOrdering,
+            "Customer QR ordering stops working — customers can no longer order from their own phones.")
+        lost(fromCaps.printableQrSheets, toCaps.printableQrSheets,
+            "Printable table QR sheets are no longer available.")
+        lost(fromCaps.tables, toCaps.tables,
+            "Tables are removed entirely — orders will be identified by a running number instead.")
+        lost(fromCaps.staffDevices, toCaps.staffDevices,
+            "Staff devices are no longer supported; this becomes a single-device café.")
+        lost(fromCaps.secondaryAdmin, toCaps.secondaryAdmin,
+            "Secondary admin devices are no longer supported.")
+        lost(fromCaps.websiteInvites, toCaps.websiteInvites,
+            "Invite links stop working — staff devices pair by scanning a code instead.")
+        lost(fromCaps.cloudImageHosting, toCaps.cloudImageHosting,
+            "Menu photos move to this device's own storage rather than the cloud.")
+    }
+
+    // Data consequences are not capability-shaped, so they stay explicit — but they are keyed on the
+    // direction of travel rather than on the destination mode, which keeps them correct for any
+    // future mode too.
+    val dataWarnings = buildList {
         if (from == OperatingMode.CLOUD) {
             add("This device will stop reading the café's online orders and reports. Anything recorded online stays there, but this app will no longer show it.")
             add("The saved Supabase details and this device's sign-in are cleared. You will need them again to switch back.")
         } else {
             add("Orders taken on this device while offline are not uploaded. Switching now leaves them here only.")
         }
-        when (to) {
-            OperatingMode.CLOUD -> add("You will need a Supabase project and a website before this café can take orders again.")
-            OperatingMode.LAN -> {
-                add("Customer QR ordering and the printable table QR sheets stop working — there is no website to scan into.")
-                add("Staff devices must re-pair over your Wi-Fi.")
-            }
-            OperatingMode.KIOSK -> {
-                add("Customer QR ordering, printable QR sheets and staff devices all stop working.")
-                add("Tables are removed entirely — orders are identified by a running number instead.")
-            }
+        if (to == OperatingMode.CLOUD) {
+            add("You will need a Supabase project and a website before this café can take orders again.")
+        }
+        if (toCaps.staffDevices && !fromCaps.staffDevices) {
+            add("Staff devices will need to pair with this device before they can take orders.")
         }
     }
+
+    val losses = dataWarnings + losing
 
     AlertDialog(
         onDismissRequest = onDismiss,
