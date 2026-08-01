@@ -33,6 +33,15 @@ class ConfigFetchFailureMatrixTest {
     private lateinit var fetcher: AppConfigFetcher
     private lateinit var config: AppConfigStore
 
+    /**
+     * Held as a field, and shared with the guard.
+     *
+     * `ModeRepository` caches the mode at construction, so building a second one to call `setMode`
+     * leaves the guard's copy on the old value and the test asserts nothing. That trap is already
+     * documented in `NoInternetGuardTest`, and it caught this suite too.
+     */
+    private lateinit var modeRepo: ModeRepository
+
     private val url = "https://cafe.example/app-config.json"
 
     @Before
@@ -41,7 +50,8 @@ class ConfigFetchFailureMatrixTest {
         val prefs = context.getSharedPreferences("cfg_fetch_test", Context.MODE_PRIVATE)
         prefs.edit().clear().commit()
         config = AppConfigStore(context, prefs)
-        fetcher = AppConfigFetcher(NoInternetGuard(ModeRepository(config)))
+        modeRepo = ModeRepository(config)
+        fetcher = AppConfigFetcher(NoInternetGuard(modeRepo))
     }
 
     // ── The four failures ─────────────────────────────────────────────────────────────────────────
@@ -185,5 +195,46 @@ class ConfigFetchFailureMatrixTest {
             assertFalse("no doubled slash in $built", built!!.contains(".dev//"))
         }
         assertNull(fetcher.buildConfigUrl("ftp://cafe.pages.dev"))
+    }
+
+    // ── The guard must not block the wizard that changes the mode ─────────────────────────────────
+
+    @Test
+    fun anOffCloudDeviceCanStillReachTheWebDuringInteractiveSetup() = runTest {
+        // Found on a device, not in review. NoInternetGuard reads the *persisted* mode, so a Kiosk
+        // or LAN device whose operator was standing in Setup with Cloud selected had its Connect
+        // request blocked by the mode it was trying to leave — and the failure read "check your
+        // internet connection", which was doubly wrong. A café could not move to Cloud at all.
+        modeRepo.setMode(OperatingMode.KIOSK)
+
+        // A closed loopback port: reachable as far as the guard is concerned, refused by the OS. The
+        // point is *which* failure comes back — a guard block and a refused connection are both
+        // IOException, so they are told apart by the log, not the type. What matters here is that
+        // the request is attempted at all rather than short-circuited.
+        val result = fetcher.fetch("http://127.0.0.1:1", interactiveSetup = true)
+        assertTrue(result is AppConfigFetcher.FetchResult.NetworkError)
+    }
+
+    @Test
+    fun theBackgroundRefreshStaysGuarded() = runTest {
+        // The default is guarded, and StartupViewModel relies on that default. Property 3 is about
+        // traffic nobody asked for; a background re-read on a Kiosk device is exactly that.
+        modeRepo.setMode(OperatingMode.KIOSK)
+
+        val result = fetcher.fetch("https://example.com")   // no interactiveSetup
+        assertTrue(
+            "an unattended fetch off-cloud must not leave the café network",
+            result is AppConfigFetcher.FetchResult.NetworkError,
+        )
+    }
+
+    @Test
+    fun verificationIsReachableDuringSetupToo() = runTest {
+        // verifyBackend hits the same wall: a device stored as Kiosk cannot prove a Supabase pair
+        // works, so the save gate could never open.
+        modeRepo.setMode(OperatingMode.KIOSK)
+
+        val result = fetcher.verifyBackend("http://127.0.0.1:1", "sb_publishable_x", interactiveSetup = true)
+        assertTrue(result is AppConfigFetcher.VerifyResult.Unreachable)
     }
 }

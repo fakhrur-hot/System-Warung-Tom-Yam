@@ -85,18 +85,39 @@ open class AppConfigFetcher @Inject constructor(
 
     // Short timeout: this is a foreground user-initiated fetch. A café's Pages CDN should respond
     // in under a second; 10 s is generous and prevents the UI from hanging.
-    // Task 18.1: guarded first, so no later builder call can be added "above" it. This is the
-    // seventh HTTP client in the app and it was initially built without the guard — exactly the
-    // omission NoInternetGuard.PROTECTED_CLIENTS exists to make visible.
     //
-    // Guarding it is also correct on the merits, not just for consistency: a café in LAN or Kiosk
-    // Mode has no website to fetch a config from, so a request leaving the premises there is always
-    // wrong. During Cloud setup the mode is CLOUD and the guard passes it through untouched.
+    // Task 18.1: guarded first, so no later builder call can be added "above" it.
     private val client = OkHttpClient.Builder()
         .dns(noInternetGuard)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
+
+    /**
+     * The same client **without** [NoInternetGuard], used only by an interactive Setup action.
+     *
+     * This exists because guarding every call was wrong in exactly one case, and it took a device to
+     * find it. The guard reads the *persisted* mode. A device stored as LAN or Kiosk, whose operator
+     * is standing in Setup with Cloud selected and their website typed in, had its Connect request
+     * blocked by the mode it was trying to leave — and the failure surfaced as "check your internet
+     * connection", which is doubly misleading: the address was right and the network was fine. A
+     * café could not move from Kiosk to Cloud through the wizard at all.
+     *
+     * Narrowing rather than removing the guard is the right fix, because Property 3 is about traffic
+     * the café did not ask for. Its wording — "no internet traffic *originates* in LAN or Kiosk
+     * Mode" — is aimed at background sync, leftover image URLs and telemetry: things that happen
+     * without anyone deciding. An operator typing a URL and tapping Connect is the opposite of that.
+     * The background refresh in `StartupViewModel` stays guarded, because nobody asked for it.
+     *
+     * Reachable only from [fetch] and [verifyBackend] with `interactiveSetup = true`, and Setup only
+     * offers those controls while Cloud is the selected mode.
+     */
+    private val setupClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
+        .build()
+
+    private fun clientFor(interactiveSetup: Boolean) = if (interactiveSetup) setupClient else client
 
     /**
      * Normalises [websiteUrl], appends `/app-config.json`, performs a GET, and validates the
@@ -105,7 +126,10 @@ open class AppConfigFetcher @Inject constructor(
      * @param websiteUrl  The café's website URL as the operator typed it.  May or may not include
      *                    a scheme, a trailing slash, or a path.  Normalised internally.
      */
-    open suspend fun fetch(websiteUrl: String): FetchResult = withContext(Dispatchers.IO) {
+    open suspend fun fetch(
+        websiteUrl: String,
+        interactiveSetup: Boolean = false,
+    ): FetchResult = withContext(Dispatchers.IO) {
         val configUrl = buildConfigUrl(websiteUrl)
             ?: return@withContext FetchResult.NetworkError(
                 "That doesn't look like a valid website address. " +
@@ -119,7 +143,7 @@ open class AppConfigFetcher @Inject constructor(
                 .get()
                 .build()
 
-            val responseBody = client.newCall(request).execute().use { response ->
+            val responseBody = clientFor(interactiveSetup).newCall(request).execute().use { response ->
                 response.body?.string() ?: ""
             }
 
@@ -226,7 +250,11 @@ open class AppConfigFetcher @Inject constructor(
      * outcomes distinguishable: a bad host fails to connect, a bad key is refused by the gateway with
      * 401, and a working pair answers 200.
      */
-    open suspend fun verifyBackend(supabaseUrl: String, anonKey: String): VerifyResult =
+    open suspend fun verifyBackend(
+        supabaseUrl: String,
+        anonKey: String,
+        interactiveSetup: Boolean = false,
+    ): VerifyResult =
         withContext(Dispatchers.IO) {
             val base = supabaseUrl.trim().trimEnd('/')
             if (base.isBlank() || anonKey.isBlank()) {
@@ -243,7 +271,7 @@ open class AppConfigFetcher @Inject constructor(
             val probe = "$base/functions/v1/branding"
             try {
                 val request = Request.Builder().url(probe).addHeader("apikey", anonKey).get().build()
-                val code = client.newCall(request).execute().use { it.code }
+                val code = clientFor(interactiveSetup).newCall(request).execute().use { it.code }
                 when {
                     code == 401 || code == 403 -> VerifyResult.BadKey(
                         "Reached ${originOf(probe)}, but it refused the publishable key. " +

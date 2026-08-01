@@ -51,7 +51,11 @@ class SetupVerificationTest {
         guard: NoInternetGuard,
         var result: VerifyResult = VerifyResult.Ok,
     ) : AppConfigFetcher(guard) {
-        override suspend fun verifyBackend(supabaseUrl: String, anonKey: String) = result
+        override suspend fun verifyBackend(
+            supabaseUrl: String,
+            anonKey: String,
+            interactiveSetup: Boolean,
+        ) = result
     }
 
     private lateinit var fetcher: FakeFetcher

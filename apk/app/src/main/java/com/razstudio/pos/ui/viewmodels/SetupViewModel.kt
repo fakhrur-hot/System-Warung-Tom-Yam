@@ -154,7 +154,10 @@ class SetupViewModel @Inject constructor(
                 saved = false,
             )
 
-            when (val result = appConfigFetcher.fetch(url)) {
+            // interactiveSetup: the operator is standing here with Cloud selected and their
+            // website typed in. Guarding this on the *stored* mode blocked a Kiosk or LAN
+            // device from ever reaching Cloud through the wizard — see AppConfigFetcher.
+            when (val result = appConfigFetcher.fetch(url, interactiveSetup = true)) {
                 is AppConfigFetcher.FetchResult.Success -> {
                     // Populate all three fields from the fetched payload.
                     // The operator can still review them in the manual section if they want.
@@ -233,7 +236,9 @@ class SetupViewModel @Inject constructor(
 
         viewModelScope.launch {
             _state.value = _state.value.copy(isVerifying = true, verifyError = null, saved = false)
-            val result = appConfigFetcher.verifyBackend(s.supabaseUrl, s.supabaseAnonKey)
+            val result = appConfigFetcher.verifyBackend(
+                s.supabaseUrl, s.supabaseAnonKey, interactiveSetup = true,
+            )
             val ok = result is AppConfigFetcher.VerifyResult.Ok
             _state.value = _state.value.copy(
                 isVerifying = false,
