@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -37,8 +41,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.razstudio.pos.data.OperatingMode
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.ui.components.BlockingLoadingOverlay
 import com.razstudio.pos.ui.components.HoldCountdownOverlay
@@ -99,6 +106,7 @@ fun AdminHomeScreen(
     val orderEntry by tableViewModel.orderEntry.collectAsState()
     val availableMenu by tableViewModel.availableMenu.collectAsState()
     val cafeName by tableViewModel.cafeName.collectAsState()
+    val activeMode by tableViewModel.activeMode.collectAsState()
     val pendingPrints by tableViewModel.pendingKitchenPrints.collectAsState()
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
@@ -214,7 +222,16 @@ fun AdminHomeScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
-                        Text(strings.tableView)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(strings.tableView)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            // Task 9.4 / Requirement 1.4 — the operator can see the topology without
+                            // opening Setup. It lives beside the screen title rather than in the
+                            // overflow menu because the overflow is behind the PIN gate, and the one
+                            // moment this matters most is when someone is trying to work out why the
+                            // café is behaving unexpectedly.
+                            ModeBadge(mode = activeMode)
+                        }
                     }
                 },
                 actions = {
@@ -590,6 +607,52 @@ fun AdminHomeScreen(
 }
 
 /** Recent kitchen print jobs with their status — answers "did it actually print?" */
+
+/**
+ * The café's active operating mode, as a compact chip (task 9.4, Requirement 1.4).
+ *
+ * All three modes are shown, including CLOUD. Hiding the default would make the badge's absence
+ * ambiguous — it could equally mean "Cloud" or "this build is too old to have modes" — and the point
+ * of the requirement is that the operator can always answer the question without entering Setup.
+ *
+ * LAN and Kiosk are tinted to stand out because those are the states where the answer changes what
+ * the café can do; CLOUD is deliberately quiet so an existing install's top bar stays as it was.
+ */
+@Composable
+private fun ModeBadge(mode: OperatingMode) {
+    val (label, container, content) = when (mode) {
+        OperatingMode.CLOUD -> Triple(
+            "CLOUD",
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OperatingMode.LAN -> Triple(
+            "LAN",
+            MaterialTheme.colorScheme.tertiaryContainer,
+            MaterialTheme.colorScheme.onTertiaryContainer,
+        )
+        OperatingMode.KIOSK -> Triple(
+            "KIOSK",
+            MaterialTheme.colorScheme.secondaryContainer,
+            MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+    }
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(container)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = content,
+        )
+    }
+}
+
 @Composable
 private fun RecentPrintsDialog(
     prints: List<com.razstudio.pos.data.local.PrintJob>,

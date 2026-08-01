@@ -37,6 +37,19 @@ interface OrderDao {
     @Query("UPDATE orders SET status = :status WHERE id = :orderId")
     suspend fun updateOrderStatus(orderId: String, status: String)
 
+    /**
+     * Re-price an order after its lines change.
+     *
+     * A targeted UPDATE, and it must stay one. The obvious alternative —
+     * `insertOrder(order.copy(total = …))` — goes through `@Insert(onConflict = REPLACE)`, which
+     * SQLite implements as DELETE-then-INSERT. `order_items` has an `ON DELETE CASCADE` foreign key
+     * to this table, so replacing the parent row **deletes every line item belonging to it**. The
+     * total ends up correct while the bill it was computed from is gone: the receipt prints with no
+     * lines and the reports' popular-items rollup loses the sale entirely.
+     */
+    @Query("UPDATE orders SET total = :total WHERE id = :orderId")
+    suspend fun updateOrderTotal(orderId: String, total: Double)
+
     @Query("UPDATE orders SET sentToKitchenAt = :timestamp, status = :status WHERE id = :orderId")
     suspend fun markSentToKitchen(orderId: String, timestamp: String, status: String)
 

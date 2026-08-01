@@ -228,7 +228,8 @@ class DemoBackend @Inject constructor(
         val total = all.sumOf { it.unitPriceSnapshot * it.quantity }
         val order = db.orderDao().getOrderById(orderId)
             ?: return ApiResult.Error("NOT_FOUND", "Order not found")
-        db.orderDao().insertOrder(order.copy(total = total))
+        // Not insertOrder: REPLACE on the parent cascades and wipes the lines just inserted.
+        db.orderDao().updateOrderTotal(orderId, total)
         return ApiResult.Success(order.copy(total = total).toDto(all))
     }
 
@@ -268,9 +269,8 @@ class DemoBackend @Inject constructor(
         db.orderDao().deleteItemsForOrder(orderId)
         db.orderDao().insertOrderItems(kept)
         val total = kept.sumOf { it.unitPriceSnapshot * it.quantity }
-        val updated = order.copy(total = total)
-        db.orderDao().insertOrder(updated)
-        return ApiResult.Success(updated.toDto(kept))
+        db.orderDao().updateOrderTotal(orderId, total)
+        return ApiResult.Success(order.copy(total = total).toDto(kept))
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

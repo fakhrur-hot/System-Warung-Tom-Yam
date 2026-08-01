@@ -242,4 +242,22 @@ class SecureStorage @Inject constructor(
     fun clearSessionToken() {
         safeWrite(KEY_SESSION_TOKEN, null)
     }
+
+    /**
+     * Drop both cloud credentials when a café switches to LAN or Kiosk Mode (task 9.3,
+     * Requirements 1.1, 11.3).
+     *
+     * Neither is usable off-cloud, and leaving them is not merely untidy: `isAuthenticated()` above
+     * answers from whichever of them matches the stored role, so a stale token would keep reporting
+     * a device as signed in against a backend it no longer talks to, and the app would route past
+     * the screens that are supposed to set the new topology up.
+     *
+     * The device id and role deliberately survive. The id is this device's stable identity in every
+     * mode — regenerating it would make the Server Device look like a brand-new peer to its own
+     * paired clients — and the role is what it will still be after the switch.
+     */
+    fun clearCloudCredentials() {
+        safeWrite(KEY_SESSION_TOKEN, null)
+        safeWrite(KEY_API_KEY, null)
+    }
 }
