@@ -94,11 +94,17 @@ class OrderingForegroundService : Service() {
     @Inject lateinit var settingsDao: SettingsDao
     @Inject lateinit var appConfig: com.razstudio.pos.data.AppConfigStore
     @Inject lateinit var modeRepository: com.razstudio.pos.data.ModeRepository
+    @Inject lateinit var noInternetGuard: com.razstudio.pos.data.net.NoInternetGuard
 
-    private val client = OkHttpClient.Builder()
-        .readTimeout(0, TimeUnit.MILLISECONDS)
-        .pingInterval(25, TimeUnit.SECONDS)
-        .build()
+    // Task 18.1. `by lazy` because @Inject fields are not populated until onCreate, and a property
+    // initialiser would read the guard before Hilt has set it.
+    private val client by lazy {
+        OkHttpClient.Builder()
+            .dns(noInternetGuard)
+            .readTimeout(0, TimeUnit.MILLISECONDS)
+            .pingInterval(25, TimeUnit.SECONDS)
+            .build()
+    }
 
     override fun onCreate() {
         super.onCreate()

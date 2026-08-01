@@ -170,16 +170,22 @@ class RealtimeService : Service() {
     @Inject lateinit var languageManager: LanguageManager
     @Inject lateinit var appConfig: com.razstudio.pos.data.AppConfigStore
     @Inject lateinit var modeRepository: com.razstudio.pos.data.ModeRepository
+    @Inject lateinit var noInternetGuard: com.razstudio.pos.data.net.NoInternetGuard
     @Inject lateinit var lanServer: com.razstudio.pos.data.lan.LanServer
     @Inject lateinit var secureStorage: com.razstudio.pos.data.SecureStorage
     @Inject lateinit var newOrderSound: NewOrderSoundPlayer
 
     private fun s() = uiStrings(languageManager.language.value)
 
-    private val client = OkHttpClient.Builder()
-        .readTimeout(0, TimeUnit.MILLISECONDS) // No read timeout for WebSocket
-        .pingInterval(25, TimeUnit.SECONDS)    // Match Supabase heartbeat interval
-        .build()
+    // Task 18.1. `by lazy` because @Inject fields are not populated until onCreate, and a
+    // property initialiser would read the guard before Hilt has set it.
+    private val client by lazy {
+        OkHttpClient.Builder()
+            .dns(noInternetGuard)
+            .readTimeout(0, TimeUnit.MILLISECONDS) // No read timeout for WebSocket
+            .pingInterval(25, TimeUnit.SECONDS)    // Match Supabase heartbeat interval
+            .build()
+    }
 
     override fun onCreate() {
         super.onCreate()
