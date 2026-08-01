@@ -34,6 +34,7 @@ class ApiClient @Inject constructor(
     private val demoBackend: com.razstudio.pos.data.demo.DemoBackend,
     private val appConfig: AppConfigStore,
     private val noInternetGuard: com.razstudio.pos.data.net.NoInternetGuard,
+    private val modeRepository: ModeRepository,
 ) : BackendGateway {
 
     companion object {
@@ -59,8 +60,14 @@ class ApiClient @Inject constructor(
      * this one line is the only difference between the two topologies.
      */
     private fun baseUrl(): String {
+        // The LAN address only wins in LAN Mode. Keying purely on "is lan_server_url set?" — as an
+        // earlier revision did — lets a stale value from a past pairing hijack a Cloud café's API
+        // calls: every request, including the owner-key recovery that has to reach Supabase, would
+        // be sent to a phone on the counter that no longer serves it. The mode is the fact; the
+        // stored URL is only a detail of one mode.
         val lan = appConfig.lanServerUrl()
-        val base = if (lan.isNotBlank()) lan else supabaseUrl()
+        val useLan = modeRepository.currentMode() == OperatingMode.LAN && lan.isNotBlank()
+        val base = if (useLan) lan else supabaseUrl()
         return base.trimEnd('/') + "/functions/v1"
     }
 

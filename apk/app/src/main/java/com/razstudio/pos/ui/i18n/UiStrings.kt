@@ -356,6 +356,13 @@ data class UiStringsGroup5(
     val recoveryKeyLoadFailed: String,
     val savePngAgain: String,
     val makeMainAdmin: String,
+    val invalidOwnerKeyError: String,
+    val adminAlreadyRegisteredError: String,
+    val notAValidKeyOrInvite: String,
+    val notAValidInviteQr: String,
+    val couldNotReadQrFromImage: String,
+    val scanOwnerKeyPrompt: String,
+    val invalidOrExpiredInvite: String,
 )
 
 data class UiStringsGroup6(
@@ -891,6 +898,13 @@ class UiStrings(
     val recoveryKeyLoadFailed: String get() = g5.recoveryKeyLoadFailed
     val savePngAgain: String get() = g5.savePngAgain
     val makeMainAdmin: String get() = g5.makeMainAdmin
+    val invalidOwnerKeyError: String get() = g5.invalidOwnerKeyError
+    val adminAlreadyRegisteredError: String get() = g5.adminAlreadyRegisteredError
+    val notAValidKeyOrInvite: String get() = g5.notAValidKeyOrInvite
+    val notAValidInviteQr: String get() = g5.notAValidInviteQr
+    val couldNotReadQrFromImage: String get() = g5.couldNotReadQrFromImage
+    val scanOwnerKeyPrompt: String get() = g5.scanOwnerKeyPrompt
+    val invalidOrExpiredInvite: String get() = g5.invalidOrExpiredInvite
     val moreOptions: String get() = g6.moreOptions
     val pendingKitchenPrints: String get() = g6.pendingKitchenPrints
     val recentPrints: String get() = g6.recentPrints
@@ -1395,6 +1409,13 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             recoveryKeyLoadFailed = "Gagal memuatkan kunci pemulihan. Cuba lagi.",
             savePngAgain = "Simpan PNG semula",
             makeMainAdmin = "Jadikan Utama",
+            invalidOwnerKeyError = "Kunci pemilik tidak sah.",
+            adminAlreadyRegisteredError = "Peranti admin telah didaftarkan. Hanya satu peranti admin dibenarkan.",
+            notAValidKeyOrInvite = "Itu tidak kelihatan seperti kunci pemilik atau jemputan yang sah.",
+            notAValidInviteQr = "Itu tidak kelihatan seperti QR atau kod jemputan yang sah.",
+            couldNotReadQrFromImage = "Tidak dapat membaca kod QR daripada imej itu.",
+            scanOwnerKeyPrompt = "Imbas QR kunci pemilik, atau QR jemputan Admin Pembantu",
+            invalidOrExpiredInvite = "Jemputan tidak sah atau telah tamat tempoh.",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "Lagi pilihan",
@@ -1907,6 +1928,13 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             recoveryKeyLoadFailed = "Couldn't load the recovery key. Try again.",
             savePngAgain = "Save PNG again",
             makeMainAdmin = "Make Main",
+            invalidOwnerKeyError = "Invalid owner key.",
+            adminAlreadyRegisteredError = "An admin device is already registered. Only one admin device is allowed.",
+            notAValidKeyOrInvite = "That doesn't look like a valid owner key or invite.",
+            notAValidInviteQr = "That doesn't look like a valid invite QR or code.",
+            couldNotReadQrFromImage = "Couldn't read a QR code from that image.",
+            scanOwnerKeyPrompt = "Scan the owner key QR, or a Secondary Admin invite QR",
+            invalidOrExpiredInvite = "Invalid or expired invite.",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "More options",
@@ -2419,6 +2447,13 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             recoveryKeyLoadFailed = "无法加载恢复密钥，请重试。",
             savePngAgain = "再次保存 PNG",
             makeMainAdmin = "设为主要",
+            invalidOwnerKeyError = "店主密钥无效。",
+            adminAlreadyRegisteredError = "已注册管理设备。仅允许一台管理设备。",
+            notAValidKeyOrInvite = "这看起来不是有效的店主密钥或邀请。",
+            notAValidInviteQr = "这看起来不是有效的邀请二维码或代码。",
+            couldNotReadQrFromImage = "无法从该图片中读取二维码。",
+            scanOwnerKeyPrompt = "扫描店主密钥二维码，或副管理员邀请二维码",
+            invalidOrExpiredInvite = "邀请无效或已过期。",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "更多选项",
@@ -2929,6 +2964,13 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             recoveryKeyLoadFailed = "மீட்பு விசையை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
             savePngAgain = "PNG ஐ மீண்டும் சேமி",
             makeMainAdmin = "முதன்மையாக்கு",
+            invalidOwnerKeyError = "தவறான உரிமையாளர் விசை.",
+            adminAlreadyRegisteredError = "நிர்வாக சாதனம் ஏற்கனவே பதிவு செய்யப்பட்டுள்ளது. ஒரு நிர்வாக சாதனம் மட்டுமே அனுமதிக்கப்படும்.",
+            notAValidKeyOrInvite = "அது சரியான உரிமையாளர் விசை அல்லது அழைப்பாகத் தெரியவில்லை.",
+            notAValidInviteQr = "அது சரியான அழைப்பு QR அல்லது குறியீடாகத் தெரியவில்லை.",
+            couldNotReadQrFromImage = "அந்தப் படத்திலிருந்து QR குறியீட்டைப் படிக்க முடியவில்லை.",
+            scanOwnerKeyPrompt = "உரிமையாளர் விசை QR அல்லது துணை நிர்வாகி அழைப்பு QR ஐ ஸ்கேன் செய்யவும்",
+            invalidOrExpiredInvite = "தவறான அல்லது காலாவதியான அழைப்பு.",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "மேலும் விருப்பங்கள்",
@@ -3441,6 +3483,13 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             recoveryKeyLoadFailed = "ไม่สามารถโหลดกุญแจกู้คืนได้ กรุณาลองใหม่",
             savePngAgain = "บันทึก PNG อีกครั้ง",
             makeMainAdmin = "ตั้งเป็นหลัก",
+            invalidOwnerKeyError = "กุญแจเจ้าของไม่ถูกต้อง",
+            adminAlreadyRegisteredError = "มีอุปกรณ์ผู้ดูแลระบบลงทะเบียนแล้ว อนุญาตเพียงเครื่องเดียว",
+            notAValidKeyOrInvite = "นั่นไม่ใช่กุญแจเจ้าของหรือคำเชิญที่ถูกต้อง",
+            notAValidInviteQr = "นั่นไม่ใช่ QR หรือรหัสคำเชิญที่ถูกต้อง",
+            couldNotReadQrFromImage = "ไม่สามารถอ่าน QR จากรูปนั้นได้",
+            scanOwnerKeyPrompt = "สแกน QR กุญแจเจ้าของ หรือ QR คำเชิญผู้ดูแลระบบสำรอง",
+            invalidOrExpiredInvite = "คำเชิญไม่ถูกต้องหรือหมดอายุ",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "ตัวเลือกเพิ่มเติม",
