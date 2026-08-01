@@ -61,6 +61,7 @@ import javax.inject.Inject
 class StaffOrderViewModel @Inject constructor(
     private val apiClient: ApiClient,
     private val orderDao: OrderDao,
+    private val lanServerLocator: com.razstudio.pos.data.lan.LanServerLocator,
     private val tableDao: TableDao,
     private val menuDao: MenuDao,
     private val categoryStore: MenuCategoryStore,
@@ -398,6 +399,34 @@ class StaffOrderViewModel @Inject constructor(
                         isLoading = false,
                         error = str().msgNetworkError.format(result.message)
                     )
+                }
+            }
+        }
+    }
+
+    /**
+     * Recover the LAN Server's address after a connection failure (task 7.3, Requirement 5.5).
+     *
+     * Called when a request fails to connect — not on every request, so the happy path stays a plain
+     * HTTP call. The three branches live in [com.razstudio.pos.data.lan.LanServerLocator]: retry the
+     * last known address, then mDNS, then report that a re-scan is needed.
+     *
+     * **The credential is never touched.** It was issued to this device, not to an address, so a
+     * server that moved does not invalidate it and no re-approval is required — that is the whole
+     * point of the requirement. Re-pairing would mean the admin approving each phone again mid-service.
+     */
+    fun recoverServerAddress(onOutcome: (reScanNeeded: Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            when (lanServerLocator.locate()) {
+                is com.razstudio.pos.data.lan.LanServerLocator.Result.Reachable -> {
+                    _orderDetail.value = _orderDetail.value.copy(error = null)
+                    onOutcome(false)
+                }
+                com.razstudio.pos.data.lan.LanServerLocator.Result.NotFound -> {
+                    _orderDetail.value = _orderDetail.value.copy(
+                        error = str().lanServerNotFoundMsg,
+                    )
+                    onOutcome(true)
                 }
             }
         }

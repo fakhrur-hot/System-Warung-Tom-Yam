@@ -36,6 +36,17 @@ class AppConfigStore @Inject constructor(
 
         // Used by the running app
         private const val KEY_SUPABASE_URL = "supabase_url"
+
+        /**
+         * The LAN Server's base URL on a **Client** Device (tasks 7.2, 7.3).
+         *
+         * Kept separate from [KEY_SUPABASE_URL] rather than reusing it. They mean different things
+         * and have opposite lifecycles: switching to LAN Mode *clears* the Supabase URL (task 9.3),
+         * and a Client then *sets* this one — overloading a single key would make those two writes
+         * fight, and would leave "is this a cloud project or a phone on the counter?" undecidable
+         * from storage.
+         */
+        private const val KEY_LAN_SERVER_URL = "lan_server_url"
         private const val KEY_SUPABASE_ANON_KEY = "supabase_anon_key"
         private const val KEY_WEBSITE_URL = "website_url"
         private const val KEY_CAFE_NAME = "cafe_name"
@@ -123,6 +134,20 @@ class AppConfigStore @Inject constructor(
 
     // --- Used by the running app ---
     fun supabaseUrl(): String = read(KEY_SUPABASE_URL)
+
+    /** The paired LAN Server's base URL, e.g. `http://192.168.43.1:8765`. Blank when unpaired. */
+    fun lanServerUrl(): String = read(KEY_LAN_SERVER_URL)
+
+    /**
+     * Remember where the Server was last reached (task 7.3).
+     *
+     * Persisted rather than held in memory because address-change recovery starts by retrying the
+     * last known address, and the common way a café meets that problem is the tablet rebooting and
+     * the hotspot coming back on a different subnet — by which time nothing in memory survived.
+     */
+    fun setLanServerUrl(url: String) {
+        write(KEY_LAN_SERVER_URL, url.trim().trimEnd('/'))
+    }
     fun supabaseAnonKey(): String = read(KEY_SUPABASE_ANON_KEY)
     fun websiteUrl(): String = read(KEY_WEBSITE_URL)
     fun cafeName(): String = read(KEY_CAFE_NAME)

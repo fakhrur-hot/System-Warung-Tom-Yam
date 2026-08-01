@@ -162,6 +162,8 @@ class RealtimeService : Service() {
     @Inject lateinit var languageManager: LanguageManager
     @Inject lateinit var appConfig: com.razstudio.pos.data.AppConfigStore
     @Inject lateinit var modeRepository: com.razstudio.pos.data.ModeRepository
+    @Inject lateinit var lanServer: com.razstudio.pos.data.lan.LanServer
+    @Inject lateinit var secureStorage: com.razstudio.pos.data.SecureStorage
     @Inject lateinit var newOrderSound: NewOrderSoundPlayer
 
     private fun s() = uiStrings(languageManager.language.value)
@@ -181,6 +183,7 @@ class RealtimeService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.i(TAG, "Service started")
         startForegroundWithNotification()
+        startLanServerIfServer()
         connectToRealtime()
         startPeriodicPolling()
         // START_STICKY: system will restart this service after a kill
@@ -219,6 +222,10 @@ class RealtimeService : Service() {
 
     override fun onDestroy() {
         Log.i(TAG, "Service destroyed")
+        // Stopped with the service that owns it, so a LAN café's clients lose the server at the same
+        // moment they lose everything else, rather than talking to a listener whose process is going
+        // away underneath it.
+        lanServer.stop()
         webSocket?.close(1000, "Service destroyed")
         webSocket = null
         serviceJob.cancel()
@@ -373,6 +380,32 @@ class RealtimeService : Service() {
         val baseUrl = supabaseUrl.replace("https://", "wss://")
         val anonKey = appConfig.supabaseAnonKey().ifBlank { BuildConfig.SUPABASE_ANON_KEY }
         return "$baseUrl/realtime/v1/websocket?apikey=$anonKey&vsn=1.0.0"
+    }
+
+    /**
+     * Run the LAN HTTP server for as long as this service lives (task 6.3, Requirements 4.1, 4.6).
+     *
+     * Hosted here rather than in its own service on purpose: this one already holds the foreground
+     * notification and the wake lock that keep the admin device reachable through Doze. A second
+     * service would need its own copy of both, and the two could then disagree — a café whose staff
+     * phones can reach the server only while the admin screen happens to be awake is worse than one
+     * where the whole thing is up or down together.
+     *
+     * Gated on LAN **and** ADMIN. Kiosk has no clients to serve, Cloud has Supabase, and a Client
+     * Device starting its own server would answer its peers with an empty database.
+     */
+    private fun startLanServerIfServer() {
+        val isLanServer = modeRepository.currentMode() == com.razstudio.pos.data.OperatingMode.LAN &&
+            secureStorage.getRole() == com.razstudio.pos.data.SecureStorage.Role.ADMIN
+        if (!isLanServer) return
+
+        if (lanServer.start()) {
+            Log.i(TAG, "LAN server started on ${lanServer.boundHost}")
+        } else {
+            // Not fatal: the admin device still works standalone, and the pairing screen shows the
+            // same reason LanAddress reported. Retried on the next service start.
+            Log.w(TAG, "LAN server did not start — no usable network")
+        }
     }
 
     private fun connectToRealtime() {
