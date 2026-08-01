@@ -129,4 +129,36 @@ class OwnerRecoveryQrPayloadTest {
         assertTrue(config.adoptBackendFromRecoveryQr("$api/", anon))
         assertEquals(api, config.supabaseUrl())
     }
+
+    // ── The café's Cloudflare site rides along in the link's own origin ───────────────────────────
+
+    @Test
+    fun theWebsiteOriginIsReadFromTheLinkItself() {
+        // The backend builds the QR as "${WEBSITE_ORIGIN}/join?recover=…", so the Pages site is
+        // already stated by the URL and needs no third parameter.
+        assertEquals("https://tani.example", originOf(enrichedQr))
+        assertEquals("https://tani.example", originOf(legacyQr))
+    }
+
+    @Test
+    fun aBareTokenHasNoOrigin() {
+        assertEquals("", originOf(token))
+        assertEquals("", originOf("not a url at all"))
+    }
+
+    @Test
+    fun adoptingBringsAcrossTheSiteAsWellAsTheBackend() {
+        // Supabase alone is only half a till: without the site the device cannot print QR cards or
+        // hand a customer an ordering link.
+        assertTrue(config.adoptBackendFromRecoveryQr(api, anon, websiteUrl = "https://tani.example"))
+        assertEquals("https://tani.example", config.websiteUrl())
+    }
+
+    @Test
+    fun aLegacyQrStillAdoptsNothingAtAll() {
+        // No api/key params means no adoption path was taken, so the site must not be written
+        // either — a device holding a website but no backend is a state Setup cannot repair.
+        assertNull(queryParam(legacyQr, ApiClient.QR_PARAM_API))
+        assertTrue(config.websiteUrl().isBlank())
+    }
 }

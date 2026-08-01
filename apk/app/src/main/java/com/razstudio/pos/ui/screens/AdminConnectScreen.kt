@@ -124,7 +124,24 @@ class AdminConnectViewModel @Inject constructor(
     private fun adoptBackendFrom(scanned: String) {
         val api = queryParam(scanned, ApiClient.QR_PARAM_API) ?: return
         val key = queryParam(scanned, ApiClient.QR_PARAM_KEY) ?: return
-        appConfig.adoptBackendFromRecoveryQr(api, key)
+        appConfig.adoptBackendFromRecoveryQr(api, key, websiteUrl = originOf(scanned))
+    }
+
+    /**
+     * Fill in the café name once the connection is live.
+     *
+     * Adoption brings across the two things only the QR can carry — the backend and the café's site.
+     * The name is not one of them: it is already in the café's own `settings`, so it is fetched
+     * rather than transported, which keeps a renamed café from being stamped with an old name by a
+     * QR printed months ago. Best-effort: a failure here leaves the device connected and working,
+     * with the name blank until the next branding fetch.
+     */
+    private suspend fun adoptCafeNameFromBranding() {
+        if (appConfig.cafeName().isNotBlank()) return
+        val result = apiClient.getBranding()
+        if (result is ApiResult.Success) {
+            result.data.cafeName.takeIf { it.isNotBlank() }?.let { appConfig.setCafeName(it) }
+        }
     }
 
     /**
@@ -178,6 +195,9 @@ class AdminConnectViewModel @Inject constructor(
             is ApiResult.Success -> {
                 secureStorage.setSessionToken(result.data)
                 secureStorage.setRole(SecureStorage.Role.ADMIN)
+                // The session exists now, so branding is reachable — this is the first moment the
+                // café's name can be filled in on a device that arrived with nothing but a QR.
+                adoptCafeNameFromBranding()
                 true
             }
             is ApiResult.Error -> {
@@ -313,6 +333,18 @@ class AdminConnectViewModel @Inject constructor(
  * empty strings instead of an error. Returns null unless the parameter is genuinely present and
  * non-blank after decoding.
  */
+/**
+ * The `scheme://host[:port]` of a scanned link, or "" if it isn't one.
+ *
+ * The Owner Recovery QR is built by the backend as `${WEBSITE_ORIGIN}/join?recover=…`, so the café's
+ * Cloudflare Pages site is already present in the link — this reads it back out instead of adding a
+ * third query parameter for something the URL states by construction.
+ */
+internal fun originOf(input: String): String {
+    val m = Regex("^(https?://[^/?#\\s]+)").find(input.trim()) ?: return ""
+    return m.groupValues[1]
+}
+
 internal fun queryParam(input: String, name: String): String? {
     val raw = Regex("[?&]${Regex.escape(name)}=([^&\\s]+)").find(input.trim())
         ?.groupValues?.get(1) ?: return null
