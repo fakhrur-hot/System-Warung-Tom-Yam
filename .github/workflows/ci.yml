@@ -11,6 +11,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Requirement 9 — the single-source property is not self-enforcing. One edit putting a real café's
+  # name or domain back into shared source would undo the whole template effort silently, which is
+  # how the fork happened the first time. Runs first and cheaply, so a violation is reported in
+  # seconds rather than after a full Gradle build.
+  no-cafe-literals:
+    name: No café-specific literals in shared source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check shared source is café-agnostic
+        run: node scripts/check-no-cafe-literals.mjs
+      - name: Self-test the check (it must fail when it should)
+        run: node scripts/check-no-cafe-literals.test.mjs
+
   website:
     name: Website (build + typecheck)
     runs-on: ubuntu-latest

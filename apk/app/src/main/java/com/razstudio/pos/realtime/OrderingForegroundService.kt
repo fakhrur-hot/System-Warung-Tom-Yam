@@ -414,7 +414,9 @@ class OrderingForegroundService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Warung Tom Yam")
+            // The café's own name, not a hardcoded one — this notification sits in the shade for
+            // the whole shift, and a hardcoded name meant every café showed one café's on the staff phone.
+            .setContentTitle(appConfig.cafeName().ifBlank { getString(R.string.app_name) })
             .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pendingIntent)

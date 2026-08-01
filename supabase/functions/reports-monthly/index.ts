@@ -41,6 +41,15 @@ serve(async (req) => {
 
   const supabase = getSupabaseClient();
 
+  // The café's own name for the report's sender line. Hardcoding it meant every café's
+  // report arrived signed with one café's name.
+  const { data: cafeNameSetting } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "cafe_name")
+    .single();
+  const cafeName = cafeNameSetting?.value || "POS";
+
   // Get date range for the month
   const startDate = `${year}-${String(monthNum).padStart(2, "0")}-01`;
   const lastDay = new Date(year, monthNum, 0).getDate();
@@ -139,7 +148,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          sender: { email: reportEmail, name: "Warung Tom Yam" },
+          sender: { email: reportEmail, name: cafeName },
           to: [{ email: reportEmail }],
           subject: `Monthly Report — ${month}`,
           htmlContent: html,

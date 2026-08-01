@@ -25,7 +25,7 @@ val websiteUrl = localProps.getProperty("WEBSITE_URL") ?: ""
 val deepLinkHost = localProps.getProperty("DEEP_LINK_HOST") ?: "your-cafe.pages.dev"
 
 // The source package (namespace) is the constant vendor base `com.razstudio.pos` on every branch —
-// this keeps git merges between the template (main) and café builds (e.g. tani-tom-yam) conflict-free.
+// this keeps a branded build's inputs out of shared source, so there is nothing to merge.
 // The APPLICATION ID, which is what Android uses as the installed-app identity (and what the signing
 // cert + Play/update path bind to), is overridable per café via local.properties `APPLICATION_ID`.
 // Template default = the vendor base; a café build sets its own (e.g. com.warungtomyam.pos) to keep

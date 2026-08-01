@@ -36,6 +36,15 @@ serve(async (req) => {
 
   const timezone = tzSetting?.value || "Asia/Kuala_Lumpur";
 
+  // The café's own name for the report's sender line. Hardcoding it meant every café's
+  // report arrived signed with one café's name.
+  const { data: cafeNameSetting } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "cafe_name")
+    .single();
+  const cafeName = cafeNameSetting?.value || "POS";
+
   // Business-day start hour (default 15 = 3 PM) so late-night cafés anchor the report to the
   // opening day, not the post-midnight calendar date.
   const { data: bdSetting } = await supabase
@@ -105,7 +114,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          sender: { email: reportEmail, name: "Warung Tom Yam" },
+          sender: { email: reportEmail, name: cafeName },
           to: [{ email: reportEmail }],
           subject: `Closing Report — ${todayStr}`,
           htmlContent: html,

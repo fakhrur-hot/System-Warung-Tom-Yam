@@ -888,7 +888,7 @@ fun AdminSettingsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showPresetConfirm = false
-                    presetViewModel.loadTaniPreset()
+                    presetViewModel.loadSampleMenuPreset()
                 }) {
                     Text(strings.commonConfirm)
                 }

@@ -10,10 +10,10 @@ package com.razstudio.pos.util
 object CaesarCipher {
     private const val SHIFT = 3
 
-    /** e.g. "tanitomyam" -> "wdqlwrpbdp" */
+    /** e.g. "mycafe" -> "pbfdih" */
     fun encode(input: String): String = shift(input, SHIFT)
 
-    /** e.g. "wdqlwrpbdp" -> "tanitomyam" */
+    /** e.g. "pbfdih" -> "mycafe" */
     fun decode(input: String): String = shift(input, -SHIFT)
 
     private fun shift(input: String, amount: Int): String = input.map { c ->

@@ -36,13 +36,19 @@ class MenuPresetViewModel @Inject constructor(
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
-    /** Load the bundled "Tani Tom Yam" preset and soft-restart the app on completion. */
-    fun loadTaniPreset() {
+    /**
+     * Load the bundled sample menu and soft-restart the app on completion.
+     *
+     * The asset was named after one café and the function after it — a starter menu every café
+     * inherits should not be, and could not be, that café's. The content is unchanged: a generic
+     * Malaysian menu whose own `presetName` already read "Sample Menu".
+     */
+    fun loadSampleMenuPreset() {
         if (_loading.value) return
         _loading.value = true
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                val root = JSONObject(readAsset("presets/tani-tom-yam.json"))
+                val root = JSONObject(readAsset("presets/sample-menu.json"))
 
                 // Category order from the preset (sorted by sortOrder).
                 val categoriesArray = root.optJSONArray("categories") ?: JSONArray()
