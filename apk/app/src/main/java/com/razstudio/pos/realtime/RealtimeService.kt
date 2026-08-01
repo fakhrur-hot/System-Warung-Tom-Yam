@@ -86,6 +86,10 @@ class RealtimeService : Service() {
         // GET /orders?since=lastSeen catch-up, so it's a cheap incremental fetch.
         private const val POLL_INTERVAL_MS = 10_000L
 
+        /** Task 8.7 reconnect backoff. Generous: a dropped socket costs latency, never correctness. */
+        private const val LAN_PUSH_INITIAL_BACKOFF_MS = 2_000L
+        private const val LAN_PUSH_MAX_BACKOFF_MS = 30_000L
+
         /**
          * Tighter catch-up interval used only while Ambient (screensaver) mode is on screen.
          *
@@ -119,6 +123,10 @@ class RealtimeService : Service() {
     }
 
     private var webSocket: WebSocket? = null
+
+    /** LAN push socket (task 8.7). Null whenever disconnected; the poll covers the gap. */
+    private var lanPushSocket: WebSocket? = null
+    private var lanPushBackoffMs = LAN_PUSH_INITIAL_BACKOFF_MS
     private var currentBackoffMs = INITIAL_BACKOFF_MS
     private var isConnected = false
     private var lastMessageTime = 0L
@@ -184,6 +192,7 @@ class RealtimeService : Service() {
         Log.i(TAG, "Service started")
         startForegroundWithNotification()
         startLanServerIfServer()
+        connectLanPushSocket()
         connectToRealtime()
         startPeriodicPolling()
         // START_STICKY: system will restart this service after a kill
@@ -226,6 +235,8 @@ class RealtimeService : Service() {
         // moment they lose everything else, rather than talking to a listener whose process is going
         // away underneath it.
         lanServer.stop()
+        lanPushSocket?.close(1000, "Service destroyed")
+        lanPushSocket = null
         webSocket?.close(1000, "Service destroyed")
         webSocket = null
         serviceJob.cancel()
@@ -406,6 +417,97 @@ class RealtimeService : Service() {
             // same reason LanAddress reported. Retried on the next service start.
             Log.w(TAG, "LAN server did not start — no usable network")
         }
+    }
+
+    /**
+     * The LAN push socket (task 8.7, Requirements 6.5, 6.6, 6.4).
+     *
+     * ### A push is a TRIGGER, not a payload to apply
+     *
+     * This is the one decision worth understanding. The obvious reading of "apply received deltas"
+     * is to mutate local state straight from the frame — and it is wrong here. The de-duplication
+     * that Requirement 6.4 depends on lives in [autoPrintFromSync] and [maybeNotifyNewOrders], both
+     * of which key off **order-item ids** and therefore need whole `OrderDto`s. A delta carries an
+     * order id and a status, not its items.
+     *
+     * Applying deltas directly would mean a second path into printing that de-duplicates against
+     * different data from the poll's. The two would eventually disagree, and the way that surfaces
+     * is a kitchen slip printing twice in the middle of service — exactly what Property 6 exists to
+     * prevent.
+     *
+     * So a `STATUS_UPDATE` runs [performCatchUpSync] immediately: the *same* function the poll runs,
+     * with the same `?since=` window and the same de-dup sets. Push contributes latency and nothing
+     * else. It costs one extra HTTP round trip after the frame — tens of milliseconds against a poll
+     * interval measured in tens of seconds — and in exchange there is exactly one code path that can
+     * print a slip.
+     *
+     * ### The poll is unchanged and still authoritative
+     *
+     * Every push may be lost — socket down, frame dropped, Client backgrounded — and the café still
+     * converges on the next poll tick (Requirement 6.6). Nothing here is load-bearing on its own.
+     */
+    private fun connectLanPushSocket() {
+        if (modeRepository.currentMode() != com.razstudio.pos.data.OperatingMode.LAN) return
+
+        val base = appConfig.lanServerUrl()
+        if (base.isBlank()) return
+        val credential = secureStorage.getApiKey() ?: return
+
+        lanPushSocket?.close(1001, "Reconnecting")
+        lanPushSocket = null
+
+        val url = base.trimEnd('/')
+            .replaceFirst("http://", "ws://")
+            .replaceFirst("https://", "wss://") + "/functions/v1/realtime"
+
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("Authorization", "Bearer $credential")
+            .build()
+
+        lanPushSocket = client.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                Log.i(TAG, "LAN push connected")
+                lanPushBackoffMs = LAN_PUSH_INITIAL_BACKOFF_MS
+            }
+
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                val envelope = com.razstudio.pos.data.lan.LanPushEnvelope.decode(text) ?: return
+                if (envelope.type != com.razstudio.pos.data.lan.LanPushEnvelope.Type.STATUS_UPDATE) return
+
+                // Acknowledge before syncing, so the Server's view of delivery does not depend on
+                // how long the follow-up fetch takes.
+                runCatching {
+                    webSocket.send(
+                        com.razstudio.pos.data.lan.LanPushEnvelope(
+                            type = com.razstudio.pos.data.lan.LanPushEnvelope.Type.ACK,
+                            sessionId = envelope.sessionId,
+                            messageId = envelope.messageId,
+                            timestamp = envelope.timestamp,
+                            ackFor = envelope.messageId,
+                        ).encode()
+                    )
+                }
+
+                serviceScope.launch { performCatchUpSync() }
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                // Not an error state for the café: the poll keeps working. Reconnect on backoff.
+                Log.w(TAG, "LAN push disconnected (${t.message}) — poll continues to cover")
+                lanPushSocket = null
+                serviceScope.launch {
+                    delay(lanPushBackoffMs)
+                    lanPushBackoffMs = (lanPushBackoffMs * 2).coerceAtMost(LAN_PUSH_MAX_BACKOFF_MS)
+                    connectLanPushSocket()
+                }
+            }
+
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                Log.i(TAG, "LAN push closing: $code $reason")
+                lanPushSocket = null
+            }
+        })
     }
 
     private fun connectToRealtime() {
