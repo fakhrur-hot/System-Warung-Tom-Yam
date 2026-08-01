@@ -22,6 +22,7 @@ val localProps = Properties().apply {
 val supabaseUrl = localProps.getProperty("SUPABASE_URL") ?: ""
 val supabaseAnonKey = localProps.getProperty("SUPABASE_ANON_KEY") ?: ""
 val websiteUrl = localProps.getProperty("WEBSITE_URL") ?: ""
+val deepLinkHost = localProps.getProperty("DEEP_LINK_HOST") ?: "your-cafe.pages.dev"
 
 // The source package (namespace) is the constant vendor base `com.razstudio.pos` on every branch —
 // this keeps git merges between the template (main) and café builds (e.g. tani-tom-yam) conflict-free.
@@ -30,6 +31,40 @@ val websiteUrl = localProps.getProperty("WEBSITE_URL") ?: ""
 // Template default = the vendor base; a café build sets its own (e.g. com.warungtomyam.pos) to keep
 // its existing installed identity and update path.
 val cafeApplicationId = localProps.getProperty("APPLICATION_ID") ?: "com.razstudio.pos"
+
+// CAFE_NAME: the display name shown in the app launcher. Overridable per café via local.properties
+// `CAFE_NAME`. Template default = "RAZ POS" (the original app_name value from strings.xml).
+val cafeName = localProps.getProperty("CAFE_NAME") ?: "RAZ POS"
+
+// CAFE_PROFILE_DIR: optional path to a per-café resource directory. When set and the directory
+// exists, its res/ sub-directory is added as an extra Android resource source set, and Android's
+// resource merger overlays those resources over the template's. A café supplying
+// res/raw/qr_default_logo.jpg, launcher icons (mipmap-*) and/or a colors.xml override will have
+// them automatically merged at build time; a café supplying nothing (or with no profile at all)
+// gets the template's resources unchanged. A missing or invalid path NEVER fails the build.
+//
+// Expected profile directory layout (relative to the path given in CAFE_PROFILE_DIR):
+//   res/
+//     raw/
+//       qr_default_logo.jpg          ← café QR logo (overrides template logo)
+//     mipmap-mdpi/
+//       ic_launcher.png              ← launcher icon at each density bucket
+//     mipmap-hdpi/
+//       ic_launcher.png
+//     mipmap-xhdpi/
+//       ic_launcher.png
+//     mipmap-xxhdpi/
+//       ic_launcher.png
+//     mipmap-xxxhdpi/
+//       ic_launcher.png
+//     values/
+//       colors.xml                   ← theme palette override (TomYam50…TomYam900, etc.)
+//
+// Only files the café actually wants to override need to be present — any file absent in the
+// profile directory is inherited from the template. (Requirement 4.1, 4.3, 4.4)
+val cafeProfileDir: File? = localProps.getProperty("CAFE_PROFILE_DIR")
+    ?.let { file(it) }
+    ?.takeIf { it.exists() && it.isDirectory }
 
 android {
     namespace = "com.razstudio.pos"
@@ -48,6 +83,13 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         buildConfigField("String", "WEBSITE_URL", "\"$websiteUrl\"")
+        // DEEP_LINK_HOST: manifest placeholder for the /join deep link host (Requirement 4.1, 4.2).
+        manifestPlaceholders["deepLinkHost"] = deepLinkHost
+        // CAFE_NAME: generated string resource for the app launcher name. Overrides the value
+        // that would otherwise be in res/values/strings.xml (Requirement 4.1, 4.2). Must be deleted
+        // from strings.xml to avoid a duplicate resource error (resValue generates into a separate
+        // generated/res/ directory that collides with res/values entries of the same name).
+        resValue("string", "app_name", cafeName)
     }
 
     if (signingReady) {
@@ -111,6 +153,21 @@ android {
     // JSON out of the release APK, which would otherwise ship a few KB it has no use for.
     sourceSets {
         getByName("debug") { assets.srcDirs("$projectDir/schemas") }
+
+        // CAFE_PROFILE_DIR: when present, add the café profile's res/ directory as an extra
+        // resource source set. Android's resource merger automatically overlays profile resources
+        // over the template's — no conditional logic needed in any Kotlin/Java consumer.
+        // When CAFE_PROFILE_DIR is absent or the directory doesn't exist, this block is skipped
+        // entirely, so the template resources are used as-is (Requirement 4.4).
+        if (cafeProfileDir != null) {
+            val profileResDir = File(cafeProfileDir, "res")
+            if (profileResDir.exists()) {
+                getByName("main") { res.srcDirs(profileResDir) }
+                logger.lifecycle("CAFE_PROFILE_DIR: merging resources from ${profileResDir.absolutePath}")
+            } else {
+                logger.lifecycle("CAFE_PROFILE_DIR set to '${cafeProfileDir.absolutePath}' but no res/ sub-directory found — template resources used")
+            }
+        }
     }
 
     lint {

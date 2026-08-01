@@ -11,5 +11,31 @@ WEBSITE_URL=https://your-project.pages.dev
 # Installed-app identity. Leave unset for the template (defaults to the vendor base
 # com.razstudio.pos). A café build sets its OWN applicationId here to keep its existing
 # installed identity + update path (the source package/namespace stays com.razstudio.pos
-# on every branch). Example for the Tani build:
-#   APPLICATION_ID=com.warungtomyam.pos
+# on every branch).
+#APPLICATION_ID=com.warungmaju.pos
+
+# App launcher name shown on the device home screen.
+# Defaults to "RAZ POS" when absent.
+#CAFE_NAME=Warung Maju
+
+# Deep-link host for /join invite links. Set to the café's Cloudflare Pages domain.
+# Defaults to "your-cafe.pages.dev" when absent.
+#DEEP_LINK_HOST=warung-maju.pages.dev
+
+# Per-café branding profile directory (optional). When set to a directory that exists,
+# its res/ sub-directory is merged OVER the template resources at build time. A missing
+# path or a path that does not exist is silently ignored — never a build failure.
+#
+# Expected layout inside the profile directory:
+#   res/
+#     raw/
+#       qr_default_logo.jpg       ← café QR / receipt logo (pure black on white, no gradients)
+#     mipmap-mdpi/
+#       ic_launcher.png           ← launcher icon (repeat for hdpi / xhdpi / xxhdpi / xxxhdpi)
+#     values/
+#       colors.xml                ← theme palette override (TomYam50…TomYam900 ramp)
+#
+# Only supply the files you want to override; anything absent falls back to the template.
+# The path is resolved relative to the apk/ project root, so ../profiles/warung-maju means
+# a sibling directory of the apk/ folder.
+#CAFE_PROFILE_DIR=../profiles/warung-maju

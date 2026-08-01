@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Malay (Bahasa Melayu). Dictionary-generated from the English base; overridable. -->
 <resources>
-    <!-- App -->
-    <string name="app_name">RAZ POS</string>
-
     <!-- Screen titles -->
     <string name="title_table_view">Paparan Meja</string>
     <string name="title_menu_management">Pengurusan Menu</string>
