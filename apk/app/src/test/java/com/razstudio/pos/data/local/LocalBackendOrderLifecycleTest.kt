@@ -68,6 +68,7 @@ class LocalBackendOrderLifecycleTest {
             localImageStore = LocalImageStore(context),
             pairedDeviceDao = db.pairedDeviceDao(),
             pairingTokenDao = db.pairingTokenDao(),
+            lanAddress = com.razstudio.pos.data.lan.LanAddress(context),
         )
     }
 

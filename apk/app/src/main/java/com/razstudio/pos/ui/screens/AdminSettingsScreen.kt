@@ -95,8 +95,14 @@ fun AdminSettingsScreen(
     languageViewModel: LanguageViewModel = hiltViewModel(),
     pinLockViewModel: com.razstudio.pos.ui.viewmodels.PinLockViewModel = hiltViewModel(),
     devicePrefsViewModel: com.razstudio.pos.ui.viewmodels.DevicePrefsViewModel = hiltViewModel(),
-    presetViewModel: com.razstudio.pos.ui.viewmodels.MenuPresetViewModel = hiltViewModel()
+    presetViewModel: com.razstudio.pos.ui.viewmodels.MenuPresetViewModel = hiltViewModel(),
+    modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel()
 ) {
+    // Task 11.4 / Requirements 7.4, 7.5. Collected from a StateFlow, so the gate is re-evaluated on
+    // every recomposition — which is what makes rotation and back-stack restore safe: there is no
+    // cached "was visible" flag to restore, the field simply is not emitted when the capability is
+    // false. There is no deep link to an individual setting, so the screen is the only entry point.
+    val capabilities by modeViewModel.capabilities.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -330,12 +336,15 @@ fun AdminSettingsScreen(
                     onSelect = { viewModel.updateDefaultLangOrdering(it) }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                LanguagePickerRow(
-                    label = strings.defaultLangCustomerLabel,
-                    selectedCode = uiState.defaultLangCustomer,
-                    onSelect = { viewModel.updateDefaultLangCustomer(it) }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                // Task 11.4: the customer surface is the website. No website, no default to set.
+                if (capabilities.customerQrOrdering) {
+                    LanguagePickerRow(
+                        label = strings.defaultLangCustomerLabel,
+                        selectedCode = uiState.defaultLangCustomer,
+                        onSelect = { viewModel.updateDefaultLangCustomer(it) }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
                 // Printer language — all 5 supported. Latin (BM/EN) prints as fast ESC/POS text;
                 // Chinese/Tamil/Thai auto-render as a bitmap so the glyphs print correctly.
                 // Always used for slips & receipts regardless of any device's UI language.
@@ -434,6 +443,11 @@ fun AdminSettingsScreen(
             // "Hold before kitchen" delay for customer-placed orders. The order waits this
             // long (customer can cancel) before it's sent to the kitchen. Admin/staff orders
             // use a fixed short hold, not this value.
+            //
+            // Task 11.4: the whole section is customer-web pacing, so off-cloud it configures a flow
+            // that does not exist. Hidden rather than disabled — a café that cannot have web ordering
+            // should not be shown a dial for it and left wondering what it does.
+            if (capabilities.customerQrOrdering) {
             SettingsSection(title = strings.customerOrderSection) {
                 // Auto-print vs buffer-to-pending-modal.
                 Row(
@@ -491,6 +505,7 @@ fun AdminSettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
+            }
             }
 
             HorizontalDivider()

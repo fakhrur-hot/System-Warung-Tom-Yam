@@ -22,6 +22,7 @@ import com.razstudio.pos.data.OrdersSyncResponse
 import com.razstudio.pos.data.RegisterResponse
 import com.razstudio.pos.data.SessionResponse
 import com.razstudio.pos.data.SettingsResponse
+import com.razstudio.pos.data.lan.LanAddress
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
@@ -83,6 +84,7 @@ class LocalBackend @Inject constructor(
     private val localImageStore: LocalImageStore,
     private val pairedDeviceDao: PairedDeviceDao,
     private val pairingTokenDao: PairingTokenDao,
+    private val lanAddress: com.razstudio.pos.data.lan.LanAddress,
 ) : BackendGateway {
 
     private companion object {
@@ -107,6 +109,13 @@ class LocalBackend @Inject constructor(
         private const val STATUS_APPROVED = "APPROVED"
         private const val STATUS_REVOKED = "REVOKED"
         private const val ROLE_ORDERING = "ORDERING"
+
+        /**
+         * The port the LAN Server listens on (task 6.2 binds it; the pairing QR has to carry it
+         * now). 8765 is above the privileged range, outside IANA's registered block, and not one
+         * of the ports an OEM's own on-device services tend to squat.
+         */
+        private const val LAN_PORT = 8765
 
         /**
          * Hashes a credential string using SHA-256.
@@ -239,12 +248,17 @@ class LocalBackend @Inject constructor(
      * resolves nowhere — the Devices screen renders the token as a QR, which is what a Client scans.
      */
     override suspend fun getInvite(role: String?): ApiResult<InviteResponse> {
+        val url = when (val addr = lanAddress.resolve()) {
+            is LanAddress.Result.Found -> "http://${addr.ip}:$LAN_PORT"
+            is LanAddress.Result.Unavailable -> return ApiResult.Error("NO_NETWORK", addr.reason)
+        }
+
         val nowMs = System.currentTimeMillis()
         val live = pairingTokenDao.getCurrentToken(nowMs)
-        if (live != null) return ApiResult.Success(InviteResponse(token = live.token, url = ""))
+        if (live != null) return ApiResult.Success(InviteResponse(token = live.token, url = url))
 
         val minted = pairingTokenDao.generateToken()
-        return ApiResult.Success(InviteResponse(token = minted.token, url = ""))
+        return ApiResult.Success(InviteResponse(token = minted.token, url = url))
     }
 
     /**
@@ -255,11 +269,16 @@ class LocalBackend @Inject constructor(
      * leaks locks out the leak without knocking every staff phone in the café off the system.
      */
     override suspend fun regenerateInvite(role: String?): ApiResult<InviteResponse> {
+        val url = when (val addr = lanAddress.resolve()) {
+            is LanAddress.Result.Found -> "http://${addr.ip}:$LAN_PORT"
+            is LanAddress.Result.Unavailable -> return ApiResult.Error("NO_NETWORK", addr.reason)
+        }
+
         val nowMs = System.currentTimeMillis()
         pairingTokenDao.getCurrentToken(nowMs)?.let { pairingTokenDao.deleteToken(it.token) }
 
         val minted = pairingTokenDao.generateToken()
-        return ApiResult.Success(InviteResponse(token = minted.token, url = ""))
+        return ApiResult.Success(InviteResponse(token = minted.token, url = url))
     }
 
     /**

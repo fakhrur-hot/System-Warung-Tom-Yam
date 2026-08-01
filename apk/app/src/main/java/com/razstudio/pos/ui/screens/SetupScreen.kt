@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,10 +28,14 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
@@ -57,6 +62,11 @@ fun SetupScreen(
     viewModel: SetupViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    // The mode this device was ALREADY on when Setup opened. Captured once, so that after a
+    // successful switch the button stops warning about a change that has already happened.
+    var savedMode by rememberSaveable { mutableStateOf(state.operatingMode) }
+    var showModeChangeConfirm by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -145,7 +155,13 @@ fun SetupScreen(
                 KeyboardType.Text, secret = true) { v -> viewModel.update { it.copy(githubToken = v) } }
 
             Button(
-                onClick = { viewModel.save() },
+                onClick = {
+                    // Task 10.1: a mode switch is destructive and irreversible in the ways that
+                    // matter, so it is confirmed. A save that changes nothing about the topology is
+                    // not — making an operator confirm a café-name edit would train them to dismiss
+                    // the dialog that actually matters.
+                    if (state.operatingMode != savedMode) showModeChangeConfirm = true else viewModel.save()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 24.dp),
@@ -154,6 +170,84 @@ fun SetupScreen(
             }
         }
     }
+
+    if (showModeChangeConfirm) {
+        ModeChangeConfirmDialog(
+            from = savedMode,
+            to = state.operatingMode,
+            onConfirm = {
+                showModeChangeConfirm = false
+                viewModel.save()
+                savedMode = state.operatingMode
+            },
+            onDismiss = { showModeChangeConfirm = false },
+        )
+    }
+}
+
+/**
+ * Confirm a topology change before anything is written (task 10.1, Requirements 10.1, 10.2).
+ *
+ * The requirement is that the operator is told *exactly* what will be lost and what will stop
+ * working, before the write — not a generic "are you sure". So the copy is generated from the actual
+ * transition rather than being one fixed paragraph: leaving Cloud loses different things from
+ * entering it, and Kiosk removes tables while LAN keeps them.
+ *
+ * Orders are called out first because they are the part an owner cannot reconstruct. Nothing here
+ * deletes the local database — but the café's data lives in whichever backend the mode selects, so
+ * after the switch the orders on the other side are no longer the ones the app reads or reports on,
+ * which for the person running the till is indistinguishable from losing them.
+ */
+@Composable
+private fun ModeChangeConfirmDialog(
+    from: OperatingMode,
+    to: OperatingMode,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val losses = buildList {
+        if (from == OperatingMode.CLOUD) {
+            add("This device will stop reading the café's online orders and reports. Anything recorded online stays there, but this app will no longer show it.")
+            add("The saved Supabase details and this device's sign-in are cleared. You will need them again to switch back.")
+        } else {
+            add("Orders taken on this device while offline are not uploaded. Switching now leaves them here only.")
+        }
+        when (to) {
+            OperatingMode.CLOUD -> add("You will need a Supabase project and a website before this café can take orders again.")
+            OperatingMode.LAN -> {
+                add("Customer QR ordering and the printable table QR sheets stop working — there is no website to scan into.")
+                add("Staff devices must re-pair over your Wi-Fi.")
+            }
+            OperatingMode.KIOSK -> {
+                add("Customer QR ordering, printable QR sheets and staff devices all stop working.")
+                add("Tables are removed entirely — orders are identified by a running number instead.")
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Switch from ${from.name} to ${to.name}?") },
+        text = {
+            Column {
+                Text(
+                    "This changes how the whole café runs. Before you continue:",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(modifier = Modifier.padding(top = 8.dp))
+                losses.forEach { line ->
+                    Text("• $line", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.padding(top = 6.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Switch to ${to.name}", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /**

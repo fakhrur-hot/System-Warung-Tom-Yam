@@ -46,8 +46,10 @@ fun CafeManagementScreen(
     onNavigateToQrPdf: () -> Unit = {},
     onNavigateToPrinters: () -> Unit = {},
     languageViewModel: LanguageViewModel = hiltViewModel(),
-    sessionViewModel: AdminSessionViewModel = hiltViewModel()
+    sessionViewModel: AdminSessionViewModel = hiltViewModel(),
+    modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel()
 ) {
+    val capabilities by modeViewModel.capabilities.collectAsState()
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
 
@@ -85,21 +87,32 @@ fun CafeManagementScreen(
                 onClick = onNavigateToMenu
             )
 
-            HubCard(
-                icon = Icons.Default.TableRestaurant,
-                title = strings.tablesManagementTitle,
-                description = strings.tablesManagementDesc,
-                onClick = onNavigateToTables
-            )
+            // Task 11.2 / Requirement 3.2: Kiosk Mode has no tables at all — one counter, orders
+            // identified by a running number. A Tables screen there would let an operator create
+            // rows that nothing can ever select.
+            if (capabilities.tables) {
+                HubCard(
+                    icon = Icons.Default.TableRestaurant,
+                    title = strings.tablesManagementTitle,
+                    description = strings.tablesManagementDesc,
+                    onClick = onNavigateToTables
+                )
+            }
 
             // Generate the printable table QR cards (sits under Tables Management since it's
             // about the tables you just set up).
-            HubCard(
-                icon = Icons.Default.QrCode2,
-                title = strings.generateTableQrTitle,
-                description = strings.generateTableQrDesc,
-                onClick = onNavigateToQrPdf
-            )
+            // Task 11.1 / Requirement 7.1: printable table QR sheets only mean something when
+            // customers can scan them to order, which needs the website. Hidden rather than
+            // disabled — a greyed control invites "why can't I press this", whereas a café that
+            // never had web ordering has no reason to know the feature exists.
+            if (capabilities.printableQrSheets) {
+                HubCard(
+                    icon = Icons.Default.QrCode2,
+                    title = strings.generateTableQrTitle,
+                    description = strings.generateTableQrDesc,
+                    onClick = onNavigateToQrPdf
+                )
+            }
 
             // Printers moved here from the home overflow menu, directly under Generate Table QR.
             HubCard(

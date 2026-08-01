@@ -81,8 +81,10 @@ fun DevicesScreen(
     viewModel: DevicesViewModel = hiltViewModel(),
     settingsViewModel: AdminSettingsViewModel = hiltViewModel(),
     languageViewModel: LanguageViewModel = hiltViewModel(),
+    modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel(),
     onBack: () -> Unit
 ) {
+    val capabilities by modeViewModel.capabilities.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val settingsState by settingsViewModel.uiState.collectAsState()
     val language by languageViewModel.language.collectAsState()
@@ -154,6 +156,27 @@ fun DevicesScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // Task 21.2 / Requirement 4.3.2: show where this device can actually be reached,
+                // so the operator can confirm the network is up BEFORE holding a QR at a staff phone.
+                // Task 21.3: when there is no usable interface, say so instead of rendering a QR that
+                // carries an address nothing can reach — the failure would otherwise only appear
+                // minutes later as a phone that "won't connect", with nothing pointing at the network.
+                if (!capabilities.websiteInvites) {
+                    when (val addr = modeViewModel.lanAddress()) {
+                        is com.razstudio.pos.data.lan.LanAddress.Result.Found -> Text(
+                            text = "This device: ${addr.ip}  (${addr.interfaceName})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        is com.razstudio.pos.data.lan.LanAddress.Result.Unavailable -> Text(
+                            text = addr.reason,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 if (settingsState.inviteLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 } else if (settingsState.invite != null) {
@@ -177,6 +200,11 @@ fun DevicesScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Task 11.1 / Requirement 7.2: sharing the invite as a link only works when
+                        // it IS a link. Off-cloud the invite address is this device's LAN IP, so a
+                        // shared "http://192.168.x.x:8765" is unopenable from WhatsApp and looks
+                        // like a broken invite — the QR beside it is the working path, and it stays.
+                        if (capabilities.websiteInvites) {
                         OutlinedButton(
                             onClick = {
                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -192,6 +220,7 @@ fun DevicesScreen(
                             Icon(Icons.Default.Share, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(strings.shareButton)
+                        }
                         }
                         OutlinedButton(onClick = { settingsViewModel.regenerateInvite() }) {
                             Icon(Icons.Default.Refresh, contentDescription = null)

@@ -93,6 +93,7 @@ class OrderingForegroundService : Service() {
     @Inject lateinit var orderDao: OrderDao
     @Inject lateinit var settingsDao: SettingsDao
     @Inject lateinit var appConfig: com.razstudio.pos.data.AppConfigStore
+    @Inject lateinit var modeRepository: com.razstudio.pos.data.ModeRepository
 
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -162,6 +163,21 @@ class OrderingForegroundService : Service() {
     }
 
     private fun connectToRealtime() {
+        // Task 8.1 / Requirement 6.2: the Supabase Realtime socket only exists in Cloud Mode.
+        //
+        // The URL is built by string-replacing "https://" with "wss://". Off-cloud there is no
+        // Supabase URL — and if one lingered, or the BuildConfig fallback filled in, the result is a
+        // wss:// address that cannot resolve. OkHttp would then retry it on the backoff schedule
+        // below, forever: a permanent background reconnect loop draining the battery of the one
+        // tablet the café depends on, for a service that cannot exist in this topology.
+        //
+        // Returning before the URL is even constructed is deliberate — the point is that nothing is
+        // attempted, not that a failed attempt is handled quietly. Live updates off-cloud come from
+        // the periodic catch-up poll, which needs no socket.
+        if (!modeRepository.currentCapabilities().realtimeWebSocket) {
+            Log.i(TAG, "Realtime WebSocket disabled for ${modeRepository.currentMode()} — using catch-up poll only")
+            return
+        }
         val request = Request.Builder()
             .url(getSupabaseRealtimeUrl())
             .build()
