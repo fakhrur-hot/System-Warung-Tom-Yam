@@ -107,6 +107,12 @@ class AdminConnectViewModel @Inject constructor(
         errorKey = null
     }
 
+    /** Localised variant — the screen maps the key, so the ViewModel needs no UiStrings. */
+    fun reportErrorKey(key: String) {
+        errorKey = key
+        errorMessage = null
+    }
+
     /**
      * Debug-only: claim the admin slot with the café's plaintext name (deciphered from
      * whatever was typed/tapped) instead of a key. Same session-token result shape as
@@ -144,12 +150,17 @@ class AdminConnectViewModel @Inject constructor(
                 true
             }
             is ApiResult.Error -> {
-                errorMessage = if (result.code == "INVALID_RECOVERY") "Invalid owner key." else result.message
-                errorKey = null
+                if (result.code == "INVALID_RECOVERY") {
+                    errorKey = "INVALID_OWNER_KEY"
+                    errorMessage = null
+                } else {
+                    errorMessage = result.message
+                    errorKey = null
+                }
                 false
             }
             is ApiResult.NetworkError -> {
-                errorMessage = "Network error. Check your connection and try again."
+                errorMessage = null
                 errorKey = "NETWORK"
                 false
             }
@@ -167,7 +178,7 @@ class AdminConnectViewModel @Inject constructor(
     suspend fun registerViaInvite(androidId: String, raw: String): Boolean {
         val token = extractInviteToken(raw)
         if (token == null) {
-            errorMessage = "That doesn't look like a valid invite QR or code."
+            errorKey = "NOT_INVITE"
             errorKey = null
             return false
         }
@@ -198,12 +209,17 @@ class AdminConnectViewModel @Inject constructor(
                 true
             }
             is ApiResult.Error -> {
-                errorMessage = if (result.code == "INVALID_INVITE") "Invalid or expired invite." else result.message
-                errorKey = null
+                if (result.code == "INVALID_INVITE") {
+                    errorKey = "INVALID_INVITE"
+                    errorMessage = null
+                } else {
+                    errorMessage = result.message
+                    errorKey = null
+                }
                 false
             }
             is ApiResult.NetworkError -> {
-                errorMessage = "Network error. Check your connection and try again."
+                errorMessage = null
                 errorKey = "NETWORK"
                 false
             }
@@ -222,11 +238,10 @@ class AdminConnectViewModel @Inject constructor(
         is ApiResult.Error -> {
             when (result.code) {
                 "ADMIN_EXISTS" -> {
-                    errorMessage = "An admin device is already registered. Only one admin device is allowed."
                     errorKey = "ADMIN_EXISTS"
                 }
                 "INVALID_KEY" -> {
-                    errorMessage = "Invalid or expired key. Check the website for the current key."
+                    errorMessage = null
                     errorKey = invalidKeyErrorKey
                 }
                 else -> {
@@ -237,7 +252,7 @@ class AdminConnectViewModel @Inject constructor(
             false
         }
         is ApiResult.NetworkError -> {
-            errorMessage = "Network error. Check your connection and try again."
+            errorMessage = null
             errorKey = "NETWORK"
             false
         }
@@ -356,7 +371,7 @@ fun AdminConnectScreen(
         val text = raw?.trim().orEmpty()
         when {
             text.isBlank() ->
-                viewModel.reportError("That doesn't look like a valid owner key or invite.")
+                viewModel.reportErrorKey("NOT_KEY_OR_INVITE")
             looksLikeInvite(text) ->
                 scope.launch { if (viewModel.registerViaInvite(androidId, text)) onSecondaryRegistered() }
             else -> {
@@ -374,7 +389,7 @@ fun AdminConnectScreen(
             scope.launch {
                 val decoded = withContext(Dispatchers.IO) { decodeQrFromImage(context, uri) }
                 if (decoded == null) {
-                    viewModel.reportError("Couldn't read a QR code from that image.")
+                    viewModel.reportErrorKey("QR_UNREADABLE")
                 } else {
                     handleCredential(decoded)
                 }
@@ -396,7 +411,7 @@ fun AdminConnectScreen(
                 handleCredential(text)
             },
             onCancel = { showScanner = false },
-            promptText = "Scan the owner key QR, or a Secondary Admin invite QR",
+            promptText = strings.scanOwnerKeyPrompt,
             cancelText = strings.commonBack
         )
         return
@@ -408,6 +423,11 @@ fun AdminConnectScreen(
         "INVALID_KEY" -> strings.invalidKeyError
         "DEBUG_INVALID_NAME" -> strings.debugAdminInvalidNameError
         "NETWORK" -> strings.networkError
+        "INVALID_OWNER_KEY" -> strings.invalidOwnerKeyError
+        "INVALID_INVITE" -> strings.invalidOrExpiredInvite
+        "NOT_KEY_OR_INVITE" -> strings.notAValidKeyOrInvite
+        "NOT_INVITE" -> strings.notAValidInviteQr
+        "QR_UNREADABLE" -> strings.couldNotReadQrFromImage
         else -> viewModel.errorMessage
     }
 
