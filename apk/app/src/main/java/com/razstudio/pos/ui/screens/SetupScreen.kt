@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
@@ -228,23 +229,36 @@ fun SetupScreen(
                 )
             }
 
-            SectionHeader("Cloudflare")
-            HelpText("Stored securely for your reference / deploy tooling. Not used by the app itself.")
-            Field("Account ID", "", state.cloudflareAccountId,
-                KeyboardType.Text) { v -> viewModel.update { it.copy(cloudflareAccountId = v) } }
-            Field("DNS zone", "yourdomain.com", state.cloudflareDnsZone,
-                KeyboardType.Text) { v -> viewModel.update { it.copy(cloudflareDnsZone = v) } }
-            Field("Pages / Workers project", "your-cafe-project", state.cloudflarePagesProject,
-                KeyboardType.Text) { v -> viewModel.update { it.copy(cloudflarePagesProject = v) } }
-            Field("API token", "", state.cloudflareApiToken,
-                KeyboardType.Text, secret = true) { v -> viewModel.update { it.copy(cloudflareApiToken = v) } }
-
-            SectionHeader("GitHub")
-            HelpText("Stored securely for your reference / deploy tooling. Not used by the app itself.")
-            Field("Repository", "owner/repo", state.githubRepo,
-                KeyboardType.Text) { v -> viewModel.update { it.copy(githubRepo = v) } }
-            Field("Access token", "", state.githubToken,
-                KeyboardType.Text, secret = true) { v -> viewModel.update { it.copy(githubToken = v) } }
+            // ── Step 2: prove it works, then save (tasks 6.3, 6.6) ───────────────────────────
+            //
+            // Save alone used to be the whole flow, and it proved only that text reached disk. An
+            // operator who mistyped a key learned nothing until a later screen failed for a reason
+            // that never mentioned the key.
+            if (state.operatingMode == OperatingMode.CLOUD) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { viewModel.verifyConnection() },
+                    enabled = !state.isVerifying &&
+                        state.supabaseUrl.isNotBlank() && state.supabaseAnonKey.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        when {
+                            state.isVerifying -> "Checking…"
+                            state.verified -> "Connection OK ✓"
+                            else -> "Check connection"
+                        }
+                    )
+                }
+                state.verifyError?.let { err ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = err,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
 
             Button(
                 onClick = {
@@ -254,6 +268,9 @@ fun SetupScreen(
                     // the dialog that actually matters.
                     if (state.operatingMode != savedMode) showModeChangeConfirm = true else viewModel.save()
                 },
+                // Task 6.3: advancement is blocked until the connection has answered. Off-cloud
+                // there is nothing to verify, so the gate does not apply.
+                enabled = viewModel.canSave(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 24.dp),

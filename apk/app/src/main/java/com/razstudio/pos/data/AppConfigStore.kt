@@ -59,13 +59,6 @@ class AppConfigStore @Inject constructor(
         private const val KEY_PAYMENT_QR_HASH = "payment_qr_hash"
         private const val KEY_PAYMENT_QR_URL = "payment_qr_url"
 
-        // Stored vault (not consumed by the app at runtime)
-        private const val KEY_CF_ACCOUNT_ID = "cloudflare_account_id"
-        private const val KEY_CF_DNS_ZONE = "cloudflare_dns_zone"
-        private const val KEY_CF_API_TOKEN = "cloudflare_api_token"
-        private const val KEY_CF_PAGES_PROJECT = "cloudflare_pages_project"
-        private const val KEY_GH_REPO = "github_repo"
-        private const val KEY_GH_TOKEN = "github_token"
     }
 
     private var prefs: SharedPreferences? = createEncryptedPrefs()
@@ -277,38 +270,32 @@ class AppConfigStore @Inject constructor(
     }
 
     // --- Stored vault ---
-    fun cloudflareAccountId(): String = read(KEY_CF_ACCOUNT_ID)
-    fun cloudflareDnsZone(): String = read(KEY_CF_DNS_ZONE)
-    fun cloudflareApiToken(): String = read(KEY_CF_API_TOKEN)
-    fun cloudflarePagesProject(): String = read(KEY_CF_PAGES_PROJECT)
-    fun githubRepo(): String = read(KEY_GH_REPO)
-    fun githubToken(): String = read(KEY_GH_TOKEN)
 
     /** True once the minimum needed to reach a backend (URL + anon key) is present. */
     fun isConfigured(): Boolean = supabaseUrl().isNotBlank() && supabaseAnonKey().isNotBlank()
 
-    /** Persist the whole config in one shot from the Setup screen. Blank = leave/clear that field. */
+    /**
+     * Persist the whole config in one shot from the Setup screen. Blank = leave/clear that field.
+     *
+     * Formerly took six further parameters — Cloudflare account id, DNS zone, API token and Pages
+     * project, plus a GitHub repo and token. The app never read any of them; the Setup screen said
+     * so itself ("Stored securely for your reference / deploy tooling. Not used by the app itself").
+     *
+     * They were removed rather than hidden (task 6.4). A credential collected for no purpose is
+     * indistinguishable, to the person typing it, from one that matters — so a wrong value there
+     * taught the operator that this screen's fields are optional guesses. The GitHub pair was worse
+     * than useless: provisioning builds every café's site from the RAZStudio repository, so a café
+     * owner needs no GitHub account at all and asking invented an obstacle for a non-developer.
+     */
     fun save(
         supabaseUrl: String,
         supabaseAnonKey: String,
         websiteUrl: String,
         cafeName: String,
-        cloudflareAccountId: String,
-        cloudflareDnsZone: String,
-        cloudflareApiToken: String,
-        cloudflarePagesProject: String,
-        githubRepo: String,
-        githubToken: String,
     ) {
         write(KEY_SUPABASE_URL, supabaseUrl)
         write(KEY_SUPABASE_ANON_KEY, supabaseAnonKey)
         write(KEY_WEBSITE_URL, websiteUrl)
         write(KEY_CAFE_NAME, cafeName)
-        write(KEY_CF_ACCOUNT_ID, cloudflareAccountId)
-        write(KEY_CF_DNS_ZONE, cloudflareDnsZone)
-        write(KEY_CF_API_TOKEN, cloudflareApiToken)
-        write(KEY_CF_PAGES_PROJECT, cloudflarePagesProject)
-        write(KEY_GH_REPO, githubRepo)
-        write(KEY_GH_TOKEN, githubToken)
     }
 }

@@ -49,14 +49,22 @@ data class SetupState(
      */
     val fetchError: String? = null,
 
+    // ── Step 2: live verification (task 6.3) ─────────────────────────────────────────────────────
+
+    /** True while the pending Supabase pair is being probed. */
+    val isVerifying: Boolean = false,
+
+    /**
+     * Non-null when the last verification failed. Blocks [SetupViewModel.save] — "Saved" must never
+     * be shown for a connection that was never proven to work.
+     */
+    val verifyError: String? = null,
+
+    /** True once the pending pair has answered successfully. Reset whenever a field changes. */
+    val verified: Boolean = false,
+
     // ── Other sections ───────────────────────────────────────────────────────────────────────────
 
-    val cloudflareAccountId: String = "",
-    val cloudflareDnsZone: String = "",
-    val cloudflareApiToken: String = "",
-    val cloudflarePagesProject: String = "",
-    val githubRepo: String = "",
-    val githubToken: String = "",
     val saved: Boolean = false,
 )
 
@@ -92,19 +100,16 @@ class SetupViewModel @Inject constructor(
                 supabaseUrl = existingUrl,
                 supabaseAnonKey = existingKey,
                 cafeName = appConfig.cafeName(),
-                cloudflareAccountId = appConfig.cloudflareAccountId(),
-                cloudflareDnsZone = appConfig.cloudflareDnsZone(),
-                cloudflareApiToken = appConfig.cloudflareApiToken(),
-                cloudflarePagesProject = appConfig.cloudflarePagesProject(),
-                githubRepo = appConfig.githubRepo(),
-                githubToken = appConfig.githubToken(),
             )
         }
     )
     val state: StateFlow<SetupState> = _state.asStateFlow()
 
     fun update(transform: (SetupState) -> SetupState) {
-        _state.value = transform(_state.value).copy(saved = false)
+        // Editing any field invalidates a prior verification. Without this, an operator could
+        // verify a working pair, then retype the key, and still be allowed to save — which is the
+        // shape of bug that makes a verification step worthless.
+        _state.value = transform(_state.value).copy(saved = false, verified = false, verifyError = null)
     }
 
     /** Task 9.2 — pick the topology. Nothing is persisted until [save]. */
@@ -161,6 +166,10 @@ class SetupViewModel @Inject constructor(
                         fetchError = null,
                         showManualFields = false,
                         saved = false,
+                        // Step 1 proved the *website* serves a payload. It says nothing about
+                        // whether those credentials work, which is step 2's job.
+                        verified = false,
+                        verifyError = null,
                     )
                 }
 
@@ -204,25 +213,67 @@ class SetupViewModel @Inject constructor(
      * project — and `ModeCapabilities` exists precisely so nothing infers its topology from whether a
      * URL happens to be set. Clearing them makes the stored state agree with the chosen mode.
      *
-     * The Cloudflare and GitHub fields are left untouched in every mode: they are reference material
-     * for the operator's own deploy tooling and are never read by the running app, so discarding them
-     * on a mode switch would destroy something the user typed for no benefit.
+     * The Cloudflare and GitHub fields this paragraph used to describe are gone (task 6.4). They
+     * were never read by the running app — the screen said as much — and a credential collected for
+     * no purpose is indistinguishable, to the person typing it, from one that matters.
      */
+    /**
+     * Step 2 (task 6.3) — prove the pending Supabase pair works before anything is written.
+     *
+     * Off-cloud there is nothing to verify: LAN and Kiosk store no Supabase values at all, so the
+     * step is skipped rather than faked.
+     */
+    fun verifyConnection(onVerified: () -> Unit = {}) {
+        val s = _state.value
+        if (s.operatingMode != OperatingMode.CLOUD) {
+            _state.value = s.copy(verified = true, verifyError = null)
+            onVerified()
+            return
+        }
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(isVerifying = true, verifyError = null, saved = false)
+            val result = appConfigFetcher.verifyBackend(s.supabaseUrl, s.supabaseAnonKey)
+            val ok = result is AppConfigFetcher.VerifyResult.Ok
+            _state.value = _state.value.copy(
+                isVerifying = false,
+                verified = ok,
+                verifyError = result.messageOrNull,
+            )
+            if (ok) onVerified()
+        }
+    }
+
+    /**
+     * True when [save] would be allowed. Cloud requires a live verification; off-cloud does not,
+     * because it stores no Supabase values to get wrong.
+     */
+    fun canSave(): Boolean {
+        val s = _state.value
+        return s.operatingMode != OperatingMode.CLOUD || s.verified
+    }
+
     fun save() {
         val s = _state.value
         val cloud = s.operatingMode == OperatingMode.CLOUD
+
+        // Nothing is written for a cloud café until the pair has answered. "Saved ✓" against
+        // credentials that were never tried is the exact reassurance this rework removes.
+        if (cloud && !s.verified) {
+            _state.value = s.copy(
+                verifyError = s.verifyError
+                    ?: "Check the connection before saving, so a wrong value is caught here rather " +
+                    "than on a later screen.",
+                saved = false,
+            )
+            return
+        }
 
         appConfig.save(
             supabaseUrl = if (cloud) s.supabaseUrl else "",
             supabaseAnonKey = if (cloud) s.supabaseAnonKey else "",
             websiteUrl = if (cloud) s.websiteUrl else "",
             cafeName = s.cafeName,
-            cloudflareAccountId = s.cloudflareAccountId,
-            cloudflareDnsZone = s.cloudflareDnsZone,
-            cloudflareApiToken = s.cloudflareApiToken,
-            cloudflarePagesProject = s.cloudflarePagesProject,
-            githubRepo = s.githubRepo,
-            githubToken = s.githubToken,
         )
 
         // Task 9.3: the cloud session token and ordering api key go too. Clearing the URL alone is

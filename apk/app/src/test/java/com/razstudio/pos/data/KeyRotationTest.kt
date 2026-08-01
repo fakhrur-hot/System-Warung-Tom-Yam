@@ -45,8 +45,6 @@ class KeyRotationTest {
             supabaseAnonKey = oldKey,
             websiteUrl = "https://cafe.pages.dev",
             cafeName = "Kopitiam",
-            cloudflareAccountId = "", cloudflareDnsZone = "", cloudflareApiToken = "",
-            cloudflarePagesProject = "", githubRepo = "", githubToken = "",
         )
     }
 
