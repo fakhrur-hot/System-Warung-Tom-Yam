@@ -4,9 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.razstudio.pos",
-      "sha256_cert_fingerprints": [
-        "A2:B9:69:16:9C:74:47:06:78:84:8D:E1:10:B2:87:61:F5:A6:72:79:AB:68:08:1C:09:1E:EE:0D:BD:B5:DA:AC"
-      ]
+      "sha256_cert_fingerprints": []
     }
   }
 ]

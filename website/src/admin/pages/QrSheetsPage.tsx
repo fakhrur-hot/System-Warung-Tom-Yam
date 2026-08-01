@@ -17,7 +17,7 @@ const EMPTY_SLOTS: TableSlot[] = [
 
 export default function QrSheetsPage() {
   const [slots, setSlots] = useState<TableSlot[]>(EMPTY_SLOTS)
-  const [cafeName, setCafeName] = useState('POS')
+  const [cafeName, setCafeName] = useState(import.meta.env.VITE_CAFE_NAME || 'RAZ POS')
   const [qrSvgs, setQrSvgs] = useState<Map<number, string>>(new Map())
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
