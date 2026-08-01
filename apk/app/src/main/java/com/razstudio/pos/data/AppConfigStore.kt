@@ -164,11 +164,21 @@ class AppConfigStore @Inject constructor(
      * Only the two connection fields are written; café name, website, and deployment credentials are
      * left alone for the branding fetch and Setup to fill in.
      */
-    fun adoptBackendFromRecoveryQr(supabaseUrl: String, supabaseAnonKey: String): Boolean {
+    fun adoptBackendFromRecoveryQr(
+        supabaseUrl: String,
+        supabaseAnonKey: String,
+        websiteUrl: String = "",
+    ): Boolean {
         if (supabaseUrl.isBlank() || supabaseAnonKey.isBlank()) return false
         if (read(KEY_SUPABASE_URL).isNotBlank()) return false
         write(KEY_SUPABASE_URL, supabaseUrl.trim().trimEnd('/'))
         write(KEY_SUPABASE_ANON_KEY, supabaseAnonKey.trim())
+
+        // The café's Cloudflare Pages site, taken from the QR link's own origin — the backend builds
+        // that link as "${WEBSITE_ORIGIN}/join?recover=…", so the site is already in the QR and needs
+        // no extra parameter. Without it the device would be connected to Supabase but unable to
+        // print QR cards or hand customers an ordering link, which is only half a configured till.
+        if (websiteUrl.isNotBlank()) write(KEY_WEBSITE_URL, websiteUrl.trim().trimEnd('/'))
         return true
     }
     fun websiteUrl(): String = read(KEY_WEBSITE_URL)
