@@ -39,6 +39,14 @@ class ApiClient @Inject constructor(
 
     companion object {
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        /**
+         * Query params carrying the café's backend in the Owner Recovery QR. Shared with
+         * `AdminConnectScreen`, which reads them back — the two must not drift, so they live here
+         * rather than being spelled out at each end.
+         */
+        const val QR_PARAM_API = "api"
+        const val QR_PARAM_KEY = "key"
     }
 
     /**
@@ -112,6 +120,33 @@ class ApiClient @Inject constructor(
 
     private fun anonKey(): String =
         appConfig.supabaseAnonKey().ifBlank { BuildConfig.SUPABASE_ANON_KEY }
+
+    /**
+     * Append this café's backend address to the Owner Recovery URL, so the QR is self-sufficient.
+     *
+     * Without this the QR carries a recovery token and nothing else — and a token names no café. A
+     * device that has never been set up therefore cannot act on it, which is why an owner holding a
+     * perfectly good key was still being sent through the Setup Wizard to type in a project URL and
+     * anon key by hand. Carrying both in the QR makes the wizard optional whenever the owner has
+     * their QR: scan, adopt, sign in.
+     *
+     * The anon key is safe to publish here — it is a public client key, already compiled into every
+     * café-specific APK and sent as the `apikey` header on unauthenticated calls. What guards the
+     * café is the recovery token beside it and the row-level policies behind it.
+     *
+     * Added as extra query params on the existing link rather than as a new payload format, so the
+     * URL still opens the join page in a browser and `extractRecoverToken`'s `recover=` match is
+     * untouched. Older QRs simply lack the params and keep working exactly as before.
+     */
+    private fun withBackendDetails(url: String): String {
+        val base = supabaseUrl()
+        val key = anonKey()
+        if (base.isBlank() || key.isBlank()) return url
+        if (url.contains("$QR_PARAM_API=")) return url
+        val sep = if (url.contains('?')) '&' else '?'
+        val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
+        return "$url$sep$QR_PARAM_API=${enc(base)}&$QR_PARAM_KEY=${enc(key)}"
+    }
 
     // Task 18.1: guarded first, so no later builder call can be added "above" it.
     private val client = OkHttpClient.Builder()
@@ -1009,7 +1044,12 @@ class ApiClient @Inject constructor(
             when (response.code) {
                 200 -> {
                     val json = JSONObject(responseBody)
-                    ApiResult.Success(InviteResponse(token = json.getString("token"), url = json.getString("url")))
+                    ApiResult.Success(
+                        InviteResponse(
+                            token = json.getString("token"),
+                            url = withBackendDetails(json.getString("url")),
+                        )
+                    )
                 }
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
                 else -> ApiResult.Error("UNKNOWN", "Server error: ${response.code}")

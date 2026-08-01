@@ -149,6 +149,28 @@ class AppConfigStore @Inject constructor(
         write(KEY_LAN_SERVER_URL, url.trim().trimEnd('/'))
     }
     fun supabaseAnonKey(): String = read(KEY_SUPABASE_ANON_KEY)
+
+    /**
+     * Point an **unconfigured** device at a café using the connection details carried in the Owner
+     * Recovery QR, so an owner who already holds their key never has to walk the Setup Wizard.
+     *
+     * Returns false and writes nothing when a backend is already configured. That refusal is the
+     * security boundary, not an optimisation: the owner key is a bearer credential, and if a scanned
+     * QR could silently repoint a working till at someone else's project, a QR handed over by a
+     * stranger would move the café's admin session to a backend they control. An unconfigured device
+     * has no café to betray, so adopting one there costs nothing — while a till that is already
+     * serving a café can only be repointed through Setup, deliberately and with the values on screen.
+     *
+     * Only the two connection fields are written; café name, website, and deployment credentials are
+     * left alone for the branding fetch and Setup to fill in.
+     */
+    fun adoptBackendFromRecoveryQr(supabaseUrl: String, supabaseAnonKey: String): Boolean {
+        if (supabaseUrl.isBlank() || supabaseAnonKey.isBlank()) return false
+        if (read(KEY_SUPABASE_URL).isNotBlank()) return false
+        write(KEY_SUPABASE_URL, supabaseUrl.trim().trimEnd('/'))
+        write(KEY_SUPABASE_ANON_KEY, supabaseAnonKey.trim())
+        return true
+    }
     fun websiteUrl(): String = read(KEY_WEBSITE_URL)
     fun cafeName(): String = read(KEY_CAFE_NAME)
 

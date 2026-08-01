@@ -65,7 +65,8 @@ import javax.inject.Inject
 @HiltViewModel
 class AdminConnectViewModel @Inject constructor(
     private val apiClient: ApiClient,
-    private val secureStorage: SecureStorage
+    private val secureStorage: SecureStorage,
+    private val appConfig: com.razstudio.pos.data.AppConfigStore,
 ) : ViewModel() {
 
     var isLoading by mutableStateOf(false)
@@ -114,6 +115,19 @@ class AdminConnectViewModel @Inject constructor(
     }
 
     /**
+     * Take the café's backend from a scanned Owner Recovery QR, if it carries one.
+     *
+     * Both params must be present and decode cleanly, or nothing is written — a half-applied
+     * connection (a URL with no anon key) would leave the device in a state Setup cannot detect as
+     * unconfigured, and every call would fail 401 with no way back except clearing app data.
+     */
+    private fun adoptBackendFrom(scanned: String) {
+        val api = queryParam(scanned, ApiClient.QR_PARAM_API) ?: return
+        val key = queryParam(scanned, ApiClient.QR_PARAM_KEY) ?: return
+        appConfig.adoptBackendFromRecoveryQr(api, key)
+    }
+
+    /**
      * Debug-only: claim the admin slot with the café's plaintext name (deciphered from
      * whatever was typed/tapped) instead of a key. Same session-token result shape as
      * [recover] — the caller only needs to distinguish which triggered success.
@@ -135,13 +149,21 @@ class AdminConnectViewModel @Inject constructor(
      * owner-recovery token). This is the sole production admin login: the key alone grants
      * Main Admin, whether it arrives by camera scan, saved QR image, or manual entry.
      */
-    suspend fun recover(recoveryToken: String): Boolean {
+    suspend fun recover(recoveryToken: String, scanned: String = ""): Boolean {
         errorMessage = null
         errorKey = null
 
-        // Checked before the round trip, not after. On a build with no backend configured the call
-        // cannot succeed for any key, and reporting the generic network failure here would send the
-        // owner off hunting for a bad QR — the key is fine; the app simply has nowhere to send it.
+        // An owner who already holds their QR should never be forced through the Setup Wizard. The
+        // QR carries the café's backend alongside the token precisely so an unconfigured device can
+        // adopt it here and sign straight in. Ignored when this device already serves a café — see
+        // AppConfigStore.adoptBackendFromRecoveryQr for why that refusal matters.
+        if (!apiClient.isBackendConfigured() && scanned.isNotBlank()) {
+            adoptBackendFrom(scanned)
+        }
+
+        // Checked before the round trip, not after. With no backend the call cannot succeed for any
+        // key, and reporting the generic network failure would send the owner hunting for a bad QR —
+        // the key is fine; the app simply has nowhere to send it.
         if (!apiClient.isBackendConfigured()) {
             errorKey = "NO_BACKEND"
             return false
@@ -283,7 +305,22 @@ class AdminConnectViewModel @Inject constructor(
  */
 /** Pull the owner key from a pasted "…/join?recover=<token>" link, or accept a raw
  *  32-hex token; null if neither. */
-private fun extractRecoverToken(input: String): String? {
+/**
+ * Read one URL-encoded query parameter out of a scanned string.
+ *
+ * Hand-rolled rather than `Uri.parse`, because the input is whatever a camera decoded: it may be a
+ * bare token, a truncated link, or not a URL at all, and `Uri.parse` answers those with nulls and
+ * empty strings instead of an error. Returns null unless the parameter is genuinely present and
+ * non-blank after decoding.
+ */
+internal fun queryParam(input: String, name: String): String? {
+    val raw = Regex("[?&]${Regex.escape(name)}=([^&\\s]+)").find(input.trim())
+        ?.groupValues?.get(1) ?: return null
+    return runCatching { java.net.URLDecoder.decode(raw, "UTF-8") }
+        .getOrNull()?.takeIf { it.isNotBlank() }
+}
+
+internal fun extractRecoverToken(input: String): String? {
     val t = input.trim()
     Regex("[?&]recover=([a-fA-F0-9]+)").find(t)?.let { return it.groupValues[1] }
     if (Regex("^[a-fA-F0-9]{32}$").matches(t)) return t
@@ -393,7 +430,9 @@ fun AdminConnectScreen(
                 scope.launch { if (viewModel.registerViaInvite(androidId, text)) onSecondaryRegistered() }
             else -> {
                 val tok = extractRecoverToken(text) ?: text
-                scope.launch { if (viewModel.recover(tok)) onConnected() }
+                // The full scanned string is passed alongside the token: it may carry the café's
+                // backend, which is what lets an unconfigured device skip the Setup Wizard.
+                scope.launch { if (viewModel.recover(tok, scanned = text)) onConnected() }
             }
         }
     }
@@ -465,7 +504,7 @@ fun AdminConnectScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Sign in with the café owner key",
+                text = strings.signInWithOwnerKeyTitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -485,7 +524,7 @@ fun AdminConnectScreen(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Scan owner key QR")
+                    Text(strings.scanOwnerKeyQrAction)
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -495,12 +534,12 @@ fun AdminConnectScreen(
                     onClick = { imagePickerLauncher.launch("image/*") },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Choose saved QR image")
+                    Text(strings.chooseSavedQrImageAction)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "or enter the key manually",
+                    text = strings.orEnterKeyManually,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -510,8 +549,8 @@ fun AdminConnectScreen(
                 OutlinedTextField(
                     value = keyInput,
                     onValueChange = { keyInput = it },
-                    label = { Text("Owner key") },
-                    placeholder = { Text("Paste or type the owner key") },
+                    label = { Text(strings.ownerKeyLabel) },
+                    placeholder = { Text(strings.ownerKeyPlaceholder) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -521,7 +560,7 @@ fun AdminConnectScreen(
                     enabled = keyInput.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Sign in")
+                    Text(strings.signInAction)
                 }
 
                 // ── Secondary Admin ──────────────────────────────────────────────
@@ -531,14 +570,13 @@ fun AdminConnectScreen(
                 Divider()
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Secondary Admin",
+                    text = strings.secondaryAdminHeading,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Joining as a second admin? Scan the invite QR from the main admin — " +
-                        "you'll get access once they approve this device.",
+                    text = strings.secondaryAdminJoinHelp,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -552,14 +590,14 @@ fun AdminConnectScreen(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Scan invite QR")
+                    Text(strings.scanInviteQrAction)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = inviteInput,
                     onValueChange = { inviteInput = it },
-                    label = { Text("Invite link or code") },
-                    placeholder = { Text("Paste the invite link or code") },
+                    label = { Text(strings.inviteLinkOrCodeLabel) },
+                    placeholder = { Text(strings.inviteLinkOrCodePlaceholder) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -569,7 +607,7 @@ fun AdminConnectScreen(
                     enabled = inviteInput.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Register as Secondary Admin")
+                    Text(strings.registerAsSecondaryAdminAction)
                 }
             }
 
