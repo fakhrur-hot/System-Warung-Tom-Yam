@@ -337,6 +337,25 @@ data class UiStringsGroup5(
     val voidCannotIncreaseMsg: String,
     val remainingLabel: String,
     val lanServerNotFoundMsg: String,
+    // ── Sections that previously had no picker-driven translation (see UiStrings KDoc) ──
+    val paymentQrSection: String,
+    val paymentQrHelp: String,
+    val paymentQrNone: String,
+    val paymentQrUpload: String,
+    val paymentQrReplace: String,
+    val aboutSection: String,
+    val openSourceLicenses: String,
+    val kitchenPrintRouting: String,
+    val printerNotAssigned: String,
+    val kitchenSlipFontSize: String,
+    val noteOneSizeSmaller: String,
+    val secondaryAdminSection: String,
+    val addSecondaryAdmin: String,
+    val ownerRecoveryKeySection: String,
+    val showOwnerRecoveryQr: String,
+    val recoveryKeyLoadFailed: String,
+    val savePngAgain: String,
+    val makeMainAdmin: String,
 )
 
 data class UiStringsGroup6(
@@ -854,6 +873,24 @@ class UiStrings(
     val voidCannotIncreaseMsg: String get() = g5.voidCannotIncreaseMsg
     val remainingLabel: String get() = g5.remainingLabel
     val lanServerNotFoundMsg: String get() = g5.lanServerNotFoundMsg
+    val paymentQrSection: String get() = g5.paymentQrSection
+    val paymentQrHelp: String get() = g5.paymentQrHelp
+    val paymentQrNone: String get() = g5.paymentQrNone
+    val paymentQrUpload: String get() = g5.paymentQrUpload
+    val paymentQrReplace: String get() = g5.paymentQrReplace
+    val aboutSection: String get() = g5.aboutSection
+    val openSourceLicenses: String get() = g5.openSourceLicenses
+    val kitchenPrintRouting: String get() = g5.kitchenPrintRouting
+    val printerNotAssigned: String get() = g5.printerNotAssigned
+    val kitchenSlipFontSize: String get() = g5.kitchenSlipFontSize
+    val noteOneSizeSmaller: String get() = g5.noteOneSizeSmaller
+    val secondaryAdminSection: String get() = g5.secondaryAdminSection
+    val addSecondaryAdmin: String get() = g5.addSecondaryAdmin
+    val ownerRecoveryKeySection: String get() = g5.ownerRecoveryKeySection
+    val showOwnerRecoveryQr: String get() = g5.showOwnerRecoveryQr
+    val recoveryKeyLoadFailed: String get() = g5.recoveryKeyLoadFailed
+    val savePngAgain: String get() = g5.savePngAgain
+    val makeMainAdmin: String get() = g5.makeMainAdmin
     val moreOptions: String get() = g6.moreOptions
     val pendingKitchenPrints: String get() = g6.pendingKitchenPrints
     val recentPrints: String get() = g6.recentPrints
@@ -1339,6 +1376,25 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             voidCannotIncreaseMsg = "Tidak boleh menambah di sini — guna Tambah ke Pesanan.",
             remainingLabel = "kekal",
             lanServerNotFoundMsg = "Pelayan kafe tidak dijumpai. Imbas semula kod berpasangan daripada peranti admin.",
+            // ── Payment QR / About / printers / devices ──
+            paymentQrSection = "QR Pembayaran",
+            paymentQrHelp = "Dipaparkan apabila pelanggan meminta bayaran QR. Muat naik foto QR pembayaran anda (JPEG atau PNG).",
+            paymentQrNone = "Tiada QR Pembayaran — butang Tunjuk QR kekal tersembunyi.",
+            paymentQrUpload = "Muat Naik QR Pembayaran",
+            paymentQrReplace = "Ganti",
+            aboutSection = "Perihal",
+            openSourceLicenses = "Lesen sumber terbuka",
+            kitchenPrintRouting = "Penghalaan Cetakan Dapur",
+            printerNotAssigned = "Tidak ditetapkan",
+            kitchenSlipFontSize = "Saiz Fon Slip Dapur",
+            noteOneSizeSmaller = "Nota arahan khas dicetak satu saiz lebih kecil.",
+            secondaryAdminSection = "Admin Pembantu",
+            addSecondaryAdmin = "Tambah Admin Pembantu",
+            ownerRecoveryKeySection = "Kunci Pemulihan Pemilik",
+            showOwnerRecoveryQr = "Tunjuk QR Pemulihan Pemilik",
+            recoveryKeyLoadFailed = "Gagal memuatkan kunci pemulihan. Cuba lagi.",
+            savePngAgain = "Simpan PNG semula",
+            makeMainAdmin = "Jadikan Utama",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "Lagi pilihan",
@@ -1832,6 +1888,25 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             voidCannotIncreaseMsg = "Cannot increase here — use Add to Order instead.",
             remainingLabel = "stay",
             lanServerNotFoundMsg = "Cannot find the café server. Re-scan the pairing code from the admin device.",
+            // ── Payment QR / About / printers / devices ──
+            paymentQrSection = "Payment QR",
+            paymentQrHelp = "Shown on screen when a customer asks to pay by QR. Upload a photo of your own payment QR (JPEG or PNG).",
+            paymentQrNone = "No Payment QR uploaded — the Show QR button stays hidden.",
+            paymentQrUpload = "Upload Payment QR",
+            paymentQrReplace = "Replace",
+            aboutSection = "About",
+            openSourceLicenses = "Open source licences",
+            kitchenPrintRouting = "Kitchen Print Routing",
+            printerNotAssigned = "Not assigned",
+            kitchenSlipFontSize = "Kitchen Slip Font Size",
+            noteOneSizeSmaller = "The special-instruction note prints one size smaller.",
+            secondaryAdminSection = "Secondary Admin",
+            addSecondaryAdmin = "Add Secondary Admin",
+            ownerRecoveryKeySection = "Owner Recovery Key",
+            showOwnerRecoveryQr = "Show Owner Recovery QR",
+            recoveryKeyLoadFailed = "Couldn't load the recovery key. Try again.",
+            savePngAgain = "Save PNG again",
+            makeMainAdmin = "Make Main",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "More options",
@@ -2325,6 +2400,25 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             voidCannotIncreaseMsg = "此处无法增加 — 请使用「添加到订单」。",
             remainingLabel = "保留",
             lanServerNotFoundMsg = "找不到咖啡馆服务器。请从管理设备重新扫描配对码。",
+            // ── Payment QR / About / printers / devices ──
+            paymentQrSection = "付款二维码",
+            paymentQrHelp = "当顾客要求以二维码付款时显示。请上传您自己的付款二维码照片（JPEG 或 PNG）。",
+            paymentQrNone = "未上传付款二维码 — 显示二维码按钮将保持隐藏。",
+            paymentQrUpload = "上传付款二维码",
+            paymentQrReplace = "替换",
+            aboutSection = "关于",
+            openSourceLicenses = "开源许可",
+            kitchenPrintRouting = "厨房打印路由",
+            printerNotAssigned = "未分配",
+            kitchenSlipFontSize = "厨房单字体大小",
+            noteOneSizeSmaller = "特别说明备注会以小一号字体打印。",
+            secondaryAdminSection = "副管理员",
+            addSecondaryAdmin = "添加副管理员",
+            ownerRecoveryKeySection = "店主恢复密钥",
+            showOwnerRecoveryQr = "显示店主恢复二维码",
+            recoveryKeyLoadFailed = "无法加载恢复密钥，请重试。",
+            savePngAgain = "再次保存 PNG",
+            makeMainAdmin = "设为主要",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "更多选项",
@@ -2816,6 +2910,25 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             voidCannotIncreaseMsg = "இங்கு அதிகரிக்க முடியாது — 'ஆர்டரில் சேர்' பயன்படுத்தவும்.",
             remainingLabel = "உள்ளன",
             lanServerNotFoundMsg = "கஃபே சேவையகம் கிடைக்கவில்லை. நிர்வாக சாதனத்திலிருந்து இணைப்புக் குறியீட்டை மீண்டும் ஸ்கேன் செய்யவும்.",
+            // ── Payment QR / About / printers / devices ──
+            paymentQrSection = "கட்டண QR",
+            paymentQrHelp = "வாடிக்கையாளர் QR மூலம் பணம் செலுத்தக் கேட்கும்போது காட்டப்படும். உங்கள் சொந்தக் கட்டண QR புகைப்படத்தைப் பதிவேற்றவும் (JPEG அல்லது PNG).",
+            paymentQrNone = "கட்டண QR பதிவேற்றப்படவில்லை — QR காட்டு பொத்தான் மறைந்தே இருக்கும்.",
+            paymentQrUpload = "கட்டண QR பதிவேற்று",
+            paymentQrReplace = "மாற்று",
+            aboutSection = "பற்றி",
+            openSourceLicenses = "திறந்த மூல உரிமங்கள்",
+            kitchenPrintRouting = "சமையலறை அச்சு வழி",
+            printerNotAssigned = "ஒதுக்கப்படவில்லை",
+            kitchenSlipFontSize = "சமையலறைச் சீட்டு எழுத்து அளவு",
+            noteOneSizeSmaller = "சிறப்பு அறிவுறுத்தல் குறிப்பு ஒரு அளவு சிறியதாக அச்சிடப்படும்.",
+            secondaryAdminSection = "துணை நிர்வாகி",
+            addSecondaryAdmin = "துணை நிர்வாகியைச் சேர்",
+            ownerRecoveryKeySection = "உரிமையாளர் மீட்பு விசை",
+            showOwnerRecoveryQr = "உரிமையாளர் மீட்பு QR காட்டு",
+            recoveryKeyLoadFailed = "மீட்பு விசையை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+            savePngAgain = "PNG ஐ மீண்டும் சேமி",
+            makeMainAdmin = "முதன்மையாக்கு",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "மேலும் விருப்பங்கள்",
@@ -3309,6 +3422,25 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             voidCannotIncreaseMsg = "ไม่สามารถเพิ่มที่นี่ — กรุณาใช้ 'เพิ่มลงในออเดอร์'",
             remainingLabel = "คงไว้",
             lanServerNotFoundMsg = "ไม่พบเซิร์ฟเวอร์ของร้าน กรุณาสแกนรหัสจับคู่จากอุปกรณ์ผู้ดูแลอีกครั้ง",
+            // ── Payment QR / About / printers / devices ──
+            paymentQrSection = "QR ชำระเงิน",
+            paymentQrHelp = "แสดงเมื่อลูกค้าขอชำระด้วย QR อัปโหลดรูป QR ชำระเงินของคุณ (JPEG หรือ PNG)",
+            paymentQrNone = "ยังไม่ได้อัปโหลด QR ชำระเงิน — ปุ่มแสดง QR จะยังซ่อนอยู่",
+            paymentQrUpload = "อัปโหลด QR ชำระเงิน",
+            paymentQrReplace = "แทนที่",
+            aboutSection = "เกี่ยวกับ",
+            openSourceLicenses = "ใบอนุญาตโอเพนซอร์ส",
+            kitchenPrintRouting = "การกำหนดเส้นทางพิมพ์ครัว",
+            printerNotAssigned = "ยังไม่ได้กำหนด",
+            kitchenSlipFontSize = "ขนาดฟอนต์ใบครัว",
+            noteOneSizeSmaller = "หมายเหตุคำสั่งพิเศษจะพิมพ์เล็กลงหนึ่งขนาด",
+            secondaryAdminSection = "ผู้ดูแลระบบสำรอง",
+            addSecondaryAdmin = "เพิ่มผู้ดูแลระบบสำรอง",
+            ownerRecoveryKeySection = "กุญแจกู้คืนของเจ้าของ",
+            showOwnerRecoveryQr = "แสดง QR กู้คืนของเจ้าของ",
+            recoveryKeyLoadFailed = "ไม่สามารถโหลดกุญแจกู้คืนได้ กรุณาลองใหม่",
+            savePngAgain = "บันทึก PNG อีกครั้ง",
+            makeMainAdmin = "ตั้งเป็นหลัก",
         ),
         g6 = UiStringsGroup6(
             moreOptions = "ตัวเลือกเพิ่มเติม",

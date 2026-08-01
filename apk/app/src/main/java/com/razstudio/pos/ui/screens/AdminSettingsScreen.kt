@@ -785,9 +785,9 @@ fun AdminSettingsScreen(
             // gated on ModeCapabilities. Visibility of the *Show QR* button elsewhere depends solely
             // on whether a hash is stored — absence of a hash IS the "not configured" state, so there
             // is no separate enabled flag that could drift from whether the image really exists.
-            SettingsSection(title = stringResource(R.string.payment_qr_section)) {
+            SettingsSection(title = strings.paymentQrSection) {
                 Text(
-                    text = stringResource(R.string.payment_qr_help),
+                    text = strings.paymentQrHelp,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -797,7 +797,7 @@ fun AdminSettingsScreen(
                 if (qrPreview != null && uiState.paymentQrHash != null) {
                     Image(
                         bitmap = qrPreview.asImageBitmap(),
-                        contentDescription = stringResource(R.string.payment_qr_section),
+                        contentDescription = strings.paymentQrSection,
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .size(120.dp)
@@ -808,15 +808,15 @@ fun AdminSettingsScreen(
                         OutlinedButton(
                             onClick = { paymentQrPickerLauncher.launch("image/*") },
                             enabled = !uiState.paymentQrBusy,
-                        ) { Text(stringResource(R.string.payment_qr_replace)) }
+                        ) { Text(strings.paymentQrReplace) }
                         OutlinedButton(
                             onClick = { viewModel.removePaymentQr() },
                             enabled = !uiState.paymentQrBusy,
-                        ) { Text(stringResource(R.string.payment_qr_remove)) }
+                        ) { Text(strings.removeButton) }
                     }
                 } else {
                     Text(
-                        text = stringResource(R.string.payment_qr_none),
+                        text = strings.paymentQrNone,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -833,7 +833,7 @@ fun AdminSettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                         }
-                        Text(stringResource(R.string.payment_qr_upload))
+                        Text(strings.paymentQrUpload)
                     }
                 }
 
@@ -862,7 +862,7 @@ fun AdminSettingsScreen(
             // Labels come from res/values rather than UiStrings because the licence texts themselves
             // are English-only; see THIRD-PARTY-NOTICES.md for the audit and the one component
             // (ZXing) the generator cannot detect.
-            SettingsSection(title = stringResource(R.string.about_section)) {
+            SettingsSection(title = strings.aboutSection) {
                 OutlinedButton(
                     onClick = {
                         context.startActivity(
@@ -871,7 +871,7 @@ fun AdminSettingsScreen(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(stringResource(R.string.open_source_licenses))
+                    Text(strings.openSourceLicenses)
                 }
             }
 

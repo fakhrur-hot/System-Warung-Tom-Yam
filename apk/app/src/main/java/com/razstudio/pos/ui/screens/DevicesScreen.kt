@@ -241,7 +241,7 @@ fun DevicesScreen(
                     // A separate QR that grants an admin-level device with full management but no
                     // local printer (its orders print on this Main Admin). Loaded on demand.
                     Text(
-                        text = "Secondary Admin",
+                        text = strings.secondaryAdminSection,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -260,7 +260,7 @@ fun DevicesScreen(
                         }) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Add Secondary Admin")
+                            Text(strings.addSecondaryAdmin)
                         }
                     } else if (settingsState.adminInviteLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp))
@@ -315,7 +315,7 @@ fun DevicesScreen(
 
                     // === Owner Recovery Key (permanent) ===
                     Text(
-                        text = "Owner Recovery Key",
+                        text = strings.ownerRecoveryKeySection,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -332,7 +332,7 @@ fun DevicesScreen(
                     OutlinedButton(onClick = {
                         settingsViewModel.loadRecoveryToken()
                         showRecovery = true
-                    }) { Text("Show Owner Recovery QR") }
+                    }) { Text(strings.showOwnerRecoveryQr) }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -433,6 +433,7 @@ fun DevicesScreen(
         OwnerRecoveryQrDialog(
             url = settingsState.recoveryInvite?.url,
             loading = settingsState.recoveryLoading,
+            strings = strings,
             onDismiss = { showRecovery = false }
         )
     }
@@ -447,6 +448,7 @@ fun DevicesScreen(
 private fun OwnerRecoveryQrDialog(
     url: String?,
     loading: Boolean,
+    strings: UiStrings,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -507,7 +509,7 @@ private fun OwnerRecoveryQrDialog(
                     }
                     else -> {
                         Text(
-                            text = "Couldn't load the recovery key. Try again.",
+                            text = strings.recoveryKeyLoadFailed,
                             color = MaterialTheme.colorScheme.error
                         )
                     }
@@ -515,7 +517,7 @@ private fun OwnerRecoveryQrDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
+            TextButton(onClick = onDismiss) { Text(strings.commonClose) }
         },
         dismissButton = if (qr != null) {
             {
@@ -526,7 +528,7 @@ private fun OwnerRecoveryQrDialog(
                         loc?.let { "Saved recovery QR to $it" } ?: "Couldn't save the QR image",
                         Toast.LENGTH_LONG
                     ).show()
-                }) { Text("Save PNG again") }
+                }) { Text(strings.savePngAgain) }
             }
         } else null
     )
@@ -643,7 +645,7 @@ private fun DeviceCard(
                         // Promote a Secondary Admin to Main (printer host); demotes current Main.
                         if (device.role == "ADMIN_SECONDARY" && !isSecondaryAdmin) {
                             androidx.compose.material3.TextButton(onClick = onPromoteToMain) {
-                                Text("Make Main")
+                                Text(strings.makeMainAdmin)
                             }
                         }
                         IconButton(onClick = onRename) {

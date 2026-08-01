@@ -236,7 +236,7 @@ fun PrintersScreen(
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 Text(
-                    text = "Kitchen Print Routing",
+                    text = strings.kitchenPrintRouting,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -252,11 +252,11 @@ fun PrintersScreen(
                     Text(label, style = MaterialTheme.typography.labelLarge)
                     Box {
                         OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                            Text(printers.firstOrNull { it.id == currentId }?.name ?: "Not assigned")
+                            Text(printers.firstOrNull { it.id == currentId }?.name ?: strings.printerNotAssigned)
                         }
                         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                             DropdownMenuItem(
-                                text = { Text("Not assigned") },
+                                text = { Text(strings.printerNotAssigned) },
                                 onClick = { viewModel.setBucketPrinter(bucket, null); open = false }
                             )
                             printers.forEach { p ->
@@ -272,7 +272,7 @@ fun PrintersScreen(
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 Text(
-                    text = "Kitchen Slip Font Size",
+                    text = strings.kitchenSlipFontSize,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -296,7 +296,7 @@ fun PrintersScreen(
                     }
                 }
                 Text(
-                    text = "The special-instruction note prints one size smaller.",
+                    text = strings.noteOneSizeSmaller,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
