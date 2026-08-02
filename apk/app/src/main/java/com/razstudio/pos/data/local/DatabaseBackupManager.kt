@@ -46,20 +46,40 @@ class DatabaseBackupManager @Inject constructor(
         root.put("tables", tablesArray)
 
         // Menu Items
+        //
+        // Ten of MenuItem's twenty columns used to be dropped here: `code`, `extraCategories`,
+        // `marketPrice`, `imageUrl`, `imagePath`, `hasVariablePrice`, `variablePriceDailyPrompt`
+        // and the three price options. Export claims to save all local data, so a cafe that
+        // restored from its own backup silently lost every item code, every photo reference, its
+        // market-price flags and all its price tiers — and only found out when a customer ordered
+        // something that no longer had a price.
+        //
+        // Everything MenuItem holds is written now. Reading stays tolerant of absence, so a backup
+        // taken before this change still imports.
         val menuArray = JSONArray()
         menuDao.getAll().forEach { item ->
             menuArray.put(JSONObject().apply {
                 put("id", item.id)
                 put("category", item.category)
+                put("extraCategories", item.extraCategories)
+                put("code", item.code)
                 put("price", item.price)
+                put("marketPrice", item.marketPrice)
                 put("available", item.available)
                 put("askMeDaily", item.askMeDaily)
+                put("imageUrl", item.imageUrl)
+                put("imagePath", item.imagePath)
                 put("nameEn", item.nameEn)
                 put("nameBm", item.nameBm)
                 put("nameZh", item.nameZh)
                 put("nameTa", item.nameTa)
                 put("nameTh", item.nameTh)
                 put("doNotTranslate", item.doNotTranslate)
+                put("hasVariablePrice", item.hasVariablePrice)
+                put("variablePriceDailyPrompt", item.variablePriceDailyPrompt)
+                put("priceOption1", item.priceOption1 ?: JSONObject.NULL)
+                put("priceOption2", item.priceOption2 ?: JSONObject.NULL)
+                put("priceOption3", item.priceOption3 ?: JSONObject.NULL)
             })
         }
         root.put("menuItems", menuArray)
@@ -230,15 +250,27 @@ class DatabaseBackupManager @Inject constructor(
                     MenuItem(
                         id = obj.getString("id"),
                         category = obj.getString("category"),
+                        extraCategories = obj.optString("extraCategories", ""),
+                        code = obj.optString("code", ""),
                         price = obj.getDouble("price"),
+                        marketPrice = obj.optBoolean("marketPrice", false),
                         available = obj.getBoolean("available"),
                         askMeDaily = obj.optBoolean("askMeDaily", false),
+                        imageUrl = obj.optString("imageUrl", ""),
+                        imagePath = obj.optString("imagePath", ""),
                         nameEn = obj.getString("nameEn"),
                         nameBm = obj.optString("nameBm", ""),
                         nameZh = obj.optString("nameZh", ""),
                         nameTa = obj.optString("nameTa", ""),
                         nameTh = obj.optString("nameTh", ""),
-                        doNotTranslate = obj.optBoolean("doNotTranslate", false)
+                        doNotTranslate = obj.optBoolean("doNotTranslate", false),
+                        hasVariablePrice = obj.optBoolean("hasVariablePrice", false),
+                        variablePriceDailyPrompt = obj.optBoolean("variablePriceDailyPrompt", false),
+                        // `optDouble` returns NaN for a missing key, which would silently become a
+                        // real price of NaN on the till. Absence has to stay null.
+                        priceOption1 = if (obj.isNull("priceOption1")) null else obj.optDouble("priceOption1"),
+                        priceOption2 = if (obj.isNull("priceOption2")) null else obj.optDouble("priceOption2"),
+                        priceOption3 = if (obj.isNull("priceOption3")) null else obj.optDouble("priceOption3"),
                     )
                 )
             }

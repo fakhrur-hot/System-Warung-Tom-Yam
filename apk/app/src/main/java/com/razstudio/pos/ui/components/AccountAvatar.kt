@@ -66,6 +66,12 @@ fun AccountAvatar(
 
     val current = account ?: return
 
+    // Off-cloud the photo can never load: NoInternetGuard refuses to resolve Google's image host in
+    // LAN and Kiosk Mode, exactly as it should. Coil then draws its broken-image placeholder, which
+    // on a café till looks like a bug rather than a working sign-in. Falling back to the initial
+    // makes an unreachable photo indistinguishable from an account that never had one.
+    var photoFailed by remember(current.photoUrl) { mutableStateOf(false) }
+
     Box {
         Box(
             modifier = modifier
@@ -75,11 +81,12 @@ fun AccountAvatar(
                 .clickable { expanded = true },
             contentAlignment = Alignment.Center,
         ) {
-            if (current.photoUrl.isNotBlank()) {
+            if (current.photoUrl.isNotBlank() && !photoFailed) {
                 AsyncImage(
                     model = current.photoUrl,
                     contentDescription = current.email,
                     modifier = Modifier.size(40.dp).clip(CircleShape),
+                    onError = { photoFailed = true },
                 )
             } else {
                 // Not every Google account has a picture, and a blank circle looks broken. The
