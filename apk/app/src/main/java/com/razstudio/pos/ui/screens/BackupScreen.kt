@@ -210,6 +210,13 @@ fun BackupScreen(
                             }
                         }
                     }
+
+                    // ── Task 23.7: the café setup, in the owner's Google account ──────────────
+                    // Sits beside export/import because it is the same idea — a copy somewhere
+                    // that is not this phone — but it is a separate card, not a checkbox on
+                    // export, because it saves something different: the setup and the café key,
+                    // not the day's orders.
+                    CafeBundleCard()
                 }
 
                 // Loading overlay
@@ -302,6 +309,99 @@ fun BackupScreen(
                     Text(strings.commonCancel)
                 }
             }
+        )
+    }
+}
+
+/**
+ * Task 23.7 / 23.9 — save the café setup to the owner's Google account, deliberately.
+ *
+ * Hidden entirely off-cloud: LAN and Kiosk store no backend and have no internet, so the card would
+ * offer an action that could not complete (task 23.4).
+ */
+@Composable
+private fun CafeBundleCard(
+    viewModel: com.razstudio.pos.ui.viewmodels.CafeBundleViewModel = hiltViewModel(),
+) {
+    if (!viewModel.isOffered()) return
+
+    val state by viewModel.state.collectAsState()
+    val activity = LocalContext.current as? android.app.Activity
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Café setup in your Google account",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Saves how this café is set up — not its orders — so a new or replacement " +
+                    "device can restore it by signing in, instead of being set up again by hand.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { viewModel.askToSave() },
+                    enabled = !state.busy,
+                ) { Text("Save to Google") }
+
+                OutlinedButton(
+                    onClick = { activity?.let { viewModel.remove(it) } },
+                    enabled = !state.busy && activity != null,
+                ) { Text("Remove") }
+            }
+
+            state.message?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            state.error?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+
+    // Task 23.9 — the trade, stated at the moment it is made. The owner recovery key is what proves
+    // ownership of this café; putting it in a Google account means whoever reaches that account
+    // reaches the café. That is worth saying plainly and once, here.
+    if (state.confirming) {
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelSave() },
+            title = { Text("Your Google account will hold the café key") },
+            text = {
+                Text(
+                    "This saves your café's setup and its owner recovery key into your own Google " +
+                        "Drive, where only this app can read it.\n\n" +
+                        "Anyone who can sign into this Google account can restore your café onto " +
+                        "their own device. Use an account only you control.\n\n" +
+                        "You can remove it again at any time."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.cancelSave()
+                    activity?.let { viewModel.save(it) }
+                }) { Text("Save it") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.cancelSave() }) { Text("Cancel") }
+            },
         )
     }
 }

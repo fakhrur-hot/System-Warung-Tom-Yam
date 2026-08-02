@@ -24,6 +24,21 @@ val supabaseAnonKey = localProps.getProperty("SUPABASE_ANON_KEY") ?: ""
 val websiteUrl = localProps.getProperty("WEBSITE_URL") ?: ""
 val deepLinkHost = localProps.getProperty("DEEP_LINK_HOST") ?: "your-cafe.pages.dev"
 
+// GOOGLE_WEB_CLIENT_ID: the *Web* OAuth client that Credential Manager takes as its server client
+// ID (the ID token's audience). It is not a secret — it ships in every APK by definition — but it
+// is still per-deployment, so it lives here rather than inline in Kotlin.
+//
+// The template default is the RAZStudio client, which is registered against package
+// `com.razstudio.pos`. A café that overrides APPLICATION_ID changes the package, and an *Android*
+// OAuth client is matched by package name + signing SHA-1 — so a rebranded café needs its own
+// clients registered and its own value set here (task 23.11).
+//
+// Blank is a supported configuration, not a broken one: sign-in is then skipped entirely and the
+// app opens on its entry screen. A café that never wants Google sign-in sets this to empty and
+// loses nothing, which is what keeps sign-in from ever becoming a gate (Property 10).
+val googleWebClientId = localProps.getProperty("GOOGLE_WEB_CLIENT_ID")
+    ?: "433847383899-1e444mbvpfagjoc1tgp9k1s3knljf6de.apps.googleusercontent.com"
+
 // The source package (namespace) is the constant vendor base `com.razstudio.pos` on every branch —
 // this keeps a branded build's inputs out of shared source, so there is nothing to merge.
 // The APPLICATION ID, which is what Android uses as the installed-app identity (and what the signing
@@ -83,6 +98,7 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         buildConfigField("String", "WEBSITE_URL", "\"$websiteUrl\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         // DEEP_LINK_HOST: manifest placeholder for the /join deep link host (Requirement 4.1, 4.2).
         manifestPlaceholders["deepLinkHost"] = deepLinkHost
         // CAFE_NAME: generated string resource for the app launcher name. Overrides the value
@@ -262,6 +278,16 @@ dependencies {
 
     // WorkManager: periodic backup reminders
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Google sign-in (task 23). Credential Manager replaces the deprecated GoogleSignInClient;
+    // the -play-services-auth artifact is the provider that fulfils the request, and leaving it out
+    // compiles fine and fails on device with NoCredentialException.
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
+    // Authorization API only — used to request `drive.appdata` at the moment the owner first backs
+    // up, so an owner who never uses backup is never asked for Drive access (task 23.5b).
+    implementation(libs.play.services.auth)
 
     // Ktor server: embedded HTTP listener for LanServer (Requirement 4.2)
     implementation(libs.ktor.server.core)

@@ -16,6 +16,15 @@ navigationCompose = "2.8.4"
 hiltNavigationCompose = "1.2.0"
 securityCrypto = "1.1.0-alpha06"
 ktor = "2.3.12"
+# Credential Manager is the only supported way to sign in with Google on Android 14+; the old
+# GoogleSignInClient is deprecated. `googleid` supplies the request/response types, and
+# `credentials-play-services-auth` is the provider that actually talks to Play Services — all three
+# are required together, and omitting the provider fails at runtime, not at compile time.
+credentials = "1.3.0"
+googleid = "1.1.1"
+# play-services-auth is NOT for sign-in here — it is only for the Authorization API, which is how
+# `drive.appdata` is requested incrementally at first backup rather than up front (task 23.5b).
+playServicesAuth = "21.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -35,6 +44,12 @@ room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
+
+# Google sign-in (task 23)
+androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
+androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
+googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
+play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
 
 # Ktor server
 ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }

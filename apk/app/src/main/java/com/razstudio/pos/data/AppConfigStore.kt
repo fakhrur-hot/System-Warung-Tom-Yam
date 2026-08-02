@@ -58,6 +58,7 @@ class AppConfigStore @Inject constructor(
          * copy had been un-backed-up — which is the whole content of a useful reminder.
          */
         private const val KEY_LAST_BACKUP_AT = "last_backup_at"
+        private const val KEY_SIGN_IN_SETTLED = "startup_sign_in_settled"
 
         // Operating mode (Requirement 1.1 / 1.2)
         private const val KEY_OPERATING_MODE = "operating_mode"
@@ -150,6 +151,23 @@ class AppConfigStore @Inject constructor(
         write(KEY_LAN_SERVER_URL, url.trim().trimEnd('/'))
     }
     /** Epoch millis of the last successful export, or 0 when this café has never backed up. */
+    /**
+     * Task 23.1 — has the owner already answered the startup sign-in screen, either way?
+     *
+     * The screen is shown once, not on every cold start. An owner who tapped Skip has *made a
+     * decision*, and re-asking on each launch would turn an optional convenience into a daily toll
+     * on the person opening the café — which is the same thing as a gate, just slower
+     * (Requirement 15.9).
+     *
+     * Set by both exits: Skip and a completed sign-in. It is deliberately not cleared by a mode
+     * change; the owner can always sign in from Settings.
+     */
+    fun startupSignInSettled(): Boolean = read(KEY_SIGN_IN_SETTLED) == "true"
+
+    fun setStartupSignInSettled() {
+        write(KEY_SIGN_IN_SETTLED, "true")
+    }
+
     fun lastBackupAtMs(): Long = read(KEY_LAST_BACKUP_AT).toLongOrNull() ?: 0L
 
     fun setLastBackupAtMs(millis: Long) {

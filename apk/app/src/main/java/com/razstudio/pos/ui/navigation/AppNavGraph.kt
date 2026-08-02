@@ -59,6 +59,7 @@ import com.razstudio.pos.ui.screens.ReportsScreen
 import com.razstudio.pos.ui.screens.RoleSelectScreen
 import com.razstudio.pos.ui.screens.LanPairingScreen
 import com.razstudio.pos.ui.screens.SetupScreen
+import com.razstudio.pos.ui.screens.SignInScreen
 import com.razstudio.pos.ui.screens.TableManagementScreen
 
 /**
@@ -173,6 +174,31 @@ fun AppNavGraph(
         navController = navController,
         startDestination = startDestination
     ) {
+        // Task 23 — the first screen. Every exit here pops itself off the stack: an owner who has
+        // reached their café must not be able to swipe back into the account screen, and one who
+        // skipped has already answered the question.
+        composable(NavRoutes.SIGN_IN) {
+            SignInScreen(
+                onContinueToEntry = {
+                    navController.navigate(NavRoutes.ROLE_SELECT) {
+                        popUpTo(NavRoutes.SIGN_IN) { inclusive = true }
+                    }
+                },
+                onSetup = {
+                    navController.navigate(NavRoutes.SETUP) {
+                        popUpTo(NavRoutes.SIGN_IN) { inclusive = true }
+                    }
+                },
+                onTryDemo = {
+                    demoModeViewModel.enter {
+                        navController.navigate(NavRoutes.ADMIN_HOME) {
+                            popUpTo(NavRoutes.SIGN_IN) { inclusive = true }
+                        }
+                    }
+                },
+            )
+        }
+
         composable(NavRoutes.ROLE_SELECT) {
             RoleSelectScreen(
                 onAdminConnect = {

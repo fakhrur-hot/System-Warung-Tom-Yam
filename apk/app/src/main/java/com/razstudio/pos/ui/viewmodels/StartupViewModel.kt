@@ -8,6 +8,7 @@ import com.razstudio.pos.data.AppConfigStore
 import com.razstudio.pos.data.ModeRepository
 import com.razstudio.pos.data.OperatingMode
 import com.razstudio.pos.data.SecureStorage
+import com.razstudio.pos.data.google.GoogleSignInService
 import com.razstudio.pos.data.local.SessionPrefs
 import com.razstudio.pos.ui.navigation.NavRoutes
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,7 +40,29 @@ class StartupViewModel @Inject constructor(
     private val appConfigStore: AppConfigStore,
     private val modeRepository: ModeRepository,
     private val appConfigFetcher: AppConfigFetcher,
+    private val googleSignInService: GoogleSignInService,
 ) : ViewModel() {
+
+    /**
+     * Task 23.1 / 23.4 — should this launch open on the sign-in screen?
+     *
+     * Four conditions, and every one of them is a way for the screen to be actively wrong rather
+     * than merely unhelpful:
+     *
+     *  - **No OAuth client in this build.** A café that rebranded its `applicationId` has no
+     *    registered Android client, so the button could only ever fail (task 23.11).
+     *  - **Already answered.** Skip is a decision, and re-asking every morning is a gate with extra
+     *    steps.
+     *  - **LAN or Kiosk.** No internet by definition; the attempt would hang, then fail
+     *    (Requirement 15.9, 11.1).
+     *  - **A configured Cloud café that already knows who it is** still sees it once, because that
+     *    is the device whose owner most benefits from saving their setup before they lose the phone.
+     */
+    private fun offersStartupSignIn(): Boolean {
+        if (!googleSignInService.isAvailable()) return false
+        if (appConfigStore.startupSignInSettled()) return false
+        return modeRepository.currentMode() == OperatingMode.CLOUD
+    }
 
     companion object {
         private const val TAG = "StartupViewModel"
@@ -73,6 +96,17 @@ class StartupViewModel @Inject constructor(
                             SecureStorage.Role.ORDERING -> NavRoutes.ORDERING_HOME
                             null -> NavRoutes.ROLE_SELECT
                         }
+                    // ── Task 23.1 / 23.4: sign-in ahead of the entry screen ─────────────────
+                    // This branch is last on purpose. A device already carrying a session, or
+                    // arriving on an invite/recovery link, has a destination that sign-in cannot
+                    // improve on — putting the account screen in front of those would interrupt a
+                    // staff member mid-join to ask about a café key they do not hold.
+                    //
+                    // Cloud and unconfigured devices only: LAN and Kiosk have no internet by
+                    // definition, so the attempt would hang on the network and NoInternetGuard
+                    // would refuse the lookup anyway (Requirements 15.9, 11.1).
+                    offersStartupSignIn() -> NavRoutes.SIGN_IN
+
                     else -> NavRoutes.ROLE_SELECT
                 }
             }

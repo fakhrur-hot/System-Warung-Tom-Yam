@@ -2,6 +2,13 @@ package com.razstudio.pos.ui.navigation
 
 /** Navigation route constants for the app. */
 object NavRoutes {
+    /**
+     * Google sign-in — the first screen, ahead of [ROLE_SELECT] (task 23.1). Reached only by a Cloud
+     * or unconfigured device with an OAuth client in the build; every other device starts on
+     * [ROLE_SELECT] exactly as before.
+     */
+    const val SIGN_IN = "sign_in"
+
     const val ROLE_SELECT = "role_select"
 
     /** Wireless AP Mode: the server device shows its pairing QR so staff phones can join. */
