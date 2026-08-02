@@ -28,8 +28,22 @@ class ManualDineInViewModel @Inject constructor(
     private val menuDao: MenuDao,
     private val orderDao: OrderDao,
     private val tableDao: TableDao,
-    private val languageManager: LanguageManager
+    private val languageManager: LanguageManager,
+    private val modeRepository: com.razstudio.pos.data.ModeRepository,
+    private val orderNumberSequenceDao: com.razstudio.pos.data.local.OrderNumberSequenceDao,
+    private val settingsDao: com.razstudio.pos.data.local.SettingsDao,
 ) : ViewModel() {
+
+    /**
+     * Kiosk is a grocery-style till: ring up, take payment, print, next customer. It has no tables
+     * at all (Requirement 3.2), so this screen skips straight to item selection and identifies the
+     * sale by a running number instead.
+     *
+     * Reusing this screen rather than building a second one is deliberate — the menu grid, search,
+     * cart and note handling are the same work in both modes, and a parallel implementation would
+     * be the place they quietly drift apart.
+     */
+    val isKiosk: Boolean = modeRepository.currentMode() == com.razstudio.pos.data.OperatingMode.KIOSK
 
     private fun str() = uiStrings(languageManager.language.value)
 
@@ -97,6 +111,8 @@ class ManualDineInViewModel @Inject constructor(
 
     data class UiState(
         val step: Step = Step.SELECT_TABLE,
+        /** Kiosk's running number for the sale being rung up; null until it is charged. */
+        val kioskOrderNumber: Int? = null,
         val tables: List<TableItem> = emptyList(),
         val menuItems: List<MenuItemDisplay> = emptyList(),
         val cartItems: List<CartItem> = emptyList(),
@@ -109,7 +125,10 @@ class ManualDineInViewModel @Inject constructor(
         val error: String? = null
     )
 
-    private val _uiState = MutableStateFlow(UiState())
+    // Kiosk has no tables, so there is nothing to select first (Requirement 3.2).
+    private val _uiState = MutableStateFlow(
+        UiState(step = if (isKiosk) Step.SELECT_ITEMS else Step.SELECT_TABLE)
+    )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
     private var orderHoldJob: kotlinx.coroutines.Job? = null
 
@@ -295,9 +314,25 @@ class ManualDineInViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(holdRemaining = null, isSubmitting = false)
     }
 
+    /**
+     * The next running number for today's business day.
+     *
+     * Delegates to [OrderNumberSequenceDao.getNextOrderNumber], whose read-and-increment is mutex-
+     * guarded — the atomicity that makes two quick sales impossible to give the same number. The day
+     * key comes from the café's own `businessDayStartHour`, so a kiosk open past midnight keeps
+     * numbering against the day it opened rather than restarting at 1 mid-shift.
+     */
+    private suspend fun nextKioskOrderNumber(): Int {
+        val settings = settingsDao.get()
+        val zone = com.razstudio.pos.util.BusinessDay.zoneOf(settings?.timezone ?: "Asia/Kuala_Lumpur")
+        val day = com.razstudio.pos.util.BusinessDay.current(zone, settings?.businessDayStartHour ?: 15)
+        return orderNumberSequenceDao.getNextOrderNumber(day.toString())
+    }
+
     fun submitOrder() {
         val state = _uiState.value
-        val tableId = state.selectedTableId ?: return
+        // Kiosk sells over the counter with no table to attach the sale to.
+        val tableId = if (isKiosk) null else (state.selectedTableId ?: return)
         if (state.cartItems.isEmpty()) return
         if (orderHoldJob?.isActive == true) return
 
@@ -318,13 +353,23 @@ class ManualDineInViewModel @Inject constructor(
             }
             _uiState.value = _uiState.value.copy(holdRemaining = null, isSubmitting = true)
 
-            // If the table already has an active order (occupied), append to it; otherwise
-            // create a new order. This lets a New Dine-In order top up an occupied table.
-            val existingOrder = orderDao.getActiveOrderForTable(tableId)
-            val result = if (existingOrder != null) {
-                apiClient.addItemsToOrder(existingOrder.id, items)
+            // Kiosk: every sale is its own transaction — a grocery till never appends to the
+            // previous customer's basket — so it always creates, and carries a running number
+            // minted per business day (Requirement 3.5). The number appears on both the kitchen
+            // slip and the receipt so counter and kitchen refer to the same sale.
+            val result = if (tableId == null) {
+                val number = nextKioskOrderNumber()
+                _uiState.value = _uiState.value.copy(kioskOrderNumber = number)
+                apiClient.createOrder(null, items, "STAFF", orderNumber = number)
             } else {
-                apiClient.createOrder(tableId, items, "STAFF")
+                // If the table already has an active order (occupied), append to it; otherwise
+                // create a new order. This lets a New Dine-In order top up an occupied table.
+                val existingOrder = orderDao.getActiveOrderForTable(tableId)
+                if (existingOrder != null) {
+                    apiClient.addItemsToOrder(existingOrder.id, items)
+                } else {
+                    apiClient.createOrder(tableId, items, "STAFF")
+                }
             }
             when (result) {
                 is ApiResult.Success -> {

@@ -186,6 +186,11 @@ fun AppNavGraph(
                 onWirelessAp = {
                     navController.navigate(NavRoutes.LAN_PAIRING)
                 },
+                // Kiosk: the same order-entry screen, minus the table step. Reusing it keeps the
+                // menu grid, search and cart identical across modes instead of drifting apart.
+                onKiosk = {
+                    navController.navigate(NavRoutes.MANUAL_DINE_IN)
+                },
                 onTryDemo = {
                     // Rebuilt demo: seed one shared local dataset, then drop the user into the REAL
                     // admin home. The global DemoModeOverlay handles exit + teardown from any screen.

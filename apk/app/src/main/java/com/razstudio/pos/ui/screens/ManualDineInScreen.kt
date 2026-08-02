@@ -116,7 +116,11 @@ fun ManualDineInScreen(
                     IconButton(onClick = {
                         when (uiState.step) {
                             ManualDineInViewModel.Step.SELECT_TABLE -> onBack()
-                            ManualDineInViewModel.Step.SELECT_ITEMS -> viewModel.goToTableSelect()
+                            // Kiosk never had a table step to return to (Requirement 3.2), so
+                            // Back leaves the till rather than dropping the operator on a screen
+                            // that does not exist in this mode.
+                            ManualDineInViewModel.Step.SELECT_ITEMS ->
+                                if (viewModel.isKiosk) onBack() else viewModel.goToTableSelect()
                             ManualDineInViewModel.Step.CART_REVIEW -> viewModel.goToMenuSelect()
                         }
                     }) {
@@ -171,6 +175,7 @@ fun ManualDineInScreen(
                         cartItems = uiState.cartItems,
                         menuItems = uiState.menuItems,
                         selectedTableLabel = uiState.selectedTableLabel,
+                        isKiosk = viewModel.isKiosk,
                         isSubmitting = uiState.isSubmitting,
                         strings = strings,
                         language = language,
@@ -451,6 +456,7 @@ private fun CartReview(
     cartItems: List<ManualDineInViewModel.CartItem>,
     menuItems: List<ManualDineInViewModel.MenuItemDisplay>,
     selectedTableLabel: String,
+    isKiosk: Boolean = false,
     isSubmitting: Boolean,
     strings: UiStrings,
     language: AppLanguage,
@@ -463,7 +469,10 @@ private fun CartReview(
             .padding(16.dp)
     ) {
         Text(
-            text = "${strings.tableLabelPrefix}: $selectedTableLabel",
+            // Kiosk identifies a sale by its running number, not a table — the number is minted
+            // on charge, so before that this simply names the mode.
+            text = if (isKiosk) strings.kioskModeButton
+                   else "${strings.tableLabelPrefix}: $selectedTableLabel",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )

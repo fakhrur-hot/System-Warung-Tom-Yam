@@ -174,7 +174,8 @@ class DemoBackend @Inject constructor(
     // ── Order lifecycle (stateful, shared across roles) ───────────────────────
 
     suspend fun createOrder(
-        tableId: String,
+        // Demo mirrors the real gateway. Demo never runs Kiosk, so this is always a real table.
+        tableId: String?,
         items: List<NewOrderItem>,
         source: String,
     ): ApiResult<CreateOrderResponse> {

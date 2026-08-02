@@ -564,9 +564,10 @@ class LocalBackend @Inject constructor(
      * later menu edit cannot retroactively change what a customer was billed.
      */
     override suspend fun createOrder(
-        tableId: String,
+        tableId: String?,
         items: List<NewOrderItem>,
         source: String,
+        orderNumber: Int?,
     ): ApiResult<CreateOrderResponse> {
         val orderId = UUID.randomUUID().toString()
         val now = nowTimestamp()
@@ -577,6 +578,9 @@ class LocalBackend @Inject constructor(
             Order(
                 id = orderId,
                 tableId = tableId,
+                // Kiosk's running number, minted by the caller from OrderNumberSequence so the
+                // read-and-increment stays atomic. Null in every mode that has tables.
+                orderNumber = orderNumber,
                 source = source,
                 status = OrderStatus.RECEIVED,
                 total = total,

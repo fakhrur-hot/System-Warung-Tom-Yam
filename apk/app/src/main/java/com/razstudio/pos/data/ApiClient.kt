@@ -1990,9 +1990,12 @@ class ApiClient @Inject constructor(
      * Create a new order (manual dine-in entry with source=STAFF).
      */
     override suspend fun createOrder(
-        tableId: String,
+        tableId: String?,
         items: List<NewOrderItem>,
-        source: String
+        source: String,
+        // Cloud cafés have tables, so this is always null here. Kiosk never reaches ApiClient —
+        // it runs entirely on LocalBackend with no network of any kind (Requirement 3.1).
+        orderNumber: Int?,
     ): ApiResult<CreateOrderResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.createOrder(tableId, items, source)
         try {

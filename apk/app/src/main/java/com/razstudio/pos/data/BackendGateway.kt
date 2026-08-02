@@ -60,7 +60,16 @@ interface BackendGateway {
     suspend fun deleteMenuImage(path: String): ApiResult<Unit>
 
     // ── Orders - admin ────────────────────────────────────────────────────────────
-    suspend fun createOrder(tableId: String, items: List<NewOrderItem>, source: String = "STAFF"): ApiResult<CreateOrderResponse>
+    /**
+     * @param tableId null in Kiosk Mode, which has no tables — the order is identified by
+     *   [orderNumber] instead, minted per business day.
+     */
+    suspend fun createOrder(
+        tableId: String?,
+        items: List<NewOrderItem>,
+        source: String = "STAFF",
+        orderNumber: Int? = null,
+    ): ApiResult<CreateOrderResponse>
     suspend fun getOrdersSince(since: String): ApiResult<OrdersSyncResponse>
     suspend fun sendToKitchen(orderId: String, sessionNumber: Int? = null): ApiResult<KitchenResponse>
     suspend fun addItemsToOrder(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto>
