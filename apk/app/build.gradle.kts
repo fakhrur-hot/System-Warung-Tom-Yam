@@ -46,10 +46,24 @@ val googleWebClientId = localProps.getProperty("GOOGLE_WEB_CLIENT_ID")
 // Template default = the vendor base; a café build sets its own (e.g. com.warungtomyam.pos) to keep
 // its existing installed identity and update path.
 val cafeApplicationId = localProps.getProperty("APPLICATION_ID") ?: "com.razstudio.pos"
+//
+// Left as com.razstudio.pos on purpose. It is the app's identity to Play, AdMob and Android, and
+// changing it is not a rename — it is a different app:
+//   * Play Console treats it as a new listing. Installed cafés stop receiving updates and have to
+//     install the new one by hand; reviews and install counts do not carry over.
+//   * The Google OAuth Android clients are matched by package name + signing SHA-1, so every one
+//     would have to be re-registered. Until then owner sign-in fails on every device.
+//   * AdMob app records and ad-unit ids are bound to it.
+// A display name is what the owner and the store listing actually show, and that is CAFE_NAME.
 
-// CAFE_NAME: the display name shown in the app launcher. Overridable per café via local.properties
-// `CAFE_NAME`. Template default = "RAZ POS" (the original app_name value from strings.xml).
-val cafeName = localProps.getProperty("CAFE_NAME") ?: "RAZ POS"
+// CAFE_NAME: the app's display name — the launcher icon's label, the title Android shows in
+// Settings > Apps, and the name to use for the Play Console listing, AdMob and AdSense.
+// Overridable per café via local.properties `CAFE_NAME`; a branded build sets its own.
+//
+// This is NOT the package name. `applicationId` below is the unique id Play, AdMob and the OS
+// identify the app by, it cannot contain spaces, and it is deliberately left alone — see the
+// comment there for what changing it would break.
+val cafeName = localProps.getProperty("CAFE_NAME") ?: "Warung POS RAZStudio"
 
 // CAFE_PROFILE_DIR: optional path to a per-café resource directory. When set and the directory
 // exists, its res/ sub-directory is added as an extra Android resource source set, and Android's

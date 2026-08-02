@@ -176,7 +176,7 @@ fun SetupScreen(
         ) {
             // ── Task 9.2: the topology comes first, because it decides what else is worth asking ──
             SectionHeader("How this café runs")
-            HelpText("Pick this first — it decides what the rest of this screen asks for.")
+            HelpText("This decides what the rest of the screen asks for.")
             ModeChoice(
                 selected = state.operatingMode,
                 onSelect = { viewModel.selectMode(it) },
@@ -241,7 +241,7 @@ fun SetupScreen(
                 state.connectionTab == ConnectionTab.MANUAL
             ) {
                 // ── Task 4.2: single website URL field as the primary input ──────────────────────
-                HelpText("Enter the café's website address and tap Connect to fill in the backend details automatically.")
+                HelpText("Enter the café's website address and tap Connect. The rest fills in itself.")
 
                 Field(
                     label = "Café website URL",
@@ -337,11 +337,11 @@ fun SetupScreen(
                 // Requirement 2.4: an off-cloud café is never asked for a Supabase URL. Not merely
                 // optional — absent. A field that can be filled in and then ignored is how an owner
                 // ends up believing their LAN café is syncing somewhere.
-                HelpText(
-                    "No internet backend. This device holds the café's data, and prints " +
-                        "directly to its own printer. Saving will clear any Supabase details " +
-                        "previously stored on this device."
-                )
+                // The old copy ended "Saving will clear any Supabase details previously stored on
+                // this device." On the screen an owner actually meets — a fresh install, nothing
+                // ever saved — that sentence describes an event that cannot happen, and warns about
+                // losing data that does not exist. It is gone.
+                HelpText("This device holds the café's data and prints to its own printer. No internet needed.")
             }
             // Hidden on the owner-QR tab. The name arrives from `branding` the moment the key is
             // accepted, so a field here would be overwritten seconds after it was filled in — and a
@@ -361,12 +361,13 @@ fun SetupScreen(
 
             if (state.operatingMode != OperatingMode.CLOUD) {
                 HelpText(
-                    "Next: pair the printer from Café Management → Printers. " +
+                    // The Kiosk branch used to repeat this screen's own mode description back at
+                    // the owner. What is useful after saving is the next action, not a recap.
+                    "Next: pair the printer in Café Management → Printers." +
                         if (state.operatingMode == OperatingMode.LAN) {
-                            "Then add staff devices from the Devices screen."
+                            " Then add staff phones in Devices."
                         } else {
-                            "Kiosk Mode runs on this device alone — no tables, no staff devices, " +
-                                "and orders are identified by a running number instead of a table."
+                            ""
                         }
                 )
             }
@@ -638,9 +639,9 @@ private fun HotspotGuidance() {
     val context = LocalContext.current
 
     HelpText(
-        "Staff devices need to be on the same network as this one. Turn on this device's " +
-            "hotspot in Android settings, then connect each staff phone to it. Give it a name " +
-            "and password you can share — the café will use this network every day."
+        "Staff phones must be on the same network as this device. Turn on its hotspot, then " +
+            "connect each phone to it. Use a name and password you can share — the café will use " +
+            "this network every day."
     )
 
     OutlinedButton(
@@ -706,17 +707,17 @@ private fun ModeChoice(
         Triple(
             OperatingMode.CLOUD,
             "Full Online with QR ordering",
-            "Customers scan a table QR and order from their own phone. Needs internet and a Supabase project.",
+            "Customers order from their own phone by scanning a table QR. Needs internet.",
         ),
         Triple(
             OperatingMode.LAN,
             "(W)LAN AP without QR ordering",
-            "Staff phones order over your own Wi-Fi. No internet needed. This device holds the data and the printer.",
+            "Staff phones order over your own Wi-Fi. This device holds the data and the printer.",
         ),
         Triple(
             OperatingMode.KIOSK,
             "Kiosk Mode",
-            "This one device only. No tables, no staff phones, no internet — orders get a running number.",
+            "This device alone. No tables and no staff phones — each order gets a running number.",
         ),
     )
 

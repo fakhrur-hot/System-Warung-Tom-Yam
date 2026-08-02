@@ -5,8 +5,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,6 +60,8 @@ fun AccountAvatar(
     onSignedOut: () -> Unit,
     modifier: Modifier = Modifier,
     onReloadDrive: () -> Unit = {},
+    /** Nobody linked yet — take the owner to the Google flow. Home screen only. */
+    onLink: () -> Unit = {},
     viewModel: AccountAvatarViewModel = hiltViewModel(),
     languageViewModel: LanguageViewModel = hiltViewModel(),
 ) {
@@ -64,7 +70,25 @@ fun AccountAvatar(
     val strings = uiStrings(language)
     var expanded by remember { mutableStateOf(false) }
 
-    val current = account ?: return
+    val current = account
+    if (current == null) {
+        // Home screen: offer to link, in the same slot the avatar will occupy afterwards, so the
+        // control does not move once an account exists. This is what replaced the separate sign-in
+        // page — the one unique thing that page offered, on the screen the owner already opens.
+        //
+        // Everywhere else: nothing. Sign-in is optional (Property 10), and a café that never links
+        // must not be nagged from behind its own till.
+        if (isHomeScreen) {
+            IconButton(onClick = onLink, modifier = modifier.size(40.dp)) {
+                Icon(
+                    imageVector = Icons.Default.AccountCircle,
+                    contentDescription = strings.googleLinkButton,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        return
+    }
 
     // Off-cloud the photo can never load: NoInternetGuard refuses to resolve Google's image host in
     // LAN and Kiosk Mode, exactly as it should. Coil then draws its broken-image placeholder, which

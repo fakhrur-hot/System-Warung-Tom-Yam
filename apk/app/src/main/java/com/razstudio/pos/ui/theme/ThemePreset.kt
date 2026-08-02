@@ -21,7 +21,6 @@ import com.razstudio.pos.R
  */
 enum class ThemePreset(
     val displayName: String,
-    val emoji: String,
     // 10-shade ramp
     val shade50: Color,
     val shade100: Color,
@@ -54,7 +53,6 @@ enum class ThemePreset(
     /** 🌶 Tom Yam — deep red. The build-time default and the house identity. */
     TOM_YAM(
         displayName = "Tom Yam",
-        emoji = "🌶",
         shade50  = Color(0xFFFEF3F1),
         shade100 = Color(0xFFFADEDB),
         shade200 = Color(0xFFF0B2AC),
@@ -72,7 +70,6 @@ enum class ThemePreset(
     /** 🎩 Luxury — warm ivory and antique gold. Opulent, high-end. */
     LUXURY(
         displayName = "Luxury",
-        emoji = "🎩",
         shade50  = Color(0xFFF8F4E8),
         shade100 = Color(0xFFEDE4CC),
         shade200 = Color(0xFFD4C4A0),
@@ -92,7 +89,6 @@ enum class ThemePreset(
     /** 💎 Elegant — champagne and rose gold. Refined, timeless. */
     ELEGANT(
         displayName = "Elegant",
-        emoji = "💎",
         shade50  = Color(0xFFFDF8F5),
         shade100 = Color(0xFFF5EBE0),
         shade200 = Color(0xFFE8D5C4),
@@ -112,7 +108,6 @@ enum class ThemePreset(
     /** ⬜ Minimalist — pure white and charcoal. Clean, uncluttered. */
     MINIMALIST(
         displayName = "Minimalist",
-        emoji = "⬜",
         shade50  = Color(0xFFFAFAFA),
         shade100 = Color(0xFFF4F4F5),
         shade200 = Color(0xFFE4E4E7),
@@ -132,7 +127,6 @@ enum class ThemePreset(
     /** 🔥 Bold — cobalt blue and electric. High contrast, energetic. */
     BOLD(
         displayName = "Bold",
-        emoji = "🔥",
         shade50  = Color(0xFFEFF6FF),
         shade100 = Color(0xFFDBEAFE),
         shade200 = Color(0xFFBFDBFE),
@@ -152,7 +146,6 @@ enum class ThemePreset(
     /** 🌸 Soft — blush pink and lavender. Gentle, romantic. */
     SOFT(
         displayName = "Soft",
-        emoji = "🌸",
         shade50  = Color(0xFFFDF2F8),
         shade100 = Color(0xFFFCE7F3),
         shade200 = Color(0xFFFBCFE8),
@@ -172,7 +165,6 @@ enum class ThemePreset(
     /** ⚡ Edgy — charcoal and electric lime. Sharp, rebellious. */
     EDGY(
         displayName = "Edgy",
-        emoji = "⚡",
         shade50  = Color(0xFFF0FDF4),
         shade100 = Color(0xFFDCFCE7),
         shade200 = Color(0xFFBBF7D0),

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Adaptive icon: what every launcher on API 26+ actually draws.
+
+    Without this the OS falls back to the legacy PNG and shows the café's mark as a small square
+    floating inside a system-supplied shape — the "icon in a white box" look. The foreground layer
+    is 108dp with only the centre 72dp guaranteed visible, so the mark is inset accordingly; the
+    launcher crops and masks the rest as it animates.
+
+    The background is the logo's own paper white rather than a colour, so the mark sits on the
+    surface it was drawn for whatever mask shape the launcher picks.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

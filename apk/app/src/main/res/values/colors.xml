@@ -20,4 +20,6 @@
     <!-- Neutral muted slate for secondary text. -->
     <color name="tom_yam_muted">#6B7280</color>
     <color name="tom_yam_outline">#C7D2FE</color>
+    <!-- The logo's own paper white; the adaptive icon's background layer. -->
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>

@@ -181,15 +181,13 @@ fun SignInScreen(
                         .padding(horizontal = 24.dp, vertical = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    // Demo has gone from this footer. The screen is reached deliberately now, from
+                    // the home screen's account control — and the home screen already offers Demo.
+                    // Two doors to it, one of them on a page about Google accounts, was clutter.
                     OutlinedButton(
                         onClick = leaveToEntry,
                         modifier = Modifier.weight(1f),
                     ) { Text(strings.signInSkip) }
-
-                    OutlinedButton(
-                        onClick = leaveToDemo,
-                        modifier = Modifier.weight(1f),
-                    ) { Text(strings.signInDemoMode) }
                 }
             }
         }

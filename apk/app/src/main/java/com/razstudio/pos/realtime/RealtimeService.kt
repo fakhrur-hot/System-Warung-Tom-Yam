@@ -423,10 +423,28 @@ class RealtimeService : Service() {
         }
     }
 
-    private fun getSupabaseRealtimeUrl(): String {
+    /**
+     * The Realtime socket URL, or null when this device has no backend to point it at.
+     *
+     * ## Why null and not a best-effort string
+     *
+     * This used to interpolate whatever it found. With no stored Supabase URL and an empty
+     * `BuildConfig.SUPABASE_URL` — which is exactly how the template ships — it produced
+     * `"/realtime/v1/websocket?apikey=&vsn=1.0.0"`, OkHttp rejected the schemeless address with
+     * `IllegalArgumentException: Expected URL scheme 'http' or 'https'`, and the exception escaped
+     * `onStartCommand` and killed the process.
+     *
+     * That is a launch crash on a **fresh install**: the template carries no URL, CLOUD is the
+     * default mode, so a new café's first run died before its owner could reach the Setup wizard.
+     * It is the same schemeless-URL shape `ApiClient.baseUrl()` was hardened against — missed here
+     * because this path builds its address by string replacement instead of going through it.
+     */
+    private fun getSupabaseRealtimeUrl(): String? {
         val supabaseUrl = appConfig.supabaseUrl().ifBlank { BuildConfig.SUPABASE_URL }
-        val baseUrl = supabaseUrl.replace("https://", "wss://")
+        if (!supabaseUrl.startsWith("http")) return null
         val anonKey = appConfig.supabaseAnonKey().ifBlank { BuildConfig.SUPABASE_ANON_KEY }
+        if (anonKey.isBlank()) return null
+        val baseUrl = supabaseUrl.replace("https://", "wss://")
         return "$baseUrl/realtime/v1/websocket?apikey=$anonKey&vsn=1.0.0"
     }
 
@@ -571,8 +589,15 @@ class RealtimeService : Service() {
         webSocket?.close(1001, "Reconnecting")
         webSocket = null
 
+        val url = getSupabaseRealtimeUrl() ?: run {
+            // Unconfigured, not broken. The owner still reaches Setup, and the catch-up poll covers
+            // everything the socket would have carried.
+            Log.i(TAG, "No backend configured yet — Realtime socket not started")
+            return
+        }
+
         val request = Request.Builder()
-            .url(getSupabaseRealtimeUrl())
+            .url(url)
             .build()
 
         webSocket = client.newWebSocket(request, object : WebSocketListener() {

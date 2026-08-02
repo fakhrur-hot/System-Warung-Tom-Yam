@@ -110,6 +110,7 @@ fun RoleSelectScreen(
                 // owner is between things and can afford it.
                 com.razstudio.pos.ui.components.AccountAvatar(
                     isHomeScreen = true,
+                    onLink = onReloadDrive,
                     onReloadDrive = onReloadDrive,
                     onSignedOut = onAccountSignedOut,
                 )

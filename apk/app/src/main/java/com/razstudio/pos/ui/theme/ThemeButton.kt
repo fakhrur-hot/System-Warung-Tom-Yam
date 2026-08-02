@@ -31,7 +31,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 /**
  * Squircle theme selector — a rounded-square button showing a small colour swatch of the
  * active theme's primary (600) shade. Tapping it opens a menu listing all [ThemePreset]s
- * with their emoji and name; the current one is marked with a bullet.
+ * by name beside a swatch of its colour; the current one is marked with a bullet.
  *
  * Drop this into any screen's top-bar actions row to the right of [LanguageButton], exactly
  * as [com.razstudio.pos.ui.i18n.LanguageButton] is placed today.
@@ -101,17 +101,13 @@ fun ThemeButton(
                         )
                     },
                     text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = preset.emoji,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (isCurrent) "● ${preset.displayName}" else preset.displayName,
-                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                            )
-                        }
+                        // Name only. The bordered colour swatch beside it already shows what the
+                        // preset looks like, which is the thing being chosen — an emoji next to it
+                        // decorated the row without telling the owner anything the swatch had not.
+                        Text(
+                            text = if (isCurrent) "● ${preset.displayName}" else preset.displayName,
+                            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                        )
                     },
                     onClick = {
                         expanded = false
