@@ -82,6 +82,12 @@ class TableViewViewModel @Inject constructor(
     )
 
     companion object {
+        /**
+         * Recorded on the original order's void audit when a share is lifted off. Split items are
+         * not wastage, and this reason is the only thing that tells them apart there.
+         */
+        const val SPLIT_REASON = "Split payment"
+
         const val MAX_TABLES = 30
         const val MAX_TABLE_NUMBER = 9999
         // Take-out ("Tapaw") slots are additional to the dine-in cap (30 + 6 = 36 total).
@@ -564,6 +570,68 @@ class TableViewViewModel @Inject constructor(
      * [printReceipt] reflects the admin's choice in the print-confirm dialog shown
      * before this is called — payment completes and the table frees either way.
      */
+    /**
+     * Settle one customer's share of a group bill.
+     *
+     * Three calls, in an order that matters: create the share as its own order, pay it, then shrink
+     * the original by exactly what was lifted. Shrinking last means a failure anywhere leaves the
+     * table still owing the full amount — the café can retry. Shrinking first and then failing to
+     * charge would hand the food away.
+     *
+     * The final share never reaches here: [SplitPaymentPlanner] returns `SettleWholeOrder` for it,
+     * and the caller pays the original through the normal path, which is what ends the table
+     * session and offers the receipt.
+     */
+    fun paySplitShare(
+        orderId: String,
+        tableId: String?,
+        plan: SplitPaymentPlanner.Plan.SliceOff,
+        method: String,
+    ) {
+        viewModelScope.launch {
+            _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null)
+
+            val created = apiClient.createOrder(tableId, plan.sliceItems, source = "STAFF")
+            if (created !is ApiResult.Success) {
+                _orderDetail.value = _orderDetail.value.copy(
+                    isLoading = false, error = str().splitShareFailed,
+                )
+                return@launch
+            }
+            val shareId = created.data.orderId
+
+            when (apiClient.processPayment(shareId, method)) {
+                is ApiResult.Success -> Unit
+                else -> {
+                    // The share exists but is unpaid. Saying so beats a silent retry that would
+                    // create a second one and double-charge the table.
+                    _orderDetail.value = _orderDetail.value.copy(
+                        isLoading = false, error = str().splitShareUnpaid,
+                    )
+                    return@launch
+                }
+            }
+            orderDao.completePayment(shareId, method)
+
+            when (val shrunk = apiClient.voidOrderItems(orderId, plan.keepLines, SPLIT_REASON)) {
+                is ApiResult.Success -> {
+                    // Destructive reconcile: reconcileOrderFromDto only inserts, so a line that
+                    // shrank would keep its old quantity beside the new one.
+                    orderDao.deleteItemsForOrder(orderId)
+                    reconcileOrderFromDto(shrunk.data)
+                    tableId?.let { loadOrderForTable(it) }
+                    _orderDetail.value = _orderDetail.value.copy(
+                        isLoading = false,
+                        successMessage = str().splitSharePaid.format(method),
+                    )
+                }
+                else -> _orderDetail.value = _orderDetail.value.copy(
+                    isLoading = false, error = str().splitShareNotRemoved,
+                )
+            }
+        }
+    }
+
     fun processPayment(orderId: String, method: String, printReceipt: Boolean) {
         viewModelScope.launch {
             _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null)

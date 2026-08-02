@@ -679,6 +679,18 @@ data class UiStringsGroup8(
     val googleBundleCreate: String,
     val googleBundleUpdate: String,
     val googleBundleRecheck: String,
+    val splitPaymentOption: String,
+    val payWholeBillOption: String,
+    val splitPaymentButton: String,
+    val splitDialogTitle: String,
+    val splitThisCustomerPays: String,
+    val splitRemaining: String,
+    val splitEditItems: String,
+    val splitEditItemsHint: String,
+    val splitSharePaid: String,
+    val splitShareFailed: String,
+    val splitShareUnpaid: String,
+    val splitShareNotRemoved: String,
 )
 
 class UiStrings(
@@ -1279,6 +1291,18 @@ class UiStrings(
     val googleBundleCreate: String get() = g8.googleBundleCreate
     val googleBundleUpdate: String get() = g8.googleBundleUpdate
     val googleBundleRecheck: String get() = g8.googleBundleRecheck
+    val splitPaymentOption: String get() = g8.splitPaymentOption
+    val payWholeBillOption: String get() = g8.payWholeBillOption
+    val splitPaymentButton: String get() = g8.splitPaymentButton
+    val splitDialogTitle: String get() = g8.splitDialogTitle
+    val splitThisCustomerPays: String get() = g8.splitThisCustomerPays
+    val splitRemaining: String get() = g8.splitRemaining
+    val splitEditItems: String get() = g8.splitEditItems
+    val splitEditItemsHint: String get() = g8.splitEditItemsHint
+    val splitSharePaid: String get() = g8.splitSharePaid
+    val splitShareFailed: String get() = g8.splitShareFailed
+    val splitShareUnpaid: String get() = g8.splitShareUnpaid
+    val splitShareNotRemoved: String get() = g8.splitShareNotRemoved
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1891,6 +1915,18 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             googleBundleCreate = "Cipta %1\$s",
             googleBundleUpdate = "Kemas kini sandaran sekarang",
             googleBundleRecheck = "Semak semula",
+            splitPaymentOption = "Bayaran berasingan",
+            payWholeBillOption = "Bayar semua",
+            splitPaymentButton = "Bayaran berasingan",
+            splitDialogTitle = "Bayaran berasingan",
+            splitThisCustomerPays = "Pelanggan ini bayar",
+            splitRemaining = "Masih di meja",
+            splitEditItems = "Betulkan pesanan",
+            splitEditItemsHint = "Kurangkan apa-apa yang tidak sampai ke meja. Sifar membuang baris itu.",
+            splitSharePaid = "Bahagian dibayar secara %1\$s.",
+            splitShareFailed = "Tidak dapat memulakan bahagian itu. Tiada caj dikenakan.",
+            splitShareUnpaid = "Bahagian itu tidak dibayar. Semak dahulu sebelum cuba lagi supaya tiada caj berganda.",
+            splitShareNotRemoved = "Dibayar, tetapi meja masih menunjukkan barangan itu. Muat semula sebelum bahagian seterusnya.",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -2502,6 +2538,18 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             googleBundleCreate = "Create %1\$s",
             googleBundleUpdate = "Update backup now",
             googleBundleRecheck = "Check again",
+            splitPaymentOption = "Split payment",
+            payWholeBillOption = "Pay whole bill",
+            splitPaymentButton = "Split payment",
+            splitDialogTitle = "Split payment",
+            splitThisCustomerPays = "This customer pays",
+            splitRemaining = "Still on the table",
+            splitEditItems = "Fix items",
+            splitEditItemsHint = "Reduce anything that never reached the table. Zero clears the line.",
+            splitSharePaid = "Share paid by %1\$s.",
+            splitShareFailed = "Couldn't start that share. Nothing was charged.",
+            splitShareUnpaid = "That share wasn't paid. Check before trying again, so nobody is charged twice.",
+            splitShareNotRemoved = "Paid, but the table still shows those items. Refresh before the next share.",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -3111,6 +3159,18 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             googleBundleCreate = "创建 %1\$s",
             googleBundleUpdate = "立即更新备份",
             googleBundleRecheck = "重新检查",
+            splitPaymentOption = "分开付款",
+            payWholeBillOption = "支付全部",
+            splitPaymentButton = "分开付款",
+            splitDialogTitle = "分开付款",
+            splitThisCustomerPays = "本位顾客支付",
+            splitRemaining = "桌上剩余",
+            splitEditItems = "修正菜品",
+            splitEditItemsHint = "减去未送到桌上的菜品。减至零即清除该项。",
+            splitSharePaid = "已以 %1\$s 支付该部分。",
+            splitShareFailed = "无法开始该部分。未收取任何费用。",
+            splitShareUnpaid = "该部分未支付。请先确认再重试，以免重复收费。",
+            splitShareNotRemoved = "已支付，但桌上仍显示这些菜品。请先刷新再收下一份。",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -3722,6 +3782,18 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             googleBundleCreate = "%1\$s உருவாக்கு",
             googleBundleUpdate = "காப்புப்பிரதியை இப்போது புதுப்பி",
             googleBundleRecheck = "மீண்டும் சரிபார்",
+            splitPaymentOption = "பிரித்துச் செலுத்தல்",
+            payWholeBillOption = "முழுவதையும் செலுத்து",
+            splitPaymentButton = "பிரித்துச் செலுத்தல்",
+            splitDialogTitle = "பிரித்துச் செலுத்தல்",
+            splitThisCustomerPays = "இந்த வாடிக்கையாளர் செலுத்துவது",
+            splitRemaining = "மேஜையில் மீதமுள்ளது",
+            splitEditItems = "உணவுகளைச் சரிசெய்",
+            splitEditItemsHint = "மேஜைக்கு வராதவற்றைக் குறைக்கவும். பூஜ்யம் அவ்வரிசை நீக்கும்.",
+            splitSharePaid = "%1\$s மூலம் பங்கு செலுத்தப்பட்டது.",
+            splitShareFailed = "அந்தப் பங்கைத் தொடங்க முடியவில்லை. எந்தக் கட்டணமும் வசூலிக்கப்படவில்லை.",
+            splitShareUnpaid = "அந்தப் பங்கு செலுத்தப்படவில்லை. இரட்டிப்பட்ட கட்டணம் தவிர்க்க மீண்டும் முயற்சிப்பதற்கு முன் சரிபார்க்கவும்.",
+            splitShareNotRemoved = "செலுத்தப்பட்டது, ஆனால் மேஜை இன்னும் அவ்வுணவுகளைக் காட்டுகிறது. அடுத்த பங்குக்கு முன் புதுப்பிக்கவும்.",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -4333,6 +4405,18 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             googleBundleCreate = "สร้าง %1\$s",
             googleBundleUpdate = "อัปเดตสำรองตอนนี้",
             googleBundleRecheck = "ตรวจสอบอีกครั้ง",
+            splitPaymentOption = "แยกจ่าย",
+            payWholeBillOption = "จ่ายทั้งหมด",
+            splitPaymentButton = "แยกจ่าย",
+            splitDialogTitle = "แยกจ่าย",
+            splitThisCustomerPays = "ลูกค้าคนนี้จ่าย",
+            splitRemaining = "คงเหลือบนโต๊ะ",
+            splitEditItems = "แก้รายการ",
+            splitEditItemsHint = "ลดรายการที่ไม่ได้ส่งถึงโต๊ะ เหลือศูนย์จะลบรายการนั้น",
+            splitSharePaid = "ชำระส่วนนี้ด้วย %1\$s แล้ว",
+            splitShareFailed = "เริ่มส่วนนี้ไม่สำเร็จ ยังไม่มีการเรียกเก็บเงิน",
+            splitShareUnpaid = "ส่วนนี้ยังไม่ได้ชำระ ตรวจสอบก่อนลองใหม่เพื่อไม่ให้เก็บซ้ำ",
+            splitShareNotRemoved = "ชำระแล้ว แต่โต๊ะยังแสดงรายการเหล่านั้น รีเฟรชก่อนรับส่วนถัดไป",
         ),
     )
 }

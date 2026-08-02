@@ -455,6 +455,10 @@ fun AdminHomeScreen(
     // Shared order detail bottom sheet with full admin permissions (Requirement 5.2, 5.3)
     if (showOrderSheet) {
         OrderDetailSheet(
+            allowSplitPayment = true,
+            onSplitShare = { orderId, tableId, plan, method ->
+                tableViewModel.paySplitShare(orderId, tableId, plan, method)
+            },
             state = orderDetail,
             tableLabel = selectedTableLabel,
             permissions = StaffPermissions.ADMIN,

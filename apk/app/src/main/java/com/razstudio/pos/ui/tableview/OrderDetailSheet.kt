@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import android.content.res.Configuration
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +52,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -70,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.razstudio.pos.data.NewOrderItem
 import com.razstudio.pos.data.VoidLine
@@ -78,6 +81,7 @@ import com.razstudio.pos.data.local.OrderActions
 import com.razstudio.pos.data.local.OrderItem
 import com.razstudio.pos.ui.i18n.AppLanguage
 import com.razstudio.pos.ui.i18n.UiStrings
+import com.razstudio.pos.ui.viewmodels.SplitPaymentPlanner
 import kotlinx.coroutines.delay
 
 /**
@@ -112,6 +116,22 @@ fun OrderDetailSheet(
     onReprintSession: (orderId: String, sessionNumber: Int) -> Unit = { _, _ -> },
     onPayment: (orderId: String, method: String, printReceipt: Boolean) -> Unit,
     onVoidItems: (orderId: String, lines: List<VoidLine>, reason: String) -> Unit = { _, _, _ -> },
+    /**
+     * Settle one customer's share of a group bill. Only ever called with a SliceOff plan — the last
+     * share goes through [onPayment], which is what ends the table session and offers the receipt.
+     */
+    onSplitShare: (
+        orderId: String,
+        tableId: String?,
+        plan: SplitPaymentPlanner.Plan.SliceOff,
+        method: String,
+    ) -> Unit = { _, _, _, _ -> },
+    /**
+     * Whether this caller can settle shares. Off by default, and the whole split UI disappears with
+     * it — the staff table view has no handler wired, and a radio that leads to a pay button doing
+     * nothing is worse than no radio at all.
+     */
+    allowSplitPayment: Boolean = false,
     onCancel: (String, String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -120,6 +140,10 @@ fun OrderDetailSheet(
     var showAddItemPicker by remember(state.order?.id) { mutableStateOf(false) }
     var stagedCart by remember(state.order?.id) { mutableStateOf(listOf<StagedCartLine>()) }
     var pendingPaymentMethod by remember { mutableStateOf<String?>(null) }
+    // Split state lives here rather than in the ViewModel: it is a cashier's working scratchpad for
+    // one customer standing at the counter, and it must not survive the sheet closing.
+    var splitMode by remember { mutableStateOf(false) }
+    var showSplitDialog by remember { mutableStateOf(false) }
 
     // ── Voiding unserved lines at payment time ─────────────────────────────────────
     // The café's actual counter situation: the customer is leaving, says a dish never came, and wants
@@ -528,23 +552,77 @@ fun OrderDetailSheet(
             if (!editItemsMode &&
                 permissions.canTakePayment && OrderActions.canTakePayment(order.status)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(
-                        onClick = { pendingPaymentMethod = "CASH" },
-                        modifier = Modifier.weight(1f),
-                        enabled = !state.isLoading,
+                // ── Two ways to settle, chosen before the money moves ────────────────────────
+                //
+                // Whole-bill stays first and stays the default: most tables pay once, and a cashier
+                // should not have to dismiss a choice to do the ordinary thing.
+                //
+                // Split exists because groups arrive together and pay separately. Without it the
+                // cashier either made one person cover everyone or did the arithmetic on paper and
+                // told the till something untrue about who paid how.
+                // A radio group of one is not a choice. With split unavailable the screen stays
+                // exactly as it was before this feature existed.
+                if (allowSplitPayment) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = !splitMode,
+                                onClick = { splitMode = false },
+                                role = Role.RadioButton,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(strings.payCash)
+                        RadioButton(selected = !splitMode, onClick = { splitMode = false })
+                        Text(strings.payWholeBillOption, style = MaterialTheme.typography.bodyMedium)
                     }
-                    Button(
-                        onClick = { pendingPaymentMethod = "QR" },
-                        modifier = Modifier.weight(1f),
-                        enabled = !state.isLoading,
+                }
+
+                if (!splitMode) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(strings.payQR)
+                        Button(
+                            onClick = { pendingPaymentMethod = "CASH" },
+                            modifier = Modifier.weight(1f),
+                            enabled = !state.isLoading,
+                        ) {
+                            Text(strings.payCash)
+                        }
+                        Button(
+                            onClick = { pendingPaymentMethod = "QR" },
+                            modifier = Modifier.weight(1f),
+                            enabled = !state.isLoading,
+                        ) {
+                            Text(strings.payQR)
+                        }
+                    }
+                }
+
+                if (allowSplitPayment) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = splitMode,
+                                onClick = { splitMode = true },
+                                role = Role.RadioButton,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = splitMode, onClick = { splitMode = true })
+                        Text(strings.splitPaymentOption, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                if (splitMode && allowSplitPayment) {
+                    Button(
+                        onClick = { showSplitDialog = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !state.isLoading && state.items.isNotEmpty(),
+                    ) {
+                        Text(strings.splitPaymentButton)
                     }
                 }
 
@@ -707,6 +785,39 @@ fun OrderDetailSheet(
                 showCancelDialog = false
             },
             onDismiss = { showCancelDialog = false },
+        )
+    }
+
+    // ── Split payment ─────────────────────────────────────────────────────────────
+    //
+    // The last share is deliberately NOT handled here. When a selection covers everything left the
+    // planner returns SettleWholeOrder, and this hands it to `pendingPaymentMethod` — the ordinary
+    // path, which shows the 10-second receipt prompt, ends the table session and returns to the
+    // table grid. Closing a table in two different places would give two behaviours to keep in step.
+    if (showSplitDialog) {
+        SplitPaymentDialog(
+            items = state.items,
+            strings = strings,
+            isLoading = state.isLoading,
+            onPay = { plan, method ->
+                when (plan) {
+                    is SplitPaymentPlanner.Plan.SettleWholeOrder -> {
+                        showSplitDialog = false
+                        splitMode = false
+                        pendingPaymentMethod = method
+                    }
+                    is SplitPaymentPlanner.Plan.SliceOff -> {
+                        // The sheet stays open: the next customer in the group is already waiting,
+                        // and the list they need has just shrunk in front of them.
+                        state.order?.let { onSplitShare(it.id, it.tableId, plan, method) }
+                    }
+                    SplitPaymentPlanner.Plan.NothingSelected -> Unit
+                }
+            },
+            onReduceItems = { lines ->
+                state.order?.let { onVoidItems(it.id, lines, strings.splitEditItems) }
+            },
+            onDismiss = { showSplitDialog = false },
         )
     }
 

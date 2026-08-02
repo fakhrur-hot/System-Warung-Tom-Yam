@@ -253,6 +253,12 @@ fun StaffTableViewScreen(
     // Shared order detail bottom sheet with RBAC-gated permissions (Requirement 5.2, 5.3)
     if (showOrderSheet) {
         OrderDetailSheet(
+            // Governed by the café's "Staff can Take Payment" setting: the whole payment block,
+            // split included, only renders when permissions.canTakePayment is true.
+            allowSplitPayment = true,
+            onSplitShare = { orderId, tableId, plan, method ->
+                viewModel.paySplitShare(orderId, tableId, plan, method)
+            },
             state = orderDetail,
             tableLabel = selectedTableLabel,
             permissions = permissions,

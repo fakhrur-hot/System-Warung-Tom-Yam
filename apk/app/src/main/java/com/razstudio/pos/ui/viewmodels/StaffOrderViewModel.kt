@@ -121,6 +121,9 @@ class StaffOrderViewModel @Inject constructor(
     private var orderHoldJob: kotlinx.coroutines.Job? = null
 
     companion object {
+        /** Matches TableViewViewModel: split-off items are not wastage, and the reason says so. */
+        const val SPLIT_REASON = "Split payment"
+
         // Fixed pre-send hold for staff orders (mis-tap guard).
         const val STAFF_ORDER_HOLD_SECONDS = 3
     }
@@ -279,6 +282,72 @@ class StaffOrderViewModel @Inject constructor(
      * the admin ViewModel's payment-confirm-dialog flow, but staff devices have no
      * printer attached — only the admin device ever prints receipts.
      */
+    /**
+     * Settle one customer's share of a group bill, from a staff device.
+     *
+     * Mirrors `TableViewViewModel.paySplitShare` on the staff endpoints. It is reachable only where
+     * the ordinary pay buttons are, so the café's "Staff can Take Payment" setting governs both —
+     * a staff phone that may take a whole payment may take part of one, and one that may not, may
+     * not do either.
+     *
+     * Order matters: charge first, shrink second. A failure after shrinking would have given the
+     * food away.
+     */
+    fun paySplitShare(
+        orderId: String,
+        tableId: String?,
+        plan: SplitPaymentPlanner.Plan.SliceOff,
+        method: String,
+    ) {
+        viewModelScope.launch {
+            _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null)
+
+            val table = tableId ?: run {
+                _orderDetail.value = _orderDetail.value.copy(
+                    isLoading = false, error = str().splitShareFailed,
+                )
+                return@launch
+            }
+
+            val created = apiClient.createOrderAsStaff(table, plan.sliceItems)
+            if (created !is ApiResult.Success) {
+                _orderDetail.value = _orderDetail.value.copy(
+                    isLoading = false, error = str().splitShareFailed,
+                )
+                return@launch
+            }
+            val shareId = created.data.orderId
+
+            when (apiClient.processPaymentAsStaff(shareId, method)) {
+                is ApiResult.Success -> Unit
+                else -> {
+                    _orderDetail.value = _orderDetail.value.copy(
+                        isLoading = false, error = str().splitShareUnpaid,
+                    )
+                    return@launch
+                }
+            }
+            orderDao.completePayment(shareId, method)
+
+            when (val shrunk = apiClient.voidOrderItemsAsStaff(orderId, plan.keepLines, SPLIT_REASON)) {
+                is ApiResult.Success -> {
+                    // Destructive: reconcileOrderFromDto only inserts, so a shrunk line would keep
+                    // its old quantity alongside the new one.
+                    orderDao.deleteItemsForOrder(orderId)
+                    reconcileOrderFromDto(shrunk.data)
+                    loadOrderForTable(table)
+                    _orderDetail.value = _orderDetail.value.copy(
+                        isLoading = false,
+                        successMessage = str().splitSharePaid.format(method),
+                    )
+                }
+                else -> _orderDetail.value = _orderDetail.value.copy(
+                    isLoading = false, error = str().splitShareNotRemoved,
+                )
+            }
+        }
+    }
+
     fun processPayment(orderId: String, method: String, @Suppress("UNUSED_PARAMETER") printReceipt: Boolean) {
         viewModelScope.launch {
             _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null)
