@@ -17,6 +17,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import com.razstudio.pos.data.OperatingMode
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -52,6 +57,8 @@ import com.razstudio.pos.ui.viewmodels.SetupViewModel
 fun RoleSelectScreen(
     onAdminConnect: () -> Unit,
     onOrderingConnect: () -> Unit,
+    onWirelessAp: () -> Unit = {},
+    onKiosk: () -> Unit = {},
     onTryDemo: () -> Unit = {},
     onSetup: () -> Unit = {},
     languageViewModel: LanguageViewModel = hiltViewModel(),
@@ -60,6 +67,13 @@ fun RoleSelectScreen(
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
     val configuredState by setupViewModel.state.collectAsState()
+
+    // Which modes this device may actually enter. Read from what was *saved*, never from what is
+    // currently selected in Setup — an unsaved radio choice must not unlock anything.
+    val cloudReady = setupViewModel.isModeReady(OperatingMode.CLOUD)
+    val lanReady = setupViewModel.isModeReady(OperatingMode.LAN)
+    val kioskReady = setupViewModel.isModeReady(OperatingMode.KIOSK)
+    var qrExpanded by remember { mutableStateOf(false) }
     val title = configuredState.cafeName.ifBlank { stringResource(R.string.app_name) }
 
     Surface(modifier = Modifier.fillMaxSize()) {
@@ -108,33 +122,60 @@ fun RoleSelectScreen(
 
                 Spacer(modifier = Modifier.height(48.dp))
 
-                // ── Top action: prominent filled button ───────────────────────────────
-                Button(
-                    onClick = onOrderingConnect,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                ) {
-                    Text(
-                        text = strings.joinAsOrderingMode,
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                // ── One button per operating mode ─────────────────────────────────────
+                //
+                // Exactly one is enabled: the mode whose Setup was completed and saved. The other
+                // two are greyed with the reason rather than hidden, so a café owner can see the
+                // modes exist and knows what to do about them — a hidden option reads as a missing
+                // feature, and a mis-set device reads as a broken one.
+                //
+                // QR Ordering expands in place rather than navigating, because it is the only mode
+                // with two device roles to choose between. The other two go straight to work.
+
+                ModeButton(
+                    label = strings.qrOrderingModeButton,
+                    enabled = cloudReady,
+                    disabledHint = strings.modeNotSetUpHint,
+                    expanded = qrExpanded,
+                    onClick = { qrExpanded = !qrExpanded },
+                )
+
+                // Nested roles, revealed only once the café can actually run in Cloud mode.
+                AnimatedVisibility(visible = qrExpanded && cloudReady) {
+                    Column(modifier = Modifier.padding(start = 16.dp, top = 8.dp)) {
+                        Button(
+                            onClick = onOrderingConnect,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                        ) {
+                            Text(strings.joinAsOrderingMode, style = MaterialTheme.typography.titleSmall)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onAdminConnect,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                        ) {
+                            Text(strings.reloginAsCafeAdmin, style = MaterialTheme.typography.titleSmall)
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // ── Middle action: secondary outlined button ───────────────────────────
-                OutlinedButton(
-                    onClick = onAdminConnect,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                ) {
-                    Text(
-                        text = strings.reloginAsCafeAdmin,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
+                ModeButton(
+                    label = strings.wirelessApModeButton,
+                    enabled = lanReady,
+                    disabledHint = strings.modeNotSetUpHint,
+                    onClick = onWirelessAp,
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                ModeButton(
+                    label = strings.kioskModeButton,
+                    enabled = kioskReady,
+                    disabledHint = strings.modeNotSetUpHint,
+                    onClick = onKiosk,
+                )
 
                 // ── Real layout gap (Requirement 2.5) ─────────────────────────────────
                 // weight(1f) distributes the remaining screen height here, pushing the
@@ -172,5 +213,44 @@ fun RoleSelectScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * One operating mode, enabled only when that mode has been set up and saved.
+ *
+ * Disabled modes stay visible with their reason underneath rather than being hidden. Hiding would
+ * make a café owner think the feature does not exist; greying tells them it does and what to do.
+ */
+@Composable
+private fun ModeButton(
+    label: String,
+    enabled: Boolean,
+    disabledHint: String,
+    onClick: () -> Unit,
+    expanded: Boolean? = null,
+) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp),
+    ) {
+        Text(
+            text = if (expanded == true) "$label  ▲" else if (expanded == false) "$label  ▼" else label,
+            style = MaterialTheme.typography.titleMedium,
+        )
+    }
+    if (!enabled) {
+        Text(
+            text = disabledHint,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp, start = 8.dp, end = 8.dp),
+        )
     }
 }

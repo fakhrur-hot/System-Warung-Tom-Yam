@@ -3,6 +3,9 @@ package com.razstudio.pos.ui.navigation
 /** Navigation route constants for the app. */
 object NavRoutes {
     const val ROLE_SELECT = "role_select"
+
+    /** Wireless AP Mode: the server device shows its pairing QR so staff phones can join. */
+    const val LAN_PAIRING = "lan_pairing"
     const val ADMIN_CONNECT = "admin_connect"
     const val ORDERING_CONNECT = "ordering_connect"
     const val PENDING_APPROVAL = "pending_approval"

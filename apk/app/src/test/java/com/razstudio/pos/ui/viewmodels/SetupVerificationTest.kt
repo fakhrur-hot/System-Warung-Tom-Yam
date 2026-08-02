@@ -178,11 +178,23 @@ class SetupVerificationTest {
 
     @Test
     fun switchingToCloudReimposesTheGate() {
-        vm.update { it.copy(operatingMode = OperatingMode.KIOSK) }
+        // A café name is now required in every mode — it is what the home screen's mode gate reads —
+        // so Kiosk is savable only once it is named.
+        vm.update { it.copy(operatingMode = OperatingMode.KIOSK, cafeName = "Kiosk Kopitiam") }
         assertTrue(vm.canSave())
 
         vm.update { it.copy(operatingMode = OperatingMode.CLOUD) }
-        assertFalse("cloud always needs a live check", vm.canSave())
+        assertFalse("cloud always needs a backend and a live check", vm.canSave())
+    }
+
+    @Test
+    fun everyModeRequiresACafeName() {
+        // Without it, Save would light up a mode button on the home screen for an unnamed café.
+        OperatingMode.entries.forEach { mode ->
+            vm.update { it.copy(operatingMode = mode, cafeName = "") }
+            assertFalse("$mode must not save unnamed", vm.canSave())
+            assertTrue(vm.blockingReason()!!.contains("café name"))
+        }
     }
 
     // ── A website fetch is not a backend verification ─────────────────────────────────────────────

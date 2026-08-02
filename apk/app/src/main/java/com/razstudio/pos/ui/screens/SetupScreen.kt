@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -71,6 +72,9 @@ import com.razstudio.pos.ui.viewmodels.SetupViewModel
 @Composable
 fun SetupScreen(
     onBack: () -> Unit,
+    /** Invoked after a successful save, so the operator lands back on the home screen and
+     *  sees the mode button they just unlocked. */
+    onSaved: () -> Unit = onBack,
     viewModel: SetupViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -79,6 +83,12 @@ fun SetupScreen(
     // successful switch the button stops warning about a change that has already happened.
     var savedMode by rememberSaveable { mutableStateOf(state.operatingMode) }
     var showModeChangeConfirm by rememberSaveable { mutableStateOf(false) }
+
+    // Return to the home screen the moment a save lands, so the operator sees the mode button
+    // they just unlocked rather than having to find their own way back and wonder if it took.
+    LaunchedEffect(state.saved) {
+        if (state.saved) onSaved()
+    }
 
     Scaffold(
         topBar = {
@@ -260,6 +270,18 @@ fun SetupScreen(
                 }
             }
 
+            // Why Save is refused, named rather than left to guesswork. The home screen enables
+            // exactly one mode button — the one whose setup was completed — so a blocked Save is
+            // the difference between a café that can start and one that cannot.
+            viewModel.blockingReason()?.let { reason ->
+                Text(
+                    text = reason,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+
             Button(
                 onClick = {
                     // Task 10.1: a mode switch is destructive and irreversible in the ways that
@@ -268,8 +290,7 @@ fun SetupScreen(
                     // the dialog that actually matters.
                     if (state.operatingMode != savedMode) showModeChangeConfirm = true else viewModel.save()
                 },
-                // Task 6.3: advancement is blocked until the connection has answered. Off-cloud
-                // there is nothing to verify, so the gate does not apply.
+                // Every field this mode shows must be filled, and Cloud must have answered.
                 enabled = viewModel.canSave(),
                 modifier = Modifier
                     .fillMaxWidth()

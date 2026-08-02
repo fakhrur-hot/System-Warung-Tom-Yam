@@ -57,6 +57,7 @@ import com.razstudio.pos.ui.screens.PrintersScreen
 import com.razstudio.pos.ui.screens.QrPdfScreen
 import com.razstudio.pos.ui.screens.ReportsScreen
 import com.razstudio.pos.ui.screens.RoleSelectScreen
+import com.razstudio.pos.ui.screens.LanPairingScreen
 import com.razstudio.pos.ui.screens.SetupScreen
 import com.razstudio.pos.ui.screens.TableManagementScreen
 
@@ -180,6 +181,11 @@ fun AppNavGraph(
                 onOrderingConnect = {
                     navController.navigate(NavRoutes.ORDERING_CONNECT)
                 },
+                // Wireless AP Mode. LanPairingScreen already existed but nothing routed to it —
+                // a LAN café had no way to show the QR its staff phones need to scan.
+                onWirelessAp = {
+                    navController.navigate(NavRoutes.LAN_PAIRING)
+                },
                 onTryDemo = {
                     // Rebuilt demo: seed one shared local dataset, then drop the user into the REAL
                     // admin home. The global DemoModeOverlay handles exit + teardown from any screen.
@@ -193,8 +199,20 @@ fun AppNavGraph(
             )
         }
 
+        composable(NavRoutes.LAN_PAIRING) {
+            LanPairingScreen(onBack = { navController.popBackStack() })
+        }
+
         composable(NavRoutes.SETUP) {
-            SetupScreen(onBack = { navController.popBackStack() })
+            SetupScreen(
+                onBack = { navController.popBackStack() },
+                // Land back on the home screen so the mode just unlocked is visible immediately.
+                onSaved = {
+                    navController.navigate(NavRoutes.ROLE_SELECT) {
+                        popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
+                    }
+                },
+            )
         }
 
         composable(NavRoutes.ADMIN_CONNECT) {

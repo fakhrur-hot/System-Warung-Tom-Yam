@@ -37,6 +37,12 @@ data class UiStringsGroup1(
     val joinAsOrderingMode: String,
     val reloginAsCafeAdmin: String,
     val setupWizard: String,
+    val qrOrderingModeButton: String,
+    val wirelessApModeButton: String,
+    val kioskModeButton: String,
+    val modeNotSetUpHint: String,
+    val hostThisCafe: String,
+    val joinThisCafe: String,
     // ── Table View / order screens ──
     val tableView: String,
     val free: String,
@@ -629,6 +635,12 @@ class UiStrings(
     val joinAsOrderingMode: String get() = g1.joinAsOrderingMode
     val reloginAsCafeAdmin: String get() = g1.reloginAsCafeAdmin
     val setupWizard: String get() = g1.setupWizard
+    val qrOrderingModeButton: String get() = g1.qrOrderingModeButton
+    val wirelessApModeButton: String get() = g1.wirelessApModeButton
+    val kioskModeButton: String get() = g1.kioskModeButton
+    val modeNotSetUpHint: String get() = g1.modeNotSetUpHint
+    val hostThisCafe: String get() = g1.hostThisCafe
+    val joinThisCafe: String get() = g1.joinThisCafe
     val tableView: String get() = g1.tableView
     val free: String get() = g1.free
     val newOrder: String get() = g1.newOrder
@@ -1144,6 +1156,12 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             joinAsOrderingMode = "Sertai sebagai Mod Pesanan",
             reloginAsCafeAdmin = "Log Masuk Semula sebagai Admin Kafe",
             setupWizard = "Wizard Persediaan",
+            qrOrderingModeButton = "Mod Pesanan QR",
+            wirelessApModeButton = "Mod AP Tanpa Wayar",
+            kioskModeButton = "Mod Kiosk",
+            modeNotSetUpHint = "Belum disediakan. Buka Wizard Persediaan, pilih mod ini, isi semua ruangan dan simpan.",
+            hostThisCafe = "Hos kafe ini",
+            joinThisCafe = "Sertai kafe ini",
             tableView = "Paparan Meja",
             free = "Kosong",
             newOrder = "Pesanan Baharu",
@@ -1677,6 +1695,12 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             joinAsOrderingMode = "Join as Ordering mode",
             reloginAsCafeAdmin = "Relogin as Café Admin",
             setupWizard = "Setup Wizard",
+            qrOrderingModeButton = "QR Ordering Mode",
+            wirelessApModeButton = "Wireless AP Mode",
+            kioskModeButton = "Kiosk Mode",
+            modeNotSetUpHint = "Not set up yet. Open the Setup Wizard, pick this mode, fill in every field and save.",
+            hostThisCafe = "Host this café",
+            joinThisCafe = "Join this café",
             tableView = "Table View",
             free = "Free",
             newOrder = "New Order",
@@ -2210,6 +2234,12 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             joinAsOrderingMode = "以点餐模式加入",
             reloginAsCafeAdmin = "重新登录为咖啡馆管理员",
             setupWizard = "设置向导",
+            qrOrderingModeButton = "二维码点餐模式",
+            wirelessApModeButton = "无线热点模式",
+            kioskModeButton = "自助模式",
+            modeNotSetUpHint = "尚未设置。请打开设置向导，选择此模式，填写所有栏位并保存。",
+            hostThisCafe = "托管此店铺",
+            joinThisCafe = "加入此店铺",
             tableView = "餐桌视图",
             free = "空闲",
             newOrder = "新订单",
@@ -2741,6 +2771,12 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             joinAsOrderingMode = "ஆர்டர் பயன்முறையில் சேரவும்",
             reloginAsCafeAdmin = "கஃபே நிர்வாகியாக மீண்டும் உள்நுழைக",
             setupWizard = "அமைவு வழிகாட்டி",
+            qrOrderingModeButton = "QR ஆர்டர் முறை",
+            wirelessApModeButton = "வயர்லெஸ் AP முறை",
+            kioskModeButton = "கியோஸ்க் முறை",
+            modeNotSetUpHint = "இன்னும் அமைக்கப்படவில்லை. அமைப்பு விருதுவைத் திறந்து, இந்த முறையைத் தேர்ந்தெடுத்து, அனைத்து புலங்களையும் நிரப்பிச் சேமிக்கவும்.",
+            hostThisCafe = "இந்தக் கேபை ஹோஸ்ட் செய்",
+            joinThisCafe = "இந்தக் கேபில் சேர்",
             tableView = "மேசை காட்சி",
             free = "காலி",
             newOrder = "புதிய ஆர்டர்",
@@ -3274,6 +3310,12 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             joinAsOrderingMode = "เข้าร่วมในโหมดรับออเดอร์",
             reloginAsCafeAdmin = "เข้าสู่ระบบใหม่ในฐานะแอดมินคาเฟ่",
             setupWizard = "ตัวช่วยตั้งค่า",
+            qrOrderingModeButton = "โหมดสั่งด้วย QR",
+            wirelessApModeButton = "โหมด Wireless AP",
+            kioskModeButton = "โหมดคีออสก์",
+            modeNotSetUpHint = "ยังไม่ได้ตั้งค่า เปิดตัวช่วยตั้งค่า เลือกโหมดนี้ กรอกทุกช่องแล้วบันทึก",
+            hostThisCafe = "โฮสต์ร้านนี้",
+            joinThisCafe = "เข้าร่วมร้านนี้",
             tableView = "มุมมองโต๊ะ",
             free = "ว่าง",
             newOrder = "ออเดอร์ใหม่",

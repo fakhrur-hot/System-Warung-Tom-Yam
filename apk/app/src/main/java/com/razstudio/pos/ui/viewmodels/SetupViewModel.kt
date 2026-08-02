@@ -112,6 +112,14 @@ class SetupViewModel @Inject constructor(
         _state.value = transform(_state.value).copy(saved = false, verified = false, verifyError = null)
     }
 
+    /**
+     * May the home screen let this device enter [mode]?
+     *
+     * Reads what was **saved**, never [SetupState.operatingMode] — that field tracks the radio the
+     * operator is currently touching, and an unsaved selection must not unlock a mode button.
+     */
+    fun isModeReady(mode: OperatingMode): Boolean = appConfig.isModeConfigured(mode)
+
     /** Task 9.2 — pick the topology. Nothing is persisted until [save]. */
     fun selectMode(mode: OperatingMode) {
         _state.value = _state.value.copy(operatingMode = mode, saved = false)
@@ -250,27 +258,47 @@ class SetupViewModel @Inject constructor(
     }
 
     /**
-     * True when [save] would be allowed. Cloud requires a live verification; off-cloud does not,
-     * because it stores no Supabase values to get wrong.
+     * True when [save] would be allowed.
+     *
+     * The rule is *every field this screen shows for the selected mode must be filled*, plus — for
+     * Cloud — a live check that the backend answers. That matters more than it sounds: the home
+     * screen enables exactly one mode button, the one whose setup was completed and saved, so a Save
+     * that accepted blanks would light up a mode button for a café that cannot actually run.
+     *
+     * Off-cloud asks for no connection at all, so the café name is the whole requirement there.
      */
-    fun canSave(): Boolean {
+    fun canSave(): Boolean = blockingReason() == null
+
+    /**
+     * Why [save] is refused, or null when it is allowed. Drives both the disabled Save button and
+     * the message under it, so the operator is never left guessing which field is missing.
+     */
+    fun blockingReason(): String? {
         val s = _state.value
-        return s.operatingMode != OperatingMode.CLOUD || s.verified
+        if (s.cafeName.isBlank()) return "Enter the café name."
+
+        if (s.operatingMode != OperatingMode.CLOUD) return null
+
+        if (s.supabaseUrl.isBlank() || s.supabaseAnonKey.isBlank()) {
+            return "Connect using the café's website address, or enter the Supabase URL and " +
+                "publishable key manually."
+        }
+        if (!s.verified) {
+            return "Check the connection before saving, so a wrong value is caught here rather " +
+                "than on a later screen."
+        }
+        return null
     }
 
     fun save() {
         val s = _state.value
         val cloud = s.operatingMode == OperatingMode.CLOUD
 
-        // Nothing is written for a cloud café until the pair has answered. "Saved ✓" against
-        // credentials that were never tried is the exact reassurance this rework removes.
-        if (cloud && !s.verified) {
-            _state.value = s.copy(
-                verifyError = s.verifyError
-                    ?: "Check the connection before saving, so a wrong value is caught here rather " +
-                    "than on a later screen.",
-                saved = false,
-            )
+        // The same rule the button is disabled by, enforced again here. A disabled button is a
+        // hint; this is the boundary. "Saved ✓" against a half-filled form would light up a mode
+        // button on the home screen for a café that cannot run.
+        blockingReason()?.let { reason ->
+            _state.value = s.copy(verifyError = reason, saved = false)
             return
         }
 

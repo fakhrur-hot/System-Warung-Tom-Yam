@@ -275,6 +275,33 @@ class AppConfigStore @Inject constructor(
     fun isConfigured(): Boolean = supabaseUrl().isNotBlank() && supabaseAnonKey().isNotBlank()
 
     /**
+     * Has [mode] actually been set up on this device?
+     *
+     * The home screen enables exactly one mode button — the one matching what the owner chose and
+     * saved in Setup — and greys the rest with the reason. That gate needs a predicate per mode,
+     * because "configured" means different things: a Cloud café needs a backend it can reach, while
+     * a Kiosk needs nothing but its own name.
+     *
+     * The rule is simply *every field Setup shows for that mode must be filled*, which is why
+     * [isConfigured] alone was not enough — it never looked at the café name, and answers nothing
+     * for the two off-cloud modes.
+     *
+     * A mode other than the saved one is never "configured", even if leftover values would satisfy
+     * it: switching mode clears the fields the new topology does not use (task 9.3), so a device
+     * carrying a stale Supabase URL from a previous life must not present itself as a working Cloud
+     * café.
+     */
+    fun isModeConfigured(mode: OperatingMode): Boolean {
+        if (operatingMode() != mode) return false
+        if (cafeName().isBlank()) return false
+        return when (mode) {
+            OperatingMode.CLOUD -> supabaseUrl().isNotBlank() && supabaseAnonKey().isNotBlank()
+            // Off-cloud stores no backend at all, so the café name is the whole requirement.
+            OperatingMode.LAN, OperatingMode.KIOSK -> true
+        }
+    }
+
+    /**
      * Persist the whole config in one shot from the Setup screen. Blank = leave/clear that field.
      *
      * Formerly took six further parameters — Cloudflare account id, DNS zone, API token and Pages
