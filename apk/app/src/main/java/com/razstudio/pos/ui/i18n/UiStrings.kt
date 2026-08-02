@@ -612,6 +612,39 @@ data class UiStringsGroup8(
     val alertSoundSilent: String,
     val alertSoundVolume: String,
     val alertSoundTest: String,
+    // -- Google sign-in + cafe bundle (task 23) --
+    val signInSubtitle: String,
+    val signInWithGoogle: String,
+    val signInSkip: String,
+    val signInDemoMode: String,
+    val signInStepSigningIn: String,
+    val signInStepLookingUp: String,
+    val signInStepWaitingDrive: String,
+    val signInNoCafeFound: String,
+    val signInSetupThisCafe: String,
+    val signInProblemTitle: String,
+    val signInContinueWithout: String,
+    val signInTryAgain: String,
+    val signInUnavailable: String,
+    val signInBundleUnreadable: String,
+    val signInDriveUnreachable: String,
+    val signInRestoreIncomplete: String,
+    val signInConflictTitle: String,
+    val signInConflictBody: String,
+    val signInKeepAccountCafe: String,
+    val signInKeepDeviceCafe: String,
+    val cafeBundleTitle: String,
+    val cafeBundleDesc: String,
+    val cafeBundleSave: String,
+    val cafeBundleRemove: String,
+    val cafeBundleConsentTitle: String,
+    val cafeBundleConsentBody: String,
+    val cafeBundleConsentConfirm: String,
+    val cafeBundleSaved: String,
+    val cafeBundleRemoved: String,
+    val cafeBundleUploadRejected: String,
+    val cafeBundleNeedsConsent: String,
+    val cafeBundleNoPermission: String,
 )
 
 class UiStrings(
@@ -1146,6 +1179,38 @@ class UiStrings(
     val alertSoundSilent: String get() = g8.alertSoundSilent
     val alertSoundVolume: String get() = g8.alertSoundVolume
     val alertSoundTest: String get() = g8.alertSoundTest
+    val signInSubtitle: String get() = g8.signInSubtitle
+    val signInWithGoogle: String get() = g8.signInWithGoogle
+    val signInSkip: String get() = g8.signInSkip
+    val signInDemoMode: String get() = g8.signInDemoMode
+    val signInStepSigningIn: String get() = g8.signInStepSigningIn
+    val signInStepLookingUp: String get() = g8.signInStepLookingUp
+    val signInStepWaitingDrive: String get() = g8.signInStepWaitingDrive
+    val signInNoCafeFound: String get() = g8.signInNoCafeFound
+    val signInSetupThisCafe: String get() = g8.signInSetupThisCafe
+    val signInProblemTitle: String get() = g8.signInProblemTitle
+    val signInContinueWithout: String get() = g8.signInContinueWithout
+    val signInTryAgain: String get() = g8.signInTryAgain
+    val signInUnavailable: String get() = g8.signInUnavailable
+    val signInBundleUnreadable: String get() = g8.signInBundleUnreadable
+    val signInDriveUnreachable: String get() = g8.signInDriveUnreachable
+    val signInRestoreIncomplete: String get() = g8.signInRestoreIncomplete
+    val signInConflictTitle: String get() = g8.signInConflictTitle
+    val signInConflictBody: String get() = g8.signInConflictBody
+    val signInKeepAccountCafe: String get() = g8.signInKeepAccountCafe
+    val signInKeepDeviceCafe: String get() = g8.signInKeepDeviceCafe
+    val cafeBundleTitle: String get() = g8.cafeBundleTitle
+    val cafeBundleDesc: String get() = g8.cafeBundleDesc
+    val cafeBundleSave: String get() = g8.cafeBundleSave
+    val cafeBundleRemove: String get() = g8.cafeBundleRemove
+    val cafeBundleConsentTitle: String get() = g8.cafeBundleConsentTitle
+    val cafeBundleConsentBody: String get() = g8.cafeBundleConsentBody
+    val cafeBundleConsentConfirm: String get() = g8.cafeBundleConsentConfirm
+    val cafeBundleSaved: String get() = g8.cafeBundleSaved
+    val cafeBundleRemoved: String get() = g8.cafeBundleRemoved
+    val cafeBundleUploadRejected: String get() = g8.cafeBundleUploadRejected
+    val cafeBundleNeedsConsent: String get() = g8.cafeBundleNeedsConsent
+    val cafeBundleNoPermission: String get() = g8.cafeBundleNoPermission
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1692,6 +1757,38 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             alertSoundSilent = "Senyap",
             alertSoundVolume = "Kelantangan",
             alertSoundTest = "Uji bunyi",
+            signInSubtitle = "Log masuk untuk mengembalikan kafe yang anda sudah sediakan — atau teruskan tanpa akaun.",
+            signInWithGoogle = "Teruskan dengan Google",
+            signInSkip = "Langkau",
+            signInDemoMode = "Mod Demo",
+            signInStepSigningIn = "Sedang log masuk…",
+            signInStepLookingUp = "Mencari kafe anda yang disimpan…",
+            signInStepWaitingDrive = "Menunggu kebenaran Google Drive…",
+            signInNoCafeFound = "Log masuk sebagai %1\$s. Akaun ini belum menyimpan sebarang kafe.",
+            signInSetupThisCafe = "Sediakan kafe ini",
+            signInProblemTitle = "Tidak dapat log masuk",
+            signInContinueWithout = "Teruskan tanpanya",
+            signInTryAgain = "Cuba lagi",
+            signInUnavailable = "Log masuk Google tidak tersedia pada peranti ini. Anda boleh teruskan tanpanya.",
+            signInBundleUnreadable = "Kafe yang disimpan dalam akaun ini tidak dapat dibaca, jadi tiada apa-apa diubah pada peranti ini. Sediakannya di sini dan simpan semula untuk menggantikannya.",
+            signInDriveUnreachable = "Tidak dapat menghubungi Google Drive, jadi tiada apa-apa diubah pada peranti ini.",
+            signInRestoreIncomplete = "Kafe yang disimpan dalam akaun ini kekurangan sesuatu yang diperlukan peranti ini, jadi ia tidak digunakan. Sediakannya di sini sebaliknya.",
+            signInConflictTitle = "Dua kafe",
+            signInConflictBody = "Peranti ini disediakan sebagai “%1\$s”, tetapi akaun Google anda menyimpan “%2\$s”.\n\nMengekalkan kafe akaun akan menggantikan tetapan pada peranti ini.",
+            signInKeepAccountCafe = "Guna “%1\$s”",
+            signInKeepDeviceCafe = "Kekalkan “%1\$s”",
+            cafeBundleTitle = "Tetapan kafe dalam akaun Google anda",
+            cafeBundleDesc = "Menyimpan cara kafe ini disediakan — bukan pesanannya — supaya peranti baharu atau gantian boleh memulihkannya dengan log masuk, tanpa perlu disediakan semula secara manual.",
+            cafeBundleSave = "Simpan ke Google",
+            cafeBundleRemove = "Buang",
+            cafeBundleConsentTitle = "Akaun Google anda akan memegang kunci kafe",
+            cafeBundleConsentBody = "Ini menyimpan tetapan kafe anda dan kunci pemulihan pemilik ke dalam Google Drive anda sendiri, di mana hanya aplikasi ini boleh membacanya.\n\nSesiapa yang boleh log masuk ke akaun Google ini boleh memulihkan kafe anda ke peranti mereka sendiri. Gunakan akaun yang anda sahaja kawal.\n\nAnda boleh membuangnya semula pada bila-bila masa.",
+            cafeBundleConsentConfirm = "Simpan",
+            cafeBundleSaved = "Disimpan ke akaun Google anda. Log masuk pada peranti baharu akan menawarkan untuk memulihkannya.",
+            cafeBundleRemoved = "Dibuang. Akaun ini tidak lagi membawa kafe anda.",
+            cafeBundleUploadRejected = "Google Drive tidak menerima perubahan itu. Tiada apa-apa diubah.",
+            cafeBundleNeedsConsent = "Google memerlukan kebenaran anda dahulu. Ketik butang itu sekali lagi dan benarkan akses.",
+            cafeBundleNoPermission = "Tidak dapat memperoleh kebenaran untuk Google Drive.",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -2237,6 +2334,38 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             alertSoundSilent = "Silent",
             alertSoundVolume = "Volume",
             alertSoundTest = "Test sound",
+            signInSubtitle = "Sign in to bring back a café you've already set up — or carry on without an account.",
+            signInWithGoogle = "Continue with Google",
+            signInSkip = "Skip",
+            signInDemoMode = "Demo Mode",
+            signInStepSigningIn = "Signing in…",
+            signInStepLookingUp = "Looking for your saved café…",
+            signInStepWaitingDrive = "Waiting for Google Drive permission…",
+            signInNoCafeFound = "Signed in as %1\$s. This account has no café saved yet.",
+            signInSetupThisCafe = "Set up this café",
+            signInProblemTitle = "Couldn't sign in",
+            signInContinueWithout = "Continue without it",
+            signInTryAgain = "Try again",
+            signInUnavailable = "Google sign-in isn't available on this device. You can continue without it.",
+            signInBundleUnreadable = "The café saved in this account couldn't be read, so nothing was changed on this device. Set it up here and save again to replace it.",
+            signInDriveUnreachable = "Couldn't reach Google Drive, so nothing was changed on this device.",
+            signInRestoreIncomplete = "The café saved in this account is missing something this device needs, so it wasn't applied. Set it up here instead.",
+            signInConflictTitle = "Two cafés",
+            signInConflictBody = "This device is set up as “%1\$s”, but your Google account has “%2\$s” saved.\n\nKeeping the account's café replaces the setup on this device.",
+            signInKeepAccountCafe = "Use “%1\$s”",
+            signInKeepDeviceCafe = "Keep “%1\$s”",
+            cafeBundleTitle = "Café setup in your Google account",
+            cafeBundleDesc = "Saves how this café is set up — not its orders — so a new or replacement device can restore it by signing in, instead of being set up again by hand.",
+            cafeBundleSave = "Save to Google",
+            cafeBundleRemove = "Remove",
+            cafeBundleConsentTitle = "Your Google account will hold the café key",
+            cafeBundleConsentBody = "This saves your café's setup and its owner recovery key into your own Google Drive, where only this app can read it.\n\nAnyone who can sign into this Google account can restore your café onto their own device. Use an account only you control.\n\nYou can remove it again at any time.",
+            cafeBundleConsentConfirm = "Save it",
+            cafeBundleSaved = "Saved to your Google account. Signing in on a new device will offer to restore it.",
+            cafeBundleRemoved = "Removed. This account no longer carries your café.",
+            cafeBundleUploadRejected = "Google Drive wouldn't accept the change. Nothing was altered.",
+            cafeBundleNeedsConsent = "Google needs your permission first. Tap the button again and allow access.",
+            cafeBundleNoPermission = "Couldn't get permission for Google Drive.",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2780,6 +2909,38 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             alertSoundSilent = "静音",
             alertSoundVolume = "音量",
             alertSoundTest = "试听",
+            signInSubtitle = "登录即可恢复您已设置好的餐厅，或者不使用账户直接继续。",
+            signInWithGoogle = "使用 Google 继续",
+            signInSkip = "跳过",
+            signInDemoMode = "演示模式",
+            signInStepSigningIn = "正在登录…",
+            signInStepLookingUp = "正在查找已保存的餐厅…",
+            signInStepWaitingDrive = "正在等待 Google 云端硬盘授权…",
+            signInNoCafeFound = "已以 %1\$s 登录。此账户尚未保存任何餐厅。",
+            signInSetupThisCafe = "设置此餐厅",
+            signInProblemTitle = "无法登录",
+            signInContinueWithout = "不使用它继续",
+            signInTryAgain = "重试",
+            signInUnavailable = "此设备无法使用 Google 登录。您可以不使用它继续。",
+            signInBundleUnreadable = "无法读取此账户中保存的餐厅，因此本设备未做任何更改。请在此处设置并重新保存以替换它。",
+            signInDriveUnreachable = "无法连接 Google 云端硬盘，因此本设备未做任何更改。",
+            signInRestoreIncomplete = "此账户中保存的餐厅缺少本设备所需的内容，因此未予应用。请改为在此处设置。",
+            signInConflictTitle = "两间餐厅",
+            signInConflictBody = "本设备设置为“%1\$s”，但您的 Google 账户中保存的是“%2\$s”。\n\n保留账户中的餐厅将替换本设备上的设置。",
+            signInKeepAccountCafe = "使用“%1\$s”",
+            signInKeepDeviceCafe = "保留“%1\$s”",
+            cafeBundleTitle = "Google 账户中的餐厅设置",
+            cafeBundleDesc = "保存本餐厅的设置方式（不含订单），让新设备或替换设备只需登录即可恢复，无需重新手动设置。",
+            cafeBundleSave = "保存到 Google",
+            cafeBundleRemove = "移除",
+            cafeBundleConsentTitle = "您的 Google 账户将持有餐厅密钥",
+            cafeBundleConsentBody = "这会将您餐厅的设置及其店主恢复密钥保存到您自己的 Google 云端硬盘中，只有本应用可以读取。\n\n任何能登录此 Google 账户的人都可以把您的餐厅恢复到他们自己的设备上。请使用只有您能掌控的账户。\n\n您随时可以再次移除。",
+            cafeBundleConsentConfirm = "保存",
+            cafeBundleSaved = "已保存到您的 Google 账户。在新设备上登录时将提供恢复选项。",
+            cafeBundleRemoved = "已移除。此账户不再持有您的餐厅。",
+            cafeBundleUploadRejected = "Google 云端硬盘未接受此更改。没有任何内容被改动。",
+            cafeBundleNeedsConsent = "Google 需要您先授权。请再次点击按钮并允许访问。",
+            cafeBundleNoPermission = "无法获得 Google 云端硬盘的授权。",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -3325,6 +3486,38 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             alertSoundSilent = "அமைதி",
             alertSoundVolume = "ஒலி அளவு",
             alertSoundTest = "ஒலியை சோதி",
+            signInSubtitle = "நீங்கள் ஏற்கெனவே அமைத்த கஃபேயை மீட்க உள்நுழையவும் — அல்லது கணக்கு இல்லாமல் தொடரவும்.",
+            signInWithGoogle = "Google மூலம் தொடரவும்",
+            signInSkip = "தவிர்",
+            signInDemoMode = "டெமோ முறை",
+            signInStepSigningIn = "உள்நுழைகிறது…",
+            signInStepLookingUp = "சேமித்த கஃபேயைத் தேடுகிறது…",
+            signInStepWaitingDrive = "Google Drive அனுமதிக்காகக் காத்திருக்கிறது…",
+            signInNoCafeFound = "%1\$s ஆக உள்நுழைந்துள்ளீர்கள். இந்தக் கணக்கில் இதுவரை கஃபே எதுவும் சேமிக்கப்படவில்லை.",
+            signInSetupThisCafe = "இந்தக் கஃபேயை அமைக்கவும்",
+            signInProblemTitle = "உள்நுழைய முடியவில்லை",
+            signInContinueWithout = "அது இல்லாமல் தொடரவும்",
+            signInTryAgain = "மீண்டும் முயற்சிக்கவும்",
+            signInUnavailable = "இந்தச் சாதனத்தில் Google உள்நுழைவு கிடைக்கவில்லை. அது இல்லாமல் நீங்கள் தொடரலாம்.",
+            signInBundleUnreadable = "இந்தக் கணக்கில் சேமித்த கஃபேயைப் படிக்க முடியவில்லை, எனவே இந்தச் சாதனத்தில் எதுவும் மாற்றப்படவில்லை. இங்கே அமைத்து மீண்டும் சேமித்து அதை மாற்றவும்.",
+            signInDriveUnreachable = "Google Drive-ஐ அணுக முடியவில்லை, எனவே இந்தச் சாதனத்தில் எதுவும் மாற்றப்படவில்லை.",
+            signInRestoreIncomplete = "இந்தக் கணக்கில் சேமித்த கஃபேயில் இந்தச் சாதனத்திற்குத் தேவையான ஏதோ இல்லை, எனவே அது பயன்படுத்தப்படவில்லை. அதற்குப் பதிலாக இங்கே அமைக்கவும்.",
+            signInConflictTitle = "இரண்டு கஃபேக்கள்",
+            signInConflictBody = "இந்தச் சாதனம் “%1\$s” எனும் பெயரில் அமைக்கப்பட்டுள்ளது, ஆனால் உங்கள் Google கணக்கில் “%2\$s” சேமிக்கப்பட்டுள்ளது.\n\nகணக்கின் கஃபேயை வைத்திருப்பது இந்தச் சாதனத்தின் அமைப்பை மாற்றிவிடும்.",
+            signInKeepAccountCafe = "“%1\$s” ஐப் பயன்படுத்து",
+            signInKeepDeviceCafe = "“%1\$s” ஐ வைத்திரு",
+            cafeBundleTitle = "உங்கள் Google கணக்கில் கஃபே அமைப்பு",
+            cafeBundleDesc = "இந்தக் கஃபே எப்படி அமைக்கப்பட்டுள்ளது என்பதைச் சேமிக்கிறது — ஆர்டர்களை அல்ல — இதனால் புதிய அல்லது மாற்றுச் சாதனம் கையால் மீண்டும் அமைக்கப்படாமல், உள்நுழைவதன் மூலம் அதை மீட்டெடுக்கலாம்.",
+            cafeBundleSave = "Google-இல் சேமி",
+            cafeBundleRemove = "அகற்று",
+            cafeBundleConsentTitle = "உங்கள் Google கணக்கு கஃபே சாவியை வைத்திருக்கும்",
+            cafeBundleConsentBody = "இது உங்கள் கஃபேயின் அமைப்பையும் உரிமையாளர் மீட்புச் சாவியையும் உங்கள் சொந்த Google Drive-இல் சேமிக்கிறது; அதை இந்தச் செயலி மட்டுமே படிக்க முடியும்.\n\nஇந்த Google கணக்கில் உள்நுழைய முடிந்த யாரும் உங்கள் கஃபேயைத் தங்கள் சாதனத்தில் மீட்டெடுக்க முடியும். நீங்கள் மட்டுமே கட்டுப்படுத்தும் கணக்கைப் பயன்படுத்தவும்.\n\nநீங்கள் எப்போது வேண்டுமானாலும் அதை மீண்டும் அகற்றலாம்.",
+            cafeBundleConsentConfirm = "சேமி",
+            cafeBundleSaved = "உங்கள் Google கணக்கில் சேமிக்கப்பட்டது. புதிய சாதனத்தில் உள்நுழையும்போது அதை மீட்டெடுக்க வழங்கப்படும்.",
+            cafeBundleRemoved = "அகற்றப்பட்டது. இந்தக் கணக்கு இனி உங்கள் கஃபேயைக் கொண்டிருக்காது.",
+            cafeBundleUploadRejected = "Google Drive அந்த மாற்றத்தை ஏற்கவில்லை. எதுவும் மாற்றப்படவில்லை.",
+            cafeBundleNeedsConsent = "Google-க்கு முதலில் உங்கள் அனுமதி தேவை. பொத்தானை மீண்டும் தட்டி அணுகலை அனுமதிக்கவும்.",
+            cafeBundleNoPermission = "Google Drive-க்கான அனுமதியைப் பெற முடியவில்லை.",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -3870,6 +4063,38 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             alertSoundSilent = "ปิดเสียง",
             alertSoundVolume = "ระดับเสียง",
             alertSoundTest = "ทดสอบเสียง",
+            signInSubtitle = "ลงชื่อเข้าใช้เพื่อกู้คืนร้านที่คุณตั้งค่าไว้แล้ว — หรือใช้งานต่อโดยไม่ต้องมีบัญชี",
+            signInWithGoogle = "ดำเนินการต่อด้วย Google",
+            signInSkip = "ข้าม",
+            signInDemoMode = "โหมดทดลอง",
+            signInStepSigningIn = "กำลังลงชื่อเข้าใช้…",
+            signInStepLookingUp = "กำลังค้นหาร้านที่บันทึกไว้…",
+            signInStepWaitingDrive = "กำลังรอสิทธิ์ Google ไดรฟ์…",
+            signInNoCafeFound = "ลงชื่อเข้าใช้เป็น %1\$s บัญชีนี้ยังไม่ได้บันทึกร้านใดไว้",
+            signInSetupThisCafe = "ตั้งค่าร้านนี้",
+            signInProblemTitle = "ลงชื่อเข้าใช้ไม่สำเร็จ",
+            signInContinueWithout = "ใช้งานต่อโดยไม่ต้องใช้",
+            signInTryAgain = "ลองอีกครั้ง",
+            signInUnavailable = "อุปกรณ์นี้ใช้การลงชื่อเข้าใช้ด้วย Google ไม่ได้ คุณใช้งานต่อโดยไม่ต้องใช้ได้",
+            signInBundleUnreadable = "อ่านร้านที่บันทึกไว้ในบัญชีนี้ไม่ได้ จึงไม่มีการเปลี่ยนแปลงใดบนอุปกรณ์นี้ ตั้งค่าที่นี่แล้วบันทึกใหม่เพื่อแทนที่",
+            signInDriveUnreachable = "เชื่อมต่อ Google ไดรฟ์ไม่ได้ จึงไม่มีการเปลี่ยนแปลงใดบนอุปกรณ์นี้",
+            signInRestoreIncomplete = "ร้านที่บันทึกไว้ในบัญชีนี้ขาดข้อมูลที่อุปกรณ์นี้ต้องใช้ จึงไม่ได้นำมาใช้ กรุณาตั้งค่าที่นี่แทน",
+            signInConflictTitle = "สองร้าน",
+            signInConflictBody = "อุปกรณ์นี้ตั้งค่าเป็น “%1\$s” แต่บัญชี Google ของคุณบันทึก “%2\$s” ไว้\n\nการเก็บร้านของบัญชีจะแทนที่การตั้งค่าบนอุปกรณ์นี้",
+            signInKeepAccountCafe = "ใช้ “%1\$s”",
+            signInKeepDeviceCafe = "เก็บ “%1\$s”",
+            cafeBundleTitle = "การตั้งค่าร้านในบัญชี Google ของคุณ",
+            cafeBundleDesc = "บันทึกวิธีตั้งค่าร้านนี้ — ไม่รวมออร์เดอร์ — เพื่อให้อุปกรณ์ใหม่หรืออุปกรณ์ทดแทนกู้คืนได้ด้วยการลงชื่อเข้าใช้ แทนการตั้งค่าใหม่ด้วยมือ",
+            cafeBundleSave = "บันทึกไปยัง Google",
+            cafeBundleRemove = "นำออก",
+            cafeBundleConsentTitle = "บัญชี Google ของคุณจะเก็บกุญแจร้าน",
+            cafeBundleConsentBody = "การทำเช่นนี้จะบันทึกการตั้งค่าร้านและกุญแจกู้คืนของเจ้าของลงใน Google ไดรฟ์ของคุณเอง ซึ่งมีเพียงแอปนี้เท่านั้นที่อ่านได้\n\nใครก็ตามที่ลงชื่อเข้าใช้บัญชี Google นี้ได้ จะกู้คืนร้านของคุณลงอุปกรณ์ของเขาได้ ใช้บัญชีที่คุณควบคุมแต่เพียงผู้เดียว\n\nคุณนำออกได้ทุกเมื่อ",
+            cafeBundleConsentConfirm = "บันทึก",
+            cafeBundleSaved = "บันทึกไปยังบัญชี Google ของคุณแล้ว เมื่อลงชื่อเข้าใช้บนอุปกรณ์ใหม่จะมีตัวเลือกให้กู้คืน",
+            cafeBundleRemoved = "นำออกแล้ว บัญชีนี้ไม่ได้เก็บร้านของคุณอีกต่อไป",
+            cafeBundleUploadRejected = "Google ไดรฟ์ไม่ยอมรับการเปลี่ยนแปลงนี้ ไม่มีสิ่งใดถูกแก้ไข",
+            cafeBundleNeedsConsent = "Google ต้องการสิทธิ์จากคุณก่อน แตะปุ่มอีกครั้งแล้วอนุญาตการเข้าถึง",
+            cafeBundleNoPermission = "ขอสิทธิ์สำหรับ Google ไดรฟ์ไม่สำเร็จ",
         ),
     )
 }

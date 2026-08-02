@@ -48,7 +48,7 @@ class SignInViewModel @Inject constructor(
         data object Idle : State()
 
         /** Sheet is up or Drive is being read. Skip stays available throughout. */
-        data class Working(val message: String) : State()
+        data class Working(val step: Step) : State()
 
         /**
          * Task 23.8 — the device holds one café and the account holds another. Both can be right:
@@ -71,8 +71,18 @@ class SignInViewModel @Inject constructor(
          * Something did not work. Carries no severity: the screen shows the reason and the same
          * Skip that was there before, because the recovery is identical in every case.
          */
-        data class Problem(val message: String) : State()
+        data class Problem(val reason: Reason) : State()
     }
+
+    /**
+     * What the spinner is waiting on. An enum rather than a string because a ViewModel that holds
+     * user-facing English cannot be translated — and this app ships in five languages, so a café in
+     * Kelantan would read half a screen in Malay and half in English.
+     */
+    enum class Step { SIGNING_IN, LOOKING_UP, WAITING_FOR_DRIVE }
+
+    /** Why it did not work. Same reasoning as [Step]; the screen owns the wording. */
+    enum class Reason { SIGN_IN_UNAVAILABLE, BUNDLE_UNREADABLE, DRIVE_UNREACHABLE, RESTORE_INCOMPLETE }
 
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state.asStateFlow()
@@ -91,7 +101,7 @@ class SignInViewModel @Inject constructor(
         signInService.isAvailable() && modeRepository.currentMode() == OperatingMode.CLOUD
 
     fun signIn(activity: Activity) {
-        _state.value = State.Working("Signing in…")
+        _state.value = State.Working(Step.SIGNING_IN)
         viewModelScope.launch {
             when (val result = signInService.signIn(activity as Context)) {
                 is GoogleSignInService.Result.Success -> {
@@ -101,15 +111,14 @@ class SignInViewModel @Inject constructor(
                 // Dismissing the sheet returns the owner to the screen unchanged. It is a choice,
                 // not a failure, and an error message here would read as an accusation.
                 is GoogleSignInService.Result.Cancelled -> _state.value = State.Idle
-                is GoogleSignInService.Result.Unavailable -> _state.value = State.Problem(
-                    "Google sign-in isn't available on this device. You can continue without it."
-                )
+                is GoogleSignInService.Result.Unavailable ->
+                    _state.value = State.Problem(Reason.SIGN_IN_UNAVAILABLE)
             }
         }
     }
 
     private suspend fun lookUpSavedCafe(activity: Activity) {
-        _state.value = State.Working("Looking for your saved café…")
+        _state.value = State.Working(Step.LOOKING_UP)
 
         // Drive access is asked for here, not at sign-in — an owner who has nothing saved and never
         // saves anything is never prompted for it (task 23.5b).
@@ -117,7 +126,7 @@ class SignInViewModel @Inject constructor(
             is CafeBundleStore.AuthResult.Granted -> auth.accessToken
             is CafeBundleStore.AuthResult.NeedsConsent -> {
                 // The screen launches the consent intent and calls back into [onDriveConsentResult].
-                _state.value = State.Working("Waiting for Google Drive permission…")
+                _state.value = State.Working(Step.WAITING_FOR_DRIVE)
                 pendingConsent = auth.pendingIntent
                 _consentRequest.value = auth.pendingIntent
                 return
@@ -176,14 +185,9 @@ class SignInViewModel @Inject constructor(
             is CafeBundleStore.LoadResult.Unusable ->
                 // Nothing is written. Half a café is worse than none: the device would report itself
                 // ready, reach the counter, and fail at the first order (task 23.10).
-                _state.value = State.Problem(
-                    "The café saved in this account couldn't be read, so nothing was changed on this " +
-                        "device. Set it up here and save again to replace it."
-                )
+                _state.value = State.Problem(Reason.BUNDLE_UNREADABLE)
             is CafeBundleStore.LoadResult.Failed ->
-                _state.value = State.Problem(
-                    "Couldn't reach Google Drive, so nothing was changed on this device."
-                )
+                _state.value = State.Problem(Reason.DRIVE_UNREACHABLE)
         }
     }
 
@@ -218,10 +222,7 @@ class SignInViewModel @Inject constructor(
         _state.value = if (appConfigStore.isModeConfigured(payload.mode)) {
             State.Restored(payload.cafeName)
         } else {
-            State.Problem(
-                "The café saved in this account is missing something this device needs, so it wasn't " +
-                    "applied. Set it up here instead."
-            )
+            State.Problem(Reason.RESTORE_INCOMPLETE)
         }
     }
 

@@ -35,6 +35,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.R
+import com.razstudio.pos.ui.i18n.LanguageViewModel
+import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.viewmodels.SignInViewModel
 
 /**
@@ -60,8 +62,11 @@ fun SignInScreen(
     onSetup: () -> Unit,
     onTryDemo: () -> Unit,
     viewModel: SignInViewModel = hiltViewModel(),
+    languageViewModel: LanguageViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val language by languageViewModel.language.collectAsState()
+    val strings = uiStrings(language)
     val consentRequest by viewModel.consentRequest.collectAsState()
     val context = LocalContext.current
     val activity = context as? Activity
@@ -114,8 +119,7 @@ fun SignInScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Sign in to bring back a café you've already set up — " +
-                        "or carry on without an account.",
+                    text = strings.signInSubtitle,
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -129,7 +133,11 @@ fun SignInScreen(
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = s.message,
+                            text = when (s.step) {
+                                SignInViewModel.Step.SIGNING_IN -> strings.signInStepSigningIn
+                                SignInViewModel.Step.LOOKING_UP -> strings.signInStepLookingUp
+                                SignInViewModel.Step.WAITING_FOR_DRIVE -> strings.signInStepWaitingDrive
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -137,7 +145,7 @@ fun SignInScreen(
 
                     is SignInViewModel.State.SignedInNoCafe -> {
                         Text(
-                            text = "Signed in as ${s.email}. This account has no café saved yet.",
+                            text = strings.signInNoCafeFound.format(s.email),
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
@@ -146,7 +154,7 @@ fun SignInScreen(
                         Button(
                             onClick = leaveToSetup,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Set up this café") }
+                        ) { Text(strings.signInSetupThisCafe) }
                     }
 
                     else -> {
@@ -154,7 +162,7 @@ fun SignInScreen(
                             onClick = { activity?.let { viewModel.signIn(it) } },
                             modifier = Modifier.fillMaxWidth(),
                             enabled = activity != null,
-                        ) { Text("Continue with Google") }
+                        ) { Text(strings.signInWithGoogle) }
                     }
                 }
             }
@@ -176,12 +184,12 @@ fun SignInScreen(
                     OutlinedButton(
                         onClick = leaveToEntry,
                         modifier = Modifier.weight(1f),
-                    ) { Text("Skip") }
+                    ) { Text(strings.signInSkip) }
 
                     OutlinedButton(
                         onClick = leaveToDemo,
                         modifier = Modifier.weight(1f),
-                    ) { Text("Demo Mode") }
+                    ) { Text(strings.signInDemoMode) }
                 }
             }
         }
@@ -191,22 +199,18 @@ fun SignInScreen(
     (state as? SignInViewModel.State.Conflict)?.let { conflict ->
         AlertDialog(
             onDismissRequest = { viewModel.keepDeviceCafe() },
-            title = { Text("Two cafés") },
+            title = { Text(strings.signInConflictTitle) },
             text = {
-                Text(
-                    "This device is set up as “${conflict.onDevice}”, but your Google account has " +
-                        "“${conflict.inAccount}” saved.\n\n" +
-                        "Keeping the account's café replaces the setup on this device."
-                )
+                Text(strings.signInConflictBody.format(conflict.onDevice, conflict.inAccount))
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.keepAccountCafe() }) {
-                    Text("Use “${conflict.inAccount}”")
+                    Text(strings.signInKeepAccountCafe.format(conflict.inAccount))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.keepDeviceCafe() }) {
-                    Text("Keep “${conflict.onDevice}”")
+                    Text(strings.signInKeepDeviceCafe.format(conflict.onDevice))
                 }
             },
         )
@@ -215,14 +219,23 @@ fun SignInScreen(
     (state as? SignInViewModel.State.Problem)?.let { problem ->
         AlertDialog(
             onDismissRequest = { viewModel.dismissProblem() },
-            title = { Text("Couldn't sign in") },
-            text = { Text(problem.message) },
+            title = { Text(strings.signInProblemTitle) },
+            text = {
+                Text(
+                    when (problem.reason) {
+                        SignInViewModel.Reason.SIGN_IN_UNAVAILABLE -> strings.signInUnavailable
+                        SignInViewModel.Reason.BUNDLE_UNREADABLE -> strings.signInBundleUnreadable
+                        SignInViewModel.Reason.DRIVE_UNREACHABLE -> strings.signInDriveUnreachable
+                        SignInViewModel.Reason.RESTORE_INCOMPLETE -> strings.signInRestoreIncomplete
+                    }
+                )
+            },
             // Both buttons lead somewhere. Nothing here is a dead end (Property 10).
             confirmButton = {
-                TextButton(onClick = leaveToEntry) { Text("Continue without it") }
+                TextButton(onClick = leaveToEntry) { Text(strings.signInContinueWithout) }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissProblem() }) { Text("Try again") }
+                TextButton(onClick = { viewModel.dismissProblem() }) { Text(strings.signInTryAgain) }
             },
         )
     }

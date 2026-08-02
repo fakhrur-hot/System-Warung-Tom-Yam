@@ -48,6 +48,7 @@ import com.razstudio.pos.ui.components.AdBannerFooter
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.viewmodels.BackupViewModel
+import com.razstudio.pos.ui.viewmodels.CafeBundleViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -322,10 +323,13 @@ fun BackupScreen(
 @Composable
 private fun CafeBundleCard(
     viewModel: com.razstudio.pos.ui.viewmodels.CafeBundleViewModel = hiltViewModel(),
+    languageViewModel: LanguageViewModel = hiltViewModel(),
 ) {
     if (!viewModel.isOffered()) return
 
     val state by viewModel.state.collectAsState()
+    val language by languageViewModel.language.collectAsState()
+    val strings = uiStrings(language)
     val activity = LocalContext.current as? android.app.Activity
 
     Card(
@@ -337,13 +341,12 @@ private fun CafeBundleCard(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Café setup in your Google account",
+                text = strings.cafeBundleTitle,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Saves how this café is set up — not its orders — so a new or replacement " +
-                    "device can restore it by signing in, instead of being set up again by hand.",
+                text = strings.cafeBundleDesc,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -352,26 +355,27 @@ private fun CafeBundleCard(
                 Button(
                     onClick = { viewModel.askToSave() },
                     enabled = !state.busy,
-                ) { Text("Save to Google") }
+                ) { Text(strings.cafeBundleSave) }
 
                 OutlinedButton(
                     onClick = { activity?.let { viewModel.remove(it) } },
                     enabled = !state.busy && activity != null,
-                ) { Text("Remove") }
+                ) { Text(strings.cafeBundleRemove) }
             }
 
-            state.message?.let {
+            state.outcome?.let { outcome ->
+                val (text, isError) = when (outcome) {
+                    CafeBundleViewModel.Outcome.SAVED -> strings.cafeBundleSaved to false
+                    CafeBundleViewModel.Outcome.REMOVED -> strings.cafeBundleRemoved to false
+                    CafeBundleViewModel.Outcome.UPLOAD_REJECTED -> strings.cafeBundleUploadRejected to true
+                    CafeBundleViewModel.Outcome.NEEDS_CONSENT -> strings.cafeBundleNeedsConsent to true
+                    CafeBundleViewModel.Outcome.NO_PERMISSION -> strings.cafeBundleNoPermission to true
+                }
                 Text(
-                    text = it,
+                    text = text,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-            state.error?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = if (isError) MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.primary,
                 )
             }
         }
@@ -383,24 +387,16 @@ private fun CafeBundleCard(
     if (state.confirming) {
         AlertDialog(
             onDismissRequest = { viewModel.cancelSave() },
-            title = { Text("Your Google account will hold the café key") },
-            text = {
-                Text(
-                    "This saves your café's setup and its owner recovery key into your own Google " +
-                        "Drive, where only this app can read it.\n\n" +
-                        "Anyone who can sign into this Google account can restore your café onto " +
-                        "their own device. Use an account only you control.\n\n" +
-                        "You can remove it again at any time."
-                )
-            },
+            title = { Text(strings.cafeBundleConsentTitle) },
+            text = { Text(strings.cafeBundleConsentBody) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.cancelSave()
                     activity?.let { viewModel.save(it) }
-                }) { Text("Save it") }
+                }) { Text(strings.cafeBundleConsentConfirm) }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.cancelSave() }) { Text("Cancel") }
+                TextButton(onClick = { viewModel.cancelSave() }) { Text(strings.commonCancel) }
             },
         )
     }

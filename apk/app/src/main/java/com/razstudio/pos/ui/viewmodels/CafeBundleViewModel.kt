@@ -49,11 +49,16 @@ class CafeBundleViewModel @Inject constructor(
 
     data class State(
         val busy: Boolean = false,
-        val message: String? = null,
-        val error: String? = null,
+        val outcome: Outcome? = null,
         /** True while the confirm dialog carrying the trade (task 23.9) is up. */
         val confirming: Boolean = false,
     )
+
+    /**
+     * What happened, not what to say about it. The card owns the wording, because this app ships in
+     * five languages and a ViewModel holding English would strand four of them.
+     */
+    enum class Outcome { SAVED, REMOVED, UPLOAD_REJECTED, NEEDS_CONSENT, NO_PERMISSION }
 
     private val _state = MutableStateFlow(State())
     val state: StateFlow<State> = _state.asStateFlow()
@@ -66,7 +71,7 @@ class CafeBundleViewModel @Inject constructor(
         signInService.isAvailable() && modeRepository.currentMode() == OperatingMode.CLOUD
 
     fun askToSave() {
-        _state.value = _state.value.copy(confirming = true, message = null, error = null)
+        _state.value = _state.value.copy(confirming = true, outcome = null)
     }
 
     fun cancelSave() {
@@ -100,11 +105,9 @@ class CafeBundleViewModel @Inject constructor(
             )
 
             val failure = bundleStore.save(token, payload)
-            _state.value = if (failure == null) {
-                State(message = "Saved to your Google account. Signing in on a new device will offer to restore it.")
-            } else {
-                State(error = failure)
-            }
+            _state.value = State(
+                outcome = if (failure == null) Outcome.SAVED else Outcome.UPLOAD_REJECTED
+            )
         }
     }
 
@@ -114,11 +117,9 @@ class CafeBundleViewModel @Inject constructor(
         viewModelScope.launch {
             val token = authorize(activity) ?: return@launch
             val failure = bundleStore.delete(token)
-            _state.value = if (failure == null) {
-                State(message = "Removed. This account no longer carries your café.")
-            } else {
-                State(error = failure)
-            }
+            _state.value = State(
+                outcome = if (failure == null) Outcome.REMOVED else Outcome.UPLOAD_REJECTED
+            )
         }
     }
 
@@ -134,18 +135,16 @@ class CafeBundleViewModel @Inject constructor(
         when (val auth = bundleStore.authorizeDrive(activity)) {
             is CafeBundleStore.AuthResult.Granted -> auth.accessToken
             is CafeBundleStore.AuthResult.NeedsConsent -> {
-                _state.value = State(
-                    error = "Google needs your permission first. Tap the button again and allow access."
-                )
+                _state.value = State(outcome = Outcome.NEEDS_CONSENT)
                 null
             }
             is CafeBundleStore.AuthResult.Failed -> {
-                _state.value = State(error = "Couldn't get permission for Google Drive.")
+                _state.value = State(outcome = Outcome.NO_PERMISSION)
                 null
             }
         }
 
     fun clearMessages() {
-        _state.value = _state.value.copy(message = null, error = null)
+        _state.value = _state.value.copy(outcome = null)
     }
 }
