@@ -45,6 +45,7 @@ class CafeBundleViewModel @Inject constructor(
     private val appConfigStore: AppConfigStore,
     private val modeRepository: ModeRepository,
     private val backend: BackendGateway,
+    private val backupManager: com.razstudio.pos.data.local.DatabaseBackupManager,
 ) : ViewModel() {
 
     data class State(
@@ -100,6 +101,7 @@ class CafeBundleViewModel @Inject constructor(
                 supabaseAnonKey = appConfigStore.supabaseAnonKey(),
                 websiteUrl = appConfigStore.websiteUrl(),
                 ownerRecoveryQr = recoveryQr,
+                setupData = setupDataJson(),
                 savedAtMs = System.currentTimeMillis(),
                 savedByDevice = android.os.Build.MODEL ?: "",
             )
@@ -109,6 +111,26 @@ class CafeBundleViewModel @Inject constructor(
                 outcome = if (failure == null) Outcome.SAVED else Outcome.UPLOAD_REJECTED
             )
         }
+    }
+
+    /**
+     * The cafe's setup as JSON: a full export with the trading history emptied.
+     *
+     * Reuses `DatabaseBackupManager` rather than hand-rolling a second serialiser, so the bundle
+     * cannot drift from the export/import format that `applyImport` already knows how to read. The
+     * two arrays are emptied rather than the keys removed, because `applyImport` reads them
+     * positionally-by-key and a missing key would restore whatever a previous import left behind.
+     */
+    private suspend fun setupDataJson(): String = try {
+        val root = org.json.JSONObject(backupManager.exportToJson())
+        root.put("orders", org.json.JSONArray())
+        root.put("pendingOrders", org.json.JSONArray())
+        root.toString()
+    } catch (e: Exception) {
+        // A cafe whose setup cannot be serialised still saves its config. Half a bundle is fine
+        // here in a way half a *restore* is not: the missing half is additive, and the owner is
+        // told nothing was lost because nothing was.
+        ""
     }
 
     /** Lets an owner take the café key back out of their Google account. */

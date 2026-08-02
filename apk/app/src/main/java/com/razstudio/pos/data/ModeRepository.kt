@@ -27,6 +27,30 @@ class ModeRepository @Inject constructor(
     private val _activeMode = MutableStateFlow(appConfigStore.operatingMode())
     private val _capabilities = MutableStateFlow(_activeMode.value.toCapabilities())
 
+    /**
+     * Is this device the LAN Server — the one that *holds* the café rather than talking to it?
+     *
+     * ## Why this exists as one function
+     *
+     * Three places needed the answer and each derived it separately: `BackendModule` picked the
+     * gateway, `RealtimeService` decided whether to start the embedded server, and `ApiClient`
+     * decided what to use as a base URL. They disagreed, and the way that surfaced was a host device
+     * telling its own owner "Can't reach the admin device" — about the phone in their hand.
+     *
+     * ## Why `lan_server_url` and not the role
+     *
+     * A Client acquires that URL by scanning the host's pairing QR, or by auto-discovery. A host
+     * never has one. That makes it persisted configuration, written during pairing, rather than a
+     * runtime flag — which matters because `BackendModule` is `@Singleton` and resolves once, at
+     * whatever moment something first injects a `BackendGateway`. A role written when the owner taps
+     * "Host this café" routinely lands *after* that, so the host stayed pinned to the remote client
+     * for the rest of the process.
+     *
+     * Only meaningful in LAN Mode: Cloud has Supabase, and Kiosk has no peers.
+     */
+    fun isLanHost(): Boolean =
+        currentMode() == OperatingMode.LAN && appConfigStore.lanServerUrl().isBlank()
+
     /** The persisted operating mode. Changes only via [setMode] — that is, only from Setup. */
     val activeMode: StateFlow<OperatingMode> = _activeMode.asStateFlow()
 

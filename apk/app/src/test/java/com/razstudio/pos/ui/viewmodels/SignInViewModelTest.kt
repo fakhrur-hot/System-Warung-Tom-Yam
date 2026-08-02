@@ -1,6 +1,7 @@
 package com.razstudio.pos.ui.viewmodels
 
 import android.content.Context
+import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.razstudio.pos.data.AppConfigStore
 import com.razstudio.pos.data.ModeRepository
@@ -8,6 +9,10 @@ import com.razstudio.pos.data.OperatingMode
 import com.razstudio.pos.data.google.CafeBundleStore
 import com.razstudio.pos.data.google.CafeConfigPayload
 import com.razstudio.pos.data.google.GoogleSignInService
+import com.razstudio.pos.data.local.AppDatabase
+import com.razstudio.pos.data.local.DatabaseBackupManager
+import com.razstudio.pos.data.local.MenuItem
+import com.razstudio.pos.data.local.Table
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -40,6 +45,8 @@ class SignInViewModelTest {
 
     private lateinit var config: AppConfigStore
     private lateinit var modes: ModeRepository
+    private lateinit var db: AppDatabase
+    private lateinit var backups: DatabaseBackupManager
     private val dispatcher = StandardTestDispatcher()
 
     @Before
@@ -52,11 +59,23 @@ class SignInViewModelTest {
         // to a different cached mode than the one the assertions read — the trap already documented
         // in NoInternetGuardTest.
         modes = ModeRepository(config)
+
+        // A real database and a real backup manager, not fakes. The setup-restore path is the whole
+        // reason the bundle is useful off-cloud, and a fake serialiser would test the test.
+        db = Room.inMemoryDatabaseBuilder(ctx, AppDatabase::class.java)
+            .allowMainThreadQueries().build()
+        backups = DatabaseBackupManager(
+            db.menuDao(), db.orderDao(), db.tableDao(), db.settingsDao(),
+            db.printerConfigDao(), db.pendingOrderDao(), db.printJobDao(),
+        )
         Dispatchers.setMain(dispatcher)
     }
 
     @After
-    fun tearDown() = Dispatchers.resetMain()
+    fun tearDown() {
+        db.close()
+        Dispatchers.resetMain()
+    }
 
     // ── Fakes ────────────────────────────────────────────────────────────────────────────────────
 
@@ -73,7 +92,7 @@ class SignInViewModelTest {
     private fun viewModel(
         available: Boolean = true,
         load: CafeBundleStore.LoadResult = CafeBundleStore.LoadResult.None,
-    ) = SignInViewModel(signInService(available), bundleStore(load), config, modes)
+    ) = SignInViewModel(signInService(available), bundleStore(load), config, modes, backups)
 
     private fun cloudPayload(name: String = "Tani Tom Yam") = CafeConfigPayload(
         mode = OperatingMode.CLOUD,
@@ -84,11 +103,16 @@ class SignInViewModelTest {
         ownerRecoveryQr = "https://tani.pages.dev/join?recover=tok",
     )
 
-    /** Reaches [SignInViewModel.restore] without a Google account, which no test can obtain. */
-    private fun restoreVia(vm: SignInViewModel, payload: CafeConfigPayload) {
-        vm.javaClass.getDeclaredMethod("restore", CafeConfigPayload::class.java)
-            .apply { isAccessible = true }
-            .invoke(vm, payload)
+    /**
+     * Reaches [SignInViewModel.restore] without a Google account, which no test can obtain.
+     *
+     * `restore` is `internal suspend` rather than private precisely so this can call it directly:
+     * reflection cannot invoke a suspend function without hand-rolling a Continuation, and the
+     * earlier reflective version silently failed to await the setup import — which is how the
+     * detached-coroutine race in the production path was found.
+     */
+    private suspend fun restoreVia(vm: SignInViewModel, payload: CafeConfigPayload) {
+        vm.restore(payload)
     }
 
     // ── Property 10: never a gate ────────────────────────────────────────────────────────────────
@@ -225,6 +249,69 @@ class SignInViewModelTest {
     }
 
     // ── An account with no café gets one action, not three ───────────────────────────────────────
+
+    // ── The setup half of a bundle: tables and menu, not just config ────────────────────────────
+
+    @Test
+    fun aBlankDeviceGetsItsTablesAndMenuBack() = runTest {
+        // Off-cloud this is the entire value of the feature. A LAN cafe has no backend to sync
+        // from, so a config-only restore hands a replacement device a correctly-named till with no
+        // tables and an empty menu -- configured, and unable to sell anything.
+        val setup = """
+            {"version":2,
+             "tables":[{"id":"T1","label":"1","sortOrder":0}],
+             "menuItems":[{"id":"m1","category":"MAIN","price":5.0,"available":true,
+                           "askMeDaily":false,"nameEn":"Nasi Goreng"}],
+             "orders":[],"pendingOrders":[]}
+        """.trimIndent()
+
+        val vm = viewModel()
+        restoreVia(vm, CafeConfigPayload(
+            mode = OperatingMode.KIOSK, cafeName = "Kopitiam",
+            supabaseUrl = "", supabaseAnonKey = "", websiteUrl = "",
+            ownerRecoveryQr = "", setupData = setup,
+        ))
+
+        assertEquals("the menu must come back", 1, db.menuDao().getAll().size)
+        assertTrue("and the cafe must be ready", config.isModeConfigured(OperatingMode.KIOSK))
+    }
+
+    @Test
+    fun aDeviceThatAlreadyRunsACafeKeepsItsOwnData() = runTest {
+        // applyImport wipes before it imports, including the order history. An owner may pick the
+        // account's cafe in the conflict dialog while this device still holds a day of unsynced
+        // orders; destroying them to import a menu is not a trade anyone consented to. Config
+        // crosses over so the device points at the right cafe -- its data stays put.
+        config.setOperatingMode(OperatingMode.CLOUD)
+        modes.setMode(OperatingMode.CLOUD)
+        config.save(
+            supabaseUrl = "https://mine.supabase.co", supabaseAnonKey = "sb_publishable_mine",
+            websiteUrl = "", cafeName = "My Own Cafe",
+        )
+        db.tableDao().insert(Table(id = "MINE", label = "9"))
+        db.menuDao().upsertAll(listOf(MenuItem(
+            id = "mine", category = "MAIN", price = 3.0,
+            available = true, askMeDaily = false, nameEn = "My Item",
+        )))
+
+        val setup = """{"version":2,"tables":[],"menuItems":[],"orders":[],"pendingOrders":[]}"""
+        restoreVia(viewModel(), cloudPayload("Theirs").copy(setupData = setup))
+
+        assertEquals("this device's menu must survive", 1, db.menuDao().getAll().size)
+        assertEquals("and its tables", 1, db.tableDao().getAll().size)
+        assertEquals("but the config follows the account", "Theirs", config.cafeName())
+    }
+
+    @Test
+    fun aBundleWithNoSetupDataStillRestoresItsConfig() = runTest {
+        // Bundles written before setupData existed, and cafes whose export failed. Neither should
+        // cost the owner their config restore.
+        val vm = viewModel()
+        restoreVia(vm, cloudPayload().copy(setupData = ""))
+
+        assertTrue(config.isModeConfigured(OperatingMode.CLOUD))
+        assertTrue(vm.state.value is SignInViewModel.State.Restored)
+    }
 
     @Test
     fun theSettledFlagIsRecordedOnEveryExit() {

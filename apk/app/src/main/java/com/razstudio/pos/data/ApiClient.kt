@@ -133,6 +133,20 @@ class ApiClient @Inject constructor(
         // stored URL is only a detail of one mode.
         val lan = appConfig.lanServerUrl()
         val useLan = modeRepository.currentMode() == OperatingMode.LAN && lan.isNotBlank()
+
+        // A LAN *host* has no base URL at all, and must not borrow one.
+        //
+        // Falling through to supabaseUrl() here meant falling through to BuildConfig.SUPABASE_URL —
+        // the address baked into the build — so a host with no cloud café would quietly aim its
+        // requests at somebody else's Supabase project. NoInternetGuard then refused to resolve it
+        // (correctly: LAN Mode has no internet), the IOException came back as a network failure, and
+        // the owner was told their admin device was unreachable. It was reachable. It was the device
+        // showing the message.
+        //
+        // Nothing should reach this in the first place — BackendModule hands a host LocalBackend —
+        // so throwing keeps a genuine wiring mistake loud instead of dressing it as a network blip.
+        if (modeRepository.isLanHost()) throw BackendNotConfiguredException()
+
         val base = if (useLan) lan else supabaseUrl()
 
         // A blank base used to sail straight through to `Request.Builder().url("/functions/v1/…")`,
@@ -160,6 +174,9 @@ class ApiClient @Inject constructor(
      * exactly, so the two cannot drift.
      */
     fun isBackendConfigured(): Boolean {
+        // A host is not "unconfigured" — it is the backend. Reporting false here would send an
+        // owner to Setup for a café that is already running on the device in front of them.
+        if (modeRepository.isLanHost()) return true
         val lan = appConfig.lanServerUrl()
         if (modeRepository.currentMode() == OperatingMode.LAN && lan.isNotBlank()) return true
         return supabaseUrl().isNotBlank()

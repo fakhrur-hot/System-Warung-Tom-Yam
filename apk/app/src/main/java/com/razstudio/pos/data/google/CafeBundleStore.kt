@@ -59,8 +59,25 @@ open class CafeBundleStore @Inject constructor(
         /** The sensitive scope. Requested incrementally — see the class note. */
         const val DRIVE_APPDATA_SCOPE = "https://www.googleapis.com/auth/drive.appdata"
 
-        /** Fixed name, so a second save overwrites rather than accumulating bundles. */
-        private const val FILE_NAME = "cafe-config.json"
+        /**
+         * Bundle file names are `RAZS.POS-{MODE}-{cafe name}`, e.g. `RAZS.POS-LAN-Tani Tom Yam`.
+         *
+         * The prefix is what makes a bundle findable: a restoring device knows neither the mode nor
+         * the name yet -- that is the whole point of restoring -- so [findFile] searches on the
+         * prefix and reads the rest out of the payload. Carrying the mode and name in the file name
+         * as well is for the owner: an `appDataFolder` is invisible in the Drive UI, but the name
+         * still appears in Google account data listings, and `RAZS.POS-LAN-Tani Tom Yam` tells them
+         * what it is where `cafe-config.json` does not.
+         */
+        const val FILE_PREFIX = "RAZS.POS-"
+
+        /** The pre-convention file. Still read, never written -- see [findFile]. */
+        private const val LEGACY_FILE_NAME = "cafe-config.json"
+
+        fun fileNameFor(mode: OperatingMode, cafeName: String): String =
+            // Drive treats the name as opaque text, but a stray quote would break the `q=` filter
+            // this class searches with, so the characters that matter there are dropped.
+            FILE_PREFIX + mode.name + "-" + cafeName.replace("'", "").replace("\\", "").trim()
 
         private const val DRIVE_FILES = "https://www.googleapis.com/drive/v3/files"
         private const val DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
@@ -130,10 +147,10 @@ open class CafeBundleStore @Inject constructor(
     /** Reads the account's bundle, or reports why it cannot. */
     open suspend fun load(accessToken: String): LoadResult = withContext(Dispatchers.IO) {
         try {
-            val fileId = findFileId(accessToken)
+            val file = findFile(accessToken)
                 ?: return@withContext LoadResult.None
 
-            val body = get("$DRIVE_FILES/$fileId?alt=media", accessToken)
+            val body = get("$DRIVE_FILES/${file.id}?alt=media", accessToken)
                 ?: return@withContext LoadResult.Failed("could not download the saved configuration")
 
             val payload = CafeConfigPayload.parse(body)
@@ -153,20 +170,30 @@ open class CafeBundleStore @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val json = payload.toJson()
-                val existing = findFileId(accessToken)
+                val wantedName = fileNameFor(payload.mode, payload.cafeName)
+                // Match on the prefix, not the exact name: renaming the cafe or switching mode must
+                // replace the owner's single bundle, not leave the old one behind for a future
+                // restore to find and prefer.
+                val existing = findFile(accessToken)
 
                 val ok = if (existing != null) {
-                    // Media-only update: the metadata (name, parent) is already right, and resending
-                    // it risks moving the file out of appDataFolder on a partial write.
+                    // Rename first when the cafe was renamed or changed mode, so the file on the
+                    // account never disagrees with the payload inside it. A failure here is not
+                    // fatal -- a stale *name* still restores correctly -- so the content write
+                    // below proceeds regardless.
+                    if (existing.name != wantedName) renameFile(accessToken, existing.id, wantedName)
+
+                    // Media-only update: parentage is already right, and resending metadata risks
+                    // moving the file out of appDataFolder on a partial write.
                     val request = Request.Builder()
-                        .url("$DRIVE_UPLOAD/$existing?uploadType=media")
+                        .url("$DRIVE_UPLOAD/${existing.id}?uploadType=media")
                         .patch(json.toRequestBody(JSON_MEDIA))
                         .header("Authorization", "Bearer $accessToken")
                         .build()
                     http.newCall(request).execute().use { it.isSuccessful }
                 } else {
                     val metadata = JSONObject().apply {
-                        put("name", FILE_NAME)
+                        put("name", wantedName)
                         put("parents", org.json.JSONArray().put("appDataFolder"))
                     }.toString()
 
@@ -199,9 +226,9 @@ open class CafeBundleStore @Inject constructor(
     /** Removes the bundle, so an owner can take their café key back out of their Google account. */
     open suspend fun delete(accessToken: String): String? = withContext(Dispatchers.IO) {
         try {
-            val fileId = findFileId(accessToken) ?: return@withContext null
+            val file = findFile(accessToken) ?: return@withContext null
             val request = Request.Builder()
-                .url("$DRIVE_FILES/$fileId")
+                .url("$DRIVE_FILES/${file.id}")
                 .delete()
                 .header("Authorization", "Bearer $accessToken")
                 .build()
@@ -213,14 +240,45 @@ open class CafeBundleStore @Inject constructor(
         }
     }
 
-    private fun findFileId(accessToken: String): String? {
+    /** A bundle in the account's app folder. */
+    private data class RemoteFile(val id: String, val name: String)
+
+    /**
+     * The account's bundle, or null.
+     *
+     * Searches by prefix rather than exact name, because a restoring device does not yet know its
+     * cafe's name or mode. The legacy fixed name is included so a bundle written before the naming
+     * convention still restores, instead of silently reading as "no cafe saved".
+     *
+     * Newest first, so if an account somehow holds more than one, the most recent save wins.
+     */
+    private fun findFile(accessToken: String): RemoteFile? {
+        val q = "(name contains 'PREFIX' or name = 'LEGACY') and trashed = false"
+            .replace("PREFIX", FILE_PREFIX).replace("LEGACY", LEGACY_FILE_NAME)
         val url = "$DRIVE_FILES?spaces=appDataFolder" +
-            "&q=" + java.net.URLEncoder.encode("name = '$FILE_NAME' and trashed = false", "UTF-8") +
-            "&fields=files(id)&pageSize=1"
+            "&q=" + java.net.URLEncoder.encode(q, "UTF-8") +
+            "&orderBy=modifiedTime desc" +
+            "&fields=files(id,name)&pageSize=10"
         val body = get(url, accessToken) ?: return null
         val files = JSONObject(body).optJSONArray("files") ?: return null
         if (files.length() == 0) return null
-        return files.getJSONObject(0).optString("id").ifBlank { null }
+        val first = files.getJSONObject(0)
+        val id = first.optString("id").ifBlank { return null }
+        return RemoteFile(id, first.optString("name"))
+    }
+
+    private fun renameFile(accessToken: String, fileId: String, name: String) {
+        try {
+            val body = JSONObject().put("name", name).toString()
+            val request = Request.Builder()
+                .url("$DRIVE_FILES/$fileId")
+                .patch(body.toRequestBody(JSON_MEDIA))
+                .header("Authorization", "Bearer $accessToken")
+                .build()
+            http.newCall(request).execute().close()
+        } catch (e: Exception) {
+            Log.d(TAG, "Rename failed; the bundle keeps its old name", e)
+        }
     }
 
     private fun get(url: String, accessToken: String): String? {

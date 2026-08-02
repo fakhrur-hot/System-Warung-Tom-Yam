@@ -46,6 +46,21 @@ data class CafeConfigPayload(
     /** Informational only — the Cloudflare project names, so an owner can identify their own bundle. */
     val cloudflareDomain: String = "",
     val cloudflareProject: String = "",
+    /**
+     * The cafe's own setup -- tables, menu, settings, printers -- as a `DatabaseBackupManager`
+     * export with the order history stripped out.
+     *
+     * Without this the bundle is useless off-cloud, which is where it is needed most. A Cloud cafe
+     * that restores its URL and key immediately syncs everything else down from Supabase; a LAN or
+     * Kiosk cafe has no backend to sync from, so config alone would hand a replacement device a
+     * correctly-named till with no tables and an empty menu -- configured, and unable to sell
+     * anything.
+     *
+     * Orders are deliberately not included. They belong to a device's trading history, not to the
+     * cafe's setup, and copying them onto a replacement would double-count the day's takings.
+     * Blank is valid: a bundle saved before this field existed still restores its config.
+     */
+    val setupData: String = "",
     /** Set when written; used to tell two bundles apart in the conflict dialog (task 23.8). */
     val savedAtMs: Long = 0L,
     /** The device that saved it, for the same reason. Never used for authorisation. */
@@ -62,6 +77,7 @@ data class CafeConfigPayload(
         put(KEY_OWNER_RECOVERY_QR, ownerRecoveryQr)
         put(KEY_CLOUDFLARE_DOMAIN, cloudflareDomain)
         put(KEY_CLOUDFLARE_PROJECT, cloudflareProject)
+        put(KEY_SETUP_DATA, setupData)
         put(KEY_SAVED_AT, savedAtMs)
         put(KEY_SAVED_BY, savedByDevice)
     }.toString()
@@ -79,6 +95,7 @@ data class CafeConfigPayload(
         private const val KEY_OWNER_RECOVERY_QR = "owner_recovery_qr"
         private const val KEY_CLOUDFLARE_DOMAIN = "cloudflare_domain"
         private const val KEY_CLOUDFLARE_PROJECT = "cloudflare_project"
+        private const val KEY_SETUP_DATA = "setup_data"
         private const val KEY_SAVED_AT = "saved_at_ms"
         private const val KEY_SAVED_BY = "saved_by_device"
 
@@ -122,6 +139,7 @@ data class CafeConfigPayload(
                 ownerRecoveryQr = o.optString(KEY_OWNER_RECOVERY_QR).trim(),
                 cloudflareDomain = o.optString(KEY_CLOUDFLARE_DOMAIN).trim(),
                 cloudflareProject = o.optString(KEY_CLOUDFLARE_PROJECT).trim(),
+                setupData = o.optString(KEY_SETUP_DATA),
                 savedAtMs = o.optLong(KEY_SAVED_AT, 0L),
                 savedByDevice = o.optString(KEY_SAVED_BY).trim(),
             )

@@ -41,6 +41,7 @@ class SignInViewModel @Inject constructor(
     private val bundleStore: CafeBundleStore,
     private val appConfigStore: AppConfigStore,
     private val modeRepository: ModeRepository,
+    private val backupManager: com.razstudio.pos.data.local.DatabaseBackupManager,
 ) : ViewModel() {
 
     sealed class State {
@@ -164,7 +165,7 @@ class SignInViewModel @Inject constructor(
         }
     }
 
-    private fun applyLoad(load: CafeBundleStore.LoadResult) {
+    private suspend fun applyLoad(load: CafeBundleStore.LoadResult) {
         when (load) {
             is CafeBundleStore.LoadResult.Found -> {
                 val localName = appConfigStore.cafeName()
@@ -193,7 +194,8 @@ class SignInViewModel @Inject constructor(
 
     /** Task 23.8 — the owner chose the account's café over the one already on the device. */
     fun keepAccountCafe() {
-        (state.value as? State.Conflict)?.let { restore(it.payload) }
+        val conflict = state.value as? State.Conflict ?: return
+        viewModelScope.launch { restore(conflict.payload) }
     }
 
     /** Task 23.8 — the owner kept the device's café. Nothing is written, nothing is overwritten. */
@@ -207,7 +209,11 @@ class SignInViewModel @Inject constructor(
      * and cannot host is the failure this guards against, which is why the check below is an
      * assertion about the *result* rather than a comment about the writes.
      */
-    private fun restore(payload: CafeConfigPayload) {
+    internal suspend fun restore(payload: CafeConfigPayload) {
+        // Whether this device has a café of its own to lose. Read BEFORE anything is written, since
+        // the writes below are exactly what would change the answer.
+        val deviceWasBlank = OperatingMode.entries.none { appConfigStore.isModeConfigured(it) }
+
         // Mode first: `isModeConfigured` is false for any mode other than the stored one, so writing
         // the fields before the mode would leave a window where the café reads as unconfigured.
         modeRepository.setMode(payload.mode)
@@ -218,6 +224,31 @@ class SignInViewModel @Inject constructor(
             websiteUrl = payload.websiteUrl,
             cafeName = payload.cafeName,
         )
+
+        // Tables, menu, settings and printers — but only onto a device that had no café.
+        //
+        // `applyImport` wipes the database before importing, including the order history. On a new
+        // or replacement device there is nothing there and this is the whole point of the feature:
+        // off-cloud there is no backend to sync from, so without it the owner gets a correctly-named
+        // till with no tables and an empty menu.
+        //
+        // On a device that already runs a café it is withheld. The owner may have picked the
+        // account's café in the conflict dialog while this device still holds a day of unsynced
+        // orders, and silently destroying them to import a menu is not a trade anyone consented to.
+        // Config still crosses over, so the device points at the right café; its data stays put.
+        //
+        // Awaited, not fired and forgotten. The state below is what sends the owner into the till,
+        // and a detached import would race it — the table view would open on an empty café and fill
+        // in underneath them, which reads as data loss even though nothing was lost.
+        if (deviceWasBlank && payload.setupData.isNotBlank()) {
+            try {
+                backupManager.applyImport(payload.setupData)
+            } catch (e: Exception) {
+                // The café is already configured and reachable at this point; a failed setup import
+                // costs the owner a menu re-entry, not their café.
+                android.util.Log.w("SignInViewModel", "Setup data could not be applied", e)
+            }
+        }
 
         _state.value = if (appConfigStore.isModeConfigured(payload.mode)) {
             State.Restored(payload.cafeName)

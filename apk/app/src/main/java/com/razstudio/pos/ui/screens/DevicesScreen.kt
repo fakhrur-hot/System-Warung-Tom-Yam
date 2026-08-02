@@ -34,6 +34,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -82,9 +83,16 @@ fun DevicesScreen(
     settingsViewModel: AdminSettingsViewModel = hiltViewModel(),
     languageViewModel: LanguageViewModel = hiltViewModel(),
     modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel(),
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    /**
+     * Show the LAN pairing QR. Lives here because pairing a staff device *is* device management —
+     * and because "Host this café" on the home screen now opens the till instead, which is where an
+     * owner expects that button to go. Without this the QR would be unreachable.
+     */
+    onPairStaffDevice: () -> Unit = {},
 ) {
     val capabilities by modeViewModel.capabilities.collectAsState()
+    val mode by modeViewModel.mode.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val settingsState by settingsViewModel.uiState.collectAsState()
     val language by languageViewModel.language.collectAsState()
@@ -155,7 +163,20 @@ fun DevicesScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.commonBack)
                     }
-                }
+                },
+                actions = {
+                    // LAN only. A Cloud café's staff join through the website invite link, and a
+                    // Kiosk has no peers at all, so the pairing QR would be an action with nothing
+                    // on the other end of it.
+                    if (mode == com.razstudio.pos.data.OperatingMode.LAN) {
+                        IconButton(onClick = onPairStaffDevice) {
+                            Icon(
+                                Icons.Default.QrCode2,
+                                contentDescription = strings.pairStaffDeviceButton,
+                            )
+                        }
+                    }
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }

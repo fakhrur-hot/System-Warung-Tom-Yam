@@ -120,6 +120,44 @@ class SetupViewModel @Inject constructor(
      */
     fun isModeReady(mode: OperatingMode): Boolean = appConfig.isModeConfigured(mode)
 
+    /**
+     * True on a device that has never completed Setup for any mode.
+     *
+     * This is what separates "offer everything" from "offer what was chosen". A blank device must
+     * reach the QR and pairing flows, because those are how it gets configured in the first place —
+     * the owner QR and the invite QR each carry the café's backend. A device whose owner has
+     * *already saved a mode* is a different situation: they answered the question, and continuing to
+     * offer the modes they did not pick invites a tap that lands somewhere wrong.
+     */
+    fun noModeConfiguredYet(): Boolean = OperatingMode.entries.none { appConfig.isModeConfigured(it) }
+
+    /**
+     * Task 23 follow-up — this device is the LAN Server, so it is the café's admin by construction.
+     *
+     * There is no handshake to perform: off-cloud, the host holds the database and authenticates to
+     * nobody. Recording the role matters anyway, because [StartupViewModel] routes on it — without
+     * this, an owner would land back on the mode picker every morning and have to re-declare that
+     * they are running the café they are standing in.
+     */
+    fun beginHostingLocally() {
+        // A device that was previously a Client still holds the old host's address, and
+        // `BackendModule` reads exactly that to decide who serves whom. Leaving it would make this
+        // device try to forward its own café to a phone that may no longer exist.
+        appConfig.setLanServerUrl("")
+        secureStorage.setRole(SecureStorage.Role.ADMIN)
+        secureStorage.setSessionToken(LOCAL_HOST_SESSION)
+    }
+
+    companion object {
+        /**
+         * Marks a session that exists only on this device. `LocalBackend` never inspects it — there
+         * is no remote party to present it to — but `SecureStorage.isAuthenticated()` requires a
+         * non-null token, and a sentinel that says what it is beats an empty string that looks like
+         * a bug.
+         */
+        const val LOCAL_HOST_SESSION = "local-host"
+    }
+
     /** Task 9.2 — pick the topology. Nothing is persisted until [save]. */
     fun selectMode(mode: OperatingMode) {
         _state.value = _state.value.copy(operatingMode = mode, saved = false)

@@ -645,6 +645,8 @@ data class UiStringsGroup8(
     val cafeBundleUploadRejected: String,
     val cafeBundleNeedsConsent: String,
     val cafeBundleNoPermission: String,
+    val modeConfiguredElsewhereHint: String,
+    val pairStaffDeviceButton: String,
 )
 
 class UiStrings(
@@ -1211,6 +1213,8 @@ class UiStrings(
     val cafeBundleUploadRejected: String get() = g8.cafeBundleUploadRejected
     val cafeBundleNeedsConsent: String get() = g8.cafeBundleNeedsConsent
     val cafeBundleNoPermission: String get() = g8.cafeBundleNoPermission
+    val modeConfiguredElsewhereHint: String get() = g8.modeConfiguredElsewhereHint
+    val pairStaffDeviceButton: String get() = g8.pairStaffDeviceButton
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1789,6 +1793,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeBundleUploadRejected = "Google Drive tidak menerima perubahan itu. Tiada apa-apa diubah.",
             cafeBundleNeedsConsent = "Google memerlukan kebenaran anda dahulu. Ketik butang itu sekali lagi dan benarkan akses.",
             cafeBundleNoPermission = "Tidak dapat memperoleh kebenaran untuk Google Drive.",
+            modeConfiguredElsewhereHint = "Peranti ini disediakan untuk mod lain. Tukarnya dalam Wizard Persediaan.",
+            pairStaffDeviceButton = "Gandingkan peranti kakitangan",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -2366,6 +2372,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeBundleUploadRejected = "Google Drive wouldn't accept the change. Nothing was altered.",
             cafeBundleNeedsConsent = "Google needs your permission first. Tap the button again and allow access.",
             cafeBundleNoPermission = "Couldn't get permission for Google Drive.",
+            modeConfiguredElsewhereHint = "This device is set up for another mode. Change it in the Setup Wizard.",
+            pairStaffDeviceButton = "Pair a staff device",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2941,6 +2949,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeBundleUploadRejected = "Google 云端硬盘未接受此更改。没有任何内容被改动。",
             cafeBundleNeedsConsent = "Google 需要您先授权。请再次点击按钮并允许访问。",
             cafeBundleNoPermission = "无法获得 Google 云端硬盘的授权。",
+            modeConfiguredElsewhereHint = "本设备已设置为其他模式。请在设置向导中更改。",
+            pairStaffDeviceButton = "配对员工设备",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -3518,6 +3528,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeBundleUploadRejected = "Google Drive அந்த மாற்றத்தை ஏற்கவில்லை. எதுவும் மாற்றப்படவில்லை.",
             cafeBundleNeedsConsent = "Google-க்கு முதலில் உங்கள் அனுமதி தேவை. பொத்தானை மீண்டும் தட்டி அணுகலை அனுமதிக்கவும்.",
             cafeBundleNoPermission = "Google Drive-க்கான அனுமதியைப் பெற முடியவில்லை.",
+            modeConfiguredElsewhereHint = "இந்தச் சாதனம் வேறு முறைக்காக அமைக்கப்பட்டுள்ளது. அமைப்பு விஸார்டில் அதை மாற்றவும்.",
+            pairStaffDeviceButton = "பணியாளர் சாதனத்தை இணைக்கவும்",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -4095,6 +4107,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeBundleUploadRejected = "Google ไดรฟ์ไม่ยอมรับการเปลี่ยนแปลงนี้ ไม่มีสิ่งใดถูกแก้ไข",
             cafeBundleNeedsConsent = "Google ต้องการสิทธิ์จากคุณก่อน แตะปุ่มอีกครั้งแล้วอนุญาตการเข้าถึง",
             cafeBundleNoPermission = "ขอสิทธิ์สำหรับ Google ไดรฟ์ไม่สำเร็จ",
+            modeConfiguredElsewhereHint = "อุปกรณ์นี้ตั้งค่าสำหรับโหมดอื่น เปลี่ยนได้ในตัวช่วยตั้งค่า",
+            pairStaffDeviceButton = "จับคู่อุปกรณ์พนักงาน",
         ),
     )
 }

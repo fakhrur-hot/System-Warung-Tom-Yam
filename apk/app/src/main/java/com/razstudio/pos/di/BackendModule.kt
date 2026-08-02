@@ -4,7 +4,6 @@ import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ModeRepository
 import com.razstudio.pos.data.OperatingMode
-import com.razstudio.pos.data.SecureStorage
 import com.razstudio.pos.data.local.LocalBackend
 import dagger.Lazy
 import dagger.Module
@@ -19,8 +18,8 @@ import javax.inject.Singleton
  * | Mode    | Device         | Implementation                                              |
  * |---------|----------------|-------------------------------------------------------------|
  * | `CLOUD` | any            | [ApiClient] — HTTPS to Supabase, exactly as before          |
- * | `LAN`   | Server (admin) | [LocalBackend] — in-process, Room-backed                    |
- * | `LAN`   | Client (staff) | [ApiClient], base URL pointed at `http://<server>:<port>`   |
+ * | `LAN`   | Server (host)  | [LocalBackend] — in-process, Room-backed; no `lan_server_url` |
+ * | `LAN`   | Client (staff) | [ApiClient] at `lan_server_url`, set by scanning the pairing QR |
  * | `KIOSK` | admin          | [LocalBackend]                                              |
  *
  * The LAN split is by **role**, and that asymmetry is the point: a Client reuses the HTTP
@@ -50,14 +49,24 @@ object BackendModule {
         modeRepository: ModeRepository,
         remote: ApiClient,
         local: Lazy<LocalBackend>,
-        secureStorage: SecureStorage,
     ): BackendGateway = when (modeRepository.currentMode()) {
         OperatingMode.CLOUD -> remote
 
-        // Only the admin device is the LAN Server. Ordering staff are Clients and keep speaking HTTP,
-        // just to a phone on the local network instead of Supabase.
+        // Only the LAN Server serves itself; ordering staff are Clients and keep speaking HTTP, just
+        // to a phone on the local network instead of Supabase.
+        //
+        // The discriminator is `lan_server_url`, NOT the stored role. A Client acquires that URL by
+        // scanning the host's pairing QR (or by auto-discovery); a host never has one. That makes it
+        // persisted configuration rather than a runtime flag — which matters because this provider
+        // is @Singleton and resolves once, at whatever moment something first injects a
+        // BackendGateway.
+        //
+        // Reading the role here was a real defect: "Host this café" sets the role and opens the
+        // till, but by then RealtimeService has usually already pulled the gateway with the role
+        // still unset, pinning the host to `remote` for the rest of the process. The symptom was the
+        // host device telling its owner "Can't reach the admin device" — about itself.
         OperatingMode.LAN ->
-            if (secureStorage.getRole() == SecureStorage.Role.ADMIN) local.get() else remote
+            if (modeRepository.isLanHost()) local.get() else remote
 
         OperatingMode.KIOSK -> local.get()
     }

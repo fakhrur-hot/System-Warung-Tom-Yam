@@ -280,6 +280,12 @@ class RealtimeService : Service() {
      * This ensures zero lost orders even if WebSocket drops temporarily.
      */
     private fun performCatchUpSync() {
+        // A host has nobody to catch up with: it *is* the source of truth, and every order already
+        // lives in its own Room database. Polling here would mean issuing HTTP requests with no
+        // backend to send them to — which is exactly how a host ended up reporting that it could
+        // not reach itself.
+        if (modeRepository.isLanHost()) return
+
         val client = apiClient
         val dao = orderDao
 
@@ -430,9 +436,11 @@ class RealtimeService : Service() {
      * Device starting its own server would answer its peers with an empty database.
      */
     private fun startLanServerIfServer() {
-        val isLanServer = modeRepository.currentMode() == com.razstudio.pos.data.OperatingMode.LAN &&
-            secureStorage.getRole() == com.razstudio.pos.data.SecureStorage.Role.ADMIN
-        if (!isLanServer) return
+        // Was gated on the stored role, which is written when the owner taps "Host this café" —
+        // often after this service has already started and decided not to serve. The café then had
+        // no LAN server at all and no indication why. `isLanHost` reads pairing configuration
+        // instead, which is settled long before the service runs.
+        if (!modeRepository.isLanHost()) return
 
         if (lanServer.start()) {
             Log.i(TAG, "LAN server started on ${lanServer.boundHost}")

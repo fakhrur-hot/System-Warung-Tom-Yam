@@ -212,6 +212,14 @@ fun AppNavGraph(
                 onWirelessAp = {
                     navController.navigate(NavRoutes.LAN_PAIRING)
                 },
+                // Hosting opens the till, not the pairing QR. The whole back stack is cleared: an
+                // owner who is now running their café should not be able to swipe back into the
+                // mode picker and half-leave it.
+                onHostCafe = {
+                    navController.navigate(NavRoutes.ADMIN_HOME) {
+                        popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
+                    }
+                },
                 // Kiosk: the same order-entry screen, minus the table step. Reusing it keeps the
                 // menu grid, search and cart identical across modes instead of drifting apart.
                 onKiosk = {
@@ -410,7 +418,8 @@ fun AppNavGraph(
         // Devices Management
         composable(NavRoutes.DEVICES) {
             DevicesScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onPairStaffDevice = { navController.navigate(NavRoutes.LAN_PAIRING) },
             )
         }
 

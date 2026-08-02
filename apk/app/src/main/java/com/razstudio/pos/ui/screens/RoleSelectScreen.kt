@@ -58,6 +58,8 @@ fun RoleSelectScreen(
     onAdminConnect: () -> Unit,
     onOrderingConnect: () -> Unit,
     onWirelessAp: () -> Unit = {},
+    /** Wireless AP host: open this café's till. See the Host button for why it is not the QR. */
+    onHostCafe: () -> Unit = {},
     onKiosk: () -> Unit = {},
     onTryDemo: () -> Unit = {},
     onSetup: () -> Unit = {},
@@ -76,6 +78,13 @@ fun RoleSelectScreen(
     // being used. Kiosk is a single device with nothing to join, so it is gated outright.
     val lanReady = setupViewModel.isModeReady(OperatingMode.LAN)
     val kioskReady = setupViewModel.isModeReady(OperatingMode.KIOSK)
+    val cloudReady = setupViewModel.isModeReady(OperatingMode.CLOUD)
+
+    // A blank device offers every joinable mode, because the QR flows are how it gets configured.
+    // Once the owner has SAVED a mode, that answer is respected: the modes they did not pick grey
+    // out. Leaving them live was a real defect — an owner who chose Wireless AP without QR ordering
+    // still saw a fully enabled "QR Ordering Mode" button, which can only lead somewhere wrong.
+    val blankDevice = setupViewModel.noModeConfiguredYet()
     var qrExpanded by remember { mutableStateOf(false) }
     var apExpanded by remember { mutableStateOf(false) }
     val title = configuredState.cafeName.ifBlank { stringResource(R.string.app_name) }
@@ -138,12 +147,15 @@ fun RoleSelectScreen(
 
                 ModeButton(
                     label = strings.qrOrderingModeButton,
-                    // Never gated. Both actions inside it configure the device as a side effect —
-                    // the owner QR and the invite QR each carry the café's backend — so requiring
-                    // configuration to reach them would lock out every device that has none, which
-                    // is precisely the device that needs them.
-                    enabled = true,
-                    disabledHint = strings.modeNotSetUpHint,
+                    // Open on a blank device, because the owner QR and the invite QR each carry the
+                    // café's backend and are how an unconfigured device gets configured — gating
+                    // this would lock out precisely the device that needs it.
+                    //
+                    // Closed once another mode has been saved. That is not the same situation: the
+                    // owner answered the question, and a device set up for Wireless AP has no Cloud
+                    // backend for either action inside here to reach.
+                    enabled = cloudReady || blankDevice,
+                    disabledHint = strings.modeConfiguredElsewhereHint,
                     expanded = qrExpanded,
                     onClick = { qrExpanded = !qrExpanded },
                 )
@@ -168,12 +180,13 @@ fun RoleSelectScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Wireless AP has the same two roles as QR Ordering, so it gets the same shape:
-                // hosting a café requires having set one up; joining one never does.
+                // Wireless AP has the same two roles as QR Ordering, so it gets the same shape and
+                // the same gate: open while the device is blank (a staff phone joins by scanning the
+                // host's pairing QR), closed once the owner has saved a different mode.
                 ModeButton(
                     label = strings.wirelessApModeButton,
-                    enabled = true,
-                    disabledHint = strings.modeNotSetUpHint,
+                    enabled = lanReady || blankDevice,
+                    disabledHint = strings.modeConfiguredElsewhereHint,
                     expanded = apExpanded,
                     onClick = { apExpanded = !apExpanded },
                 )
@@ -181,8 +194,19 @@ fun RoleSelectScreen(
                 AnimatedVisibility(visible = apExpanded) {
                     Column(modifier = Modifier.padding(start = 16.dp, top = 8.dp)) {
                         Button(
-                            onClick = onWirelessAp,
-                            // Hosting *is* running the café, so it needs the café to exist.
+                            // Hosting *is* running the café: this opens the till — an empty table
+                            // view on a new café, or the restored one if a bundle came back from the
+                            // owner's Google account.
+                            //
+                            // It used to open the pairing QR, which made it indistinguishable from
+                            // "Join this café" right below it — two buttons, two QR screens, and no
+                            // way into the café from either. Pairing now lives in Devices, where the
+                            // rest of the staff-device management already is.
+                            onClick = {
+                                setupViewModel.beginHostingLocally()
+                                onHostCafe()
+                            },
+                            // Still needs the café to exist — there is nothing to host otherwise.
                             enabled = lanReady,
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                         ) {
