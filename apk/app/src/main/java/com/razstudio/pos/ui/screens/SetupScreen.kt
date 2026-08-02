@@ -7,6 +7,8 @@ import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -37,6 +39,8 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +48,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
@@ -57,6 +64,7 @@ import com.razstudio.pos.data.OperatingMode
 import com.razstudio.pos.data.toCapabilities
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.ui.viewmodels.ConnectionTab
+import com.razstudio.pos.ui.viewmodels.OwnerKeyLoginViewModel
 import com.razstudio.pos.ui.viewmodels.SetupViewModel
 
 /**
@@ -76,11 +84,10 @@ import com.razstudio.pos.ui.viewmodels.SetupViewModel
 fun SetupScreen(
     onBack: () -> Unit,
     /**
-     * Open the owner-key screen. Not embedded: `AdminConnectScreen` is 747 lines of camera,
-     * saved-image picker, manual entry and secondary-admin handling, and a second copy of that
-     * would be a second place for the owner-key flow to drift.
+     * The owner key was accepted: the café is configured and this device is its admin, so Setup is
+     * over. The caller decides where that lands.
      */
-    onLoadOwnerQr: () -> Unit = {},
+    onOwnerKeyAccepted: () -> Unit = {},
     /** Invoked after a successful save, so the operator lands back on the home screen and
      *  sees the mode button they just unlocked. */
     onSaved: () -> Unit = onBack,
@@ -93,6 +100,48 @@ fun SetupScreen(
     val state by viewModel.state.collectAsState()
     val language by languageViewModel.language.collectAsState()
     val strings = com.razstudio.pos.ui.i18n.uiStrings(language)
+
+    // ── Owner key: two ways in, both handled here ────────────────────────────────────────────────
+    //
+    // This used to hand off to AdminConnectScreen, which is a *login* screen — manual entry,
+    // secondary-admin invites, a debug path — and knows nothing about the topology being set up.
+    // A wizard that jumps to a login screen and hopes control comes back is not a wizard.
+    val ownerKeyViewModel: OwnerKeyLoginViewModel = hiltViewModel()
+    val ownerKeyState by ownerKeyViewModel.state.collectAsState()
+    var showOwnerQrChoice by remember { mutableStateOf(false) }
+    var showOwnerQrScanner by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.CAMERA,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasCameraPermission = granted }
+
+    // Decoding happens off the main thread: a full-resolution photo of a QR is a few megapixels,
+    // and ZXing on the UI thread would drop frames on the café's oldest phone.
+    val scope = rememberCoroutineScope()
+    val savedImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val decoded = withContext(Dispatchers.IO) { decodeQrFromImage(context, uri) }
+                if (decoded.isNullOrBlank()) ownerKeyViewModel.imageHeldNoQr()
+                else ownerKeyViewModel.load(decoded)
+            }
+        }
+    }
+
+    // A successful key is the end of Setup: the café is configured and this device is its admin.
+    LaunchedEffect(ownerKeyState) {
+        if (ownerKeyState is OwnerKeyLoginViewModel.State.Done) onOwnerKeyAccepted()
+    }
 
     // The mode this device was ALREADY on when Setup opened. Captured once, so that after a
     // successful switch the button stops warning about a change that has already happened.
@@ -166,9 +215,25 @@ fun SetupScreen(
             ) {
                 HelpText(strings.setupOwnerQrHelp)
                 Button(
-                    onClick = onLoadOwnerQr,
+                    onClick = { showOwnerQrChoice = true },
+                    enabled = ownerKeyState !is OwnerKeyLoginViewModel.State.Working,
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(strings.setupLoadOwnerQrButton) }
+
+                when (val ok = ownerKeyState) {
+                    is OwnerKeyLoginViewModel.State.Working -> HelpText(strings.ownerQrWorking)
+                    is OwnerKeyLoginViewModel.State.Failed -> Text(
+                        text = when (ok.reason) {
+                            OwnerKeyLoginViewModel.Reason.NOT_AN_OWNER_KEY -> strings.ownerQrNotAnOwnerKey
+                            OwnerKeyLoginViewModel.Reason.NO_QR_IN_IMAGE -> strings.ownerQrNoQrInImage
+                            OwnerKeyLoginViewModel.Reason.REJECTED -> strings.ownerQrRejected
+                            OwnerKeyLoginViewModel.Reason.UNREACHABLE -> strings.ownerQrUnreachable
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    else -> Unit
+                }
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
@@ -278,8 +343,15 @@ fun SetupScreen(
                         "previously stored on this device."
                 )
             }
-            Field("Café name", "Your Café", state.cafeName,
-                KeyboardType.Text) { v -> viewModel.update { it.copy(cafeName = v) } }
+            // Hidden on the owner-QR tab. The name arrives from `branding` the moment the key is
+            // accepted, so a field here would be overwritten seconds after it was filled in — and a
+            // field whose value silently changes teaches an owner not to trust the screen.
+            if (!(state.operatingMode == OperatingMode.CLOUD &&
+                    state.connectionTab == ConnectionTab.OWNER_QR)
+            ) {
+                Field("Café name", "Your Café", state.cafeName,
+                    KeyboardType.Text) { v -> viewModel.update { it.copy(cafeName = v) } }
+            }
 
             if (state.operatingMode == OperatingMode.LAN) {
                 // ── Task 21.1: the network the café will actually run on ─────────────────────────
@@ -375,6 +447,63 @@ fun SetupScreen(
             onDismiss = { showModeChangeConfirm = false },
         )
     }
+
+    // ── Owner-key dialogs ────────────────────────────────────────────────────────────────────────
+
+    // ── The choice, as a modal ───────────────────────────────────────────────────────────────────
+    // Two buttons rather than a screen, because this is one decision — camera or file — and the
+    // owner already knows which they have.
+    if (showOwnerQrChoice) {
+        AlertDialog(
+            onDismissRequest = { showOwnerQrChoice = false },
+            title = { Text(strings.setupLoadOwnerQrButton) },
+            text = { Text(strings.ownerQrChoiceBody) },
+            confirmButton = {
+                Column {
+                    Button(
+                        onClick = {
+                            showOwnerQrChoice = false
+                            ownerKeyViewModel.reset()
+                            if (!hasCameraPermission) {
+                                cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                            }
+                            showOwnerQrScanner = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(strings.ownerQrScanWithCamera) }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            showOwnerQrChoice = false
+                            ownerKeyViewModel.reset()
+                            savedImageLauncher.launch("image/*")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(strings.ownerQrChooseSavedImage) }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showOwnerQrChoice = false }) { Text(strings.commonCancel) }
+            },
+        )
+    }
+
+    if (showOwnerQrScanner) {
+        QrScannerScreen(
+            hasCameraPermission = hasCameraPermission,
+            onRequestPermission = {
+                cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+            },
+            onQrDecoded = { text ->
+                showOwnerQrScanner = false
+                ownerKeyViewModel.load(text)
+            },
+            onCancel = { showOwnerQrScanner = false },
+            promptText = strings.ownerQrScanPrompt,
+            cancelText = strings.commonCancel,
+        )
+    }
+
 }
 
 /**

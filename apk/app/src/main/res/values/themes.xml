@@ -3,4 +3,14 @@
     <!-- Base activity theme. Compose supplies the real Material3 theming at runtime;
          this framework theme just gives the window a sane starting point. -->
     <style name="Theme.WarungTomYam" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!--
+        The Google OSS-licences screens are AppCompatActivity, and this app's theme descends from the
+        framework's android:Theme.Material — not from Theme.AppCompat. Opening them therefore threw
+        "You need to use a Theme.AppCompat theme (or descendant) with this activity" and took the
+        whole till down.
+        The two activities get this theme via a manifest override. It is the only AppCompat theme in
+        the app and exists solely for them; nothing else should use it.
+    -->
+    <style name="Theme.WarungTomYam.Licenses" parent="Theme.AppCompat.DayNight.DarkActionBar" />
 </resources>

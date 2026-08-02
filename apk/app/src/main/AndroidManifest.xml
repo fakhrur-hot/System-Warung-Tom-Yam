@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Bluetooth permissions: legacy (pre-Android 12) -->
     <uses-permission android:name="android.permission.BLUETOOTH"
@@ -48,6 +49,20 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.WarungTomYam">
+
+        <!--
+            Both OSS-licences screens, re-themed. BOTH matter: the menu lists the libraries and the
+            second shows one licence's text, so theming only the first swaps a crash on open for a
+            crash on tap.
+        -->
+        <activity
+            android:name="com.google.android.gms.oss.licenses.OssLicensesMenuActivity"
+            android:theme="@style/Theme.WarungTomYam.Licenses"
+            tools:replace="android:theme" />
+        <activity
+            android:name="com.google.android.gms.oss.licenses.OssLicensesActivity"
+            android:theme="@style/Theme.WarungTomYam.Licenses"
+            tools:replace="android:theme" />
 
         <activity
             android:name=".MainActivity"

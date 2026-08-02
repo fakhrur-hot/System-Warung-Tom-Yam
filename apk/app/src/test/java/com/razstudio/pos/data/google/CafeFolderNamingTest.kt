@@ -18,16 +18,17 @@ class CafeFolderNamingTest {
 
     @Test
     fun aNameRoundTripsBackToItsModeAndCafe() {
+        // The label is what the owner sees, so it is the one they chose in Setup — not the enum.
         val name = CafeBundleStore.folderNameFor(OperatingMode.LAN, "Tani Tom Yam")
-        assertEquals("RAZS.POS-LAN-Tani Tom Yam", name)
-        assertEquals("LAN" to "Tani Tom Yam", CafeBundleStore.parseFolderName(name))
+        assertEquals("RAZS.POS-WLAN-Tani Tom Yam", name)
+        assertEquals("WLAN" to "Tani Tom Yam", CafeBundleStore.parseFolderName(name))
     }
 
     @Test
     fun everyModeRoundTrips() {
         OperatingMode.entries.forEach { mode ->
             val name = CafeBundleStore.folderNameFor(mode, "Kopitiam")
-            assertEquals(mode.name to "Kopitiam", CafeBundleStore.parseFolderName(name))
+            assertEquals(CafeBundleStore.labelFor(mode) to "Kopitiam", CafeBundleStore.parseFolderName(name))
         }
     }
 
@@ -36,7 +37,7 @@ class CafeFolderNamingTest {
         // The split is on the FIRST hyphen after the prefix. A mode never contains one; a café name
         // routinely does, and splitting on the last would turn "Kopi-O Corner" into mode "LAN-Kopi".
         val name = CafeBundleStore.folderNameFor(OperatingMode.KIOSK, "Kopi-O Corner")
-        assertEquals("KIOSK" to "Kopi-O Corner", CafeBundleStore.parseFolderName(name))
+        assertEquals("Kiosk" to "Kopi-O Corner", CafeBundleStore.parseFolderName(name))
     }
 
     @Test
@@ -54,7 +55,7 @@ class CafeFolderNamingTest {
         // the string early and the query would either fail or match the wrong thing.
         val name = CafeBundleStore.folderNameFor(OperatingMode.CLOUD, "Mak'cik Kopi")
         assert(!name.contains("'"))
-        assertEquals("CLOUD" to "Makcik Kopi", CafeBundleStore.parseFolderName(name))
+        assertEquals("FullQR" to "Makcik Kopi", CafeBundleStore.parseFolderName(name))
     }
 
     // ── Anything that is not one of ours must not appear in the chooser ──────────────────────────
@@ -65,6 +66,21 @@ class CafeFolderNamingTest {
                "razs.pos-LAN-Cafe").forEach {
             assertNull("must not parse: $it", CafeBundleStore.parseFolderName(it))
         }
+    }
+
+    @Test
+    fun bundlesWrittenBeforeTheLabelsExistedStillParse() {
+        // Those carry the enum name. An owner must not lose a café to a rename we made.
+        assertEquals("CLOUD" to "Kopitiam", CafeBundleStore.parseFolderName("RAZS.POS-CLOUD-Kopitiam"))
+        assertEquals("LAN" to "Kopitiam", CafeBundleStore.parseFolderName("RAZS.POS-LAN-Kopitiam"))
+        assertEquals("KIOSK" to "Kopitiam", CafeBundleStore.parseFolderName("RAZS.POS-KIOSK-Kopitiam"))
+    }
+
+    @Test
+    fun theLabelsAreTheOnesTheOwnerChoseInSetup() {
+        assertEquals("FullQR", CafeBundleStore.labelFor(OperatingMode.CLOUD))
+        assertEquals("WLAN", CafeBundleStore.labelFor(OperatingMode.LAN))
+        assertEquals("Kiosk", CafeBundleStore.labelFor(OperatingMode.KIOSK))
     }
 
     @Test

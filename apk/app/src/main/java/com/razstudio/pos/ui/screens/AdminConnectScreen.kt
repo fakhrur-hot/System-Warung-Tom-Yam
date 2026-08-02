@@ -380,7 +380,7 @@ private fun looksLikeInvite(input: String): Boolean =
  * large photos first so a full-resolution camera shot doesn't OOM. Returns the decoded text,
  * or null if the image couldn't be read or held no QR. Safe to call off the main thread.
  */
-private fun decodeQrFromImage(context: Context, uri: Uri): String? {
+internal fun decodeQrFromImage(context: Context, uri: Uri): String? {
     return try {
         val resolver = context.contentResolver
         // First pass: bounds only, to pick a downsample that keeps the image manageable.

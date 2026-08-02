@@ -657,6 +657,28 @@ data class UiStringsGroup8(
     val setupTabManual: String,
     val setupOwnerQrHelp: String,
     val setupLoadOwnerQrButton: String,
+    val ownerQrChoiceBody: String,
+    val ownerQrScanWithCamera: String,
+    val ownerQrChooseSavedImage: String,
+    val ownerQrScanPrompt: String,
+    val ownerQrWorking: String,
+    val ownerQrNotAnOwnerKey: String,
+    val ownerQrNoQrInImage: String,
+    val ownerQrRejected: String,
+    val ownerQrUnreachable: String,
+    val googleAccountSection: String,
+    val googleLinkExplain: String,
+    val googleLinkButton: String,
+    val googleAccountLabel: String,
+    val googleDriveLabel: String,
+    val googleDriveChecking: String,
+    val googleDriveConnected: String,
+    val googleDriveUnreachable: String,
+    val googleBundleLabel: String,
+    val googleBundleMissing: String,
+    val googleBundleCreate: String,
+    val googleBundleUpdate: String,
+    val googleBundleRecheck: String,
 )
 
 class UiStrings(
@@ -1235,6 +1257,28 @@ class UiStrings(
     val setupTabManual: String get() = g8.setupTabManual
     val setupOwnerQrHelp: String get() = g8.setupOwnerQrHelp
     val setupLoadOwnerQrButton: String get() = g8.setupLoadOwnerQrButton
+    val ownerQrChoiceBody: String get() = g8.ownerQrChoiceBody
+    val ownerQrScanWithCamera: String get() = g8.ownerQrScanWithCamera
+    val ownerQrChooseSavedImage: String get() = g8.ownerQrChooseSavedImage
+    val ownerQrScanPrompt: String get() = g8.ownerQrScanPrompt
+    val ownerQrWorking: String get() = g8.ownerQrWorking
+    val ownerQrNotAnOwnerKey: String get() = g8.ownerQrNotAnOwnerKey
+    val ownerQrNoQrInImage: String get() = g8.ownerQrNoQrInImage
+    val ownerQrRejected: String get() = g8.ownerQrRejected
+    val ownerQrUnreachable: String get() = g8.ownerQrUnreachable
+    val googleAccountSection: String get() = g8.googleAccountSection
+    val googleLinkExplain: String get() = g8.googleLinkExplain
+    val googleLinkButton: String get() = g8.googleLinkButton
+    val googleAccountLabel: String get() = g8.googleAccountLabel
+    val googleDriveLabel: String get() = g8.googleDriveLabel
+    val googleDriveChecking: String get() = g8.googleDriveChecking
+    val googleDriveConnected: String get() = g8.googleDriveConnected
+    val googleDriveUnreachable: String get() = g8.googleDriveUnreachable
+    val googleBundleLabel: String get() = g8.googleBundleLabel
+    val googleBundleMissing: String get() = g8.googleBundleMissing
+    val googleBundleCreate: String get() = g8.googleBundleCreate
+    val googleBundleUpdate: String get() = g8.googleBundleUpdate
+    val googleBundleRecheck: String get() = g8.googleBundleRecheck
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1825,6 +1869,28 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupTabManual = "Masukkan butiran",
             setupOwnerQrHelp = "Imbas kunci pemilik kafe. Ia sudah membawa bahagian belakang, laman web dan nama kafe — tiada apa-apa di sini perlu ditaip.",
             setupLoadOwnerQrButton = "Muat QR Pemilik",
+            ownerQrChoiceBody = "Halakan kamera ke kunci itu, atau pilih gambarnya yang anda sudah simpan.",
+            ownerQrScanWithCamera = "Imbas QR pemilik",
+            ownerQrChooseSavedImage = "Pilih imej QR tersimpan",
+            ownerQrScanPrompt = "Halakan kamera ke kunci pemilik kafe",
+            ownerQrWorking = "Sedang log masuk dan memuatkan kafe…",
+            ownerQrNotAnOwnerKey = "Itu bukan kunci pemilik kafe. Jemputan kakitangan atau QR meja tidak boleh digunakan di sini.",
+            ownerQrNoQrInImage = "Tiada kod QR ditemui dalam imej itu.",
+            ownerQrRejected = "Kafe tidak menerima kunci itu. Ia mungkin telah digantikan dengan yang baharu.",
+            ownerQrUnreachable = "Tidak dapat menghubungi kafe. Pastikan peranti ini dalam talian dan cuba lagi.",
+            googleAccountSection = "Akaun Google",
+            googleLinkExplain = "Pautkan akaun untuk menyimpan salinan kafe ini dalam Google Drive anda sendiri. Telefon baharu kemudian boleh memulihkannya dengan log masuk.",
+            googleLinkButton = "Pautkan ke akaun Google",
+            googleAccountLabel = "Log masuk sebagai",
+            googleDriveLabel = "Google Drive",
+            googleDriveChecking = "Menyemak…",
+            googleDriveConnected = "Bersambung",
+            googleDriveUnreachable = "Tidak dapat dihubungi",
+            googleBundleLabel = "Sandaran kafe",
+            googleBundleMissing = "Belum dibuat",
+            googleBundleCreate = "Cipta %1\$s",
+            googleBundleUpdate = "Kemas kini sandaran sekarang",
+            googleBundleRecheck = "Semak semula",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -2414,6 +2480,28 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupTabManual = "Enter details",
             setupOwnerQrHelp = "Scan the café owner key. It already carries the backend, the website and the café name — nothing here needs typing.",
             setupLoadOwnerQrButton = "Load Owner QR",
+            ownerQrChoiceBody = "Point the camera at the key, or pick a photo of it you already saved.",
+            ownerQrScanWithCamera = "Scan owner QR",
+            ownerQrChooseSavedImage = "Choose saved QR image",
+            ownerQrScanPrompt = "Point the camera at the café owner key",
+            ownerQrWorking = "Signing in and loading the café…",
+            ownerQrNotAnOwnerKey = "That isn't a café owner key. A staff invite or a table QR won't work here.",
+            ownerQrNoQrInImage = "No QR code found in that image.",
+            ownerQrRejected = "The café didn't accept that key. It may have been replaced by a newer one.",
+            ownerQrUnreachable = "Couldn't reach the café. Check this device is online and try again.",
+            googleAccountSection = "Google account",
+            googleLinkExplain = "Link an account to keep a copy of this café in your own Google Drive. A new phone can then restore it by signing in.",
+            googleLinkButton = "Link to Google account",
+            googleAccountLabel = "Signed in as",
+            googleDriveLabel = "Google Drive",
+            googleDriveChecking = "Checking…",
+            googleDriveConnected = "Connected",
+            googleDriveUnreachable = "Not reachable",
+            googleBundleLabel = "Café backup",
+            googleBundleMissing = "Not created yet",
+            googleBundleCreate = "Create %1\$s",
+            googleBundleUpdate = "Update backup now",
+            googleBundleRecheck = "Check again",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -3001,6 +3089,28 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupTabManual = "手动填写",
             setupOwnerQrHelp = "扫描店主密钥。它已包含后端、网站和餐厅名称 — 此处无需输入任何内容。",
             setupLoadOwnerQrButton = "加载店主二维码",
+            ownerQrChoiceBody = "将摄像头对准密钥，或选择您已保存的照片。",
+            ownerQrScanWithCamera = "扫描店主二维码",
+            ownerQrChooseSavedImage = "选择已保存的二维码图片",
+            ownerQrScanPrompt = "将摄像头对准店主密钥",
+            ownerQrWorking = "正在登录并加载餐厅…",
+            ownerQrNotAnOwnerKey = "那不是店主密钥。员工邀请码或桌台二维码在此无法使用。",
+            ownerQrNoQrInImage = "在该图片中未找到二维码。",
+            ownerQrRejected = "餐厅未接受该密钥。它可能已被新密钥替换。",
+            ownerQrUnreachable = "无法连接餐厅。请确认本设备已联网后重试。",
+            googleAccountSection = "Google 账户",
+            googleLinkExplain = "关联账户，将本餐厅的副本保存在您自己的 Google 云端硬盘中。新手机只需登录即可恢复。",
+            googleLinkButton = "关联 Google 账户",
+            googleAccountLabel = "已登录为",
+            googleDriveLabel = "Google 云端硬盘",
+            googleDriveChecking = "检查中…",
+            googleDriveConnected = "已连接",
+            googleDriveUnreachable = "无法连接",
+            googleBundleLabel = "餐厅备份",
+            googleBundleMissing = "尚未创建",
+            googleBundleCreate = "创建 %1\$s",
+            googleBundleUpdate = "立即更新备份",
+            googleBundleRecheck = "重新检查",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -3590,6 +3700,28 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupTabManual = "விவரங்களை உள்ளிடவும்",
             setupOwnerQrHelp = "கஃபே உரிமையாளர் சாவியை ஸ்கேன் செய்யவும். அதில் சர்வர், இணயதளம் மற்றும் கஃபேயின் பெயர் ஏற்கெனவே உள்ளன — இங்கே எதுவும் தட்டச்சு செய்யத் தேவையில்லை.",
             setupLoadOwnerQrButton = "உரிமையாளர் QR ඐ ஏற்று",
+            ownerQrChoiceBody = "கேமராவை சாவியின் மீது நேராக வைக்கவும், அல்லது ஏற்கெனவே சேமித்த படத்தைத் தேர்ந்தெடுக்கவும்.",
+            ownerQrScanWithCamera = "உரிமையாளர் QR ஸ்கேன் செய்",
+            ownerQrChooseSavedImage = "சேமித்த QR படத்தைத் தேர்ந்தெடு",
+            ownerQrScanPrompt = "கஃபே உரிமையாளர் சாவியின் மீது கேமராவை நேராக வைக்கவும்",
+            ownerQrWorking = "உள்நுழைந்து கஃபேயை ஏற்றுகிறது…",
+            ownerQrNotAnOwnerKey = "அது கஃபே உரிமையாளர் சாவி அல்ல. பணியாளர் அழைப்பு அல்லது மேஜ QR இங்கே வேலை செய்யாது.",
+            ownerQrNoQrInImage = "அந்தப் படத்தில் QR குறியீடு ஏதும் இல்லை.",
+            ownerQrRejected = "கஃபே அந்தச் சாவியை ஏற்கவில்லை. அது புதியதால் மாற்றப்பட்டிருக்கலாம்.",
+            ownerQrUnreachable = "கஃபேயை அணுக முடியவில்லை. இந்தச் சாதனம் இணயத்தில் உள்ளதா எனப் பார்த்து மீண்டும் முயற்சிக்கவும்.",
+            googleAccountSection = "Google கணக்கு",
+            googleLinkExplain = "இந்தக் கஃபேயின் நகலை உங்கள் சொந்த Google Drive-இல் வைக்க கணக்கைஇணைக்கவும். புதிய தொலைபேசியில் உள்நுழைவதன் மூலம் அதை மீட்டெடுக்கலாம்.",
+            googleLinkButton = "Google கணக்குடன் இணை",
+            googleAccountLabel = "உள்நுழைந்தவர்",
+            googleDriveLabel = "Google Drive",
+            googleDriveChecking = "சரிபார்க்கிறது…",
+            googleDriveConnected = "இணைக்கப்பட்டது",
+            googleDriveUnreachable = "அணுக முடியவில்லை",
+            googleBundleLabel = "கஃபே காப்புப்பிரதி",
+            googleBundleMissing = "இன்னும் உருவாகவில்லை",
+            googleBundleCreate = "%1\$s உருவாக்கு",
+            googleBundleUpdate = "காப்புப்பிரதியை இப்போது புதுப்பி",
+            googleBundleRecheck = "மீண்டும் சரிபார்",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -4179,6 +4311,28 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupTabManual = "กรอกรายละเอียด",
             setupOwnerQrHelp = "สแกนกุญแจเจ้าของร้าน กุญแจนี้มีทั้งเซิร์ฟเวอร์ เว็บไซต์ และชื่อร้านอยู่แล้ว — ไม่ต้องพิมพ์อะไรที่นี่",
             setupLoadOwnerQrButton = "โหลด QR เจ้าของ",
+            ownerQrChoiceBody = "หันกล้องไปที่กุญแจ หรือเลือกรูปที่คุณบันทึกไว้แล้ว",
+            ownerQrScanWithCamera = "สแกน QR เจ้าของ",
+            ownerQrChooseSavedImage = "เลือกรูป QR ที่บันทึกไว้",
+            ownerQrScanPrompt = "หันกล้องไปที่กุญแจเจ้าของร้าน",
+            ownerQrWorking = "กำลังลงชื่อเข้าใช้และโหลดร้าน…",
+            ownerQrNotAnOwnerKey = "นั่นไม่ใช่กุญแจเจ้าของร้าน คำเชิญพนักงานหรือ QR โต๊ะใช้ที่นี่ไม่ได้",
+            ownerQrNoQrInImage = "ไม่พบรหัส QR ในรูปนั้น",
+            ownerQrRejected = "ร้านไม่ยอมรับกุญแจนี้ อาจถูกแทนที่ด้วยกุญแจใหม่แล้ว",
+            ownerQrUnreachable = "เชื่อมต่อร้านไม่ได้ ตรวจสอบว่าอุปกรณ์นี้ออนไลน์แล้วลองอีกครั้ง",
+            googleAccountSection = "บัญชี Google",
+            googleLinkExplain = "เชื่อมบัญชีเพื่อเก็บสำเนาร้านนี้ไว้ใน Google ไดรฟ์ของคุณเอง โทรศัพท์เครื่องใหม่จะกู้คืนได้ด้วยการลงชื่อเข้าใช้",
+            googleLinkButton = "เชื่อมกับบัญชี Google",
+            googleAccountLabel = "ลงชื่อเข้าใช้เป็น",
+            googleDriveLabel = "Google ไดรฟ์",
+            googleDriveChecking = "กำลังตรวจสอบ…",
+            googleDriveConnected = "เชื่อมต่อแล้ว",
+            googleDriveUnreachable = "เชื่อมต่อไม่ได้",
+            googleBundleLabel = "สำรองข้อมูลร้าน",
+            googleBundleMissing = "ยังไม่ได้สร้าง",
+            googleBundleCreate = "สร้าง %1\$s",
+            googleBundleUpdate = "อัปเดตสำรองตอนนี้",
+            googleBundleRecheck = "ตรวจสอบอีกครั้ง",
         ),
     )
 }

@@ -254,32 +254,15 @@ fun AppNavGraph(
         composable(NavRoutes.SETUP) {
             SetupScreen(
                 onBack = { navController.popBackStack() },
-                onLoadOwnerQr = { navController.navigate(NavRoutes.ADMIN_CONNECT_SETUP) },
-                // Land back on the home screen so the mode just unlocked is visible immediately.
-                onSaved = {
-                    navController.navigate(NavRoutes.ROLE_SELECT) {
-                        popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
-                    }
-                },
-            )
-        }
-
-        // Owner key, entered from Setup. Same screen; on success it also commits the device to
-        // Cloud Mode and drops the owner straight into the till, because the QR has already
-        // supplied everything Setup would have asked them to type.
-        composable(NavRoutes.ADMIN_CONNECT_SETUP) {
-            val setupViewModel: com.razstudio.pos.ui.viewmodels.SetupViewModel = hiltViewModel()
-            AdminConnectScreen(
-                onConnected = {
-                    setupViewModel.completeOwnerQrSetup()
+                // Setup owns the owner-key flow now; it only needs telling where to land.
+                onOwnerKeyAccepted = {
                     navController.navigate(NavRoutes.ADMIN_HOME) {
                         popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
                     }
                 },
-                onBack = { navController.popBackStack() },
-                onSecondaryRegistered = {
-                    setupViewModel.completeOwnerQrSetup()
-                    navController.navigate(NavRoutes.PENDING_APPROVAL) {
+                // Land back on the home screen so the mode just unlocked is visible immediately.
+                onSaved = {
+                    navController.navigate(NavRoutes.ROLE_SELECT) {
                         popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
                     }
                 },

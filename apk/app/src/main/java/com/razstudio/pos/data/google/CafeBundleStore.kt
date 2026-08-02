@@ -82,10 +82,30 @@ open class CafeBundleStore @Inject constructor(
         private const val DRIVE_FILES = "https://www.googleapis.com/drive/v3/files"
         private const val DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
 
+        /**
+         * The label a mode gets in a folder name.
+         *
+         * Deliberately NOT `OperatingMode.name`. The enum reads CLOUD / LAN / KIOSK, but the owner
+         * chose "Full Online with QR ordering" and "(W)LAN AP", and this string is the one thing
+         * they will actually see — in a folder name, in the chooser, on the Settings panel. A
+         * backup labelled with an internal enum is a backup they cannot identify.
+         */
+        fun labelFor(mode: OperatingMode): String = when (mode) {
+            OperatingMode.CLOUD -> "FullQR"
+            OperatingMode.LAN -> "WLAN"
+            OperatingMode.KIOSK -> "Kiosk"
+        }
+
+        private fun modeFromLabel(label: String): OperatingMode? =
+            // Both spellings are accepted on the way in: bundles written before the labels existed
+            // carry the enum name, and an owner should not lose a café to a rename.
+            OperatingMode.entries.firstOrNull { labelFor(it).equals(label, ignoreCase = true) }
+                ?: OperatingMode.entries.firstOrNull { it.name.equals(label, ignoreCase = true) }
+
         fun folderNameFor(mode: OperatingMode, cafeName: String): String =
             // Drive treats the name as opaque text, but a stray quote would break the `q=` filter
             // this class searches with, so the characters that matter there are dropped.
-            FILE_PREFIX + mode.name + "-" + cafeName.replace("'", "").replace("\\", "").trim()
+            FILE_PREFIX + labelFor(mode) + "-" + cafeName.replace("'", "").replace("\\", "").trim()
 
         /**
          * Split `RAZS.POS-LAN-Tani Tom Yam` back into `LAN` and `Tani Tom Yam`.
@@ -102,7 +122,7 @@ open class CafeBundleStore @Inject constructor(
             val mode = rest.substring(0, dash)
             val cafe = rest.substring(dash + 1).trim()
             if (cafe.isEmpty()) return null
-            if (OperatingMode.entries.none { it.name == mode }) return null
+            if (modeFromLabel(mode) == null) return null
             return mode to cafe
         }
     }

@@ -250,9 +250,11 @@ fun AdminSettingsScreen(
                 // Logo preview — a freshly-picked local image takes priority; otherwise
                 // fall back to whatever logo is already saved server-side, so the
                 // screen doesn't look like the logo was lost on a fresh install/relogin.
-                when {
-                    uiState.logoPreview != null -> {
-                        Image(
+                // Centred. A 120dp square pinned to the left edge of a full-width column reads as
+                // a thumbnail that failed to lay out, not as the café's identity.
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    when {
+                        uiState.logoPreview != null -> Image(
                             bitmap = uiState.logoPreview!!.asImageBitmap(),
                             contentDescription = "Logo preview",
                             modifier = Modifier
@@ -260,10 +262,7 @@ fun AdminSettingsScreen(
                                 .clip(RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                    uiState.existingLogoUrl != null -> {
-                        AsyncImage(
+                        uiState.existingLogoUrl != null -> AsyncImage(
                             model = uiState.existingLogoUrl,
                             contentDescription = "Current logo",
                             modifier = Modifier
@@ -271,8 +270,10 @@ fun AdminSettingsScreen(
                                 .clip(RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
                     }
+                }
+                if (uiState.logoPreview != null || uiState.existingLogoUrl != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
                 OutlinedButton(
@@ -287,6 +288,11 @@ fun AdminSettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 }
+
+                // Directly under the logo, because this is the other half of "what this café is":
+                // its identity on this device, and its identity in the owner's Google account.
+                Spacer(modifier = Modifier.height(16.dp))
+                com.razstudio.pos.ui.components.GoogleAccountSection()
 
                 // Save Branding button removed — committed via the sticky Save/Cancel bar
             }

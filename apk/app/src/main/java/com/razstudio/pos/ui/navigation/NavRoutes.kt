@@ -15,14 +15,6 @@ object NavRoutes {
     const val LAN_PAIRING = "lan_pairing"
     const val ADMIN_CONNECT = "admin_connect"
 
-    /**
-     * The same owner-key screen, entered from the Setup Wizard's "Owner QR" tab.
-     *
-     * A separate route rather than a flag, because the only difference is what happens on success:
-     * from Setup the device is also committing to Cloud Mode, which `AdminConnectScreen` has no way
-     * to know — it is reachable from the home screen too, where no topology was chosen.
-     */
-    const val ADMIN_CONNECT_SETUP = "admin_connect_setup"
     const val ORDERING_CONNECT = "ordering_connect"
     const val PENDING_APPROVAL = "pending_approval"
     const val ADMIN_HOME = "admin_home"
