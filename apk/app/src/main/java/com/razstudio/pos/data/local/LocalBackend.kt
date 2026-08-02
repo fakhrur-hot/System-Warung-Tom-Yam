@@ -818,7 +818,12 @@ class LocalBackend @Inject constructor(
         if (order.status == OrderStatus.COMPLETED) {
             return ApiResult.Error("ALREADY_PAID", "This order has already been paid")
         }
-        if (!OrderActions.canTakePayment(order.status)) {
+        // A counter sale (Kiosk: no table) is rung up and paid in one action — the customer is
+        // standing there. canTakePayment requires SENT_TO_KITCHEN or later, which encodes the
+        // table-service rule that food reaches the kitchen before anyone is charged; applying it to
+        // a grocery-style till would make every sale unpayable at the moment it is made.
+        val isCounterSale = order.tableId == null
+        if (!isCounterSale && !OrderActions.canTakePayment(order.status)) {
             return ApiResult.Error("PAYMENT_CONFLICT", "Order cannot be paid in its current status")
         }
 

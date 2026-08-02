@@ -132,4 +132,45 @@ class KioskOrderNumberTest {
         )
         assertTrue("a paid sale must show in the day's order count", count >= 1)
     }
+
+    // ── A counter sale must close, not sit open ──────────────────────────────────────────────────
+
+    @Test
+    fun aCounterSaleIsPayableTheMomentItExists() = runTest {
+        // canTakePayment requires SENT_TO_KITCHEN or later, which encodes the table-service rule
+        // that food reaches the kitchen before anyone is charged. A grocery till charges at the
+        // counter, so applying that rule would make every Kiosk sale unpayable at the moment it is
+        // made — and an unpaid sale never reaches the reports, which count COMPLETED orders.
+        val open = kioskSale(number = 1).copy(status = OrderStatus.RECEIVED, paymentMethod = null)
+        orders.insertOrder(open)
+
+        orders.completePayment(open.id, "CASH")
+
+        val back = orders.getOrderById(open.id)
+        assertEquals(OrderStatus.COMPLETED, back?.status)
+        assertEquals("CASH", back?.paymentMethod)
+    }
+
+    @Test
+    fun anUnpaidSaleWouldNotReachTheDaysTakings() = runTest {
+        // States the consequence directly, so the "leave it RECEIVED" shortcut cannot come back
+        // looking harmless: revenue counts COMPLETED only.
+        orders.insertOrder(kioskSale(number = 1, total = 30.0).copy(status = OrderStatus.RECEIVED))
+
+        val revenue = orders.getTotalRevenueBetween("2026-08-01T00:00:00Z", "2026-08-03T00:00:00Z")
+        assertEquals("an open sale is invisible to reports", 0.0, revenue ?: 0.0, 0.001)
+    }
+
+    @Test
+    fun bothPaymentMethodsAreRecorded() = runTest {
+        val cash = kioskSale(number = 1).copy(status = OrderStatus.RECEIVED)
+        val qr = kioskSale(number = 2).copy(status = OrderStatus.RECEIVED)
+        orders.insertOrder(cash); orders.insertOrder(qr)
+
+        orders.completePayment(cash.id, "CASH")
+        orders.completePayment(qr.id, "QR")
+
+        assertEquals("CASH", orders.getOrderById(cash.id)?.paymentMethod)
+        assertEquals("QR", orders.getOrderById(qr.id)?.paymentMethod)
+    }
 }

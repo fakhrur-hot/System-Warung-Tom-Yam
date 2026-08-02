@@ -329,7 +329,7 @@ class ManualDineInViewModel @Inject constructor(
         return orderNumberSequenceDao.getNextOrderNumber(day.toString())
     }
 
-    fun submitOrder() {
+    fun submitOrder(kioskPaymentMethod: String = "CASH") {
         val state = _uiState.value
         // Kiosk sells over the counter with no table to attach the sale to.
         val tableId = if (isKiosk) null else (state.selectedTableId ?: return)
@@ -361,6 +361,24 @@ class ManualDineInViewModel @Inject constructor(
                 val number = nextKioskOrderNumber()
                 _uiState.value = _uiState.value.copy(kioskOrderNumber = number)
                 apiClient.createOrder(null, items, "STAFF", orderNumber = number)
+                    // A grocery till rings up and takes payment in one action, so the sale closes
+                    // here rather than sitting RECEIVED waiting for someone to come back and settle
+                    // it. Leaving it open would mean a day's takings never reached the reports,
+                    // because those count COMPLETED orders.
+                    .also { created ->
+                        if (created is ApiResult.Success) {
+                            when (val paid = apiClient.processPayment(created.data.orderId, kioskPaymentMethod)) {
+                                is ApiResult.Success -> Unit
+                                is ApiResult.Error ->
+                                    // The sale exists and the slip printed; only the payment failed.
+                                    // Say so rather than implying nothing happened — the operator
+                                    // needs to settle it from the order list, not ring it up twice.
+                                    _uiState.value = _uiState.value.copy(error = paid.message)
+                                is ApiResult.NetworkError ->
+                                    _uiState.value = _uiState.value.copy(error = paid.message)
+                            }
+                        }
+                    }
             } else {
                 // If the table already has an active order (occupied), append to it; otherwise
                 // create a new order. This lets a New Dine-In order top up an occupied table.

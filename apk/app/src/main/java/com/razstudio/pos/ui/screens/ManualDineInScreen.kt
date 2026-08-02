@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -180,7 +181,8 @@ fun ManualDineInScreen(
                         strings = strings,
                         language = language,
                         onUpdateNote = { itemId, note -> viewModel.updateNote(itemId, note) },
-                        onSubmit = { viewModel.submitOrder() }
+                        onSubmit = { viewModel.submitOrder() },
+                        onCharge = { method -> viewModel.submitOrder(method) },
                     )
                 }
             }
@@ -461,7 +463,8 @@ private fun CartReview(
     strings: UiStrings,
     language: AppLanguage,
     onUpdateNote: (String, String) -> Unit,
-    onSubmit: () -> Unit
+    onSubmit: () -> Unit,
+    onCharge: (String) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -517,6 +520,25 @@ private fun CartReview(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Kiosk charges at the counter, so the action is "take the money", not "send to kitchen":
+        // the sale is created, the slip prints and the payment is recorded in one tap. Table service
+        // keeps its single Submit, because there the bill is settled later at the table.
+        if (isKiosk) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { onCharge("CASH") },
+                    enabled = !isSubmitting && cartItems.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
+                ) { Text(strings.payCash) }
+                Spacer(modifier = Modifier.width(12.dp))
+                OutlinedButton(
+                    onClick = { onCharge("QR") },
+                    enabled = !isSubmitting && cartItems.isNotEmpty(),
+                    modifier = Modifier.weight(1f),
+                ) { Text(strings.qrLabel) }
+            }
+        } else {
+
         Button(
             onClick = onSubmit,
             enabled = !isSubmitting && cartItems.isNotEmpty(),
@@ -530,6 +552,8 @@ private fun CartReview(
                 Spacer(modifier = Modifier.width(8.dp))
             }
             Text(strings.submitOrder)
+        }
+
         }
     }
 }
