@@ -112,3 +112,61 @@ class RestoreWarningTest {
         assertEquals(1, menu.getAll().size)
     }
 }
+
+/**
+ * Task 13.1 — the backup nag must say something true, and only where it matters.
+ *
+ * Nothing recorded when a backup last happened, so the app could not tell an operator how long their
+ * only copy had been un-backed-up — which is the entire content of a useful reminder. The banner is
+ * shown off-cloud only: a Cloud café has Supabase holding a second copy, and a banner that appears
+ * when it does not matter is one operators learn to ignore, which breaks it for the cafés that need it.
+ */
+@RunWith(RobolectricTestRunner::class)
+class BackupNagTest {
+
+    private lateinit var config: com.razstudio.pos.data.AppConfigStore
+
+    @Before
+    fun setUp() {
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val prefs = ctx.getSharedPreferences("backup_nag_test", android.content.Context.MODE_PRIVATE)
+        prefs.edit().clear().commit()
+        config = com.razstudio.pos.data.AppConfigStore(ctx, prefs)
+    }
+
+    @Test
+    fun aCafeThatHasNeverBackedUpReadsAsNeverNotZeroDays() {
+        // "0 days ago" would read as reassurance on a café that has never backed up at all, which is
+        // the exact opposite of what is true. 0 is the sentinel for "never".
+        assertEquals(0L, config.lastBackupAtMs())
+    }
+
+    @Test
+    fun aSuccessfulExportRecordsTheMoment() {
+        val now = 1_785_000_000_000L
+        config.setLastBackupAtMs(now)
+        assertEquals(now, config.lastBackupAtMs())
+    }
+
+    @Test
+    fun theAgeIsComputedFromTheRecordedMoment() {
+        val threeDaysAgo = System.currentTimeMillis() - 3 * 86_400_000L
+        config.setLastBackupAtMs(threeDaysAgo)
+
+        val days = ((System.currentTimeMillis() - config.lastBackupAtMs()) / 86_400_000L).toInt()
+        assertEquals(3, days)
+    }
+
+    @Test
+    fun theTimestampSurvivesRestart() {
+        // The banner is read on every admin-home composition, including after the process is killed
+        // overnight — which is precisely when a café most needs to be told it has not backed up.
+        val now = 1_785_000_000_000L
+        config.setLastBackupAtMs(now)
+
+        val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val prefs = ctx.getSharedPreferences("backup_nag_test", android.content.Context.MODE_PRIVATE)
+        val reopened = com.razstudio.pos.data.AppConfigStore(ctx, prefs)
+        assertEquals(now, reopened.lastBackupAtMs())
+    }
+}

@@ -151,6 +151,9 @@ data class UiStringsGroup2(
     val importDatabaseDesc: String,
     val selectBackupFileButton: String,
     val confirmImportTitle: String,
+    val backupBannerNever: String,
+    val backupBannerStale: String,
+    val backupBannerAction: String,
     val restoreWillEraseTitle: String,
     val restoreWillEraseBody: String,
     val restoreOnlyCopyWarning: String,
@@ -743,6 +746,9 @@ class UiStrings(
     val importDatabaseDesc: String get() = g2.importDatabaseDesc
     val selectBackupFileButton: String get() = g2.selectBackupFileButton
     val confirmImportTitle: String get() = g2.confirmImportTitle
+    val backupBannerNever: String get() = g2.backupBannerNever
+    val backupBannerStale: String get() = g2.backupBannerStale
+    val backupBannerAction: String get() = g2.backupBannerAction
     val restoreWillEraseTitle: String get() = g2.restoreWillEraseTitle
     val restoreWillEraseBody: String get() = g2.restoreWillEraseBody
     val restoreOnlyCopyWarning: String get() = g2.restoreOnlyCopyWarning
@@ -1269,6 +1275,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             importDatabaseDesc = "Pulihkan data daripada fail sandaran yang dieksport sebelum ini. Ini akan menggantikan semua data semasa.",
             selectBackupFileButton = "Pilih Fail Sandaran",
             confirmImportTitle = "Sahkan Import",
+            backupBannerNever = "Peranti ini memegang satu-satunya salinan kafe. Belum pernah disandarkan.",
+            backupBannerStale = "Peranti ini memegang satu-satunya salinan kafe. Sandaran terakhir %d hari lalu.",
+            backupBannerAction = "Sandarkan sekarang",
             restoreWillEraseTitle = "Ini akan memadam data semasa peranti",
             restoreWillEraseBody = "%d pesanan dan %d item menu pada peranti ini akan dipadam dan digantikan.",
             restoreOnlyCopyWarning = "Mod ini tiada pelayan awan. Data peranti ini ialah satu-satunya salinan kafe — setelah dipadam ia tidak boleh dipulihkan.",
@@ -1811,6 +1820,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             importDatabaseDesc = "Restore data from a previously exported backup file. This will replace all current data.",
             selectBackupFileButton = "Select Backup File",
             confirmImportTitle = "Confirm Import",
+            backupBannerNever = "This device holds the café's only copy. It has never been backed up.",
+            backupBannerStale = "This device holds the café's only copy. Last backup was %d days ago.",
+            backupBannerAction = "Back up now",
             restoreWillEraseTitle = "This will erase what is on this device",
             restoreWillEraseBody = "%d orders and %d menu items on this device will be deleted and replaced.",
             restoreOnlyCopyWarning = "This mode has no cloud server. This device's data is the café's only copy — once erased it cannot be recovered.",
@@ -2353,6 +2365,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             importDatabaseDesc = "从先前导出的备份文件恢复数据。这将替换所有当前数据。",
             selectBackupFileButton = "选择备份文件",
             confirmImportTitle = "确认导入",
+            backupBannerNever = "本设备保存着店铺的唯一副本，且从未备份。",
+            backupBannerStale = "本设备保存着店铺的唯一副本。上次备份在 %d 天前。",
+            backupBannerAction = "立即备份",
             restoreWillEraseTitle = "这将清除本设备上的数据",
             restoreWillEraseBody = "本设备上的 %d 笔订单和 %d 项菜单将被删除并替换。",
             restoreOnlyCopyWarning = "此模式没有云服务器。本设备的数据是店铺的唯一副本 — 一旦清除将无法恢复。",
@@ -2893,6 +2908,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             importDatabaseDesc = "முன்பு ஏற்றுமதி செய்யப்பட்ட காப்புப்பிரதி கோப்பிலிருந்து தரவை மீட்டமைக்கவும். இது தற்போதைய அனைத்து தரவையும் மாற்றும்.",
             selectBackupFileButton = "காப்புப்பிரதி கோப்பைத் தேர்ந்தெடு",
             confirmImportTitle = "இறக்குமதியை உறுதிப்படுத்து",
+            backupBannerNever = "இந்தச் சாதனம் கேபின் ஒரே நகலை வைத்திருக்கிறது. இதுவரை காப்புப் பிரதி எடுக்கப்படவில்லை.",
+            backupBannerStale = "இந்தச் சாதனம் கேபின் ஒரே நகலை வைத்திருக்கிறது. கடைசி காப்புப் பிரதி %d நாட்களுக்கு முன்பு.",
+            backupBannerAction = "இப்போது காப்புப் பிரதி எடு",
             restoreWillEraseTitle = "இது இந்தச் சாதனத்தில் உள்ளதை அழிக்கும்",
             restoreWillEraseBody = "இந்தச் சாதனத்தில் உள்ள %d ஆர்டர்கள் மற்றும் %d மெனு உருப்படிகள் நீக்கப்பட்டு மாற்றப்படும்.",
             restoreOnlyCopyWarning = "இந்த முறையில் கிளவுட் சேவையகம் இல்லை. இந்தச் சாதனத் தரவே கேபின் ஒரே நகல் — அழிக்கப்பட்டால் மீட்க முடியாது.",
@@ -3435,6 +3453,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             importDatabaseDesc = "กู้คืนข้อมูลจากไฟล์สำรองที่ส่งออกไว้ก่อนหน้านี้ การดำเนินการนี้จะแทนที่ข้อมูลปัจจุบันทั้งหมด",
             selectBackupFileButton = "เลือกไฟล์สำรอง",
             confirmImportTitle = "ยืนยันการนำเข้า",
+            backupBannerNever = "เครื่องนี้เก็บสำเนาเดียวของร้าน และยังไม่เคยสำรองข้อมูล",
+            backupBannerStale = "เครื่องนี้เก็บสำเนาเดียวของร้าน สำรองข้อมูลล่าสุดเมื่อ %d วันก่อน",
+            backupBannerAction = "สำรองข้อมูลตอนนี้",
             restoreWillEraseTitle = "การกู้คืนจะลบข้อมูลในเครื่องนี้",
             restoreWillEraseBody = "%d ออร์เดอร์ และ %d รายการเมนูในเครื่องนี้จะถูกลบและแทนที่",
             restoreOnlyCopyWarning = "โหมดนี้ไม่มีเซิร์ฟเวอร์คลาวด์ ข้อมูลในเครื่องนี้คือสำเนาเดียวของร้าน — เมื่อลบแล้วจะกู้คืนไม่ได้",

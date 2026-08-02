@@ -24,6 +24,7 @@ class BackupViewModel @Inject constructor(
     private val orderDao: com.razstudio.pos.data.local.OrderDao,
     private val menuDao: com.razstudio.pos.data.local.MenuDao,
     private val modeRepository: com.razstudio.pos.data.ModeRepository,
+    private val appConfig: com.razstudio.pos.data.AppConfigStore,
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
@@ -92,6 +93,10 @@ class BackupViewModel @Inject constructor(
                 } ?: throw IllegalStateException("Cannot open output stream")
                 pendingExportJson = null
                 _uiState.update {
+                    // Record it so the home banner can say how long it has been (task 13.1).
+                    // Written only on a *successful* write — a failed export must not reset the
+                    // clock and make an un-backed-up café look safe.
+                    appConfig.setLastBackupAtMs(System.currentTimeMillis())
                     it.copy(isLoading = false, exportUri = uri, successMessage = str().databaseExported)
                 }
             } catch (e: Exception) {

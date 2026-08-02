@@ -51,6 +51,14 @@ class AppConfigStore @Inject constructor(
         private const val KEY_WEBSITE_URL = "website_url"
         private const val KEY_CAFE_NAME = "cafe_name"
 
+        /**
+         * When a backup was last exported, epoch millis (task 13.1).
+         *
+         * Nothing recorded this before, so the app could not tell an operator how long their only
+         * copy had been un-backed-up — which is the whole content of a useful reminder.
+         */
+        private const val KEY_LAST_BACKUP_AT = "last_backup_at"
+
         // Operating mode (Requirement 1.1 / 1.2)
         private const val KEY_OPERATING_MODE = "operating_mode"
 
@@ -141,6 +149,13 @@ class AppConfigStore @Inject constructor(
     fun setLanServerUrl(url: String) {
         write(KEY_LAN_SERVER_URL, url.trim().trimEnd('/'))
     }
+    /** Epoch millis of the last successful export, or 0 when this café has never backed up. */
+    fun lastBackupAtMs(): Long = read(KEY_LAST_BACKUP_AT).toLongOrNull() ?: 0L
+
+    fun setLastBackupAtMs(millis: Long) {
+        write(KEY_LAST_BACKUP_AT, millis.toString())
+    }
+
     fun supabaseAnonKey(): String = read(KEY_SUPABASE_ANON_KEY)
 
     /**

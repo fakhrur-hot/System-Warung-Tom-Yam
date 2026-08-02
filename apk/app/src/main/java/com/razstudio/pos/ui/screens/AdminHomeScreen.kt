@@ -58,6 +58,7 @@ import com.razstudio.pos.ui.viewmodels.PrintAlertsViewModel
 import com.razstudio.pos.ui.i18n.LanguageButton
 import com.razstudio.pos.ui.theme.ThemeButton
 import com.razstudio.pos.ui.i18n.LanguageViewModel
+import com.razstudio.pos.ui.i18n.UiStrings
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.tableview.CartLine
 import com.razstudio.pos.ui.tableview.OrderDetailSheet
@@ -88,6 +89,7 @@ fun AdminHomeScreen(
     pinLockViewModel: PinLockViewModel = hiltViewModel(),
     devicePrefsViewModel: com.razstudio.pos.ui.viewmodels.DevicePrefsViewModel = hiltViewModel(),
     devicesViewModel: com.razstudio.pos.ui.viewmodels.DevicesViewModel = hiltViewModel(),
+    modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel(),
     onNavigateToLock: () -> Unit,
     onNavigateToReconnect: () -> Unit = {},
     onNavigateToDineIn: () -> Unit = {},
@@ -209,6 +211,8 @@ fun AdminHomeScreen(
             snackbarHostState.showSnackbar(printAlertsViewModel.message(alert))
         }
     }
+
+    val backupNag = remember { modeViewModel.backupNag() }
 
     Scaffold(
         topBar = {
@@ -374,6 +378,17 @@ fun AdminHomeScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Task 13.1 — off-cloud this device holds the café's only copy, so the need to back up
+            // has to be evident rather than discoverable three screens down in Café Management.
+            // Cloud cafés never see it: Supabase holds the second copy for them.
+            BackupNagBanner(
+                lastBackupAtMs = backupNag.lastBackupAtMs,
+                visible = backupNag.isOnlyCopy,
+                strings = strings,
+                onBackUp = onNavigateToBackup,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+
             if (sessionState.isLoading && !sessionState.isSessionOpen) {
                 // Loading session
                 Column(
@@ -785,4 +800,47 @@ private fun PendingKitchenPrintsDialog(
             androidx.compose.material3.TextButton(onClick = onDismiss) { Text(strings.commonClose) }
         }
     )
+}
+
+/**
+ * Persistent reminder that this device is the café's only copy (task 13.1, Requirement 8.2).
+ *
+ * Shown only in LAN and Kiosk Mode. A Cloud café has Supabase holding a second copy, so nagging it
+ * would be noise — and a banner that appears when it does not matter is one an operator learns to
+ * stop reading, which is exactly what breaks it for the cafés that do need it.
+ *
+ * States what is true rather than scolding: how long it has been, or that it has never happened.
+ * "Never" is its own message because "0 days ago" would read as reassurance.
+ */
+@Composable
+private fun BackupNagBanner(
+    lastBackupAtMs: Long,
+    visible: Boolean,
+    strings: UiStrings,
+    onBackUp: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (!visible) return
+
+    val days = if (lastBackupAtMs <= 0L) -1
+    else ((System.currentTimeMillis() - lastBackupAtMs) / 86_400_000L).toInt()
+
+    androidx.compose.material3.Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = if (days < 0) strings.backupBannerNever
+                       else strings.backupBannerStale.format(days),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = onBackUp) { Text(strings.backupBannerAction) }
+        }
+    }
 }

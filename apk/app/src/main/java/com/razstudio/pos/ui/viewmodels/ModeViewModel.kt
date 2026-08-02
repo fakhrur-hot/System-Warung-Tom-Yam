@@ -22,11 +22,26 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ModeViewModel @Inject constructor(
-    modeRepository: ModeRepository,
+    private val modeRepository: ModeRepository,
     private val lanAddress: com.razstudio.pos.data.lan.LanAddress,
+    private val appConfig: com.razstudio.pos.data.AppConfigStore,
 ) : ViewModel() {
     val mode: StateFlow<OperatingMode> = modeRepository.activeMode
     val capabilities: StateFlow<ModeCapabilities> = modeRepository.capabilities
+
+    /**
+     * What the admin home's backup banner needs (task 13.1).
+     *
+     * [isOnlyCopy] is the whole gate: Cloud has Supabase holding a second copy, so a banner there
+     * would be noise — and a banner shown when it does not matter is one operators learn to ignore,
+     * which breaks it for the cafés where it does.
+     */
+    data class BackupNag(val lastBackupAtMs: Long, val isOnlyCopy: Boolean)
+
+    fun backupNag(): BackupNag = BackupNag(
+        lastBackupAtMs = appConfig.lastBackupAtMs(),
+        isOnlyCopy = modeRepository.currentMode() != OperatingMode.CLOUD,
+    )
 
     /**
      * This device's address on the café network, resolved fresh on each call (task 21.2,
