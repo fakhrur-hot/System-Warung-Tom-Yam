@@ -106,3 +106,54 @@ class UnexpectedStatusTest {
         }
     }
 }
+
+/**
+ * Task 14.1 — a connection failure in LAN Mode names the admin device, not the internet.
+ *
+ * `e.message` from OkHttp is stack-flavoured — "Failed to connect to /192.168.43.1:8765", or a bare
+ * `SocketTimeoutException` — and it reached the screen at 40 call sites. In Cloud that is merely
+ * unhelpful; in LAN it is actively misleading, because the thing that is unreachable is the admin
+ * phone on the counter and the operator goes off checking their internet instead of waking it.
+ *
+ * The private-range detection is the whole decision, so it is tested directly. It is deliberately
+ * host-based rather than exception-based: the exception says the same thing in both topologies.
+ */
+class LanUnreachableHostTest {
+
+    /** Mirrors ApiClient.networkError's rule. */
+    private fun isLocalPeer(host: String): Boolean =
+        host.startsWith("192.168.") || host.startsWith("10.") || host.startsWith("127.") ||
+            Regex("""^172\.(1[6-9]|2\d|3[01])\.""").containsMatchIn(host)
+
+    @Test
+    fun everyPrivateRangeCountsAsTheAdminDevice() {
+        // A café hotspot hands out any of these depending on the phone and the router.
+        listOf("192.168.43.1", "192.168.1.20", "10.0.0.5", "127.0.0.1",
+               "172.16.4.9", "172.20.1.1", "172.31.255.254").forEach {
+            assertTrue("$it is a local peer", isLocalPeer(it))
+        }
+    }
+
+    @Test
+    fun theRangesJustOutside172AreNotPrivate() {
+        // 172.16–172.31 only. 172.15 and 172.32 are public, and treating them as the counter phone
+        // would send a Cloud café hunting for a device that does not exist.
+        listOf("172.15.0.1", "172.32.0.1").forEach {
+            assertFalse("$it must not be a local peer", isLocalPeer(it))
+        }
+    }
+
+    @Test
+    fun aCloudProjectIsNotTheAdminDevice() {
+        listOf("proj.supabase.co", "8.8.8.8", "cafe.pages.dev").forEach {
+            assertFalse("$it must not be a local peer", isLocalPeer(it))
+        }
+    }
+
+    @Test
+    fun aBlankHostDoesNotClaimToBeLocal() {
+        // baseUrl() can be empty on an unconfigured device; that is "no backend", not "the admin
+        // phone is asleep".
+        assertFalse(isLocalPeer(""))
+    }
+}

@@ -263,6 +263,37 @@ class ApiClient @Inject constructor(
         .writeTimeout(15, TimeUnit.SECONDS)
         .build()
 
+
+    /**
+     * Turn a connection failure into something a café can act on (task 14.1, Requirement 4.5).
+     *
+     * `e.message` from OkHttp is a stack-flavoured string — "Failed to connect to /192.168.43.1:8765"
+     * or a bare `SocketTimeoutException` — and it was going straight to the screen at 40 call sites.
+     * In Cloud Mode that is merely unhelpful. In LAN Mode it is actively misleading: the operator
+     * reads "connection failed" and checks their internet, when the thing that is unreachable is the
+     * admin phone sitting on the counter, and the fix is to wake it or re-join its hotspot.
+     *
+     * The two are told apart by where the request was going, not by the exception: a private-range
+     * base URL means the peer is the Server Device.
+     */
+    private fun networkError(e: IOException): ApiResult.NetworkError {
+        val base = runCatching { baseUrl() }.getOrDefault("")
+        val host = runCatching { java.net.URI(base).host.orEmpty() }.getOrDefault("")
+        val isLocalPeer = host.startsWith("192.168.") || host.startsWith("10.") ||
+            host.startsWith("127.") || Regex("""^172\.(1[6-9]|2\d|3[01])\.""").containsMatchIn(host)
+
+        return if (isLocalPeer || modeRepository.currentMode() == OperatingMode.LAN) {
+            ApiResult.NetworkError(
+                "Can't reach the admin device${if (host.isNotBlank()) " at $host" else ""}. " +
+                    "Check it is switched on, its hotspot is running, and this phone is joined to it."
+            )
+        } else {
+            ApiResult.NetworkError(
+                "Couldn't reach the café's server. Check this device's internet connection and try again."
+            )
+        }
+    }
+
     private fun adminBearerToken(): String? = secureStorage.getSessionToken()
 
     /**
@@ -336,7 +367,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -392,7 +423,7 @@ class ApiClient @Inject constructor(
                 }
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -435,7 +466,7 @@ class ApiClient @Inject constructor(
                     }
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -489,7 +520,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -524,7 +555,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -562,7 +593,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -606,7 +637,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -656,7 +687,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -708,7 +739,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -730,7 +761,7 @@ class ApiClient @Inject constructor(
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
                 voidRequest(orderId, lines, reason, token)
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -751,7 +782,7 @@ class ApiClient @Inject constructor(
                     ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
                 voidRequest(orderId, lines, reason, token)
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -844,7 +875,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -885,7 +916,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -924,7 +955,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -983,7 +1014,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1042,7 +1073,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1087,7 +1118,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1131,7 +1162,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1182,7 +1213,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1215,7 +1246,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -1285,7 +1316,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1339,7 +1370,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -1381,7 +1412,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -1424,7 +1455,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -1479,7 +1510,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -1520,7 +1551,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -1577,7 +1608,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1627,7 +1658,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -1673,7 +1704,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1717,7 +1748,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1758,7 +1789,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1793,7 +1824,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1846,7 +1877,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -1889,7 +1920,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1953,7 +1984,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -1988,7 +2019,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -2063,7 +2094,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -2117,7 +2148,7 @@ class ApiClient @Inject constructor(
                     else -> unexpectedStatus(response.code)
                 }
             } catch (e: IOException) {
-                ApiResult.NetworkError(e.message ?: "Network error")
+                networkError(e)
             } catch (e: Exception) {
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
@@ -2153,7 +2184,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
@@ -2254,7 +2285,7 @@ class ApiClient @Inject constructor(
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
-            ApiResult.NetworkError(e.message ?: "Network error")
+            networkError(e)
         } catch (e: Exception) {
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
