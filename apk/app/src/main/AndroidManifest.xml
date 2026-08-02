@@ -19,7 +19,23 @@
 
     <!-- Foreground service: keeps Realtime subscription alive -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!--
+        remoteMessaging, not dataSync. Android 15 caps dataSync at ~6 hours per app per day; a till
+        that opens at 07:00 has its service killed by early afternoon and REFUSED a restart until the
+        window resets, so the café loses realtime orders and kitchen printing for the rest of the day.
+        Observed on this device: ForegroundServiceDidNotStopInTimeException, then
+        ForegroundServiceStartNotAllowedException on every retry.
+
+        connectedDevice was tried first and rejected at runtime: it additionally requires one of
+        BLUETOOTH_CONNECT / CHANGE_WIFI_STATE / NFC / … to be *granted*, and BLUETOOTH_CONNECT is a
+        runtime permission this café had declined. The service would then have crashed on launch for
+        any café that does not print over Bluetooth — a worse failure than the one being fixed.
+
+        remoteMessaging needs no permission beyond its own, has no daily quota, and is the honest
+        description of the continuous work: receiving order and status events for this café and
+        relaying them to its staff devices.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
 
     <!-- Battery optimization exemption request -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
@@ -94,7 +110,7 @@
         <service
             android:name=".realtime.RealtimeService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="remoteMessaging" />
 
         <!-- Foreground service for ordering staff (GPS attendance + café status) -->
         <service

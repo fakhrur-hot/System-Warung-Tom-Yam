@@ -410,7 +410,14 @@ class RealtimeService : Service() {
         val notification = buildNotification(s().notifListening)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            // Must match the manifest exactly or startForeground throws. See the manifest comment
+            // for why this is remoteMessaging: dataSync is capped at ~6h/day on Android 15 and was
+            // taking the till down mid-service.
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
+            )
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
