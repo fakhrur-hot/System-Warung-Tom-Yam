@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.BuildConfig
 import com.razstudio.pos.data.ApiClient
+import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.local.Table
 import com.razstudio.pos.data.local.TableDao
@@ -34,7 +35,7 @@ import javax.inject.Inject
 class QrPdfViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val tableDao: TableDao,
-    private val apiClient: ApiClient,
+    private val apiClient: BackendGateway,
     private val languageManager: LanguageManager,
     private val appConfig: com.razstudio.pos.data.AppConfigStore
 ) : ViewModel() {

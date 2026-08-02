@@ -40,6 +40,17 @@ data class PairingQrPayload(
         .toString()
 
     companion object {
+        /**
+         * The LAN Server's fixed port — the single source of truth for it.
+         *
+         * It lived in four places (LanServer, LocalBackend, LanPairingViewModel, LanServerLocator),
+         * each carrying a "must match" comment, which is a drift hazard written down rather than
+         * removed. It belongs here because the pairing QR is what carries the port across devices:
+         * if this number and the listener ever disagreed, every staff phone would scan a code
+         * pointing at a closed port and the café would have no way to tell why.
+         */
+        const val PORT = 8765
+
         const val TYPE = "warungpos.lan.pair"
         const val VERSION = 1
 

@@ -3,6 +3,7 @@ package com.razstudio.pos.ui.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
+import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.MenuImageUploadResponse
 import com.razstudio.pos.data.local.MenuCategory
@@ -66,7 +67,7 @@ data class MenuUiState(
 @HiltViewModel
 class MenuViewModel @Inject constructor(
     private val menuDao: MenuDao,
-    private val apiClient: ApiClient,
+    private val apiClient: BackendGateway,
     private val modeRepository: com.razstudio.pos.data.ModeRepository,
     private val localImageStore: com.razstudio.pos.data.local.LocalImageStore,
     private val categoryStore: MenuCategoryStore,

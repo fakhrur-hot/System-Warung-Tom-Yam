@@ -101,6 +101,6 @@ class LanPairingViewModel @Inject constructor(
 
     private companion object {
         /** Must match `LanServer.PORT`. */
-        const val PORT = 8765
+        const val PORT = PairingQrPayload.PORT
     }
 }

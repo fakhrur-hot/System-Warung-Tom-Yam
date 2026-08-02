@@ -513,8 +513,8 @@ class LanServer @Inject constructor(
     private companion object {
         const val TAG = "LanServer"
 
-        /** Must match `LocalBackend`'s LAN_PORT — the pairing QR carries it. */
-        const val PORT = 8765
+        /** The pairing QR carries it, so the QR's payload class owns the number. */
+        const val PORT = com.razstudio.pos.data.lan.PairingQrPayload.PORT
 
         /** `ApiClient.baseUrl()` appends this; the routes have to live under it. */
         const val PREFIX = "/functions/v1"

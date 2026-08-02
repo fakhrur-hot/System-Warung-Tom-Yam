@@ -118,7 +118,7 @@ class LocalBackend @Inject constructor(
          * now). 8765 is above the privileged range, outside IANA's registered block, and not one
          * of the ports an OEM's own on-device services tend to squat.
          */
-        private const val LAN_PORT = 8765
+        private const val LAN_PORT = com.razstudio.pos.data.lan.PairingQrPayload.PORT
 
         /**
          * Hashes a credential string using SHA-256.
@@ -140,7 +140,7 @@ class LocalBackend @Inject constructor(
     }
 
     override suspend fun adminHandshakeDebug(deviceId: String, cafeName: String): ApiResult<String> =
-        notImplemented("adminHandshakeDebug")
+        unsupportedInThisMode("adminHandshakeDebug")
 
     /**
      * Register a Client Device against a pairing code (task 5.1, Requirements 5.1, 5.3).
@@ -242,10 +242,10 @@ class LocalBackend @Inject constructor(
     }
 
     override suspend fun recoverAdmin(recoveryToken: String, deviceId: String, deviceModel: String): ApiResult<String> =
-        notImplemented("recoverAdmin")
+        unsupportedInThisMode("recoverAdmin")
 
     override suspend fun getRecoveryToken(): ApiResult<InviteResponse> =
-        notImplemented("getRecoveryToken")
+        unsupportedInThisMode("getRecoveryToken")
 
     /**
      * The current pairing code, minting one if none is live (task 5.2, Requirement 5.4).
@@ -1071,7 +1071,7 @@ class LocalBackend @Inject constructor(
     }
 
     override suspend fun getTableTokens(): ApiResult<Map<String, String>> =
-        notImplemented("getTableTokens")
+        unsupportedInThisMode("getTableTokens")
 
     /**
      * Replace the table registry (task 4.5). Returns the ids that were **skipped**, matching the
@@ -1111,13 +1111,13 @@ class LocalBackend @Inject constructor(
     }
 
     override suspend fun getCafeLocation(): ApiResult<CafeLocationResponse> =
-        notImplemented("getCafeLocation")
+        unsupportedInThisMode("getCafeLocation")
 
     override suspend fun putCafeLocation(lat: Double, lng: Double, radius: Int): ApiResult<Unit> =
-        notImplemented("putCafeLocation")
+        unsupportedInThisMode("putCafeLocation")
 
     override suspend fun postAttendance(event: String, lat: Double, lng: Double, forced: Boolean): ApiResult<Unit> =
-        notImplemented("postAttendance")
+        unsupportedInThisMode("postAttendance")
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
@@ -1169,10 +1169,25 @@ class LocalBackend @Inject constructor(
         )
     }
 
-    private fun notImplemented(method: String): Nothing = throw NotImplementedError(
-        "LocalBackend.$method is not implemented yet — LAN/Kiosk backend arrives in task 4 onwards. " +
-            "If you reached this from Cloud Mode, the BackendGateway binding picked the wrong " +
-            "implementation; check ModeRepository.currentMode() and the device role."
+    /**
+     * A capability this topology genuinely does not have.
+     *
+     * These used to `throw NotImplementedError`, which is an **Error**, not an Exception — so no
+     * `catch (e: Exception)` anywhere on the way up caught it, and reaching one killed the app. That
+     * was survivable only for as long as nothing actually called them: eleven ViewModels were
+     * injecting `ApiClient` directly rather than `BackendGateway`, so LAN Mode never routed here at
+     * all. The moment that was fixed, opening Devices & Staff crashed the café's till on
+     * `getCafeLocation`.
+     *
+     * An `ApiResult.Error` is the honest shape. Every caller already handles one, the screen
+     * degrades to "this mode cannot do that" instead of vanishing, and the code is greppable.
+     *
+     * The UI should still not ask — `ModeCapabilities` exists to keep these off screen off-cloud.
+     * This is the floor, not the plan.
+     */
+    private fun unsupportedInThisMode(method: String): ApiResult.Error = ApiResult.Error(
+        "UNSUPPORTED_IN_MODE",
+        "$method needs a cloud backend. This café runs off-cloud, so that feature is unavailable here.",
     )
 
     /**

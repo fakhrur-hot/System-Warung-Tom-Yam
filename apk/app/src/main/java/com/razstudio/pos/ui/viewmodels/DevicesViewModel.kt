@@ -3,6 +3,7 @@ package com.razstudio.pos.ui.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
+import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.DeviceDto
 import com.razstudio.pos.data.SecureStorage
@@ -21,7 +22,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class DevicesViewModel @Inject constructor(
-    private val apiClient: ApiClient,
+    private val apiClient: BackendGateway,
     private val secureStorage: SecureStorage,
     private val languageManager: LanguageManager
 ) : ViewModel() {

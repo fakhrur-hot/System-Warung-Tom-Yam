@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
+import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.local.MenuCategoryStore
 import com.razstudio.pos.data.local.MenuDao
 import com.razstudio.pos.data.local.MenuItem
@@ -28,7 +29,7 @@ import javax.inject.Inject
 @HiltViewModel
 class MenuPresetViewModel @Inject constructor(
     private val menuDao: MenuDao,
-    private val apiClient: ApiClient,
+    private val apiClient: BackendGateway,
     private val categoryStore: MenuCategoryStore,
     @ApplicationContext private val context: Context
 ) : ViewModel() {

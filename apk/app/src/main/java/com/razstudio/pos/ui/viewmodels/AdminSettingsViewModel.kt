@@ -7,6 +7,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
+import com.razstudio.pos.data.BackendGateway
 import android.util.Log
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.InviteResponse
@@ -38,7 +39,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class AdminSettingsViewModel @Inject constructor(
-    private val apiClient: ApiClient,
+    private val apiClient: BackendGateway,
     private val settingsDao: SettingsDao,
     @ApplicationContext private val context: Context,
     private val languageManager: LanguageManager,

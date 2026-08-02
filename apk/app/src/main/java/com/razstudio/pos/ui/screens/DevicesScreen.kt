@@ -222,7 +222,33 @@ fun DevicesScreen(
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 } else if (settingsState.invite != null) {
                     val inviteUrl = settingsState.invite!!.url
-                    val qrBitmap = remember(inviteUrl) { QrCodeUtil.encode(inviteUrl, 512) }
+
+                    // What the QR actually encodes differs by topology, and getting this wrong is
+                    // invisible until a staff phone fails to join.
+                    //
+                    // Cloud: a `https://…/join?invite=<token>` link. The token is IN the URL, so
+                    // encoding the URL is enough, and it doubles as something shareable over
+                    // WhatsApp.
+                    //
+                    // Off-cloud: `LocalBackend.getInvite` returns `http://<ip>:8765` as a *human*
+                    // caption and the pairing token separately. Encoding that URL alone produced a
+                    // QR with an address and no token — unusable, because registration consumes the
+                    // token, and `OrderingConnectScreen` decodes `PairingQrPayload` rather than a
+                    // bare URL. The two halves have to be put back together here, in the one format
+                    // the scanner understands.
+                    val qrContent = remember(inviteUrl, settingsState.invite!!.token, capabilities.websiteInvites) {
+                        if (capabilities.websiteInvites) {
+                            inviteUrl
+                        } else {
+                            val host = (modeViewModel.lanAddress() as? com.razstudio.pos.data.lan.LanAddress.Result.Found)?.ip
+                            if (host == null) null else com.razstudio.pos.data.lan.PairingQrPayload(
+                                host = host,
+                                port = com.razstudio.pos.data.lan.PairingQrPayload.PORT,
+                                pairingToken = settingsState.invite!!.token,
+                            ).encode()
+                        }
+                    }
+                    val qrBitmap = remember(qrContent) { qrContent?.let { QrCodeUtil.encode(it, 512) } }
                     if (qrBitmap != null) {
                         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                             Image(
@@ -273,11 +299,22 @@ fun DevicesScreen(
                     Text(strings.noInvitationAvailable, style = MaterialTheme.typography.bodyMedium)
                 }
 
+                // `secondaryAdmin` is false off-cloud by design (see ModeCapabilities): LAN Mode is
+                // one ADMIN server plus N ORDERING clients, and Kiosk has no peers. The section used
+                // to render regardless, offering a Wireless AP owner a role their café cannot hold —
+                // and the invite behind it would have been minted against endpoints LocalBackend
+                // does not implement.
                 if (!isSecondaryAdmin) {
+                    // `secondaryAdmin` is false off-cloud by design (see ModeCapabilities): LAN is
+                    // one ADMIN server plus N ORDERING clients, and Kiosk has no peers. This used to
+                    // render regardless, offering a Wireless AP owner a role their café cannot hold.
+                    //
+                    // The divider lives INSIDE the gate: a separator with nothing after it reads as
+                    // a section that failed to load.
+                    if (capabilities.secondaryAdmin) {
                     Spacer(modifier = Modifier.height(16.dp))
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(12.dp))
-
                     // === Add Secondary Admin ===
                     // A separate QR that grants an admin-level device with full management but no
                     // local printer (its orders print on this Main Admin). Loaded on demand.
@@ -350,6 +387,14 @@ fun DevicesScreen(
                         }
                     }
 
+                    }
+
+                    // Owner recovery is a cloud concept: the token is minted by the `admin-recovery`
+                    // endpoint and the QR carries a link into the café's website, neither of which
+                    // exists off-cloud — `LocalBackend.getRecoveryToken` reports it unsupported.
+                    // The equivalent safety net for a LAN or Kiosk café is the backup file and the
+                    // Google bundle, both on the Backup screen.
+                    if (mode == com.razstudio.pos.data.OperatingMode.CLOUD) {
                     Spacer(modifier = Modifier.height(16.dp))
                     HorizontalDivider()
                     Spacer(modifier = Modifier.height(12.dp))
@@ -374,6 +419,7 @@ fun DevicesScreen(
                         settingsViewModel.loadRecoveryToken()
                         showRecovery = true
                     }) { Text(strings.showOwnerRecoveryQr) }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

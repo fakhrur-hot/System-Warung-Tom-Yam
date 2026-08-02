@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
+import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.MenuItemDto
 import com.razstudio.pos.util.BusinessDay
@@ -37,7 +38,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class AdminSessionViewModel @Inject constructor(
-    private val apiClient: ApiClient,
+    private val apiClient: BackendGateway,
     private val menuDao: MenuDao,
     private val categoryStore: MenuCategoryStore,
     private val sessionPrefs: SessionPrefs,

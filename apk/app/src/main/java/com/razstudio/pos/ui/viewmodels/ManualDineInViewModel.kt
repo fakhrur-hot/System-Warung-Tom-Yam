@@ -3,6 +3,7 @@ package com.razstudio.pos.ui.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
+import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.NewOrderItem
 import com.razstudio.pos.ui.i18n.AppLanguage
@@ -24,7 +25,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class ManualDineInViewModel @Inject constructor(
-    private val apiClient: ApiClient,
+    private val apiClient: BackendGateway,
     private val menuDao: MenuDao,
     private val orderDao: OrderDao,
     private val tableDao: TableDao,

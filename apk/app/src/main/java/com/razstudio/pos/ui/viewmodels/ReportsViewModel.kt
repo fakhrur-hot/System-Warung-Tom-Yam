@@ -16,6 +16,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
+import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.local.CancelledSummary
 import com.razstudio.pos.data.local.OrderDao
@@ -50,7 +51,7 @@ class ReportsViewModel @Inject constructor(
     private val orderDao: OrderDao,
     private val tableDao: TableDao,
     private val settingsDao: SettingsDao,
-    private val apiClient: ApiClient,
+    private val apiClient: BackendGateway,
     private val languageManager: LanguageManager
 ) : ViewModel() {
 
