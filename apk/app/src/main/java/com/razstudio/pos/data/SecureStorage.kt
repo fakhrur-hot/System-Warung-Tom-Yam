@@ -28,6 +28,14 @@ class SecureStorage @Inject constructor(
     companion object {
         private const val TAG = "SecureStorage"
         private const val PREFS_FILE = "secure_prefs"
+
+        /**
+         * A separate, unencrypted file for the installation id alone.
+         *
+         * Not in [PREFS_FILE]: that one is wiped wholesale on corruption, and the id must outlive
+         * exactly that event. Nothing else may be written here.
+         */
+        private const val DEVICE_ID_PREFS = "device_identity"
         private const val KEY_SESSION_TOKEN = "session_token"
         private const val KEY_API_KEY = "api_key"
         private const val KEY_DEVICE_ID = "device_id"
@@ -166,14 +174,47 @@ class SecureStorage @Inject constructor(
 
     // --- Public API ---
 
-    /** Get or generate a persistent device ID (UUID). */
+    /**
+     * This installation's identity, stable for as long as the app is installed.
+     *
+     * ## Why it does not live only in the encrypted store
+     *
+     * When the keystore is unavailable — a budget-OEM hiccup, a corrupted master key —
+     * [createEncryptedPrefs] returns null and [safeWrite] quietly returns false. This function used
+     * to mint a UUID, fail to store it, and mint a *different* one on the very next call. Every
+     * request then carried a new `devices.device_identifier`, so one phone enrolled itself over and
+     * over and the café's Devices screen filled with copies of the same handset.
+     *
+     * So the id is kept in three places, in order of preference: memory for this process, the
+     * encrypted store, and a plain [SharedPreferences] file. Plaintext is deliberate and safe here —
+     * unlike the tokens beside it, this is an opaque installation id that grants nothing. Losing it
+     * is the harm; reading it is not.
+     */
     fun getDeviceId(): String {
-        val existing = safeRead(KEY_DEVICE_ID)
-        if (existing != null) return existing
+        cachedDeviceId?.let { return it }
+
+        val stored = safeRead(KEY_DEVICE_ID) ?: plainPrefs().getString(KEY_DEVICE_ID, null)
+        if (stored != null) {
+            cachedDeviceId = stored
+            // Heal whichever copy is missing, so a keystore that recovers stops depending on the
+            // plaintext fallback — and one that never recovers still has somewhere to read from.
+            safeWrite(KEY_DEVICE_ID, stored)
+            plainPrefs().edit().putString(KEY_DEVICE_ID, stored).apply()
+            return stored
+        }
+
         val newId = UUID.randomUUID().toString()
+        cachedDeviceId = newId
         safeWrite(KEY_DEVICE_ID, newId)
+        plainPrefs().edit().putString(KEY_DEVICE_ID, newId).apply()
         return newId
     }
+
+    /** In-process cache: the floor, for when neither store can be written at all. */
+    @Volatile private var cachedDeviceId: String? = null
+
+    private fun plainPrefs(): SharedPreferences =
+        context.getSharedPreferences(DEVICE_ID_PREFS, Context.MODE_PRIVATE)
 
     /**
      * The id the **server** knows this device by, learned from `register`'s response.
@@ -266,12 +307,38 @@ class SecureStorage @Inject constructor(
     }
 
     /** Clear all stored credentials — routes user back to role selection. */
+    /**
+     * Clear every credential — but NOT this device's identity.
+     *
+     * ## Why the id survives a sign-out
+     *
+     * [KEY_DEVICE_ID] is written to `devices.device_identifier`, and that column is how the backend
+     * decides whether a device it has seen before is signing in again or a new one is enrolling.
+     * Wiping it made every sign-out mint a fresh UUID, so one physical phone accumulated a row per
+     * sign-in: a café's Devices screen filled up with revoked copies of the same handset, and the
+     * owner could not tell which entry was the phone in their hand.
+     *
+     * The identity is a property of the hardware, not of the session. Signing out ends a session.
+     *
+     * The server-assigned id is cleared, deliberately: it belongs to a registration, and the next
+     * one will hand back a fresh one. Keeping a stale `devices.id` would point later calls at a row
+     * this device no longer owns.
+     */
     fun clearAll() {
+        val deviceId = safeRead(KEY_DEVICE_ID)
         try {
             getPrefs()?.edit()?.clear()?.apply()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to clear prefs normally, forcing", e)
             handleCorruption()
+        }
+        // Restored after the wipe rather than excluded from it: EncryptedSharedPreferences has no
+        // "clear everything except" and enumerating the keys to remove would silently miss any key
+        // added later.
+        val keep = deviceId ?: cachedDeviceId
+        if (keep != null) {
+            cachedDeviceId = keep
+            safeWrite(KEY_DEVICE_ID, keep)
         }
     }
 

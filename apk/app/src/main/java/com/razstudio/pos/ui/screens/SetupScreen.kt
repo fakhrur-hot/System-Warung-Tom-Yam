@@ -457,9 +457,17 @@ fun SetupScreen(
         AlertDialog(
             onDismissRequest = { showOwnerQrChoice = false },
             title = { Text(strings.setupLoadOwnerQrButton) },
-            text = { Text(strings.ownerQrChoiceBody) },
-            confirmButton = {
+            // The two choices live in the TEXT slot, not in confirmButton.
+            //
+            // Material3 lays confirmButton and dismissButton out together in one horizontal row, so
+            // a full-width Column in confirmButton takes the whole row and Cancel gets drawn on top
+            // of it. The body slot is a plain vertical column, which is what two stacked full-width
+            // choices actually want. Cancel stays the single real button, where a dialog's cancel
+            // belongs.
+            text = {
                 Column {
+                    Text(strings.ownerQrChoiceBody)
+                    Spacer(modifier = Modifier.height(16.dp))
                     Button(
                         onClick = {
                             showOwnerQrChoice = false
@@ -482,7 +490,7 @@ fun SetupScreen(
                     ) { Text(strings.ownerQrChooseSavedImage) }
                 }
             },
-            dismissButton = {
+            confirmButton = {
                 TextButton(onClick = { showOwnerQrChoice = false }) { Text(strings.commonCancel) }
             },
         )
