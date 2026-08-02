@@ -66,7 +66,20 @@ data class SetupState(
     // ── Other sections ───────────────────────────────────────────────────────────────────────────
 
     val saved: Boolean = false,
+
+    /**
+     * Which way the owner is connecting a Cloud café. Only meaningful for `CLOUD`.
+     *
+     * Defaults to [ConnectionTab.OWNER_QR] because that is the path almost every owner takes and
+     * the only one that needs nothing typed: the owner key carries the Supabase URL, the
+     * publishable key and the café's website origin, and signing in with it fetches the café name
+     * from branding. Everything the manual tab asks for is already in that QR.
+     */
+    val connectionTab: ConnectionTab = ConnectionTab.OWNER_QR,
 )
+
+/** The two ways to point a device at a Cloud café. */
+enum class ConnectionTab { OWNER_QR, MANUAL }
 
 /**
  * Backs the in-app Setup screen (reachable from the three-dots menu on the login page).
@@ -156,6 +169,31 @@ class SetupViewModel @Inject constructor(
          * a bug.
          */
         const val LOCAL_HOST_SESSION = "local-host"
+    }
+
+    fun selectConnectionTab(tab: ConnectionTab) {
+        _state.value = _state.value.copy(connectionTab = tab, saved = false)
+    }
+
+    /**
+     * The owner signed in with their key from inside Setup, so this device runs that café in Cloud
+     * Mode. Called after `AdminConnectScreen` reports success.
+     *
+     * ## Why the mode is written here and not before the scan
+     *
+     * `AdminConnectScreen` already writes the backend (via `adoptBackendFromRecoveryQr`) and the
+     * café name (from branding). What it cannot know is the *topology* the owner chose — it is
+     * reachable from the home screen too, where no such choice was made. Persisting CLOUD up front
+     * instead would leave a device claiming a mode it had not finished configuring if the owner
+     * simply backed out of the scanner.
+     *
+     * With this, `isModeConfigured(CLOUD)` is satisfied by the QR alone: URL, key, website and name
+     * all arrive from it, which is exactly why the Save button has nothing to do on that tab.
+     */
+    fun completeOwnerQrSetup() {
+        modeRepository.setMode(OperatingMode.CLOUD)
+        appConfig.setOperatingMode(OperatingMode.CLOUD)
+        _state.value = _state.value.copy(operatingMode = OperatingMode.CLOUD, saved = true)
     }
 
     /** Task 9.2 — pick the topology. Nothing is persisted until [save]. */
@@ -313,6 +351,16 @@ class SetupViewModel @Inject constructor(
      */
     fun blockingReason(): String? {
         val s = _state.value
+
+        // The owner-key tab has no form to block. Everything Save would check — backend, key,
+        // website, café name — arrives from the QR itself, so demanding a typed café name there was
+        // asking the owner to fill in a field the next screen was about to overwrite. That is the
+        // defect this tab exists to remove: a Full QR café could not be saved at all without
+        // manually retyping details it already had in its hand.
+        if (s.operatingMode == OperatingMode.CLOUD && s.connectionTab == ConnectionTab.OWNER_QR) {
+            return null
+        }
+
         if (s.cafeName.isBlank()) return "Enter the café name."
 
         if (s.operatingMode != OperatingMode.CLOUD) return null

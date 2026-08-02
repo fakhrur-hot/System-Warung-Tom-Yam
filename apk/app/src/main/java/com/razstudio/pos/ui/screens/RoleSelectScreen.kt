@@ -179,12 +179,23 @@ fun RoleSelectScreen(
                         ) {
                             Text(strings.joinAsOrderingMode, style = MaterialTheme.typography.titleSmall)
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedButton(
-                            onClick = onAdminConnect,
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                        ) {
-                            Text(strings.reloginAsCafeAdmin, style = MaterialTheme.typography.titleSmall)
+                        // The owner-key entry used to sit here as a second button. It moved into
+                        // the Setup Wizard's "Owner QR" tab, where it belongs: scanning that key is
+                        // how a Full QR café gets *configured*, not just how somebody signs in, and
+                        // having it here meant Setup demanded a café name the QR was about to
+                        // supply. Setup is one tap away at the bottom of this screen.
+                        //
+                        // Kept for a device that is ALREADY a configured Cloud café, where this is
+                        // a genuine re-login and sending the owner through a setup wizard to do it
+                        // would be absurd.
+                        if (cloudReady) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = onAdminConnect,
+                                modifier = Modifier.fillMaxWidth().height(52.dp),
+                            ) {
+                                Text(strings.reloginAsCafeAdmin, style = MaterialTheme.typography.titleSmall)
+                            }
                         }
                     }
                 }

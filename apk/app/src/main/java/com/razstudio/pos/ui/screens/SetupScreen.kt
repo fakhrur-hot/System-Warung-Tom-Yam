@@ -32,6 +32,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -54,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import com.razstudio.pos.data.OperatingMode
 import com.razstudio.pos.data.toCapabilities
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.razstudio.pos.ui.viewmodels.ConnectionTab
 import com.razstudio.pos.ui.viewmodels.SetupViewModel
 
 /**
@@ -72,12 +75,24 @@ import com.razstudio.pos.ui.viewmodels.SetupViewModel
 @Composable
 fun SetupScreen(
     onBack: () -> Unit,
+    /**
+     * Open the owner-key screen. Not embedded: `AdminConnectScreen` is 747 lines of camera,
+     * saved-image picker, manual entry and secondary-admin handling, and a second copy of that
+     * would be a second place for the owner-key flow to drift.
+     */
+    onLoadOwnerQr: () -> Unit = {},
     /** Invoked after a successful save, so the operator lands back on the home screen and
      *  sees the mode button they just unlocked. */
     onSaved: () -> Unit = onBack,
     viewModel: SetupViewModel = hiltViewModel(),
+    // NOTE: the rest of this screen is still hardcoded English — a pre-existing gap, not one this
+    // change introduces. The new controls below are translated; the older labels around them are
+    // not, and that whole screen deserves a pass of its own.
+    languageViewModel: com.razstudio.pos.ui.i18n.LanguageViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val language by languageViewModel.language.collectAsState()
+    val strings = com.razstudio.pos.ui.i18n.uiStrings(language)
 
     // The mode this device was ALREADY on when Setup opened. Captured once, so that after a
     // successful switch the button stops warning about a change that has already happened.
@@ -120,6 +135,46 @@ fun SetupScreen(
 
             SectionHeader("Connection")
             if (state.operatingMode == OperatingMode.CLOUD) {
+                // ── Two ways in, and the fast one goes first ─────────────────────────────────────
+                //
+                // The owner key already carries the Supabase URL, the publishable key and the
+                // café's website origin, and signing in with it fetches the café name from
+                // branding. So it supplies every single thing the manual tab asks for. Before this,
+                // an owner holding that QR still could not save — the form demanded a café name it
+                // was about to overwrite — which is the whole reason these tabs exist.
+                //
+                // Manual stays, because a café whose site is not deployed yet has no QR to scan.
+                TabRow(
+                    selectedTabIndex = if (state.connectionTab == ConnectionTab.OWNER_QR) 0 else 1,
+                ) {
+                    Tab(
+                        selected = state.connectionTab == ConnectionTab.OWNER_QR,
+                        onClick = { viewModel.selectConnectionTab(ConnectionTab.OWNER_QR) },
+                        text = { Text(strings.setupTabOwnerQr) },
+                    )
+                    Tab(
+                        selected = state.connectionTab == ConnectionTab.MANUAL,
+                        onClick = { viewModel.selectConnectionTab(ConnectionTab.MANUAL) },
+                        text = { Text(strings.setupTabManual) },
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            if (state.operatingMode == OperatingMode.CLOUD &&
+                state.connectionTab == ConnectionTab.OWNER_QR
+            ) {
+                HelpText(strings.setupOwnerQrHelp)
+                Button(
+                    onClick = onLoadOwnerQr,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(strings.setupLoadOwnerQrButton) }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (state.operatingMode == OperatingMode.CLOUD &&
+                state.connectionTab == ConnectionTab.MANUAL
+            ) {
                 // ── Task 4.2: single website URL field as the primary input ──────────────────────
                 HelpText("Enter the café's website address and tap Connect to fill in the backend details automatically.")
 
@@ -208,7 +263,12 @@ fun SetupScreen(
                         )
                     }
                 }
-            } else {
+            }
+
+            // Explicitly !CLOUD, not "else". Once the Cloud branch above gained a tab condition, an
+            // `else` also caught Cloud-on-the-owner-QR-tab and showed a Full QR café the off-cloud
+            // copy: "No internet backend. This device holds the café's data." Wrong, and alarming.
+            if (state.operatingMode != OperatingMode.CLOUD) {
                 // Requirement 2.4: an off-cloud café is never asked for a Supabase URL. Not merely
                 // optional — absent. A field that can be filled in and then ignored is how an owner
                 // ends up believing their LAN café is syncing somewhere.
@@ -244,7 +304,9 @@ fun SetupScreen(
             // Save alone used to be the whole flow, and it proved only that text reached disk. An
             // operator who mistyped a key learned nothing until a later screen failed for a reason
             // that never mentioned the key.
-            if (state.operatingMode == OperatingMode.CLOUD) {
+            if (state.operatingMode == OperatingMode.CLOUD &&
+                state.connectionTab == ConnectionTab.MANUAL
+            ) {
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = { viewModel.verifyConnection() },

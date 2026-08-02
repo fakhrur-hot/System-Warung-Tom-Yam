@@ -73,6 +73,11 @@ class SetupVerificationTest {
             secureStorage = com.razstudio.pos.data.SecureStorage(context, prefs),
             appConfigFetcher = FakeFetcher(NoInternetGuard(modeRepo)).also { fetcher = it },
         )
+
+        // These exercise the MANUAL connection form. Cloud's default tab is the owner key, which
+        // has no form and therefore nothing to block — that path is covered separately by
+        // theOwnerQrTabHasNothingToBlock.
+        vm.selectConnectionTab(ConnectionTab.MANUAL)
     }
 
     private fun fillCloudFields() = vm.update {
@@ -85,6 +90,37 @@ class SetupVerificationTest {
     }
 
     // ── The gate ──────────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun theOwnerQrTabHasNothingToBlock() {
+        // The defect this tab was added for: a Full QR café holding its owner key could not be
+        // saved at all, because the form demanded a café name — one the QR carries and the very
+        // next screen overwrites. Nothing typed, nothing blocking.
+        vm.update { it.copy(operatingMode = OperatingMode.CLOUD, cafeName = "", supabaseUrl = "", supabaseAnonKey = "") }
+        vm.selectConnectionTab(ConnectionTab.OWNER_QR)
+
+        assertNull("the owner key supplies all of this", vm.blockingReason())
+    }
+
+    @Test
+    fun theManualTabStillDemandsEverything() {
+        // The QR tab relaxes nothing for the form beside it. A café typing its own details is still
+        // held to a reachable backend and a verified connection.
+        vm.update { it.copy(operatingMode = OperatingMode.CLOUD, cafeName = "", supabaseUrl = "", supabaseAnonKey = "") }
+
+        assertNotNull(vm.blockingReason())
+    }
+
+    @Test
+    fun offCloudModesAreUnaffectedByTheTab() {
+        // Only Cloud has tabs. A LAN or Kiosk café must still be blocked on its name whatever the
+        // stale tab value happens to be.
+        listOf(OperatingMode.LAN, OperatingMode.KIOSK).forEach { mode ->
+            vm.selectConnectionTab(ConnectionTab.OWNER_QR)
+            vm.update { it.copy(operatingMode = mode, cafeName = "") }
+            assertNotNull("$mode must still need a name", vm.blockingReason())
+        }
+    }
 
     @Test
     fun anUnverifiedCloudConnectionCannotBeSaved() {
@@ -190,6 +226,9 @@ class SetupVerificationTest {
     @Test
     fun everyModeRequiresACafeName() {
         // Without it, Save would light up a mode button on the home screen for an unnamed café.
+        //
+        // Cloud is checked on its MANUAL tab: the Owner QR tab has no form to block, because the
+        // key supplies the name itself. See [theOwnerQrTabHasNothingToBlock].
         OperatingMode.entries.forEach { mode ->
             vm.update { it.copy(operatingMode = mode, cafeName = "") }
             assertFalse("$mode must not save unnamed", vm.canSave())

@@ -653,6 +653,10 @@ data class UiStringsGroup8(
     val chooseCafeTitle: String,
     val chooseCafeBody: String,
     val chooseCafeCannotUndo: String,
+    val setupTabOwnerQr: String,
+    val setupTabManual: String,
+    val setupOwnerQrHelp: String,
+    val setupLoadOwnerQrButton: String,
 )
 
 class UiStrings(
@@ -1227,6 +1231,10 @@ class UiStrings(
     val chooseCafeTitle: String get() = g8.chooseCafeTitle
     val chooseCafeBody: String get() = g8.chooseCafeBody
     val chooseCafeCannotUndo: String get() = g8.chooseCafeCannotUndo
+    val setupTabOwnerQr: String get() = g8.setupTabOwnerQr
+    val setupTabManual: String get() = g8.setupTabManual
+    val setupOwnerQrHelp: String get() = g8.setupOwnerQrHelp
+    val setupLoadOwnerQrButton: String get() = g8.setupLoadOwnerQrButton
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1813,6 +1821,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             chooseCafeTitle = "Kafe yang mana?",
             chooseCafeBody = "Akaun Google ini menyimpan lebih daripada satu kafe. Pilih yang patut dijalankan oleh peranti ini.",
             chooseCafeCannotUndo = "Pilihan ini menggantikan apa sahaja yang telah disediakan pada peranti ini. Untuk bertukar kemudian, guna “Tinggalkan kafe ini”.",
+            setupTabOwnerQr = "QR Pemilik",
+            setupTabManual = "Masukkan butiran",
+            setupOwnerQrHelp = "Imbas kunci pemilik kafe. Ia sudah membawa bahagian belakang, laman web dan nama kafe — tiada apa-apa di sini perlu ditaip.",
+            setupLoadOwnerQrButton = "Muat QR Pemilik",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -2398,6 +2410,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             chooseCafeTitle = "Which café?",
             chooseCafeBody = "This Google account holds more than one café. Pick the one this device should run.",
             chooseCafeCannotUndo = "Choosing replaces whatever is set up on this device. To switch later, use “Leave this café”.",
+            setupTabOwnerQr = "Owner QR",
+            setupTabManual = "Enter details",
+            setupOwnerQrHelp = "Scan the café owner key. It already carries the backend, the website and the café name — nothing here needs typing.",
+            setupLoadOwnerQrButton = "Load Owner QR",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2981,6 +2997,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             chooseCafeTitle = "哪一间餐厅？",
             chooseCafeBody = "此 Google 账户保存了多间餐厅。请选择本设备要运行的那一间。",
             chooseCafeCannotUndo = "选择后将替换本设备上现有的设置。若要稍后更换，请使用“离开此餐厅”。",
+            setupTabOwnerQr = "店主二维码",
+            setupTabManual = "手动填写",
+            setupOwnerQrHelp = "扫描店主密钥。它已包含后端、网站和餐厅名称 — 此处无需输入任何内容。",
+            setupLoadOwnerQrButton = "加载店主二维码",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -3566,6 +3586,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             chooseCafeTitle = "எந்தக் கஃபே?",
             chooseCafeBody = "இந்த Google கணக்கில் ஒன்றுக்கு மேற்பட்ட கஃபேக்கள் உள்ளன. இந்தச் சாதனம் இயக்க வேண்டியதைத் தேர்ந்தெடுக்கவும்.",
             chooseCafeCannotUndo = "தேர்வு இந்தச் சாதனத்தில் அமைக்கப்பட்டதை மாற்றும். பிறகு மாற்ற “இந்தக் கஃபேயை விடு” ஐப் பயன்படுத்தவும்.",
+            setupTabOwnerQr = "உரிமையாளர் QR",
+            setupTabManual = "விவரங்களை உள்ளிடவும்",
+            setupOwnerQrHelp = "கஃபே உரிமையாளர் சாவியை ஸ்கேன் செய்யவும். அதில் சர்வர், இணயதளம் மற்றும் கஃபேயின் பெயர் ஏற்கெனவே உள்ளன — இங்கே எதுவும் தட்டச்சு செய்யத் தேவையில்லை.",
+            setupLoadOwnerQrButton = "உரிமையாளர் QR ඐ ஏற்று",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -4151,6 +4175,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             chooseCafeTitle = "ร้านไหน",
             chooseCafeBody = "บัญชี Google นี้เก็บร้านไว้มากกว่าหนึ่งร้าน เลือกร้านที่อุปกรณ์นี้ควรใช้งาน",
             chooseCafeCannotUndo = "การเลือกจะแทนที่การตั้งค่าที่มีอยู่บนอุปกรณ์นี้ หากต้องการเปลี่ยนภายหลัง ให้ใช้ “ออกจากร้านนี้”",
+            setupTabOwnerQr = "QR เจ้าของ",
+            setupTabManual = "กรอกรายละเอียด",
+            setupOwnerQrHelp = "สแกนกุญแจเจ้าของร้าน กุญแจนี้มีทั้งเซิร์ฟเวอร์ เว็บไซต์ และชื่อร้านอยู่แล้ว — ไม่ต้องพิมพ์อะไรที่นี่",
+            setupLoadOwnerQrButton = "โหลด QR เจ้าของ",
         ),
     )
 }
