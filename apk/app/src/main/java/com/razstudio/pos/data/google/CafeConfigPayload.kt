@@ -61,6 +61,17 @@ data class CafeConfigPayload(
      * Blank is valid: a bundle saved before this field existed still restores its config.
      */
     val setupData: String = "",
+    /**
+     * Menu photo file name -> Drive file id, for the pictures stored beside this manifest.
+     *
+     * Off-cloud, `LocalImageStore` keeps menu photos in `filesDir/menu-images/` — app-private files
+     * that are deleted with the app. A cafe restoring onto a replacement phone would otherwise get
+     * its whole menu back as grey placeholders, which for a picture menu is most of the menu.
+     *
+     * File names rather than menu-item ids, because that is what `LocalImageStore` uses on disk and
+     * what `MenuItem.imagePath` already points at.
+     */
+    val photoFileIds: Map<String, String> = emptyMap(),
     /** Set when written; used to tell two bundles apart in the conflict dialog (task 23.8). */
     val savedAtMs: Long = 0L,
     /** The device that saved it, for the same reason. Never used for authorisation. */
@@ -78,6 +89,7 @@ data class CafeConfigPayload(
         put(KEY_CLOUDFLARE_DOMAIN, cloudflareDomain)
         put(KEY_CLOUDFLARE_PROJECT, cloudflareProject)
         put(KEY_SETUP_DATA, setupData)
+        put(KEY_PHOTOS, JSONObject(photoFileIds as Map<*, *>))
         put(KEY_SAVED_AT, savedAtMs)
         put(KEY_SAVED_BY, savedByDevice)
     }.toString()
@@ -96,6 +108,7 @@ data class CafeConfigPayload(
         private const val KEY_CLOUDFLARE_DOMAIN = "cloudflare_domain"
         private const val KEY_CLOUDFLARE_PROJECT = "cloudflare_project"
         private const val KEY_SETUP_DATA = "setup_data"
+        private const val KEY_PHOTOS = "photo_file_ids"
         private const val KEY_SAVED_AT = "saved_at_ms"
         private const val KEY_SAVED_BY = "saved_by_device"
 
@@ -140,6 +153,10 @@ data class CafeConfigPayload(
                 cloudflareDomain = o.optString(KEY_CLOUDFLARE_DOMAIN).trim(),
                 cloudflareProject = o.optString(KEY_CLOUDFLARE_PROJECT).trim(),
                 setupData = o.optString(KEY_SETUP_DATA),
+                photoFileIds = o.optJSONObject(KEY_PHOTOS)?.let { obj ->
+                    obj.keys().asSequence().associateWith { k -> obj.optString(k) }
+                        .filterValues { it.isNotBlank() }
+                } ?: emptyMap(),
                 savedAtMs = o.optLong(KEY_SAVED_AT, 0L),
                 savedByDevice = o.optString(KEY_SAVED_BY).trim(),
             )

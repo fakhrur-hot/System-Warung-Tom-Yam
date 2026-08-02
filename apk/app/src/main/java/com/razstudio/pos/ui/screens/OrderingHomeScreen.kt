@@ -42,6 +42,8 @@ import com.razstudio.pos.ui.viewmodels.OrderingViewModel
  */
 @Composable
 fun OrderingHomeScreen(
+    /** Forwarded to the avatar in [StaffTableViewScreen]; see that screen for why it is Mode Logout only. */
+    onAccountSignedOut: () -> Unit = {},
     viewModel: OrderingViewModel = hiltViewModel(),
     languageViewModel: LanguageViewModel = hiltViewModel()
 ) {
@@ -72,6 +74,7 @@ fun OrderingHomeScreen(
                     onClearError = { viewModel.clearError() }
                 )
                 OrderingViewModel.CafeState.ORDERING -> OrderingScreen(
+                    onAccountSignedOut = onAccountSignedOut,
                     onCheckOut = { viewModel.checkOut() }
                 )
             }
@@ -219,7 +222,8 @@ private fun CheckInScreen(
  */
 @Composable
 private fun OrderingScreen(
-    onCheckOut: () -> Unit
+    onCheckOut: () -> Unit,
+    onAccountSignedOut: () -> Unit,
 ) {
-    StaffTableViewScreen(onCheckOut = onCheckOut)
+    StaffTableViewScreen(onCheckOut = onCheckOut, onAccountSignedOut = onAccountSignedOut)
 }

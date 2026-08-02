@@ -67,6 +67,17 @@ class LocalImageStore @Inject constructor(
      * already in the desired state if the file has gone. [path] is reduced to its filename first, so
      * a full `file://` URL or a stored path both work and neither can escape the directory.
      */
+    /**
+     * The on-disk file a stored photo name maps to.
+     *
+     * Exposed so a Drive restore can write the picture back to the exact path `MenuItem.imagePath`
+     * already points at — otherwise the menu would come back referencing files that are not there.
+     */
+    fun fileFor(name: String): File = File(dir, name)
+
+    /** Every stored menu photo, for backing the whole set up to Drive in one pass. */
+    fun allFiles(): List<File> = dir.listFiles()?.filter { it.isFile }.orEmpty()
+
     fun delete(path: String): Boolean {
         val name = path.substringAfterLast('/').ifBlank { return false }
         if (name == "." || name == "..") return false

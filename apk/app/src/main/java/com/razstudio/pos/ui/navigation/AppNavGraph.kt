@@ -234,7 +234,16 @@ fun AppNavGraph(
                         }
                     }
                 },
-                onSetup = { navController.navigate(NavRoutes.SETUP) }
+                onSetup = { navController.navigate(NavRoutes.SETUP) },
+                // "Reload from Google Drive" is the sign-in screen again: it re-authenticates and
+                // re-lists the account's cafés, which is exactly what that screen already does.
+                // A second code path would be a second place for the chooser to drift.
+                onReloadDrive = { navController.navigate(NavRoutes.SIGN_IN) },
+                onAccountSignedOut = {
+                    navController.navigate(NavRoutes.ROLE_SELECT) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
             )
         }
 
@@ -301,6 +310,11 @@ fun AppNavGraph(
 
         composable(NavRoutes.ADMIN_HOME) {
             AdminHomeScreen(
+                onAccountSignedOut = {
+                    navController.navigate(NavRoutes.ROLE_SELECT) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
                 onNavigateToLock = {
                     // Sign-out: pop the ENTIRE logged-in stack back to ROLE_SELECT, so pressing
                     // back from the lock screen stays at role-select (or closes the app), never
@@ -358,7 +372,12 @@ fun AppNavGraph(
         }
 
         composable(NavRoutes.ORDERING_HOME) {
-            OrderingHomeScreen()
+            OrderingHomeScreen(
+                onAccountSignedOut = {
+                    navController.navigate(NavRoutes.ROLE_SELECT) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },)
         }
 
         // Menu Management

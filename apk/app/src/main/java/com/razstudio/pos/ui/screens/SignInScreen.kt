@@ -216,6 +216,46 @@ fun SignInScreen(
         )
     }
 
+    // ── The account holds several cafés ──────────────────────────────────────────────────────
+    // Listed, not defaulted. A WLAN till and a Kiosk in the same account are different businesses
+    // as far as this device is concerned, and picking for the owner would silently load the wrong
+    // one — which, because choosing replaces what is on the device, is not a mistake they can undo.
+    (state as? SignInViewModel.State.ChooseCafe)?.let { choice ->
+        AlertDialog(
+            // Not dismissible: there is no sensible "neither". The owner signed in to load a café,
+            // and closing this would leave them on a screen with nothing to act on.
+            onDismissRequest = {},
+            title = { Text(strings.chooseCafeTitle) },
+            text = {
+                Column {
+                    Text(strings.chooseCafeBody, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    choice.bundles.forEach { bundle ->
+                        OutlinedButton(
+                            onClick = { viewModel.choose(bundle) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            // Mode as well as name: an owner running the same café as a Kiosk and a
+                            // WLAN till has two bundles whose names are identical, and the mode is
+                            // the only thing that tells them apart.
+                            Text("${bundle.cafeName}  ·  ${bundle.mode}")
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    Text(
+                        text = strings.chooseCafeCannotUndo,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = leaveToEntry) { Text(strings.signInContinueWithout) }
+            },
+        )
+    }
+
     (state as? SignInViewModel.State.Problem)?.let { problem ->
         AlertDialog(
             onDismissRequest = { viewModel.dismissProblem() },

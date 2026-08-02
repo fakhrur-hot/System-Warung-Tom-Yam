@@ -46,6 +46,8 @@ class CafeBundleViewModel @Inject constructor(
     private val modeRepository: ModeRepository,
     private val backend: BackendGateway,
     private val backupManager: com.razstudio.pos.data.local.DatabaseBackupManager,
+    private val imageStore: com.razstudio.pos.data.local.LocalImageStore,
+    private val session: com.razstudio.pos.data.google.GoogleAccountSession,
 ) : ViewModel() {
 
     data class State(
@@ -106,7 +108,10 @@ class CafeBundleViewModel @Inject constructor(
                 savedByDevice = android.os.Build.MODEL ?: "",
             )
 
-            val failure = bundleStore.save(token, payload)
+            // The café's menu photos travel with it. They live in app-private storage and are
+            // deleted with the app, so a replacement phone would otherwise restore a picture menu
+            // with no pictures.
+            val failure = bundleStore.save(token, payload, imageStore.allFiles())
             _state.value = State(
                 outcome = if (failure == null) Outcome.SAVED else Outcome.UPLOAD_REJECTED
             )
@@ -133,12 +138,20 @@ class CafeBundleViewModel @Inject constructor(
         ""
     }
 
-    /** Lets an owner take the café key back out of their Google account. */
+    /** Lets an owner take this café back out of their Google account. */
     fun remove(activity: Activity) {
         _state.value = State(busy = true)
         viewModelScope.launch {
             val token = authorize(activity) ?: return@launch
-            val failure = bundleStore.delete(token)
+            // Only the café this device is running. An account may hold several — a WLAN till, a
+            // Kiosk — and removing all of them because the owner tidied up one would be a much
+            // larger action than the button says.
+            val folderId = session.selected.value?.folderId
+                ?: run {
+                    _state.value = State(outcome = Outcome.REMOVED)
+                    return@launch
+                }
+            val failure = bundleStore.delete(token, folderId)
             _state.value = State(
                 outcome = if (failure == null) Outcome.REMOVED else Outcome.UPLOAD_REJECTED
             )

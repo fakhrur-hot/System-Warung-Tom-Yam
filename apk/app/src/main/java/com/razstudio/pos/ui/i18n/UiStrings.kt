@@ -647,6 +647,12 @@ data class UiStringsGroup8(
     val cafeBundleNoPermission: String,
     val modeConfiguredElsewhereHint: String,
     val pairStaffDeviceButton: String,
+    val avatarReloadDrive: String,
+    val avatarModeLogout: String,
+    val avatarGoogleLogout: String,
+    val chooseCafeTitle: String,
+    val chooseCafeBody: String,
+    val chooseCafeCannotUndo: String,
 )
 
 class UiStrings(
@@ -1215,6 +1221,12 @@ class UiStrings(
     val cafeBundleNoPermission: String get() = g8.cafeBundleNoPermission
     val modeConfiguredElsewhereHint: String get() = g8.modeConfiguredElsewhereHint
     val pairStaffDeviceButton: String get() = g8.pairStaffDeviceButton
+    val avatarReloadDrive: String get() = g8.avatarReloadDrive
+    val avatarModeLogout: String get() = g8.avatarModeLogout
+    val avatarGoogleLogout: String get() = g8.avatarGoogleLogout
+    val chooseCafeTitle: String get() = g8.chooseCafeTitle
+    val chooseCafeBody: String get() = g8.chooseCafeBody
+    val chooseCafeCannotUndo: String get() = g8.chooseCafeCannotUndo
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1795,6 +1807,12 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeBundleNoPermission = "Tidak dapat memperoleh kebenaran untuk Google Drive.",
             modeConfiguredElsewhereHint = "Peranti ini disediakan untuk mod lain. Tukarnya dalam Wizard Persediaan.",
             pairStaffDeviceButton = "Gandingkan peranti kakitangan",
+            avatarReloadDrive = "Muat semula dari Google Drive",
+            avatarModeLogout = "Tinggalkan kafe ini",
+            avatarGoogleLogout = "Log keluar Google",
+            chooseCafeTitle = "Kafe yang mana?",
+            chooseCafeBody = "Akaun Google ini menyimpan lebih daripada satu kafe. Pilih yang patut dijalankan oleh peranti ini.",
+            chooseCafeCannotUndo = "Pilihan ini menggantikan apa sahaja yang telah disediakan pada peranti ini. Untuk bertukar kemudian, guna “Tinggalkan kafe ini”.",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -2374,6 +2392,12 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeBundleNoPermission = "Couldn't get permission for Google Drive.",
             modeConfiguredElsewhereHint = "This device is set up for another mode. Change it in the Setup Wizard.",
             pairStaffDeviceButton = "Pair a staff device",
+            avatarReloadDrive = "Reload from Google Drive",
+            avatarModeLogout = "Leave this café",
+            avatarGoogleLogout = "Sign out of Google",
+            chooseCafeTitle = "Which café?",
+            chooseCafeBody = "This Google account holds more than one café. Pick the one this device should run.",
+            chooseCafeCannotUndo = "Choosing replaces whatever is set up on this device. To switch later, use “Leave this café”.",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2951,6 +2975,12 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeBundleNoPermission = "无法获得 Google 云端硬盘的授权。",
             modeConfiguredElsewhereHint = "本设备已设置为其他模式。请在设置向导中更改。",
             pairStaffDeviceButton = "配对员工设备",
+            avatarReloadDrive = "从 Google 云端硬盘重新加载",
+            avatarModeLogout = "离开此餐厅",
+            avatarGoogleLogout = "退出 Google 账户",
+            chooseCafeTitle = "哪一间餐厅？",
+            chooseCafeBody = "此 Google 账户保存了多间餐厅。请选择本设备要运行的那一间。",
+            chooseCafeCannotUndo = "选择后将替换本设备上现有的设置。若要稍后更换，请使用“离开此餐厅”。",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -3530,6 +3560,12 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeBundleNoPermission = "Google Drive-க்கான அனுமதியைப் பெற முடியவில்லை.",
             modeConfiguredElsewhereHint = "இந்தச் சாதனம் வேறு முறைக்காக அமைக்கப்பட்டுள்ளது. அமைப்பு விஸார்டில் அதை மாற்றவும்.",
             pairStaffDeviceButton = "பணியாளர் சாதனத்தை இணைக்கவும்",
+            avatarReloadDrive = "Google Drive-இலிருந்து மீண்டும் ஏற்று",
+            avatarModeLogout = "இந்தக் கஃபேயை விடு",
+            avatarGoogleLogout = "Google-இலிருந்து வெளியேறு",
+            chooseCafeTitle = "எந்தக் கஃபே?",
+            chooseCafeBody = "இந்த Google கணக்கில் ஒன்றுக்கு மேற்பட்ட கஃபேக்கள் உள்ளன. இந்தச் சாதனம் இயக்க வேண்டியதைத் தேர்ந்தெடுக்கவும்.",
+            chooseCafeCannotUndo = "தேர்வு இந்தச் சாதனத்தில் அமைக்கப்பட்டதை மாற்றும். பிறகு மாற்ற “இந்தக் கஃபேயை விடு” ஐப் பயன்படுத்தவும்.",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -4109,6 +4145,12 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeBundleNoPermission = "ขอสิทธิ์สำหรับ Google ไดรฟ์ไม่สำเร็จ",
             modeConfiguredElsewhereHint = "อุปกรณ์นี้ตั้งค่าสำหรับโหมดอื่น เปลี่ยนได้ในตัวช่วยตั้งค่า",
             pairStaffDeviceButton = "จับคู่อุปกรณ์พนักงาน",
+            avatarReloadDrive = "โหลดใหม่จาก Google ไดรฟ์",
+            avatarModeLogout = "ออกจากร้านนี้",
+            avatarGoogleLogout = "ออกจากระบบ Google",
+            chooseCafeTitle = "ร้านไหน",
+            chooseCafeBody = "บัญชี Google นี้เก็บร้านไว้มากกว่าหนึ่งร้าน เลือกร้านที่อุปกรณ์นี้ควรใช้งาน",
+            chooseCafeCannotUndo = "การเลือกจะแทนที่การตั้งค่าที่มีอยู่บนอุปกรณ์นี้ หากต้องการเปลี่ยนภายหลัง ให้ใช้ “ออกจากร้านนี้”",
         ),
     )
 }

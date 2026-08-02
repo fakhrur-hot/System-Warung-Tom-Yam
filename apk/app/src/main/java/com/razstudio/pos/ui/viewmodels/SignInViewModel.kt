@@ -42,6 +42,8 @@ class SignInViewModel @Inject constructor(
     private val appConfigStore: AppConfigStore,
     private val modeRepository: ModeRepository,
     private val backupManager: com.razstudio.pos.data.local.DatabaseBackupManager,
+    private val session: com.razstudio.pos.data.google.GoogleAccountSession,
+    private val imageStore: com.razstudio.pos.data.local.LocalImageStore,
 ) : ViewModel() {
 
     sealed class State {
@@ -67,6 +69,18 @@ class SignInViewModel @Inject constructor(
 
         /** Signed in, nothing saved. Setup Wizard only — see the class note. */
         data class SignedInNoCafe(val email: String) : State()
+
+        /**
+         * The account holds several cafés — a WLAN till, a Kiosk, a full-QR shop — so the owner
+         * picks. Shown only when there is an actual choice: one café loads without asking, because
+         * a dialog with a single button is a step, not a decision.
+         *
+         * The pick is not a filter. Choosing *loads*, replacing what is on this device, which is
+         * why it is confirmed and why switching afterwards needs a deliberate Mode Logout.
+         */
+        data class ChooseCafe(
+            val bundles: List<CafeBundleStore.RemoteBundle>,
+        ) : State()
 
         /**
          * Something did not work. Carries no severity: the screen shows the reason and the same
@@ -107,6 +121,10 @@ class SignInViewModel @Inject constructor(
             when (val result = signInService.signIn(activity as Context)) {
                 is GoogleSignInService.Result.Success -> {
                     account = result
+                    // Recorded before the Drive step: the avatar should appear the moment sign-in
+                    // succeeds, not only once a café has been found. An owner with no bundle yet is
+                    // still signed in, and the header should say so.
+                    session.setAccount(result.email, result.displayName, result.photoUrl)
                     lookUpSavedCafe(activity)
                 }
                 // Dismissing the sheet returns the owner to the screen unchanged. It is a choice,
@@ -139,7 +157,7 @@ class SignInViewModel @Inject constructor(
                 return
             }
         }
-        applyLoad(bundleStore.load(token))
+        listAndDecide(token)
     }
 
     private var pendingConsent: android.app.PendingIntent? = null
@@ -159,19 +177,62 @@ class SignInViewModel @Inject constructor(
         }
         viewModelScope.launch {
             when (val auth = bundleStore.authorizeDrive(activity)) {
-                is CafeBundleStore.AuthResult.Granted -> applyLoad(bundleStore.load(auth.accessToken))
+                is CafeBundleStore.AuthResult.Granted -> listAndDecide(auth.accessToken)
                 else -> _state.value = State.SignedInNoCafe(account?.email ?: "")
             }
         }
     }
 
-    private suspend fun applyLoad(load: CafeBundleStore.LoadResult) {
+    /** Kept for the duration of a sign-in so the chooser can load whichever café is picked. */
+    private var driveToken: String? = null
+
+    /**
+     * Zero cafés, one café, or a choice.
+     *
+     * One loads straight through — the sample calls this "auto load to café directly", and it is
+     * what makes a replacement phone a two-tap recovery instead of a setup session.
+     */
+    private suspend fun listAndDecide(token: String) {
+        driveToken = token
+        _state.value = State.Working(Step.LOOKING_UP)
+
+        when (val listed = bundleStore.listBundles(token)) {
+            is CafeBundleStore.ListResult.Failed ->
+                _state.value = State.Problem(Reason.DRIVE_UNREACHABLE)
+
+            is CafeBundleStore.ListResult.Found -> when {
+                listed.bundles.isEmpty() ->
+                    _state.value = State.SignedInNoCafe(account?.email ?: "")
+                listed.bundles.size == 1 ->
+                    choose(listed.bundles.first())
+                else ->
+                    _state.value = State.ChooseCafe(listed.bundles)
+            }
+        }
+    }
+
+    /** The owner picked a café — load it, restore it, and remember it for next launch. */
+    fun choose(bundle: CafeBundleStore.RemoteBundle) {
+        val token = driveToken ?: return
+        viewModelScope.launch {
+            _state.value = State.Working(Step.LOOKING_UP)
+            applyLoad(bundleStore.load(token, bundle.folderId), token, bundle)
+        }
+    }
+
+    private suspend fun applyLoad(
+        load: CafeBundleStore.LoadResult,
+        token: String? = null,
+        bundle: CafeBundleStore.RemoteBundle? = null,
+    ) {
         when (load) {
             is CafeBundleStore.LoadResult.Found -> {
                 val localName = appConfigStore.cafeName()
                 val deviceIsConfigured = OperatingMode.entries.any { appConfigStore.isModeConfigured(it) }
 
                 if (deviceIsConfigured && localName != load.payload.cafeName) {
+                    pendingChoice = bundle
+                    pendingToken = token
                     _state.value = State.Conflict(
                         onDevice = localName,
                         inAccount = load.payload.cafeName,
@@ -179,6 +240,8 @@ class SignInViewModel @Inject constructor(
                     )
                 } else {
                     restore(load.payload)
+                    if (token != null) restorePhotos(token, load.payload)
+                    bundle?.let { session.setSelected(it.toChoice()) }
                 }
             }
             is CafeBundleStore.LoadResult.None ->
@@ -195,7 +258,32 @@ class SignInViewModel @Inject constructor(
     /** Task 23.8 — the owner chose the account's café over the one already on the device. */
     fun keepAccountCafe() {
         val conflict = state.value as? State.Conflict ?: return
-        viewModelScope.launch { restore(conflict.payload) }
+        viewModelScope.launch {
+            restore(conflict.payload)
+            pendingToken?.let { restorePhotos(it, conflict.payload) }
+            pendingChoice?.let { session.setSelected(it.toChoice()) }
+        }
+    }
+
+    private var pendingChoice: CafeBundleStore.RemoteBundle? = null
+    private var pendingToken: String? = null
+
+    private fun CafeBundleStore.RemoteBundle.toChoice() =
+        com.razstudio.pos.data.google.GoogleAccountSession.CafeChoice(folderId, mode, cafeName)
+
+    /**
+     * Pull the menu photos down beside the menu that references them.
+     *
+     * Best-effort and per-photo: `LocalImageStore` keeps these in app-private storage, so a café
+     * restoring onto a new phone has none of them, and a picture menu with no pictures is most of
+     * the menu missing. But a café whose tables and prices came back is open for business, so one
+     * failed image must not fail the restore.
+     */
+    private suspend fun restorePhotos(token: String, payload: CafeConfigPayload) {
+        if (payload.photoFileIds.isEmpty()) return
+        payload.photoFileIds.forEach { (fileName, fileId) ->
+            bundleStore.downloadPhoto(token, fileId, imageStore.fileFor(fileName))
+        }
     }
 
     /** Task 23.8 — the owner kept the device's café. Nothing is written, nothing is overwritten. */

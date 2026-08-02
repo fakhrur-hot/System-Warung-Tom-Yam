@@ -86,13 +86,17 @@ class SignInViewModelTest {
 
     private fun bundleStore(load: CafeBundleStore.LoadResult) =
         object : CafeBundleStore(ApplicationProvider.getApplicationContext()) {
-            override suspend fun load(accessToken: String) = load
+            override suspend fun load(accessToken: String, folderId: String) = load
         }
 
     private fun viewModel(
         available: Boolean = true,
         load: CafeBundleStore.LoadResult = CafeBundleStore.LoadResult.None,
-    ) = SignInViewModel(signInService(available), bundleStore(load), config, modes, backups)
+    ) = SignInViewModel(
+        signInService(available), bundleStore(load), config, modes, backups,
+        com.razstudio.pos.data.google.GoogleAccountSession(ApplicationProvider.getApplicationContext()),
+        com.razstudio.pos.data.local.LocalImageStore(ApplicationProvider.getApplicationContext()),
+    )
 
     private fun cloudPayload(name: String = "Tani Tom Yam") = CafeConfigPayload(
         mode = OperatingMode.CLOUD,

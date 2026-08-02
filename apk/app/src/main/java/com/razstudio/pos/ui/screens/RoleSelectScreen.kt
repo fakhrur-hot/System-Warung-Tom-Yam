@@ -63,6 +63,10 @@ fun RoleSelectScreen(
     onKiosk: () -> Unit = {},
     onTryDemo: () -> Unit = {},
     onSetup: () -> Unit = {},
+    /** Avatar → re-authenticate and re-list the account's cafés. */
+    onReloadDrive: () -> Unit = {},
+    /** Avatar → either logout finished; the caller resets the stack. */
+    onAccountSignedOut: () -> Unit = {},
     languageViewModel: LanguageViewModel = hiltViewModel(),
     setupViewModel: SetupViewModel = hiltViewModel()
 ) {
@@ -102,6 +106,13 @@ fun RoleSelectScreen(
             ) {
                 LanguageButton()
                 ThemeButton()
+                // Home screen: the full account menu, including Google sign-out. This is where an
+                // owner is between things and can afford it.
+                com.razstudio.pos.ui.components.AccountAvatar(
+                    isHomeScreen = true,
+                    onReloadDrive = onReloadDrive,
+                    onSignedOut = onAccountSignedOut,
+                )
             }
 
             // Main content column — fills the screen so weight(1f) can push Setup Wizard down

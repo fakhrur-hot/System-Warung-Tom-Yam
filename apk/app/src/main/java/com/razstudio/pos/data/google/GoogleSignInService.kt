@@ -51,6 +51,8 @@ open class GoogleSignInService @Inject constructor(
             val idToken: String,
             val email: String,
             val displayName: String,
+            /** Google profile picture, or empty. The avatar falls back to an initial without it. */
+            val photoUrl: String,
         ) : Result()
 
         /** The owner dismissed the sheet. Not an error; no message is shown for it. */
@@ -94,6 +96,7 @@ open class GoogleSignInService @Inject constructor(
                     idToken = google.idToken,
                     email = google.id,
                     displayName = google.displayName ?: google.id,
+                    photoUrl = google.profilePictureUri?.toString().orEmpty(),
                 )
             } else {
                 // A provider returned something that is not a Google ID token. Nothing to do with

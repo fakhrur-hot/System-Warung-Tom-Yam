@@ -90,6 +90,11 @@ fun AdminHomeScreen(
     devicePrefsViewModel: com.razstudio.pos.ui.viewmodels.DevicePrefsViewModel = hiltViewModel(),
     devicesViewModel: com.razstudio.pos.ui.viewmodels.DevicesViewModel = hiltViewModel(),
     modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel(),
+    /**
+     * Avatar -> Mode Logout finished. The caller clears the stack back to the home screen; the
+     * Google account is untouched, so the owner's other cafés are still listed when they land.
+     */
+    onAccountSignedOut: () -> Unit = {},
     onNavigateToLock: () -> Unit,
     onNavigateToReconnect: () -> Unit = {},
     onNavigateToDineIn: () -> Unit = {},
@@ -243,6 +248,12 @@ fun AdminHomeScreen(
                     LanguageButton()
                     Spacer(modifier = Modifier.width(4.dp))
                     ThemeButton()
+                    // Mid-service: Mode Logout only. Signing out of Google here would hide every
+                    // café on the account, on a counter phone, during a shift.
+                    com.razstudio.pos.ui.components.AccountAvatar(
+                        isHomeScreen = false,
+                        onSignedOut = onAccountSignedOut,
+                    )
                     Box {
                         // The PIN gate now guards the whole overflow menu (not just Settings),
                         // so no management screen inside it is reachable without the PIN.

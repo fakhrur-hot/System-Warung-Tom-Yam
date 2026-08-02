@@ -56,38 +56,76 @@ open class CafeBundleStore @Inject constructor(
     companion object {
         private const val TAG = "CafeBundleStore"
 
-        /** The sensitive scope. Requested incrementally — see the class note. */
+        /** The sensitive scope. Requested incrementally -- see the class note. */
         const val DRIVE_APPDATA_SCOPE = "https://www.googleapis.com/auth/drive.appdata"
 
         /**
-         * Bundle file names are `RAZS.POS-{MODE}-{cafe name}`, e.g. `RAZS.POS-LAN-Tani Tom Yam`.
+         * Each cafe is a **folder** named `RAZS.POS-{MODE}-{cafe name}`, e.g.
+         * `RAZS.POS-LAN-Tani Tom Yam`, holding [BUNDLE_FILE] plus one file per menu photo.
          *
-         * The prefix is what makes a bundle findable: a restoring device knows neither the mode nor
-         * the name yet -- that is the whole point of restoring -- so [findFile] searches on the
-         * prefix and reads the rest out of the payload. Carrying the mode and name in the file name
-         * as well is for the owner: an `appDataFolder` is invisible in the Drive UI, but the name
-         * still appears in Google account data listings, and `RAZS.POS-LAN-Tani Tom Yam` tells them
-         * what it is where `cafe-config.json` does not.
+         * A folder rather than a single file because photos are binary and belong beside the JSON
+         * that references them; and because one account can hold several cafes -- a WLAN till, a
+         * Kiosk, a full-QR shop -- which the chooser lists by parsing these names.
+         *
+         * The prefix is what makes them findable: a restoring device knows neither its mode nor its
+         * cafe name yet, which is the entire point of restoring.
          */
         const val FILE_PREFIX = "RAZS.POS-"
 
-        /** The pre-convention file. Still read, never written -- see [findFile]. */
+        /** The structured half of a bundle: mode, backend, cafe name, tables, menu, settings. */
+        const val BUNDLE_FILE = "cafe.json"
+
+        /** Pre-folder bundles were a single flat file. Still read, never written -- see [listBundles]. */
         private const val LEGACY_FILE_NAME = "cafe-config.json"
 
-        fun fileNameFor(mode: OperatingMode, cafeName: String): String =
+        private const val FOLDER_MIME = "application/vnd.google-apps.folder"
+        private const val DRIVE_FILES = "https://www.googleapis.com/drive/v3/files"
+        private const val DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
+
+        fun folderNameFor(mode: OperatingMode, cafeName: String): String =
             // Drive treats the name as opaque text, but a stray quote would break the `q=` filter
             // this class searches with, so the characters that matter there are dropped.
             FILE_PREFIX + mode.name + "-" + cafeName.replace("'", "").replace("\\", "").trim()
 
-        private const val DRIVE_FILES = "https://www.googleapis.com/drive/v3/files"
-        private const val DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
+        /**
+         * Split `RAZS.POS-LAN-Tani Tom Yam` back into `LAN` and `Tani Tom Yam`.
+         *
+         * Splits on the FIRST hyphen after the prefix, because a cafe name may contain hyphens
+         * ("Kopi-O Corner") and a mode never does. Returns null for anything that does not parse,
+         * so a stray folder somebody dropped in cannot appear in the chooser as a cafe.
+         */
+        fun parseFolderName(name: String): Pair<String, String>? {
+            if (!name.startsWith(FILE_PREFIX)) return null
+            val rest = name.removePrefix(FILE_PREFIX)
+            val dash = rest.indexOf('-')
+            if (dash <= 0 || dash == rest.length - 1) return null
+            val mode = rest.substring(0, dash)
+            val cafe = rest.substring(dash + 1).trim()
+            if (cafe.isEmpty()) return null
+            if (OperatingMode.entries.none { it.name == mode }) return null
+            return mode to cafe
+        }
     }
+
+    /** One cafe bundle in the account, as the chooser lists it. */
+    data class RemoteBundle(
+        val folderId: String,
+        val mode: String,
+        val cafeName: String,
+        val modifiedTime: String,
+    )
 
     sealed class AuthResult {
         data class Granted(val accessToken: String) : AuthResult()
         /** Consent is needed; the caller must launch [pendingIntent] and retry afterwards. */
         data class NeedsConsent(val pendingIntent: android.app.PendingIntent) : AuthResult()
         data class Failed(val reason: String) : AuthResult()
+    }
+
+    sealed class ListResult {
+        /** Zero, one or many. The caller shows a chooser only when there is a choice to make. */
+        data class Found(val bundles: List<RemoteBundle>) : ListResult()
+        data class Failed(val reason: String) : ListResult()
     }
 
     sealed class LoadResult {
@@ -144,13 +182,64 @@ open class CafeBundleStore @Inject constructor(
                 }
         }
 
-    /** Reads the account's bundle, or reports why it cannot. */
-    open suspend fun load(accessToken: String): LoadResult = withContext(Dispatchers.IO) {
+    /**
+     * Every cafe this account holds, newest first.
+     *
+     * Legacy flat-file bundles are included so an owner who saved before folders existed still sees
+     * their cafe rather than an empty chooser.
+     */
+    open suspend fun listBundles(accessToken: String): ListResult = withContext(Dispatchers.IO) {
         try {
-            val file = findFile(accessToken)
-                ?: return@withContext LoadResult.None
+            val q = "(mimeType = 'FOLDER' or name = 'LEGACY') and trashed = false"
+                .replace("FOLDER", FOLDER_MIME).replace("LEGACY", LEGACY_FILE_NAME)
+            val url = "$DRIVE_FILES?spaces=appDataFolder" +
+                "&q=" + java.net.URLEncoder.encode(q, "UTF-8") +
+                "&orderBy=modifiedTime desc" +
+                "&fields=files(id,name,modifiedTime)&pageSize=100"
 
-            val body = get("$DRIVE_FILES/${file.id}?alt=media", accessToken)
+            val body = get(url, accessToken)
+                ?: return@withContext ListResult.Failed("could not list your Google Drive")
+            val files = JSONObject(body).optJSONArray("files")
+                ?: return@withContext ListResult.Found(emptyList())
+
+            val bundles = mutableListOf<RemoteBundle>()
+            for (i in 0 until files.length()) {
+                val f = files.getJSONObject(i)
+                val id = f.optString("id")
+                if (id.isBlank()) continue
+                val name = f.optString("name")
+                val modified = f.optString("modifiedTime")
+
+                if (name == LEGACY_FILE_NAME) {
+                    // A pre-folder bundle names neither mode nor cafe in the file name, so the only
+                    // way to label it is to read it. Worth one extra request: the alternative is an
+                    // unlabelled row in a chooser whose whole job is telling cafes apart.
+                    val payload = get("$DRIVE_FILES/$id?alt=media", accessToken)
+                        ?.let { CafeConfigPayload.parse(it) }
+                    if (payload != null) {
+                        bundles += RemoteBundle(id, payload.mode.name, payload.cafeName, modified)
+                    }
+                    continue
+                }
+
+                val parsed = parseFolderName(name) ?: continue
+                bundles += RemoteBundle(id, parsed.first, parsed.second, modified)
+            }
+            ListResult.Found(bundles)
+        } catch (e: Exception) {
+            Log.d(TAG, "List failed", e)
+            ListResult.Failed(e.message ?: "could not reach Google Drive")
+        }
+    }
+
+    /** Reads one bundle by folder id (or legacy file id), or reports why it cannot. */
+    open suspend fun load(accessToken: String, folderId: String): LoadResult = withContext(Dispatchers.IO) {
+        try {
+            // A legacy bundle IS the file; a folder holds one. Trying the folder listing first and
+            // falling back keeps both shapes on one path.
+            val fileId = findChild(accessToken, folderId, BUNDLE_FILE) ?: folderId
+
+            val body = get("$DRIVE_FILES/$fileId?alt=media", accessToken)
                 ?: return@withContext LoadResult.Failed("could not download the saved configuration")
 
             val payload = CafeConfigPayload.parse(body)
@@ -165,70 +254,83 @@ open class CafeBundleStore @Inject constructor(
         }
     }
 
-    /** Writes the bundle, replacing any previous one. Returns null on success, else a reason. */
-    open suspend fun save(accessToken: String, payload: CafeConfigPayload): String? =
+    /**
+     * Downloads a menu photo by Drive file id into [target]. Returns false on any failure.
+     *
+     * Photos are restored one at a time and a failure is per-photo on purpose: a cafe that comes
+     * back with its tables, its menu and four of five pictures is open for business. Refusing the
+     * whole restore over an image would not be.
+     */
+    open suspend fun downloadPhoto(accessToken: String, fileId: String, target: java.io.File): Boolean =
         withContext(Dispatchers.IO) {
             try {
-                val json = payload.toJson()
-                val wantedName = fileNameFor(payload.mode, payload.cafeName)
-                // Match on the prefix, not the exact name: renaming the cafe or switching mode must
-                // replace the owner's single bundle, not leave the old one behind for a future
-                // restore to find and prefer.
-                val existing = findFile(accessToken)
-
-                val ok = if (existing != null) {
-                    // Rename first when the cafe was renamed or changed mode, so the file on the
-                    // account never disagrees with the payload inside it. A failure here is not
-                    // fatal -- a stale *name* still restores correctly -- so the content write
-                    // below proceeds regardless.
-                    if (existing.name != wantedName) renameFile(accessToken, existing.id, wantedName)
-
-                    // Media-only update: parentage is already right, and resending metadata risks
-                    // moving the file out of appDataFolder on a partial write.
-                    val request = Request.Builder()
-                        .url("$DRIVE_UPLOAD/${existing.id}?uploadType=media")
-                        .patch(json.toRequestBody(JSON_MEDIA))
-                        .header("Authorization", "Bearer $accessToken")
-                        .build()
-                    http.newCall(request).execute().use { it.isSuccessful }
-                } else {
-                    val metadata = JSONObject().apply {
-                        put("name", wantedName)
-                        put("parents", org.json.JSONArray().put("appDataFolder"))
-                    }.toString()
-
-                    val multipart = MultipartBody.Builder().setType(MultipartBody.FORM)
-                        .addPart(
-                            okhttp3.Headers.headersOf("Content-Type", "application/json; charset=UTF-8"),
-                            metadata.toRequestBody(JSON_MEDIA),
-                        )
-                        .addPart(
-                            okhttp3.Headers.headersOf("Content-Type", "application/json; charset=UTF-8"),
-                            json.toRequestBody(JSON_MEDIA),
-                        )
-                        .build()
-
-                    val request = Request.Builder()
-                        .url("$DRIVE_UPLOAD?uploadType=multipart")
-                        .post(multipart)
-                        .header("Authorization", "Bearer $accessToken")
-                        .build()
-                    http.newCall(request).execute().use { it.isSuccessful }
+                val request = Request.Builder()
+                    .url("$DRIVE_FILES/$fileId?alt=media")
+                    .header("Authorization", "Bearer $accessToken")
+                    .build()
+                http.newCall(request).execute().use { response ->
+                    val stream = response.body?.byteStream() ?: return@use false
+                    if (!response.isSuccessful) return@use false
+                    target.parentFile?.mkdirs()
+                    target.outputStream().use { out -> stream.copyTo(out) }
+                    true
                 }
-
-                if (ok) null else "Google Drive rejected the upload"
             } catch (e: Exception) {
-                Log.d(TAG, "Save failed", e)
-                e.message ?: "could not reach Google Drive"
+                Log.d(TAG, "Photo download failed for $fileId", e)
+                false
             }
         }
 
-    /** Removes the bundle, so an owner can take their café key back out of their Google account. */
-    open suspend fun delete(accessToken: String): String? = withContext(Dispatchers.IO) {
+    /**
+     * Writes the bundle into its folder, creating the folder if needed, and uploads [photos].
+     *
+     * Returns null on success, else a reason. The JSON is written last: a folder holding photos and
+     * no manifest reads as "no cafe saved" and is harmless, whereas a manifest referencing photos
+     * that were never uploaded restores a menu of broken images.
+     */
+    open suspend fun save(
+        accessToken: String,
+        payload: CafeConfigPayload,
+        photos: List<java.io.File> = emptyList(),
+    ): String? = withContext(Dispatchers.IO) {
         try {
-            val file = findFile(accessToken) ?: return@withContext null
+            val wantedName = folderNameFor(payload.mode, payload.cafeName)
+            val folderId = findFolderByName(accessToken, wantedName)
+                ?: createFolder(accessToken, wantedName)
+                ?: return@withContext "Google Drive would not create the cafe folder"
+
+            val photoIds = mutableMapOf<String, String>()
+            photos.forEach { file ->
+                val existing = findChild(accessToken, folderId, file.name)
+                val id = uploadBinary(accessToken, folderId, file, existing)
+                if (id != null) photoIds[file.name] = id
+            }
+
+            val json = payload.copy(photoFileIds = photoIds).toJson()
+            val existingJson = findChild(accessToken, folderId, BUNDLE_FILE)
+            val ok = if (existingJson != null) {
+                val request = Request.Builder()
+                    .url("$DRIVE_UPLOAD/$existingJson?uploadType=media")
+                    .patch(json.toRequestBody(JSON_MEDIA))
+                    .header("Authorization", "Bearer $accessToken")
+                    .build()
+                http.newCall(request).execute().use { it.isSuccessful }
+            } else {
+                createTextFile(accessToken, folderId, BUNDLE_FILE, json)
+            }
+
+            if (ok) null else "Google Drive rejected the upload"
+        } catch (e: Exception) {
+            Log.d(TAG, "Save failed", e)
+            e.message ?: "could not reach Google Drive"
+        }
+    }
+
+    /** Removes one cafe folder, so an owner can take that cafe back out of their account. */
+    open suspend fun delete(accessToken: String, folderId: String): String? = withContext(Dispatchers.IO) {
+        try {
             val request = Request.Builder()
-                .url("$DRIVE_FILES/${file.id}")
+                .url("$DRIVE_FILES/$folderId")
                 .delete()
                 .header("Authorization", "Bearer $accessToken")
                 .build()
@@ -240,45 +342,113 @@ open class CafeBundleStore @Inject constructor(
         }
     }
 
-    /** A bundle in the account's app folder. */
-    private data class RemoteFile(val id: String, val name: String)
+    // ── Drive plumbing ───────────────────────────────────────────────────────────────────────────
 
-    /**
-     * The account's bundle, or null.
-     *
-     * Searches by prefix rather than exact name, because a restoring device does not yet know its
-     * cafe's name or mode. The legacy fixed name is included so a bundle written before the naming
-     * convention still restores, instead of silently reading as "no cafe saved".
-     *
-     * Newest first, so if an account somehow holds more than one, the most recent save wins.
-     */
-    private fun findFile(accessToken: String): RemoteFile? {
-        val q = "(name contains 'PREFIX' or name = 'LEGACY') and trashed = false"
-            .replace("PREFIX", FILE_PREFIX).replace("LEGACY", LEGACY_FILE_NAME)
+    private fun findFolderByName(accessToken: String, name: String): String? {
+        val q = "name = 'NAME' and mimeType = 'FOLDER' and trashed = false"
+            .replace("NAME", name.replace("'", "")).replace("FOLDER", FOLDER_MIME)
         val url = "$DRIVE_FILES?spaces=appDataFolder" +
             "&q=" + java.net.URLEncoder.encode(q, "UTF-8") +
-            "&orderBy=modifiedTime desc" +
-            "&fields=files(id,name)&pageSize=10"
+            "&fields=files(id)&pageSize=1"
         val body = get(url, accessToken) ?: return null
         val files = JSONObject(body).optJSONArray("files") ?: return null
         if (files.length() == 0) return null
-        val first = files.getJSONObject(0)
-        val id = first.optString("id").ifBlank { return null }
-        return RemoteFile(id, first.optString("name"))
+        return files.getJSONObject(0).optString("id").ifBlank { null }
     }
 
-    private fun renameFile(accessToken: String, fileId: String, name: String) {
-        try {
-            val body = JSONObject().put("name", name).toString()
+    private fun findChild(accessToken: String, folderId: String, name: String): String? {
+        val q = "'PARENT' in parents and name = 'NAME' and trashed = false"
+            .replace("PARENT", folderId).replace("NAME", name.replace("'", ""))
+        val url = "$DRIVE_FILES?spaces=appDataFolder" +
+            "&q=" + java.net.URLEncoder.encode(q, "UTF-8") +
+            "&fields=files(id)&pageSize=1"
+        val body = get(url, accessToken) ?: return null
+        val files = JSONObject(body).optJSONArray("files") ?: return null
+        if (files.length() == 0) return null
+        return files.getJSONObject(0).optString("id").ifBlank { null }
+    }
+
+    private fun createFolder(accessToken: String, name: String): String? {
+        val metadata = JSONObject().apply {
+            put("name", name)
+            put("mimeType", FOLDER_MIME)
+            put("parents", org.json.JSONArray().put("appDataFolder"))
+        }.toString()
+        val request = Request.Builder()
+            .url("$DRIVE_FILES?fields=id")
+            .post(metadata.toRequestBody(JSON_MEDIA))
+            .header("Authorization", "Bearer $accessToken")
+            .build()
+        return http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) null
+            else response.body?.string()?.let { JSONObject(it).optString("id").ifBlank { null } }
+        }
+    }
+
+    private fun createTextFile(accessToken: String, folderId: String, name: String, content: String): Boolean {
+        val metadata = JSONObject().apply {
+            put("name", name)
+            put("parents", org.json.JSONArray().put(folderId))
+        }.toString()
+        val multipart = MultipartBody.Builder().setType(MultipartBody.FORM)
+            .addPart(
+                okhttp3.Headers.headersOf("Content-Type", "application/json; charset=UTF-8"),
+                metadata.toRequestBody(JSON_MEDIA),
+            )
+            .addPart(
+                okhttp3.Headers.headersOf("Content-Type", "application/json; charset=UTF-8"),
+                content.toRequestBody(JSON_MEDIA),
+            )
+            .build()
+        val request = Request.Builder()
+            .url("$DRIVE_UPLOAD?uploadType=multipart")
+            .post(multipart)
+            .header("Authorization", "Bearer $accessToken")
+            .build()
+        return http.newCall(request).execute().use { it.isSuccessful }
+    }
+
+    /** Returns the Drive file id, or null. Replaces [existingId] in place when given. */
+    private fun uploadBinary(
+        accessToken: String,
+        folderId: String,
+        file: java.io.File,
+        existingId: String?,
+    ): String? = try {
+        val media = file.readBytes().toRequestBody(IMAGE_MEDIA)
+        if (existingId != null) {
             val request = Request.Builder()
-                .url("$DRIVE_FILES/$fileId")
-                .patch(body.toRequestBody(JSON_MEDIA))
+                .url("$DRIVE_UPLOAD/$existingId?uploadType=media&fields=id")
+                .patch(media)
                 .header("Authorization", "Bearer $accessToken")
                 .build()
-            http.newCall(request).execute().close()
-        } catch (e: Exception) {
-            Log.d(TAG, "Rename failed; the bundle keeps its old name", e)
+            http.newCall(request).execute().use { if (it.isSuccessful) existingId else null }
+        } else {
+            val metadata = JSONObject().apply {
+                put("name", file.name)
+                put("parents", org.json.JSONArray().put(folderId))
+            }.toString()
+            val multipart = MultipartBody.Builder().setType(MultipartBody.FORM)
+                .addPart(
+                    okhttp3.Headers.headersOf("Content-Type", "application/json; charset=UTF-8"),
+                    metadata.toRequestBody(JSON_MEDIA),
+                )
+                .addPart(okhttp3.Headers.headersOf("Content-Type", "image/jpeg"), media)
+                .build()
+            val request = Request.Builder()
+                .url("$DRIVE_UPLOAD?uploadType=multipart&fields=id")
+                .post(multipart)
+                .header("Authorization", "Bearer $accessToken")
+                .build()
+            http.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) null
+                else response.body?.string()?.let { JSONObject(it).optString("id").ifBlank { null } }
+            }
         }
+    } catch (e: Exception) {
+        // Per-photo failure. See downloadPhoto: a cafe missing one picture is still open.
+        Log.d(TAG, "Photo upload failed for ${file.name}", e)
+        null
     }
 
     private fun get(url: String, accessToken: String): String? {
@@ -293,6 +463,7 @@ open class CafeBundleStore @Inject constructor(
 }
 
 private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+private val IMAGE_MEDIA = "image/jpeg".toMediaType()
 
 /**
  * True when this mode should never attempt Google sign-in (task 23.4, Requirements 15.9, 11.1).
