@@ -71,7 +71,7 @@ class PrintService @Inject constructor(
      *   can tell each session apart (a fresh order is session 1, each added round increments)
      */
     suspend fun printKitchenSlip(
-        tableId: String,
+        tableId: String?,
         items: List<OrderItem>,
         isAmendment: Boolean,
         sessionNumber: Int? = null
@@ -133,7 +133,7 @@ class PrintService @Inject constructor(
         val printLanguage = settings?.printLanguage ?: "EN"
         val timezone = settings?.timezone ?: "Asia/Kuala_Lumpur"
         val (charWidth, pixelWidth) = resolveReceiptDimensions()
-        val tableName = resolveTableName(order.tableId)
+        val tableName = resolveTableName(order.tableId, order.orderNumber)
         val localizedItems = localizeItemNames(items, printLanguage)
 
         val payload = ReceiptDocument.generate(
@@ -163,7 +163,15 @@ class PrintService @Inject constructor(
      * internal id. Falls back to the id itself if the table row is missing or unnamed, so
      * a slip/receipt never prints blank.
      */
-    private suspend fun resolveTableName(tableId: String): String {
+    /**
+     * The heading a slip carries: the table's label, or the Kiosk running number.
+     *
+     * `tableId` is null in Kiosk Mode, which has no tables at all — a sale is identified by a number
+     * that resets each business day. Falling back to the id (the old behaviour) would have printed
+     * an empty heading there.
+     */
+    private suspend fun resolveTableName(tableId: String?, orderNumber: Int? = null): String {
+        if (tableId == null) return orderNumber?.let { "#$it" } ?: "—"
         val label = tableDao.getById(tableId)?.label?.trim()
         return if (label.isNullOrBlank()) tableId else label
     }

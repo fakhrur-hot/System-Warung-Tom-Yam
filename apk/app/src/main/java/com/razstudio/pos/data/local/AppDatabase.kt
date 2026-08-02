@@ -35,7 +35,7 @@ import androidx.room.TypeConverters
         CafeSession::class,
         DailyAggregate::class
     ],
-    version = 14,
+    version = 15,
     // exportSchema = true so MigrationTestHelper can validate the schema after migration.
     // Schema JSON files are written to app/schemas/ and committed to source control so that
     // future migration tests can verify against a stable baseline (Requirement 8.1, 12.6).

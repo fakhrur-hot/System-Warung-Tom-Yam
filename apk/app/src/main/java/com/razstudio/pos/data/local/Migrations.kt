@@ -149,3 +149,63 @@ val MIGRATION_13_14 = object : Migration(13, 14) {
         db.execSQL("ALTER TABLE paired_devices ADD COLUMN pendingCredential TEXT")
     }
 }
+
+/**
+ * v15 — an order can exist without a table, and can carry a running number (Kiosk Mode).
+ *
+ * Kiosk is a grocery-style till: ring up, take payment, print, next customer. It has no tables, and
+ * a sale is identified by a number that resets each business day. `OrderNumberSequence` was added in
+ * v11 for exactly this and has sat unused ever since, because `orders` had nowhere to put the number
+ * and `tableId` was NOT NULL — so a Kiosk sale could not be stored at all.
+ *
+ * ### Why the rebuild is safe
+ *
+ * SQLite cannot drop a NOT NULL constraint in place, so the table is recreated and copied. Two things
+ * make that the safe direction rather than a risk:
+ *
+ *  - It **widens**. Every existing row already has a `tableId`, so all of them satisfy the new,
+ *    looser column. Nothing can fail validation and nothing is dropped.
+ *  - The two shapes never interleave. A device runs exactly one mode, so `tableId IS NULL` and
+ *    `orderNumber IS NOT NULL` only ever appear on a Kiosk device, whose table starts empty. A
+ *    table-service café's rows keep their old shape untouched.
+ *
+ * `orders` is the café's only copy of its takings in LAN and Kiosk Mode (Requirement 8), so the copy
+ * is explicit, column by column, rather than a `SELECT *` that would silently reorder if the entity
+ * changes again.
+ */
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS orders_new (
+                id               TEXT NOT NULL PRIMARY KEY,
+                tableId          TEXT,
+                orderNumber      INTEGER,
+                source           TEXT NOT NULL,
+                status           TEXT NOT NULL,
+                paymentMethod    TEXT,
+                total            REAL NOT NULL,
+                sentToKitchenAt  TEXT,
+                cancelReason     TEXT,
+                cancelledBy      TEXT,
+                createdAt        TEXT NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO orders_new (
+                id, tableId, orderNumber, source, status, paymentMethod,
+                total, sentToKitchenAt, cancelReason, cancelledBy, createdAt
+            )
+            SELECT
+                id, tableId, NULL, source, status, paymentMethod,
+                total, sentToKitchenAt, cancelReason, cancelledBy, createdAt
+            FROM orders
+            """.trimIndent()
+        )
+        db.execSQL("DROP TABLE orders")
+        db.execSQL("ALTER TABLE orders_new RENAME TO orders")
+    }
+}
+

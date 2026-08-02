@@ -237,4 +237,85 @@ class AppDatabaseMigrationTest {
             assertEquals("pairing_tokens should be created empty", 0, c.getInt(0))
         }
     }
+
+    /**
+     * v14 → v15 rebuilds `orders` so a Kiosk sale can exist without a table.
+     *
+     * This is the highest-stakes migration in the app: in LAN and Kiosk Mode `orders` holds the
+     * café's **only** copy of its takings (Requirement 8), and SQLite cannot drop a NOT NULL
+     * constraint in place, so the table is recreated and copied rather than altered. A column
+     * mis-ordered in that copy would silently shuffle every order's data.
+     *
+     * The direction is safe — it widens, so every existing row already satisfies the looser
+     * constraint — but "safe in principle" is not evidence. This populates a real café's day and
+     * checks the money survives it.
+     */
+    @Test
+    fun migrate14To15_makesTableOptionalWithoutLosingADaysTakings() {
+        helper.createDatabase(DB_NAME, 14).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO orders (id, tableId, source, status, paymentMethod, total,
+                                    sentToKitchenAt, cancelReason, cancelledBy, createdAt)
+                VALUES ('o-1', 'T5', 'QR', 'COMPLETED', 'CASH', 42.50,
+                        '2026-08-02T10:00:00Z', NULL, NULL, '2026-08-02T09:55:00Z')
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                INSERT INTO orders (id, tableId, source, status, paymentMethod, total,
+                                    sentToKitchenAt, cancelReason, cancelledBy, createdAt)
+                VALUES ('o-2', 'T9', 'STAFF', 'CANCELLED', NULL, 8.00,
+                        NULL, 'customer left', 'admin-1', '2026-08-02T11:30:00Z')
+                """.trimIndent()
+            )
+        }
+
+        val db = helper.runMigrationsAndValidate(DB_NAME, 15, true, MIGRATION_14_15)
+
+        // Every column, in order, on a paid order — this is the shuffle a hand-written copy risks.
+        db.query(
+            "SELECT tableId, orderNumber, source, status, paymentMethod, total, " +
+                "sentToKitchenAt, cancelReason, cancelledBy, createdAt FROM orders WHERE id = 'o-1'"
+        ).use { c ->
+            assertTrue("the completed order must survive", c.moveToFirst())
+            assertEquals("T5", c.getString(0))
+            assertTrue("an existing order carries no running number", c.isNull(1))
+            assertEquals("QR", c.getString(2))
+            assertEquals("COMPLETED", c.getString(3))
+            assertEquals("CASH", c.getString(4))
+            assertEquals(42.50, c.getDouble(5), 0.001)
+            assertEquals("2026-08-02T10:00:00Z", c.getString(6))
+            assertTrue(c.isNull(7))
+            assertTrue(c.isNull(8))
+            assertEquals("2026-08-02T09:55:00Z", c.getString(9))
+        }
+
+        // Nullable columns that were already null must not have been back-filled with junk.
+        db.query("SELECT cancelReason, cancelledBy, paymentMethod FROM orders WHERE id = 'o-2'").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("customer left", c.getString(0))
+            assertEquals("admin-1", c.getString(1))
+            assertTrue("an unpaid order must stay unpaid", c.isNull(2))
+        }
+
+        db.query("SELECT COUNT(*) FROM orders").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("no order may be lost in the rebuild", 2, c.getInt(0))
+        }
+
+        // And the point of the whole migration: a tableless sale is now storable.
+        db.execSQL(
+            """
+            INSERT INTO orders (id, tableId, orderNumber, source, status, paymentMethod, total,
+                                sentToKitchenAt, cancelReason, cancelledBy, createdAt)
+            VALUES ('k-1', NULL, 7, 'STAFF', 'COMPLETED', 'CASH', 12.00,
+                    NULL, NULL, NULL, '2026-08-02T12:00:00Z')
+            """.trimIndent()
+        )
+        db.query("SELECT orderNumber FROM orders WHERE id = 'k-1'").use { c ->
+            assertTrue("a Kiosk sale must be storable with no table", c.moveToFirst())
+            assertEquals(7, c.getInt(0))
+        }
+    }
 }

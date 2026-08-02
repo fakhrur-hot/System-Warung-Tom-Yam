@@ -2323,7 +2323,10 @@ data class OrdersSyncResponse(
 
 data class OrderDto(
     val id: String,
-    val tableId: String,
+    /** Null in Kiosk Mode, which has no tables — see [orderNumber]. */
+    val tableId: String?,
+    /** Kiosk Mode's running number for the business day; null in every other mode. */
+    val orderNumber: Int? = null,
     val source: String,
     val status: String,
     val paymentMethod: String?,

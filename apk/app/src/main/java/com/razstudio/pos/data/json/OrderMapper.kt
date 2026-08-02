@@ -31,6 +31,8 @@ object OrderMapper {
     fun orderDto(json: JSONObject): OrderDto = OrderDto(
         id = json.reqString("id"),
         tableId = json.reqString("tableId"),
+        // Kiosk sales carry a running number instead of a table; absent everywhere else.
+        orderNumber = if (json.has("orderNumber") && !json.isNull("orderNumber")) json.optInt("orderNumber") else null,
         source = json.optStringOrNull("source") ?: "QR",
         status = json.reqString("status"),
         paymentMethod = json.optStringOrNull("paymentMethod"),

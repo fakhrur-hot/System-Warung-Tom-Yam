@@ -10,7 +10,23 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "orders")
 data class Order(
     @PrimaryKey val id: String,
-    val tableId: String,
+
+    /**
+     * The table this order belongs to, or null in Kiosk Mode.
+     *
+     * Kiosk is a grocery-style till with no tables at all, so an order there is identified by
+     * [orderNumber] instead. The two are mutually exclusive in practice: a device runs exactly one
+     * mode, so a café's rows are all one shape or all the other, never mixed.
+     */
+    val tableId: String?,
+
+    /**
+     * Kiosk Mode's running number, unique within a business day and null everywhere else.
+     *
+     * Minted by `OrderNumberSequenceDao.getNextOrderNumber`, which has existed since schema v11 for
+     * this purpose and had no caller until now — the column to put the number in was never added.
+     */
+    val orderNumber: Int? = null,
     val source: String,            // "QR" or "STAFF"
     val status: OrderStatus,
     val paymentMethod: String? = null,

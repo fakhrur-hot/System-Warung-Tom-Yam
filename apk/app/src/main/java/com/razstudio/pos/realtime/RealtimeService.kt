@@ -763,7 +763,9 @@ class RealtimeService : Service() {
                 val newIds = itemIds.filter { it !in notifiedItemIds }
                 if (newIds.isNotEmpty() && firstNotifySeeded) {
                     val wholeOrderNew = itemIds.all { it !in notifiedItemIds }
-                    val tableName = resolveTableName(orderDto.tableId)
+                    // Kiosk sales carry no table — the notification names the running number.
+                    val tableName = orderDto.tableId?.let { resolveTableName(it) }
+                        ?: orderDto.orderNumber?.let { "#$it" } ?: "—"
                     val title = if (wholeOrderNew) s().notifNewOrderTitle.format(tableName) else s().notifItemsAddedTitle.format(tableName)
                     val body = if (wholeOrderNew) {
                         s().notifNewOrderBody
@@ -805,7 +807,12 @@ class RealtimeService : Service() {
         newOrderSound.play()
     }
 
-    /** Table's admin-entered display name for the alert; falls back to the id. */
+    /**
+     * Table's admin-entered display name for the alert; falls back to the id.
+     *
+     * Kept non-null internally: the caller already handles the tableless (Kiosk) case by naming the
+     * running number, so a null reaching here would be a bug rather than a state to render.
+     */
     private suspend fun resolveTableName(tableId: String): String {
         val label = tableDao.getById(tableId)?.label?.trim()
         return if (label.isNullOrBlank()) tableId else label
