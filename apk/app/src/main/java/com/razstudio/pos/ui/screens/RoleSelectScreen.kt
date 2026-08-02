@@ -68,12 +68,16 @@ fun RoleSelectScreen(
     val strings = uiStrings(language)
     val configuredState by setupViewModel.state.collectAsState()
 
-    // Which modes this device may actually enter. Read from what was *saved*, never from what is
-    // currently selected in Setup — an unsaved radio choice must not unlock anything.
-    val cloudReady = setupViewModel.isModeReady(OperatingMode.CLOUD)
+    // Which modes this device may *host*. Read from what was saved, never from what is currently
+    // selected in Setup — an unsaved radio choice must not unlock anything.
+    //
+    // Cloud has no equivalent flag because neither of its actions needs one: the owner QR and the
+    // invite QR both carry the café's backend, so they configure the device as a side effect of
+    // being used. Kiosk is a single device with nothing to join, so it is gated outright.
     val lanReady = setupViewModel.isModeReady(OperatingMode.LAN)
     val kioskReady = setupViewModel.isModeReady(OperatingMode.KIOSK)
     var qrExpanded by remember { mutableStateOf(false) }
+    var apExpanded by remember { mutableStateOf(false) }
     val title = configuredState.cafeName.ifBlank { stringResource(R.string.app_name) }
 
     Surface(modifier = Modifier.fillMaxSize()) {
@@ -134,14 +138,17 @@ fun RoleSelectScreen(
 
                 ModeButton(
                     label = strings.qrOrderingModeButton,
-                    enabled = cloudReady,
+                    // Never gated. Both actions inside it configure the device as a side effect —
+                    // the owner QR and the invite QR each carry the café's backend — so requiring
+                    // configuration to reach them would lock out every device that has none, which
+                    // is precisely the device that needs them.
+                    enabled = true,
                     disabledHint = strings.modeNotSetUpHint,
                     expanded = qrExpanded,
                     onClick = { qrExpanded = !qrExpanded },
                 )
 
-                // Nested roles, revealed only once the café can actually run in Cloud mode.
-                AnimatedVisibility(visible = qrExpanded && cloudReady) {
+                AnimatedVisibility(visible = qrExpanded) {
                     Column(modifier = Modifier.padding(start = 16.dp, top = 8.dp)) {
                         Button(
                             onClick = onOrderingConnect,
@@ -161,12 +168,45 @@ fun RoleSelectScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // Wireless AP has the same two roles as QR Ordering, so it gets the same shape:
+                // hosting a café requires having set one up; joining one never does.
                 ModeButton(
                     label = strings.wirelessApModeButton,
-                    enabled = lanReady,
+                    enabled = true,
                     disabledHint = strings.modeNotSetUpHint,
-                    onClick = onWirelessAp,
+                    expanded = apExpanded,
+                    onClick = { apExpanded = !apExpanded },
                 )
+
+                AnimatedVisibility(visible = apExpanded) {
+                    Column(modifier = Modifier.padding(start = 16.dp, top = 8.dp)) {
+                        Button(
+                            onClick = onWirelessAp,
+                            // Hosting *is* running the café, so it needs the café to exist.
+                            enabled = lanReady,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                        ) {
+                            Text(strings.hostThisCafe, style = MaterialTheme.typography.titleSmall)
+                        }
+                        if (!lanReady) {
+                            Text(
+                                text = strings.modeNotSetUpHint,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            // A staff phone scans the host's pairing QR, which carries the server's
+                            // address — the same "the QR configures you" rule as the Cloud path.
+                            onClick = onOrderingConnect,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                        ) {
+                            Text(strings.joinThisCafe, style = MaterialTheme.typography.titleSmall)
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
 

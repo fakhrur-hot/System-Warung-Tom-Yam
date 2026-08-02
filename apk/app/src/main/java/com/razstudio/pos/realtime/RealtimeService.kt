@@ -86,6 +86,14 @@ class RealtimeService : Service() {
         // GET /orders?since=lastSeen catch-up, so it's a cheap incremental fetch.
         private const val POLL_INTERVAL_MS = 10_000L
 
+        // Task 8.2 (amended 2026-08-01) — LAN/Kiosk poll uses a longer fallback interval.
+        // The push channel (task 8.4's WebSocket route) carries low-latency delivery in LAN Mode,
+        // so a 3 s or 10 s poll would be redundant load on a phone-hosted server. 45 s sits
+        // comfortably inside the 30–60 s window specified by the task while being a round number.
+        // Requirement 6.3 is met because push already achieves parity with Cloud Mode's live path;
+        // the poll is here as an eventual-consistency floor (Requirement 6.6), not the fast path.
+        private const val LAN_POLL_INTERVAL_MS = 45_000L
+
         /** Task 8.7 reconnect backoff. Generous: a dropped socket costs latency, never correctness. */
         private const val LAN_PUSH_INITIAL_BACKOFF_MS = 2_000L
         private const val LAN_PUSH_MAX_BACKOFF_MS = 30_000L
@@ -219,7 +227,14 @@ class RealtimeService : Service() {
         pollingJob = serviceScope.launch {
             while (true) {
                 // Ambient mode tightens the interval so an idle station surfaces new orders sooner.
-                delay(if (ambientModeActive) AMBIENT_POLL_INTERVAL_MS else POLL_INTERVAL_MS)
+                // Off-cloud (LAN/Kiosk), use the longer fallback interval — the push channel
+                // handles latency, the poll is only the eventual-consistency floor (task 8.2,
+                // amended 2026-08-01; Requirements 6.3, 6.6).
+                val baseInterval = when (modeRepository.currentMode()) {
+                    com.razstudio.pos.data.OperatingMode.CLOUD -> POLL_INTERVAL_MS
+                    else -> LAN_POLL_INTERVAL_MS
+                }
+                delay(if (ambientModeActive) AMBIENT_POLL_INTERVAL_MS else baseInterval)
                 performCatchUpSync()
 
                 // Stale-socket watchdog: force reconnect if no WS message in >90s
@@ -348,12 +363,15 @@ class RealtimeService : Service() {
                             tableId = orderDto.tableId,
                             items = sessionItems,
                             isAmendment = isAmendment,
-                            sessionNumber = session
+                            sessionNumber = session,
+                            // Requirement 3.5 — a Kiosk slip is headed by its running number.
+                            orderNumber = orderDto.orderNumber,
                         )
                         Log.i(
                             TAG,
-                            "🖨️ Auto-printed ${sessionItems.size} kitchen line(s) for table " +
-                                "${orderDto.tableId} session $session (amendment=$isAmendment)"
+                            "🖨️ Auto-printed ${sessionItems.size} kitchen line(s) for " +
+                                "${orderDto.tableId ?: "#${orderDto.orderNumber}"} session $session " +
+                                "(amendment=$isAmendment)"
                         )
                     }
                 }
@@ -630,6 +648,7 @@ class RealtimeService : Service() {
                 val itemEntities = dto.items.map { it.toEntity(dto.id) }
                 if (itemEntities.any { it.sentToKitchen }) {
                     printService.printKitchenSlip(
+                        orderNumber = dto.orderNumber,
                         tableId = dto.tableId,
                         items = itemEntities,
                         isAmendment = false
@@ -673,6 +692,10 @@ class RealtimeService : Service() {
                 // When customerOrderAutoPrint is false, all added items arrive with
                 // sentToKitchen = false — still update Room and beep, but skip the print.
                 if (newItems.any { it.sentToKitchen }) {
+                    // No orderNumber here, and that is not an omission: this path is fed by the
+                    // Supabase realtime channel and bails above when `tableId` is blank, so it is
+                    // structurally table-service only. Kiosk has no network and no tables, and
+                    // reaches the printer through the till instead.
                     printService.printKitchenSlip(
                         tableId = tableId,
                         items = newItems,

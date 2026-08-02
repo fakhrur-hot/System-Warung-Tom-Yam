@@ -74,7 +74,14 @@ class PrintService @Inject constructor(
         tableId: String?,
         items: List<OrderItem>,
         isAmendment: Boolean,
-        sessionNumber: Int? = null
+        sessionNumber: Int? = null,
+        /**
+         * Kiosk's running number. Requirement 3.5 is explicit that it appears on **both** the
+         * kitchen slip and the customer receipt, so the counter and the kitchen refer to the same
+         * sale — without it a Kiosk slip printed a bare "—" and the kitchen had no way to match a
+         * dish to a customer.
+         */
+        orderNumber: Int? = null,
     ) {
         if (!isPrinterHost()) return
 
@@ -84,7 +91,7 @@ class PrintService @Inject constructor(
         val printLanguage = settings?.printLanguage ?: "EN"
         val timezone = settings?.timezone ?: "Asia/Kuala_Lumpur"
         val charWidth = resolveCharWidth(PrinterRole.KITCHEN_ONLY)
-        val tableName = resolveTableName(tableId)
+        val tableName = resolveTableName(tableId, orderNumber)
         val localizedItems = localizeItemNames(items, printLanguage)
 
         // Group into two buckets (FOOD / BEVERAGE) → at most two slips per order, each

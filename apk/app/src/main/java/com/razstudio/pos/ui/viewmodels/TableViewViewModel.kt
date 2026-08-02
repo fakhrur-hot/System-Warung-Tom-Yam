@@ -348,6 +348,7 @@ class TableViewViewModel @Inject constructor(
                     val order = orderDao.getOrderById(orderId)
                     if (order != null && response.linesToPrint.isNotEmpty()) {
                         printService.printKitchenSlip(
+                            orderNumber = order.orderNumber,
                             tableId = order.tableId,
                             items = response.linesToPrint.map { it.toEntity(orderId) },
                             isAmendment = sessionNumber > 1,
@@ -423,6 +424,7 @@ class TableViewViewModel @Inject constructor(
 
                     if (order != null && response.linesToPrint.isNotEmpty()) {
                         printService.printKitchenSlip(
+                            orderNumber = order.orderNumber,
                             tableId = order.tableId,
                             items = response.linesToPrint.map { it.toEntity(orderId) },
                             isAmendment = sessionNumber > 1,

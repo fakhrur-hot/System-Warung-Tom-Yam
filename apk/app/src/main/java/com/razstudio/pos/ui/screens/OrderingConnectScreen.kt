@@ -117,6 +117,13 @@ class OrderingConnectViewModel @Inject constructor(
      * - Full URL: https://host/join?invite=TOKEN
      * - Raw token string
      */
+    /** Take the café's backend from a scanned invite, if it carries one. */
+    private fun adoptBackendFrom(scanned: String) {
+        val api = queryParam(scanned, com.razstudio.pos.data.ApiClient.QR_PARAM_API) ?: return
+        val key = queryParam(scanned, com.razstudio.pos.data.ApiClient.QR_PARAM_KEY) ?: return
+        appConfig.adoptBackendFromRecoveryQr(api, key, websiteUrl = originOf(scanned))
+    }
+
     fun extractToken(strings: UiStrings): String? {
         val input = inviteInput.trim()
         if (input.isBlank()) {
@@ -149,6 +156,16 @@ class OrderingConnectViewModel @Inject constructor(
     @Suppress("DEPRECATION")
     suspend fun register(androidId: String, strings: UiStrings): Boolean {
         val token = extractToken(strings) ?: return false
+
+        // A staff phone joining a café is in the same position the owner was before the recovery QR
+        // carried its backend: the invite token names no café, so on a template APK the scan had
+        // nowhere to send it. Invite links now carry `api=` and `key=` too, and an unconfigured
+        // device adopts them here — joining is how a device becomes configured, so it cannot itself
+        // require configuration.
+        //
+        // Refused on a device that already serves a café, exactly as the owner path is: an invite
+        // handed over by a stranger must not be able to repoint a working till.
+        adoptBackendFrom(inviteInput)
 
         isLoading = true
         errorMessage = null

@@ -184,6 +184,10 @@ class ApiClient @Inject constructor(
      * Added as extra query params on the existing link rather than as a new payload format, so the
      * URL still opens the join page in a browser and `extractRecoverToken`'s `recover=` match is
      * untouched. Older QRs simply lack the params and keep working exactly as before.
+     *
+     * Applied to **invite** links as well as the owner key. A staff phone joining a café is in the
+     * same position the owner was: a token names no café, so on a template APK the scan had nowhere
+     * to go. Joining is how a device becomes configured, so it cannot itself require configuration.
      */
     private fun withBackendDetails(url: String): String {
         val base = supabaseUrl()
@@ -1072,7 +1076,10 @@ class ApiClient @Inject constructor(
                     ApiResult.Success(
                         InviteResponse(
                             token = json.getString("token"),
-                            url = json.getString("url")
+                            // Carries the café's backend, exactly as the owner recovery QR does.
+                            // Without it a staff phone on a template APK scans a valid invite and
+                            // has nowhere to send it — the token names no café.
+                            url = withBackendDetails(json.getString("url")),
                         )
                     )
                 }
@@ -1113,7 +1120,10 @@ class ApiClient @Inject constructor(
                     ApiResult.Success(
                         InviteResponse(
                             token = json.getString("token"),
-                            url = json.getString("url")
+                            // Carries the café's backend, exactly as the owner recovery QR does.
+                            // Without it a staff phone on a template APK scans a valid invite and
+                            // has nowhere to send it — the token names no café.
+                            url = withBackendDetails(json.getString("url")),
                         )
                     )
                 }
