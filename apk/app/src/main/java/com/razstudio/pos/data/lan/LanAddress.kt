@@ -157,7 +157,11 @@ class LanAddress @Inject constructor(
         const val TAG = "LanAddress"
 
         /** Cellular and loopback are never the café's network. */
-        val EXCLUDED_PREFIXES = listOf("rmnet", "lo", "dummy", "p2p")
+        // `usb` is excluded after seeing a Sunmi D3 Mini carry a permanently-up `usb0` at
+        // 172.25.241.171 — a site-local RFC 1918 address, so it passes every other test here and
+        // can be chosen ahead of the interface staff phones are actually on. A USB/RNDIS address is
+        // never reachable from a phone on the café Wi-Fi, so it can never be the pairing address.
+        val EXCLUDED_PREFIXES = listOf("rmnet", "lo", "dummy", "p2p", "usb")
 
         /** OEM-specific tethering AP interface names, preferred when present. */
         val AP_PREFIXES = listOf("ap", "swlan", "softap")
