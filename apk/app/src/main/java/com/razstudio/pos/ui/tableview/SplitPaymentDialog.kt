@@ -78,6 +78,10 @@ fun SplitPaymentDialog(
     val taken = remember { mutableStateMapOf<String, Int>() }
     var fixMode by remember { mutableStateOf(false) }
 
+    // Reducing a line is a void: the café stops charging for food it already cooked, and there is
+    // no undo. A single tap is too cheap for that, so the item waits here until it is confirmed.
+    var pendingReduce by remember { mutableStateOf<OrderItem?>(null) }
+
     val plan = SplitPaymentPlanner.plan(items, taken)
     val amount = when (plan) {
         is SplitPaymentPlanner.Plan.SettleWholeOrder -> plan.amount
@@ -125,12 +129,7 @@ fun SplitPaymentDialog(
                         if (fixMode) {
                             // Decrement only. See the class note on why there is no counterpart.
                             IconButton(
-                                onClick = {
-                                    val reduced = items.associate { it.id to it.quantity }
-                                        .toMutableMap()
-                                        .apply { this[item.id] = (item.quantity - 1).coerceAtLeast(0) }
-                                    onReduceItems(SplitPaymentPlanner.reduceTo(items, reduced))
-                                },
+                                onClick = { pendingReduce = item },
                                 enabled = !isLoading,
                             ) { Icon(Icons.Default.Remove, contentDescription = null) }
                             Text("${item.quantity}", fontWeight = FontWeight.Bold)
@@ -167,6 +166,35 @@ fun SplitPaymentDialog(
             TextButton(onClick = onDismiss, enabled = !isLoading) { Text(strings.commonCancel) }
         },
     )
+
+    pendingReduce?.let { item ->
+        val clearsLine = item.quantity <= 1
+        AlertDialog(
+            onDismissRequest = { pendingReduce = null },
+            title = { Text(strings.fixItemConfirmTitle) },
+            text = {
+                Text(
+                    if (clearsLine) strings.fixItemConfirmClears.format(item.nameSnapshot)
+                    else strings.fixItemConfirmBody.format(item.nameSnapshot)
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val reduced = items.associate { it.id to it.quantity }
+                        .toMutableMap()
+                        .apply { this[item.id] = (item.quantity - 1).coerceAtLeast(0) }
+                    onReduceItems(SplitPaymentPlanner.reduceTo(items, reduced))
+                    // Any selection of this line is stale the moment its quantity drops; leaving it
+                    // would let a customer be charged for food that was just written off.
+                    taken.remove(item.id)
+                    pendingReduce = null
+                }) { Text(strings.fixItemConfirmAction) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingReduce = null }) { Text(strings.commonCancel) }
+            },
+        )
+    }
 }
 
 @Composable

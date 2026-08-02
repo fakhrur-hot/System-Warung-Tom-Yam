@@ -691,6 +691,10 @@ data class UiStringsGroup8(
     val splitShareFailed: String,
     val splitShareUnpaid: String,
     val splitShareNotRemoved: String,
+    val fixItemConfirmTitle: String,
+    val fixItemConfirmBody: String,
+    val fixItemConfirmClears: String,
+    val fixItemConfirmAction: String,
 )
 
 class UiStrings(
@@ -1303,6 +1307,10 @@ class UiStrings(
     val splitShareFailed: String get() = g8.splitShareFailed
     val splitShareUnpaid: String get() = g8.splitShareUnpaid
     val splitShareNotRemoved: String get() = g8.splitShareNotRemoved
+    val fixItemConfirmTitle: String get() = g8.fixItemConfirmTitle
+    val fixItemConfirmBody: String get() = g8.fixItemConfirmBody
+    val fixItemConfirmClears: String get() = g8.fixItemConfirmClears
+    val fixItemConfirmAction: String get() = g8.fixItemConfirmAction
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1927,6 +1935,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             splitShareFailed = "Tidak dapat memulakan bahagian itu. Tiada caj dikenakan.",
             splitShareUnpaid = "Bahagian itu tidak dibayar. Semak dahulu sebelum cuba lagi supaya tiada caj berganda.",
             splitShareNotRemoved = "Dibayar, tetapi meja masih menunjukkan barangan itu. Muat semula sebelum bahagian seterusnya.",
+            fixItemConfirmTitle = "Buang daripada bil?",
+            fixItemConfirmBody = "Satu %1\$s akan dibuang daripada bil ini dan tidak dicaj. Tindakan ini tidak boleh dibatalkan.",
+            fixItemConfirmClears = "%1\$s ialah yang terakhir pada baris ini. Membuangnya akan mengosongkan baris itu dan ia tidak akan dicaj. Tindakan ini tidak boleh dibatalkan.",
+            fixItemConfirmAction = "Buang",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -2550,6 +2562,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             splitShareFailed = "Couldn't start that share. Nothing was charged.",
             splitShareUnpaid = "That share wasn't paid. Check before trying again, so nobody is charged twice.",
             splitShareNotRemoved = "Paid, but the table still shows those items. Refresh before the next share.",
+            fixItemConfirmTitle = "Remove from the bill?",
+            fixItemConfirmBody = "One %1\$s will be taken off this bill and not charged. This cannot be undone.",
+            fixItemConfirmClears = "%1\$s is the last one on this line. Removing it clears the line and it will not be charged. This cannot be undone.",
+            fixItemConfirmAction = "Remove",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -3171,6 +3187,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             splitShareFailed = "无法开始该部分。未收取任何费用。",
             splitShareUnpaid = "该部分未支付。请先确认再重试，以免重复收费。",
             splitShareNotRemoved = "已支付，但桌上仍显示这些菜品。请先刷新再收下一份。",
+            fixItemConfirmTitle = "从账单中移除？",
+            fixItemConfirmBody = "将从本账单移除一份%1\$s且不收费。此操作无法撤销。",
+            fixItemConfirmClears = "%1\$s 是该项的最后一份。移除后将清除该项且不收费。此操作无法撤销。",
+            fixItemConfirmAction = "移除",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -3794,6 +3814,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             splitShareFailed = "அந்தப் பங்கைத் தொடங்க முடியவில்லை. எந்தக் கட்டணமும் வசூலிக்கப்படவில்லை.",
             splitShareUnpaid = "அந்தப் பங்கு செலுத்தப்படவில்லை. இரட்டிப்பட்ட கட்டணம் தவிர்க்க மீண்டும் முயற்சிப்பதற்கு முன் சரிபார்க்கவும்.",
             splitShareNotRemoved = "செலுத்தப்பட்டது, ஆனால் மேஜை இன்னும் அவ்வுணவுகளைக் காட்டுகிறது. அடுத்த பங்குக்கு முன் புதுப்பிக்கவும்.",
+            fixItemConfirmTitle = "பில்லிலிருந்து நீக்கவா?",
+            fixItemConfirmBody = "ஒரு %1\$s இந்தப் பில்லிலிருந்து நீக்கப்பட்டு கட்டணம் வசூலிக்கப்படாது. இதை மீட்டேல் முடியாது.",
+            fixItemConfirmClears = "%1\$s இந்த வரிசையின் கடைசியானது. நீக்கினால் வரிசை அகற்றப்படும், கட்டணமும் வசூலிக்கப்படாது. இதை மீட்டேல் முடியாது.",
+            fixItemConfirmAction = "நீக்கு",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -4417,6 +4441,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             splitShareFailed = "เริ่มส่วนนี้ไม่สำเร็จ ยังไม่มีการเรียกเก็บเงิน",
             splitShareUnpaid = "ส่วนนี้ยังไม่ได้ชำระ ตรวจสอบก่อนลองใหม่เพื่อไม่ให้เก็บซ้ำ",
             splitShareNotRemoved = "ชำระแล้ว แต่โต๊ะยังแสดงรายการเหล่านั้น รีเฟรชก่อนรับส่วนถัดไป",
+            fixItemConfirmTitle = "นำออกจากบิลหรือไม่",
+            fixItemConfirmBody = "%1\$s หนึ่งรายการจะถูกนำออกจากบิลนี้และไม่เรียกเก็บเงิน การกระทำนี้ย้อนกลับไม่ได้",
+            fixItemConfirmClears = "%1\$s เป็นชิ้นสุดท้ายของรายการนี้ การนำออกจะลบรายการนี้และไม่เรียกเก็บเงิน การกระทำนี้ย้อนกลับไม่ได้",
+            fixItemConfirmAction = "นำออก",
         ),
     )
 }
