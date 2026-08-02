@@ -249,6 +249,34 @@ fun BackupScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error
                     )
+
+                    // Task 13.2 — name what is about to be destroyed, not only what is arriving.
+                    // applyImport deletes orders, order items, menu, tables, printers and settings
+                    // before it imports anything, and the dialog listed none of that.
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = strings.restoreWillEraseTitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    Text(
+                        text = strings.restoreWillEraseBody
+                            .format(state.currentOrderCount, state.currentMenuItemCount),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    if (state.localDataIsOnlyCopy) {
+                        // Off-cloud there is no server holding a second copy, so this is final.
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = strings.restoreOnlyCopyWarning,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("${strings.backupVersionLabel}: ${preview.version}")
                     Text("${strings.exportedAtLabel}: ${preview.exportedAt}")

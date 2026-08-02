@@ -20,7 +20,10 @@ import javax.inject.Inject
 @HiltViewModel
 class BackupViewModel @Inject constructor(
     private val backupManager: DatabaseBackupManager,
-    private val languageManager: LanguageManager
+    private val languageManager: LanguageManager,
+    private val orderDao: com.razstudio.pos.data.local.OrderDao,
+    private val menuDao: com.razstudio.pos.data.local.MenuDao,
+    private val modeRepository: com.razstudio.pos.data.ModeRepository,
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
@@ -31,7 +34,22 @@ class BackupViewModel @Inject constructor(
         val importPreview: BackupPreview? = null,
         val error: String? = null,
         val successMessage: String? = null,
-        val showConfirmDialog: Boolean = false
+        val showConfirmDialog: Boolean = false,
+
+        /**
+         * What restoring will **destroy** (task 13.2, Requirement 8.3).
+         *
+         * The confirm dialog already listed what the backup contains; it never said what the device
+         * is about to lose. `applyImport` deletes orders, order items, menu, tables, printers and
+         * settings before importing anything, and in LAN or Kiosk Mode that is the café's only copy
+         * — there is no server holding a second one. Naming the counts is the difference between an
+         * operator confirming a restore and an operator confirming a number they have not seen.
+         */
+        val currentOrderCount: Int = 0,
+        val currentMenuItemCount: Int = 0,
+
+        /** True off-cloud, where Room is authoritative and a wipe is unrecoverable. */
+        val localDataIsOnlyCopy: Boolean = false,
     )
 
     private val _uiState = MutableStateFlow(UiState())
@@ -94,8 +112,20 @@ class BackupViewModel @Inject constructor(
                 } ?: throw IllegalStateException("Cannot read file")
                 pendingImportJson = json
                 val preview = backupManager.importFromJson(json)
+                // Count what the restore will destroy, so the dialog can name it. Off-cloud this is
+                // the café's only copy — Requirement 8.3.
+                val offCloud = modeRepository.currentMode() != com.razstudio.pos.data.OperatingMode.CLOUD
+                val orders = orderDao.getAllOrders().size
+                val menuItems = menuDao.getAll().size
                 _uiState.update {
-                    it.copy(isLoading = false, importPreview = preview, showConfirmDialog = true)
+                    it.copy(
+                        isLoading = false,
+                        importPreview = preview,
+                        showConfirmDialog = true,
+                        currentOrderCount = orders,
+                        currentMenuItemCount = menuItems,
+                        localDataIsOnlyCopy = offCloud,
+                    )
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = str().importFailed.format(e.message)) }
