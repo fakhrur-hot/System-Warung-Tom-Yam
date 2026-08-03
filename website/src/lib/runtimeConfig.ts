@@ -31,6 +31,17 @@ export interface RuntimeConfig {
   adsterraSrc?: string
   /** Adsterra Native Banner container id, verbatim — their loader matches it exactly. */
   adsterraContainer?: string
+  /**
+   * Adsterra **Banner** publisher key. Set this to switch the café off the Native Banner.
+   *
+   * Unlike native, a banner has no shared container id — each one renders in its own iframe — so
+   * it can repeat at every slot, and a 320x50 is a fraction of a native grid's height. Setting it
+   * takes precedence over [adsterraSrc]/[adsterraContainer]; see `AdSlot`.
+   */
+  adsterraBannerKey?: string
+  /** Must match the size the unit was created at in Adsterra, or the zone returns no fill. */
+  adsterraBannerWidth?: number
+  adsterraBannerHeight?: number
 }
 
 let cached: RuntimeConfig | null = null

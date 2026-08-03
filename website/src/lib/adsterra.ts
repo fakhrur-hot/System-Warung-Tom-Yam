@@ -83,13 +83,32 @@ export const adsterraEnabled = Boolean(
  * Returns `loaded: false` until the fetch settles, so a slot renders nothing rather than briefly
  * flashing an AdSense unit and then replacing it.
  */
-export function useAdsterraNative(): {
+export interface ResolvedAdsterra {
   loaded: boolean
+  /** Native Banner. */
   src?: string
   container?: string
-} {
-  const [state, setState] = useState<{ loaded: boolean; src?: string; container?: string }>({
+  /** Banner — takes precedence over native when set. See [useAdsterra]. */
+  bannerKey?: string
+  bannerWidth: number
+  bannerHeight: number
+}
+
+/**
+ * The Adsterra units for THIS deployment, preferring runtime config over the build-time env.
+ *
+ * Runtime config is what lets one build serve many cafés: swap `app-config.json` and the same
+ * bundle points at a different café's units. The `VITE_*` values remain as a fallback so
+ * deployments already configured through Pages environment variables keep working.
+ *
+ * Returns `loaded: false` until the fetch settles, so a slot renders nothing rather than briefly
+ * flashing an AdSense unit and then replacing it.
+ */
+export function useAdsterra(): ResolvedAdsterra {
+  const [state, setState] = useState<ResolvedAdsterra>({
     loaded: false,
+    bannerWidth: ADSTERRA_BANNER_WIDTH,
+    bannerHeight: ADSTERRA_BANNER_HEIGHT,
   })
 
   useEffect(() => {
@@ -100,6 +119,9 @@ export function useAdsterraNative(): {
         loaded: true,
         src: cfg.adsterraSrc || ADSTERRA_NATIVE_SRC,
         container: cfg.adsterraContainer || ADSTERRA_NATIVE_CONTAINER,
+        bannerKey: cfg.adsterraBannerKey || ADSTERRA_BANNER_KEY,
+        bannerWidth: cfg.adsterraBannerWidth || ADSTERRA_BANNER_WIDTH,
+        bannerHeight: cfg.adsterraBannerHeight || ADSTERRA_BANNER_HEIGHT,
       })
     })
     return () => {

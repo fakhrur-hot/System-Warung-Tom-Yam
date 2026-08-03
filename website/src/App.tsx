@@ -13,6 +13,7 @@ import ConfirmDialog from './components/ConfirmDialog'
 import QrScanner from './components/QrScanner'
 import { loadAdSense } from './lib/adsense'
 import { ADSTERRA_SOCIAL_BAR_SRC, adsterraEnabled, loadAdsterraSocialBar } from './lib/adsterra'
+import { loadRuntimeConfig } from './lib/runtimeConfig'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -155,11 +156,26 @@ export default function App() {
   // Both no-op when unconfigured. AdSense auto-ads are skipped entirely once Adsterra is running:
   // AdSense holds publishers responsible for what appears alongside its units, so serving both on
   // one page view risks a strike worth more than the extra impression.
+  //
+  // This MUST consult the runtime config, not just the build-time `VITE_*` values. A café
+  // configured only through app-config.json — which is the entire point of runtime config — has
+  // `adsterraEnabled === false`, so checking that alone would load AdSense here while AdSlot
+  // renders Adsterra units from the same config: both networks on one page view, the exact thing
+  // the paragraph above exists to prevent.
   useEffect(() => {
-    if (adsterraEnabled || ADSTERRA_SOCIAL_BAR_SRC) {
-      loadAdsterraSocialBar()
-    } else {
-      loadAdSense()
+    let alive = true
+    loadRuntimeConfig().then((cfg) => {
+      if (!alive) return
+      const adsterraConfigured =
+        Boolean(cfg.adsterraBannerKey) ||
+        Boolean(cfg.adsterraSrc && cfg.adsterraContainer) ||
+        adsterraEnabled ||
+        Boolean(ADSTERRA_SOCIAL_BAR_SRC)
+      if (adsterraConfigured) loadAdsterraSocialBar()
+      else loadAdSense()
+    })
+    return () => {
+      alive = false
     }
   }, [])
 

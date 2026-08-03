@@ -1,10 +1,13 @@
 import { useMemo } from 'react'
-import {
-  ADSTERRA_BANNER_HEIGHT,
-  ADSTERRA_BANNER_KEY,
-  ADSTERRA_BANNER_WIDTH,
-  bannerFrameHtml,
-} from '../lib/adsterra'
+import { bannerFrameHtml } from '../lib/adsterra'
+
+interface AdsterraBannerProps {
+  /** Publisher key from the unit's snippet. */
+  bannerKey: string
+  /** Must match the size the unit was created at, or the zone returns no fill. */
+  width: number
+  height: number
+}
 
 /**
  * One Adsterra **banner** unit, sandboxed in an iframe.
@@ -14,15 +17,17 @@ import {
  * its own document is the standard carrier for these units in React, and as a side effect the ad
  * script cannot touch the ordering DOM, read the cart, or reach app state.
  *
- * Renders nothing when unconfigured, so an unset key ships no markup rather than an empty box.
+ * Unlike the Native Banner there is no shared container id, so this format CAN repeat at every
+ * slot on a page — each iframe is independent and the same key works in all of them. That, plus a
+ * predictable fixed height, is why it is preferred over native in `AdSlot`.
+ *
+ * Config arrives as props because it now comes from runtime `app-config.json`, which is what lets
+ * one build serve many cafés.
  */
-export default function AdsterraBanner() {
+export default function AdsterraBanner({ bannerKey, width, height }: AdsterraBannerProps) {
   const html = useMemo(
-    () =>
-      ADSTERRA_BANNER_KEY
-        ? bannerFrameHtml(ADSTERRA_BANNER_KEY, ADSTERRA_BANNER_WIDTH, ADSTERRA_BANNER_HEIGHT)
-        : null,
-    [],
+    () => (bannerKey ? bannerFrameHtml(bannerKey, width, height) : null),
+    [bannerKey, width, height],
   )
 
   if (!html) return null
@@ -32,8 +37,8 @@ export default function AdsterraBanner() {
       <iframe
         title="advertisement"
         srcDoc={html}
-        width={ADSTERRA_BANNER_WIDTH}
-        height={ADSTERRA_BANNER_HEIGHT}
+        width={width}
+        height={height}
         style={{ border: 0, overflow: 'hidden', maxWidth: '100%' }}
         scrolling="no"
         // Allows the ad's own scripts and click-throughs, but withholds same-origin — so the frame
