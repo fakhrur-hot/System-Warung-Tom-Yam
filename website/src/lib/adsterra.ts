@@ -20,6 +20,9 @@
  * the slot, and AdSense's own components stay dark unless separately configured.
  */
 
+import { useEffect, useState } from 'react'
+import { loadRuntimeConfig } from './runtimeConfig'
+
 /** Banner: the publisher key from Adsterra → Websites → the unit's code snippet (`'key'`). */
 export const ADSTERRA_BANNER_KEY = import.meta.env.VITE_ADSTERRA_BANNER_KEY as string | undefined
 
@@ -69,6 +72,43 @@ export const ADSTERRA_SMARTLINK_URL = import.meta.env.VITE_ADSTERRA_SMARTLINK_UR
 export const adsterraEnabled = Boolean(
   ADSTERRA_BANNER_KEY || (ADSTERRA_NATIVE_SRC && ADSTERRA_NATIVE_CONTAINER),
 )
+
+/**
+ * The Native Banner unit for THIS deployment, preferring runtime config over the build-time env.
+ *
+ * Runtime config is what lets one build serve many cafés: swap `app-config.json` and the same
+ * bundle points at a different café's unit. The `VITE_*` values remain as a fallback so
+ * deployments already configured through Pages environment variables keep working.
+ *
+ * Returns `loaded: false` until the fetch settles, so a slot renders nothing rather than briefly
+ * flashing an AdSense unit and then replacing it.
+ */
+export function useAdsterraNative(): {
+  loaded: boolean
+  src?: string
+  container?: string
+} {
+  const [state, setState] = useState<{ loaded: boolean; src?: string; container?: string }>({
+    loaded: false,
+  })
+
+  useEffect(() => {
+    let alive = true
+    loadRuntimeConfig().then((cfg) => {
+      if (!alive) return
+      setState({
+        loaded: true,
+        src: cfg.adsterraSrc || ADSTERRA_NATIVE_SRC,
+        container: cfg.adsterraContainer || ADSTERRA_NATIVE_CONTAINER,
+      })
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  return state
+}
 
 let socialBarLoaded = false
 

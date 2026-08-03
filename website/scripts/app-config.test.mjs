@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Task 3.4 — `/app-config.json` publishes exactly three public fields, and can never carry a secret.
+ * Task 3.4 — `/app-config.json` publishes exactly five public fields, and can never carry a secret.
  *
  * The endpoint's whole justification is that it discloses nothing new: the live bundle already
  * serves the project URL and publishable key in plain text, because Vite inlines
@@ -30,7 +30,10 @@ const check = (name, ok, detail = '') => {
 
 console.log('app-config.json contract\n')
 
-const EXPECTED = ['supabaseUrl', 'supabaseAnonKey', 'cafeName']
+// Widened from three to five when Adsterra ids moved out of build-time `VITE_*` and into this
+// runtime file, so one build can serve many cafes. Ad unit ids are public by definition -- they
+// appear in every visitor's page source -- so they do not weaken the no-secrets rule below.
+const EXPECTED = ['supabaseUrl', 'supabaseAnonKey', 'cafeName', 'adsterraSrc', 'adsterraContainer']
 
 // ── The static placeholder shipped in public/ ─────────────────────────────────────────────────
 const placeholderPath = join(ROOT, 'public', 'app-config.json')
@@ -43,7 +46,7 @@ if (existsSync(placeholderPath)) {
 
   if (json) {
     const keys = Object.keys(json).sort()
-    check('exactly the three expected fields', JSON.stringify(keys) === JSON.stringify([...EXPECTED].sort()),
+    check('exactly the expected fields', JSON.stringify(keys) === JSON.stringify([...EXPECTED].sort()),
       `got: ${keys.join(', ')}`)
 
     // The placeholder must not carry a real café's values — it is committed, and the whole
@@ -64,7 +67,7 @@ check('generator reads the same env the bundle uses',
   cfg.includes('VITE_SUPABASE_URL') && cfg.includes('VITE_SUPABASE_PUBLISHABLE_KEY'),
   'if it read different variables the endpoint could drift from the bundle it claims to mirror')
 
-check('generator emits exactly the three fields',
+check('generator emits exactly the expected fields',
   EXPECTED.every((k) => cfg.includes(k)),
   'a fourth field would break the "discloses nothing new" argument')
 
@@ -82,7 +85,7 @@ if (existsSync(built)) {
   const raw = readFileSync(built, 'utf8')
   const json = JSON.parse(raw)
   const keys = Object.keys(json).sort()
-  check('built output has exactly the three fields',
+  check('built output has exactly the expected fields',
     JSON.stringify(keys) === JSON.stringify([...EXPECTED].sort()), `got: ${keys.join(', ')}`)
   check('built output carries no secret',
     !raw.includes('sb_secret') && !raw.includes('service_role'))

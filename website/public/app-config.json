@@ -1,5 +1,7 @@
 {
   "supabaseUrl": "",
   "supabaseAnonKey": "",
-  "cafeName": "RAZ POS"
+  "cafeName": "RAZ POS",
+  "adsterraSrc": "",
+  "adsterraContainer": ""
 }

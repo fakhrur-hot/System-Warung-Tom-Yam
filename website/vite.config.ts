@@ -72,6 +72,11 @@ function generateStaticJsonPlugin(): Plugin {
       )
 
       // ── app-config.json ──────────────────────────────────────────────────────────
+      // Adsterra ids are published here rather than inlined from `VITE_*` so that ONE build can
+      // serve many cafés: this is a plain static file, so a deployment can swap it (by hand, from
+      // Supabase, or from a Worker keyed on hostname) without rebuilding. They are safe to publish
+      // — an ad unit id appears in every visitor's page source by definition — and the
+      // service-role guard above still governs what may never appear in this file.
       fs.writeFileSync(
         path.join(outDir, 'app-config.json'),
         JSON.stringify(
@@ -79,6 +84,8 @@ function generateStaticJsonPlugin(): Plugin {
             supabaseUrl,
             supabaseAnonKey: supabaseKey,
             cafeName,
+            adsterraSrc: process.env.VITE_ADSTERRA_NATIVE_SRC?.trim() ?? '',
+            adsterraContainer: process.env.VITE_ADSTERRA_NATIVE_CONTAINER?.trim() ?? '',
           },
           null,
           2
