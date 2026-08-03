@@ -54,7 +54,7 @@ class GoogleAccountSession @Inject constructor(
         val mode: String,
         val cafeName: String,
     ) {
-        /** `RAZS.POS-LAN-Tani Tom Yam` — the Drive folder name this came from. */
+        /** `RAZS.POS-LAN-Kedai Kopi` — the Drive folder name this came from. */
         val folderName: String get() = "${CafeBundleStore.FILE_PREFIX}$mode-$cafeName"
     }
 

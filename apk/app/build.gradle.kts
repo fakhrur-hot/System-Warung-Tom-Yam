@@ -63,7 +63,7 @@ val cafeApplicationId = localProps.getProperty("APPLICATION_ID") ?: "com.razstud
 // This is NOT the package name. `applicationId` below is the unique id Play, AdMob and the OS
 // identify the app by, it cannot contain spaces, and it is deliberately left alone — see the
 // comment there for what changing it would break.
-val cafeName = localProps.getProperty("CAFE_NAME") ?: "Warung POS RAZStudio"
+val cafeName = localProps.getProperty("CAFE_NAME") ?: "RAZ POS"
 
 // CAFE_PROFILE_DIR: optional path to a per-café resource directory. When set and the directory
 // exists, its res/ sub-directory is added as an extra Android resource source set, and Android's

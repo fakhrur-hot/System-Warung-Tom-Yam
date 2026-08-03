@@ -3,6 +3,7 @@ package com.razstudio.pos.ui.theme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -10,7 +11,7 @@ import com.razstudio.pos.R
 
 /**
  * Runtime-swappable colour presets. Each preset provides a complete 10-shade ramp that maps
- * directly onto [lightColorScheme], using the same role assignments as [TomYamLightColors].
+ * directly onto [lightColorScheme] or [darkColorScheme], using the same role assignments as [TomYamLightColors].
  *
  * Presets are intentionally self-contained: no resource reads, no context needed. That keeps
  * theme switching instant — no disk I/O, no recompose lag beyond the normal MaterialTheme
@@ -22,18 +23,18 @@ import com.razstudio.pos.R
 enum class ThemePreset(
     val displayName: String,
     // 10-shade ramp
-    val shade50: Color,
-    val shade100: Color,
-    val shade200: Color,
-    val shade300: Color,
-    val shade400: Color,
-    val shade500: Color,
-    val shade600: Color,   // primary accent
-    val shade700: Color,   // hover / pressed
-    val shade800: Color,
-    val shade900: Color,   // headings
-    val muted: Color,
-    val outline: Color,
+    private val rawShade50: Color,
+    private val rawShade100: Color,
+    private val rawShade200: Color,
+    private val rawShade300: Color,
+    private val rawShade400: Color,
+    private val rawShade500: Color,
+    private val rawShade600: Color,   // primary accent
+    private val rawShade700: Color,   // hover / pressed
+    private val rawShade800: Color,
+    private val rawShade900: Color,   // headings
+    private val rawMuted: Color,
+    private val rawOutline: Color,
 
     /**
      * The preset's display typeface, applied to **headings only** — never to body text.
@@ -48,138 +49,190 @@ enum class ThemePreset(
      * `null` means "use the system face throughout", which is what TOM_YAM and MINIMALIST want.
      */
     val displayFont: FontFamily? = null,
+    val isDark: Boolean = false,
 ) {
 
-    /** 🌶 Tom Yam — deep red. The build-time default and the house identity. */
+    /**  Tom Yam — deep red. The build-time default and the house identity. */
     TOM_YAM(
         displayName = "Tom Yam",
-        shade50  = Color(0xFFFEF3F1),
-        shade100 = Color(0xFFFADEDB),
-        shade200 = Color(0xFFF0B2AC),
-        shade300 = Color(0xFFE0786E),
-        shade400 = Color(0xFFC83C30),
-        shade500 = Color(0xFFB0160C),
-        shade600 = Color(0xFF9B0600),
-        shade700 = Color(0xFF7A0500),
-        shade800 = Color(0xFF5C0400),
-        shade900 = Color(0xFF400200),
-        muted    = Color(0xFF6B7280),
-        outline  = Color(0xFFF0B2AC),
+        rawShade50  = Color(0xFFFEF3F1),
+        rawShade100 = Color(0xFFFADEDB),
+        rawShade200 = Color(0xFFF0B2AC),
+        rawShade300 = Color(0xFFE0786E),
+        rawShade400 = Color(0xFFC83C30),
+        rawShade500 = Color(0xFFB0160C),
+        rawShade600 = Color(0xFF9B0600),
+        rawShade700 = Color(0xFF7A0500),
+        rawShade800 = Color(0xFF5C0400),
+        rawShade900 = Color(0xFF400200),
+        rawMuted    = Color(0xFF6B7280),
+        rawOutline  = Color(0xFFF0B2AC),
     ),
 
-    /** 🎩 Luxury — warm ivory and antique gold. Opulent, high-end. */
+    /**  Luxury — warm ivory and antique gold. Opulent, high-end. */
     LUXURY(
         displayName = "Luxury",
-        shade50  = Color(0xFFF8F4E8),
-        shade100 = Color(0xFFEDE4CC),
-        shade200 = Color(0xFFD4C4A0),
-        shade300 = Color(0xFFB8A070),
-        shade400 = Color(0xFF9C8448),
-        shade500 = Color(0xFFC9A227),
-        shade600 = Color(0xFFD4AF37),
-        shade700 = Color(0xFFB8941F),
-        shade800 = Color(0xFF2C1810),
-        shade900 = Color(0xFF1A0F0A),
-        muted    = Color(0xFF8B7355),
-        outline  = Color(0xFFD4C4A0),
+        rawShade50  = Color(0xFFF8F4E8),
+        rawShade100 = Color(0xFFEDE4CC),
+        rawShade200 = Color(0xFFD4C4A0),
+        rawShade300 = Color(0xFFB8A070),
+        rawShade400 = Color(0xFF9C8448),
+        rawShade500 = Color(0xFFC9A227),
+        rawShade600 = Color(0xFFD4AF37),
+        rawShade700 = Color(0xFFB8941F),
+        rawShade800 = Color(0xFF2C1810),
+        rawShade900 = Color(0xFF1A0F0A),
+        rawMuted    = Color(0xFF8B7355),
+        rawOutline  = Color(0xFFD4C4A0),
         // Playfair Display — high-contrast didone, the classic luxury serif
         displayFont = FontFamily(Font(R.font.playfair_display)),
     ),
 
-    /** 💎 Elegant — champagne and rose gold. Refined, timeless. */
+    /**  Elegant — champagne and rose gold. Refined, timeless. */
     ELEGANT(
         displayName = "Elegant",
-        shade50  = Color(0xFFFDF8F5),
-        shade100 = Color(0xFFF5EBE0),
-        shade200 = Color(0xFFE8D5C4),
-        shade300 = Color(0xFFD4B8A0),
-        shade400 = Color(0xFFBF9880),
-        shade500 = Color(0xFFB07B6A),
-        shade600 = Color(0xFFB5706A),
-        shade700 = Color(0xFF9C5B55),
-        shade800 = Color(0xFF3D2420),
-        shade900 = Color(0xFF2A1815),
-        muted    = Color(0xFF9E7B6E),
-        outline  = Color(0xFFE8D5C4),
+        rawShade50  = Color(0xFFFDF8F5),
+        rawShade100 = Color(0xFFF5EBE0),
+        rawShade200 = Color(0xFFE8D5C4),
+        rawShade300 = Color(0xFFD4B8A0),
+        rawShade400 = Color(0xFFBF9880),
+        rawShade500 = Color(0xFFB07B6A),
+        rawShade600 = Color(0xFFB5706A),
+        rawShade700 = Color(0xFF9C5B55),
+        rawShade800 = Color(0xFF3D2420),
+        rawShade900 = Color(0xFF2A1815),
+        rawMuted    = Color(0xFF9E7B6E),
+        rawOutline  = Color(0xFFE8D5C4),
         // Cormorant Garamond — a refined old-style serif
         displayFont = FontFamily(Font(R.font.cormorant_garamond)),
     ),
 
-    /** ⬜ Minimalist — pure white and charcoal. Clean, uncluttered. */
+    /**  Minimalist — pure white and charcoal. Clean, uncluttered. */
     MINIMALIST(
         displayName = "Minimalist",
-        shade50  = Color(0xFFFAFAFA),
-        shade100 = Color(0xFFF4F4F5),
-        shade200 = Color(0xFFE4E4E7),
-        shade300 = Color(0xFFD1D1D6),
-        shade400 = Color(0xFFA1A1AA),
-        shade500 = Color(0xFF71717A),
-        shade600 = Color(0xFF27272A),
-        shade700 = Color(0xFF18181B),
-        shade800 = Color(0xFF09090B),
-        shade900 = Color(0xFF000000),
-        muted    = Color(0xFF71717A),
-        outline  = Color(0xFFE4E4E7),
+        rawShade50  = Color(0xFFFAFAFA),
+        rawShade100 = Color(0xFFF4F4F5),
+        rawShade200 = Color(0xFFE4E4E7),
+        rawShade300 = Color(0xFFD1D1D6),
+        rawShade400 = Color(0xFFA1A1AA),
+        rawShade500 = Color(0xFF71717A),
+        rawShade600 = Color(0xFF27272A),
+        rawShade700 = Color(0xFF18181B),
+        rawShade800 = Color(0xFF09090B),
+        rawShade900 = Color(0xFF000000),
+        rawMuted    = Color(0xFF71717A),
+        rawOutline  = Color(0xFFE4E4E7),
         // Inter — a neutral grotesque, and the open stand-in for Helvetica Neue (proprietary)
         displayFont = FontFamily(Font(R.font.inter)),
     ),
 
-    /** 🔥 Bold — cobalt blue and electric. High contrast, energetic. */
+    /**  Bold — cobalt blue and electric. High contrast, energetic. */
     BOLD(
         displayName = "Bold",
-        shade50  = Color(0xFFEFF6FF),
-        shade100 = Color(0xFFDBEAFE),
-        shade200 = Color(0xFFBFDBFE),
-        shade300 = Color(0xFF93C5FD),
-        shade400 = Color(0xFF60A5FA),
-        shade500 = Color(0xFF3B82F6),
-        shade600 = Color(0xFF1D4ED8),
-        shade700 = Color(0xFF1E3A8A),
-        shade800 = Color(0xFF1E2A5E),
-        shade900 = Color(0xFF0F172A),
-        muted    = Color(0xFF64748B),
-        outline  = Color(0xFFBFDBFE),
+        rawShade50  = Color(0xFFEFF6FF),
+        rawShade100 = Color(0xFFDBEAFE),
+        rawShade200 = Color(0xFFBFDBFE),
+        rawShade300 = Color(0xFF93C5FD),
+        rawShade400 = Color(0xFF60A5FA),
+        rawShade500 = Color(0xFF3B82F6),
+        rawShade600 = Color(0xFF1D4ED8),
+        rawShade700 = Color(0xFF1E3A8A),
+        rawShade800 = Color(0xFF1E2A5E),
+        rawShade900 = Color(0xFF0F172A),
+        rawMuted    = Color(0xFF64748B),
+        rawOutline  = Color(0xFFBFDBFE),
         // Anton — heavy condensed poster face; the open stand-in for Impact (proprietary)
         displayFont = FontFamily(Font(R.font.anton)),
     ),
 
-    /** 🌸 Soft — blush pink and lavender. Gentle, romantic. */
+    /**  Soft — blush pink and lavender. Gentle, romantic. */
     SOFT(
         displayName = "Soft",
-        shade50  = Color(0xFFFDF2F8),
-        shade100 = Color(0xFFFCE7F3),
-        shade200 = Color(0xFFFBCFE8),
-        shade300 = Color(0xFFF9A8D4),
-        shade400 = Color(0xFFF472B6),
-        shade500 = Color(0xFFEC4899),
-        shade600 = Color(0xFFBE185D),
-        shade700 = Color(0xFF9D174D),
-        shade800 = Color(0xFF831843),
-        shade900 = Color(0xFF500724),
-        muted    = Color(0xFF9F8595),
-        outline  = Color(0xFFFBCFE8),
+        rawShade50  = Color(0xFFFDF2F8),
+        rawShade100 = Color(0xFFFCE7F3),
+        rawShade200 = Color(0xFFFBCFE8),
+        rawShade300 = Color(0xFFF9A8D4),
+        rawShade400 = Color(0xFFF472B6),
+        rawShade500 = Color(0xFFEC4899),
+        rawShade600 = Color(0xFFBE185D),
+        rawShade700 = Color(0xFF9D174D),
+        rawShade800 = Color(0xFF831843),
+        rawShade900 = Color(0xFF500724),
+        rawMuted    = Color(0xFF9F8595),
+        rawOutline  = Color(0xFFFBCFE8),
         // Dancing Script — a soft script
         displayFont = FontFamily(Font(R.font.dancing_script)),
     ),
 
-    /** ⚡ Edgy — charcoal and electric lime. Sharp, rebellious. */
+    /**  Edgy — charcoal and electric lime. Sharp, rebellious. */
     EDGY(
         displayName = "Edgy",
-        shade50  = Color(0xFFF0FDF4),
-        shade100 = Color(0xFFDCFCE7),
-        shade200 = Color(0xFFBBF7D0),
-        shade300 = Color(0xFF86EFAC),
-        shade400 = Color(0xFF4ADE80),
-        shade500 = Color(0xFF22C55E),
-        shade600 = Color(0xFF16A34A),
-        shade700 = Color(0xFF15803D),
-        shade800 = Color(0xFF1C1C1C),
-        shade900 = Color(0xFF0A0A0A),
-        muted    = Color(0xFF6B7280),
-        outline  = Color(0xFFBBF7D0),
+        rawShade50  = Color(0xFFF0FDF4),
+        rawShade100 = Color(0xFFDCFCE7),
+        rawShade200 = Color(0xFFBBF7D0),
+        rawShade300 = Color(0xFF86EFAC),
+        rawShade400 = Color(0xFF4ADE80),
+        rawShade500 = Color(0xFF22C55E),
+        rawShade600 = Color(0xFF16A34A),
+        rawShade700 = Color(0xFF15803D),
+        rawShade800 = Color(0xFF1C1C1C),
+        rawShade900 = Color(0xFF0A0A0A),
+        rawMuted    = Color(0xFF6B7280),
+        rawOutline  = Color(0xFFBBF7D0),
         // Oswald — tall condensed grotesque
         displayFont = FontFamily(Font(R.font.oswald)),
+    ),
+
+    /**  Material Dark — standard Material 3 dark theme */
+    MATERIAL_DARK(
+        displayName = "Material Dark",
+        rawShade50  = Color(0xFFE3E3E3), // light text
+        rawShade100 = Color(0xFFC7C7C7),
+        rawShade200 = Color(0xFFBB86FC), // primary accent (light purple)
+        rawShade300 = Color(0xFF03DAC6), // secondary accent (teal)
+        rawShade400 = Color(0xFFCF6679), // tertiary accent
+        rawShade500 = Color(0xFF985EFF),
+        rawShade600 = Color(0xFFBB86FC), // primary
+        rawShade700 = Color(0xFF3700B3),
+        rawShade800 = Color(0xFF1E1E1E), // card background
+        rawShade900 = Color(0xFF121212), // background
+        rawMuted    = Color(0xFF9E9E9E),
+        rawOutline  = Color(0xFF373737),
+        displayFont = null,
+        isDark      = true,
+    ),
+
+    /**  Amoled Dark — pure black theme for high-contrast and battery saving */
+    AMOLED_DARK(
+        displayName = "Amoled Dark",
+        rawShade50  = Color(0xFFF5F5F5), // white text
+        rawShade100 = Color(0xFFE0E0E0),
+        rawShade200 = Color(0xFF00E676), // vibrant green primary accent
+        rawShade300 = Color(0xFF29B6F6), // vibrant light blue
+        rawShade400 = Color(0xFFAB47BC), // purple
+        rawShade500 = Color(0xFF00C853),
+        rawShade600 = Color(0xFF00E676), // primary
+        rawShade700 = Color(0xFF009624),
+        rawShade800 = Color(0xFF121212), // card background
+        rawShade900 = Color(0xFF000000), // background (pure black)
+        rawMuted    = Color(0xFF888888),
+        rawOutline  = Color(0xFF222222),
+        displayFont = null,
+        isDark      = true,
     );
+
+    val shade50: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYam50 else rawShade50
+    val shade100: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYam100 else rawShade100
+    val shade200: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYam200 else rawShade200
+    val shade300: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYam300 else rawShade300
+    val shade400: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYam400 else rawShade400
+    val shade500: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYam500 else rawShade500
+    val shade600: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYam600 else rawShade600
+    val shade700: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYam700 else rawShade700
+    val shade800: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYam800 else rawShade800
+    val shade900: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYam900 else rawShade900
+    val muted: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYamMuted else rawMuted
+    val outline: Color get() = if (this == TOM_YAM && TomYamColors.isInitialized) TomYamColors.TomYamOutline else rawOutline
 
     /**
      * Material3 typography with this preset's face applied to **display and headline styles only**.
@@ -208,38 +261,75 @@ enum class ThemePreset(
 
     /** Build a Material3 [ColorScheme] from this preset's ramp, using the same role map as
      *  [TomYamLightColors] so every screen recolours consistently without component changes. */
-    fun toColorScheme(): ColorScheme = lightColorScheme(
-        primary              = shade600,
-        onPrimary            = Color.White,
-        primaryContainer     = shade100,
-        onPrimaryContainer   = shade900,
+    fun toColorScheme(): ColorScheme {
+        return if (isDark) {
+            darkColorScheme(
+                primary              = shade200,
+                onPrimary            = shade900,
+                primaryContainer     = shade800,
+                onPrimaryContainer   = shade100,
 
-        secondary            = shade500,
-        onSecondary          = Color.White,
-        secondaryContainer   = shade100,
-        onSecondaryContainer = shade900,
+                secondary            = shade300,
+                onSecondary          = shade900,
+                secondaryContainer   = shade800,
+                onSecondaryContainer = shade100,
 
-        tertiary             = shade700,
-        onTertiary           = Color.White,
-        tertiaryContainer    = shade200,
-        onTertiaryContainer  = shade900,
+                tertiary             = shade400,
+                onTertiary           = shade900,
+                tertiaryContainer    = shade800,
+                onTertiaryContainer  = shade100,
 
-        background           = shade50,
-        onBackground         = shade900,
-        surface              = Color.White,
-        onSurface            = shade900,
-        surfaceVariant       = shade100,
-        onSurfaceVariant     = muted,
+                background           = shade900,
+                onBackground         = shade50,
+                surface              = shade800,
+                onSurface            = shade50,
+                surfaceVariant       = shade800,
+                onSurfaceVariant     = muted,
 
-        outline              = outline,
-        outlineVariant       = shade200,
+                outline              = outline,
+                outlineVariant       = shade700,
 
-        // Validation / destructive: standard red — unchanged across all presets
-        error                = Color(0xFFBA1A1A),
-        onError              = Color.White,
-        errorContainer       = Color(0xFFFFDAD6),
-        onErrorContainer     = Color(0xFF410002),
-    )
+                // Validation / destructive: standard red/rose in dark theme
+                error                = Color(0xFFF2B8B5),
+                onError              = Color(0xFF601410),
+                errorContainer       = Color(0xFF8C1D18),
+                onErrorContainer     = Color(0xFFF9DEDC),
+            )
+        } else {
+            lightColorScheme(
+                primary              = shade600,
+                onPrimary            = Color.White,
+                primaryContainer     = shade100,
+                onPrimaryContainer   = shade900,
+
+                secondary            = shade500,
+                onSecondary          = Color.White,
+                secondaryContainer   = shade100,
+                onSecondaryContainer = shade900,
+
+                tertiary             = shade700,
+                onTertiary           = Color.White,
+                tertiaryContainer    = shade200,
+                onTertiaryContainer  = shade900,
+
+                background           = shade50,
+                onBackground         = shade900,
+                surface              = Color.White,
+                onSurface            = shade900,
+                surfaceVariant       = shade100,
+                onSurfaceVariant     = muted,
+
+                outline              = outline,
+                outlineVariant       = shade200,
+
+                // Validation / destructive: standard red — unchanged across all presets
+                error                = Color(0xFFBA1A1A),
+                onError              = Color.White,
+                errorContainer       = Color(0xFFFFDAD6),
+                onErrorContainer     = Color(0xFF410002),
+            )
+        }
+    }
 
     companion object {
         val DEFAULT = TOM_YAM

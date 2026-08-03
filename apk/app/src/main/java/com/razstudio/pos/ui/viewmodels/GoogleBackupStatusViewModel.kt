@@ -48,7 +48,7 @@ class GoogleBackupStatusViewModel @Inject constructor(
         val busy: Boolean = false,
         val driveReachable: Boolean = false,
         val bundleExists: Boolean = false,
-        /** `RAZS.POS-FullQR-Tani Tom Yam` — shown so the owner sees what is being promised. */
+        /** `RAZS.POS-FullQR-Kedai Kopi` — shown so the owner sees what is being promised. */
         val folderName: String = "",
         val message: String? = null,
         val isError: Boolean = false,

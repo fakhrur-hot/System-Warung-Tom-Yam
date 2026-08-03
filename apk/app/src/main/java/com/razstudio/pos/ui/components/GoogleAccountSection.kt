@@ -38,7 +38,7 @@ import com.razstudio.pos.ui.viewmodels.GoogleBackupStatusViewModel
  * sentence and one button, not a panel of blanks.
  *
  * Linked: the account, whether Drive has been reached, and whether this café has a bundle in it. If
- * it has none, the offer to create one names the exact folder — `RAZS.POS-FullQR-Tani Tom Yam` —
+ * it has none, the offer to create one names the exact folder — `RAZS.POS-FullQR-Kedai Kopi` —
  * because the whole promise here is that a reinstalled phone finds that folder and comes back
  * whole, and the owner should be able to see what they are being promised.
  *

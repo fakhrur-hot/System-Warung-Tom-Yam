@@ -40,7 +40,9 @@ class ThemeTypographyTest {
 
     @Test
     fun everyOtherPresetCarriesAFace() {
-        ThemePreset.entries.filter { it != ThemePreset.TOM_YAM }.forEach {
+        ThemePreset.entries.filter { 
+            it != ThemePreset.TOM_YAM && it != ThemePreset.MATERIAL_DARK && it != ThemePreset.AMOLED_DARK 
+        }.forEach {
             assertNotNull("${it.displayName} should have a display face", it.displayFont)
         }
     }
@@ -99,6 +101,6 @@ class ThemeTypographyTest {
             assertNotNull(it.shade900)
             assertNotNull(it.outline)
         }
-        assertEquals(7, ThemePreset.entries.size)
+        assertEquals(9, ThemePreset.entries.size)
     }
 }

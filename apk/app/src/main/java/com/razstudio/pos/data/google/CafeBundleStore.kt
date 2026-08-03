@@ -61,7 +61,7 @@ open class CafeBundleStore @Inject constructor(
 
         /**
          * Each cafe is a **folder** named `RAZS.POS-{MODE}-{cafe name}`, e.g.
-         * `RAZS.POS-LAN-Tani Tom Yam`, holding [BUNDLE_FILE] plus one file per menu photo.
+         * `RAZS.POS-LAN-Kedai Kopi`, holding [BUNDLE_FILE] plus one file per menu photo.
          *
          * A folder rather than a single file because photos are binary and belong beside the JSON
          * that references them; and because one account can hold several cafes -- a WLAN till, a
@@ -108,7 +108,7 @@ open class CafeBundleStore @Inject constructor(
             FILE_PREFIX + labelFor(mode) + "-" + cafeName.replace("'", "").replace("\\", "").trim()
 
         /**
-         * Split `RAZS.POS-LAN-Tani Tom Yam` back into `LAN` and `Tani Tom Yam`.
+         * Split `RAZS.POS-LAN-Kedai Kopi` back into `LAN` and `Kedai Kopi`.
          *
          * Splits on the FIRST hyphen after the prefix, because a cafe name may contain hyphens
          * ("Kopi-O Corner") and a mode never does. Returns null for anything that does not parse,

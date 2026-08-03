@@ -46,7 +46,7 @@ fun WarungTomYamTheme(content: @Composable () -> Unit) {
             val window = (context as Activity).window
             // Blend the status bar into the app background and use dark icons on the light ground.
             window.statusBarColor = colorScheme.background.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !activePreset.isDark
         }
     }
 
