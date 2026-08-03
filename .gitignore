@@ -58,3 +58,6 @@ DEPLOYMENT.md
 specs/
 # Dev screenshots taken while verifying on-device behaviour; not shipping artefacts.
 screenshot*.png
+
+# Adsterra Publisher API token (bare token, not JSON despite the name). Never commit.
+ADSTERRA.json
