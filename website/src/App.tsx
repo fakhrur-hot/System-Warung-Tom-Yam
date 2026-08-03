@@ -12,6 +12,7 @@ import StatusView from './components/StatusView'
 import ConfirmDialog from './components/ConfirmDialog'
 import QrScanner from './components/QrScanner'
 import { loadAdSense } from './lib/adsense'
+import { ADSTERRA_SOCIAL_BAR_SRC, adsterraEnabled, loadAdsterraSocialBar } from './lib/adsterra'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -148,10 +149,18 @@ export default function App() {
   const tableId = getTableFromUrl()
   const browserId = getBrowserId()
 
-  // Load AdSense auto ads — only from this component, which the router renders solely for
+  // Load page-level ad scripts — only from this component, which the router renders solely for
   // customer-facing paths (/order and the unmatched-path fallback), never any /admin/* route.
+  //
+  // Both no-op when unconfigured. AdSense auto-ads are skipped entirely once Adsterra is running:
+  // AdSense holds publishers responsible for what appears alongside its units, so serving both on
+  // one page view risks a strike worth more than the extra impression.
   useEffect(() => {
-    loadAdSense()
+    if (adsterraEnabled || ADSTERRA_SOCIAL_BAR_SRC) {
+      loadAdsterraSocialBar()
+    } else {
+      loadAdSense()
+    }
   }, [])
 
   // Clean up realtime subscription on unmount
