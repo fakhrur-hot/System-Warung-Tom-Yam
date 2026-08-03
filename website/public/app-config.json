@@ -3,5 +3,15 @@
   "supabaseAnonKey": "sb_publishable_mhbkJ3si-NLzAbWzn2L1jA_WvIf24bS",
   "cafeName": "Tani Tom Yam",
   "rolleradsSiteId": "2976960",
-  "rolleradsTagSrc": ""
+  "rolleradsTagSrc": "",
+  "shopeeAffiliate": {
+    "subId": "tani-menu",
+    "products": [
+      {
+        "href": "https://s.shopee.com.my/AUsvIMpRzN",
+        "img": "",
+        "alt": "Shopee pick"
+      }
+    ]
+  }
 }

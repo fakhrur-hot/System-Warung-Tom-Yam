@@ -40,6 +40,18 @@ export interface RuntimeConfig {
   rolleradsTagSrc?: string
   /** RollerAds site id. Informational — the tag URL already embeds it. */
   rolleradsSiteId?: string
+  /**
+   * Hand-picked Shopee affiliate products shown between menu items.
+   *
+   * Lives in runtime config so a café curates its own list without a rebuild, and so the list can
+   * be swapped seasonally. `products[].href` must be a short link from the Shopee affiliate
+   * portal — it already carries attribution. See `lib/shopee.ts`.
+   */
+  shopeeAffiliate?: {
+    products?: Array<{ href: string; img: string; alt: string }>
+    /** Optional `sub_id` for per-placement reporting in Shopee's dashboard. */
+    subId?: string
+  }
 }
 
 let cached: RuntimeConfig | null = null
