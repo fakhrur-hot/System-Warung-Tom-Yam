@@ -69,7 +69,15 @@ export default function AdsterraNative({ src, container }: AdsterraNativeProps) 
   if (!src || !container || !isOwner.current) return null
 
   return (
-    <div ref={hostRef} className="py-2" aria-hidden="true">
+    // Width-capped and centred rather than full-bleed. A Native Banner lays its items out in a
+    // responsive grid, so an unconstrained container on a wide screen renders more columns and a
+    // taller block. Capping the width keeps the footprint predictable without clipping the unit —
+    // `overflow:hidden` on an ad is the wrong tool: it hides paid impressions and reads as
+    // cloaking to the network.
+    //
+    // The real height control is the ROW/COLUMN setting on the unit itself in the Adsterra
+    // dashboard; nothing in this file can shrink a unit configured to render many rows.
+    <div ref={hostRef} className="mx-auto w-full max-w-sm py-2" aria-hidden="true">
       <div id={container} />
     </div>
   )
