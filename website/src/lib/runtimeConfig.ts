@@ -27,21 +27,19 @@ export interface RuntimeConfig {
   supabaseUrl?: string
   supabaseAnonKey?: string
   cafeName?: string
-  /** Adsterra Native Banner `invoke.js` URL, verbatim from the unit's snippet. */
-  adsterraSrc?: string
-  /** Adsterra Native Banner container id, verbatim — their loader matches it exactly. */
-  adsterraContainer?: string
   /**
-   * Adsterra **Banner** publisher key. Set this to switch the café off the Native Banner.
+   * Full `src` of the RollerAds tag, verbatim from my.rollerads.com → your site → get code.
    *
-   * Unlike native, a banner has no shared container id — each one renders in its own iframe — so
-   * it can repeat at every slot, and a 320x50 is a fraction of a native grid's height. Setting it
-   * takes precedence over [adsterraSrc]/[adsterraContainer]; see `AdSlot`.
+   * Deliberately the whole URL rather than an id to assemble one from: the host and path are
+   * issued by RollerAds and are not derivable from the numeric site id, so a constructed URL
+   * would load nothing while looking configured. See `lib/rollerads.ts`.
+   *
+   * RollerAds is page-level only (push / in-page push / popunder) — it has no in-page display
+   * format, so nothing here feeds `AdSlot`.
    */
-  adsterraBannerKey?: string
-  /** Must match the size the unit was created at in Adsterra, or the zone returns no fill. */
-  adsterraBannerWidth?: number
-  adsterraBannerHeight?: number
+  rolleradsTagSrc?: string
+  /** RollerAds site id. Informational — the tag URL already embeds it. */
+  rolleradsSiteId?: string
 }
 
 let cached: RuntimeConfig | null = null

@@ -12,7 +12,7 @@ import StatusView from './components/StatusView'
 import ConfirmDialog from './components/ConfirmDialog'
 import QrScanner from './components/QrScanner'
 import { loadAdSense } from './lib/adsense'
-import { ADSTERRA_SOCIAL_BAR_SRC, adsterraEnabled, loadAdsterraSocialBar } from './lib/adsterra'
+import { loadRollerAds } from './lib/rollerads'
 import { loadRuntimeConfig } from './lib/runtimeConfig'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -153,26 +153,20 @@ export default function App() {
   // Load page-level ad scripts — only from this component, which the router renders solely for
   // customer-facing paths (/order and the unmatched-path fallback), never any /admin/* route.
   //
-  // Both no-op when unconfigured. AdSense auto-ads are skipped entirely once Adsterra is running:
-  // AdSense holds publishers responsible for what appears alongside its units, so serving both on
-  // one page view risks a strike worth more than the extra impression.
+  // Both no-op when unconfigured, and unlike the Adsterra integration this replaced, both run
+  // together on purpose. RollerAds' formats are push, in-page push and popunder — none of which
+  // occupy in-page real estate or sit beside an AdSense unit, and RollerAds market push as
+  // AdSense-friendly. Adsterra's in-page units did compete, which is why that integration
+  // suppressed AdSense outright.
   //
-  // This MUST consult the runtime config, not just the build-time `VITE_*` values. A café
-  // configured only through app-config.json — which is the entire point of runtime config — has
-  // `adsterraEnabled === false`, so checking that alone would load AdSense here while AdSlot
-  // renders Adsterra units from the same config: both networks on one page view, the exact thing
-  // the paragraph above exists to prevent.
+  // The tag src is read from runtime config first: a café configured only through
+  // app-config.json — the entire point of runtime config — has no `VITE_*` value to fall back on.
   useEffect(() => {
     let alive = true
     loadRuntimeConfig().then((cfg) => {
       if (!alive) return
-      const adsterraConfigured =
-        Boolean(cfg.adsterraBannerKey) ||
-        Boolean(cfg.adsterraSrc && cfg.adsterraContainer) ||
-        adsterraEnabled ||
-        Boolean(ADSTERRA_SOCIAL_BAR_SRC)
-      if (adsterraConfigured) loadAdsterraSocialBar()
-      else loadAdSense()
+      loadRollerAds(cfg.rolleradsTagSrc)
+      loadAdSense()
     })
     return () => {
       alive = false
