@@ -3,6 +3,7 @@ package com.razstudio.pos.ui.tableview
 import com.razstudio.pos.data.local.Order
 import com.razstudio.pos.data.local.OrderItem
 import com.razstudio.pos.data.local.OrderStatus
+import com.razstudio.pos.data.local.PaymentTransaction
 import com.razstudio.pos.data.local.Table
 
 /**
@@ -54,4 +55,12 @@ data class OrderDetailState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val successMessage: String? = null,
+    /**
+     * A gateway attempt still PENDING in the local ledger for this order — crash/resume recovery
+     * (task 8.5). Non-null only immediately after [order] loads and only while nothing has
+     * settled it yet; [OrderDetailSheet] renders a "payment in progress" banner offering Resume
+     * when this is set, instead of silently showing the ordinary Pay Cash/QR row as if nothing
+     * were in flight.
+     */
+    val pendingGatewayTransaction: PaymentTransaction? = null,
 )

@@ -93,6 +93,7 @@ class SignInViewModelTest {
         available: Boolean = true,
         load: CafeBundleStore.LoadResult = CafeBundleStore.LoadResult.None,
     ) = SignInViewModel(
+        ApplicationProvider.getApplicationContext(),
         signInService(available), bundleStore(load), config, modes, backups,
         com.razstudio.pos.data.google.GoogleAccountSession(ApplicationProvider.getApplicationContext()),
         com.razstudio.pos.data.local.LocalImageStore(ApplicationProvider.getApplicationContext()),
@@ -315,6 +316,56 @@ class SignInViewModelTest {
 
         assertTrue(config.isModeConfigured(OperatingMode.CLOUD))
         assertTrue(vm.state.value is SignInViewModel.State.Restored)
+    }
+
+    // ── HW-REQ-8 / task 3.4: hardware config must not cross onto incompatible hardware ──────
+
+    /** A bundle carrying one printer of [transport], as `applyImport` would read it. */
+    private fun bundleWithPrinter(transport: String) = """
+        {"printerConfigs":[{
+            "id":"p1","name":"Counter","transport":"$transport","address":null,
+            "paperWidth":"EIGHTY_MM","printerRole":"BOTH","drawerKick":"SUNMI_AIDL"
+        }]}
+    """.trimIndent()
+
+    @Test
+    fun aSunmiPrinterSetIsWithheldFromADeviceWithNoSunmiService() {
+        // The case this guards: a café's Sunmi till dies and the owner signs in on a phone. A
+        // SUNMI_AIDL printer has no MAC, so importing it yields a till that looks configured and
+        // prints nowhere — silently. Robolectric has no Sunmi service, which is exactly a phone.
+        val vm = viewModel()
+        assertFalse(vm.hardwareConfigFitsThisDevice(bundleWithPrinter("SUNMI_AIDL")))
+    }
+
+    @Test
+    fun theLegacySunmiInternalSpellingIsAlsoWithheld() {
+        // Bundles written before the transport enum settled may carry either spelling; matching
+        // only one would restore an unusable printer from the older ones.
+        val vm = viewModel()
+        assertFalse(vm.hardwareConfigFitsThisDevice(bundleWithPrinter("SUNMI_INTERNAL")))
+    }
+
+    @Test
+    fun aBluetoothPrinterSetIsRestoredAnywhere() {
+        // The inverse matters just as much: a Bluetooth printer is addressed by MAC and can be
+        // re-paired on any device, so carrying it across is the whole point of the bundle. This is
+        // why the flag is computed rather than hardcoded false.
+        val vm = viewModel()
+        assertTrue(vm.hardwareConfigFitsThisDevice(bundleWithPrinter("BLUETOOTH")))
+    }
+
+    @Test
+    fun aBundleWithNoPrintersIsFitToRestore() {
+        val vm = viewModel()
+        assertTrue(vm.hardwareConfigFitsThisDevice("""{"tables":[]}"""))
+    }
+
+    @Test
+    fun malformedSetupDataIsTreatedAsUnfitRatherThanCrashing() {
+        // This runs inside the restore path. Failing the whole café restore over an unparseable
+        // printer row would be a poor trade, so it degrades to withholding.
+        val vm = viewModel()
+        assertFalse(vm.hardwareConfigFitsThisDevice("not json at all"))
     }
 
     @Test

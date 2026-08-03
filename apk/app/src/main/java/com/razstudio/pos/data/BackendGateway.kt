@@ -94,6 +94,101 @@ interface BackendGateway {
     suspend fun processPaymentAsStaff(orderId: String, method: String): ApiResult<OrderDto>
     suspend fun cancelOrderAsStaff(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit>
 
+    // ── Payment gateway ────────────────────────────────────────────────────────
+    /**
+     * Initiate a gateway payment attempt. Creates/uses a [PaymentTransaction] row and forwards
+     * to the `payment-initiate` Edge Function, which holds credentials and computes signatures
+     * server-side — the POS never sees the aggregator secret. (PG-REQ-4, A2, A3)
+     *
+     * The [payload]'s [PosCheckoutPayload.idempotencyKey] MUST equal
+     * [PaymentTransaction.idempotencyKeyFor]`(orderId, amountSen)`: stable for this (order, amount)
+     * pair and reused verbatim on every retry, never derived from a timestamp or a per-attempt id.
+     * The backend upserts on this key, so a retry updates the same row rather than creating a new
+     * one. (A6, 6.3)
+     *
+     * This method is unavailable in LAN and KIOSK modes — [ModeCapabilities.gatewayPaymentsEnabled]
+     * will be false there, and callers must check before showing gateway tiles. (A1, 6.4)
+     */
+    suspend fun initiatePayment(payload: PosCheckoutPayload): ApiResult<GatewayPaymentResult>
+
+    /**
+     * Query the gateway for a transaction's current status (PENDING / SUCCESS / FAILED).
+     * Used by the polling loop in the QR flow. (PG-REQ-4a, 8.2)
+     *
+     * Note: the aggregator requery expires after 24 hours. The persisted [PaymentTransaction]
+     * row is the authoritative source of truth after that window closes. (F5, 6.2c)
+     */
+    suspend fun queryPayment(transactionId: String): ApiResult<GatewayPaymentResult>
+
+    /**
+     * Fetch every payment attempt for an order, newest-first.
+     * Drives the retry history panel and task 8.5's crash-recovery display. (PG-REQ-5, 8.5)
+     */
+    suspend fun listPaymentTransactions(orderId: String): ApiResult<List<PaymentTransactionDto>>
+
+    // Staff variants — ordering-key auth, same contract as the admin counterparts. Staff devices
+    // take payment too (A2, A14).
+    suspend fun initiatePaymentAsStaff(payload: PosCheckoutPayload): ApiResult<GatewayPaymentResult>
+    suspend fun queryPaymentAsStaff(transactionId: String): ApiResult<GatewayPaymentResult>
+    suspend fun listPaymentTransactionsAsStaff(orderId: String): ApiResult<List<PaymentTransactionDto>>
+
+    /**
+     * Read-only view of the café's gateway configuration — **never** includes the verify/secret
+     * key, only whether each is set. Drives which gateway tiles task 7.2 shows at checkout (a
+     * staff device has no [com.razstudio.pos.data.GatewayCredentialStore] of its own — this is how
+     * it learns which channels are enabled) and lets the settings screen (7.1) render "already
+     * configured" without ever re-displaying a secret. (PG-REQ-2, PG-REQ-8)
+     */
+    suspend fun getGatewayConfig(): ApiResult<GatewayConfigDto>
+    suspend fun getGatewayConfigAsStaff(): ApiResult<GatewayConfigDto>
+
+    /**
+     * Write the café's gateway configuration. **Admin-only — there is no staff variant**, matching
+     * [com.razstudio.pos.data.GatewayCredentialStore]'s own restriction that only the admin
+     * settings screen ever calls `readSecretsForUpload()`. (task 7.1)
+     *
+     * [verifyKey] and [secretKey] are `null` to mean "leave unchanged" — the Edge Function never
+     * returns a secret's value, so this is the only way a screen can distinguish "nothing set yet"
+     * from "keep the existing one"; a blank string must never be sent to mean "clear it silently".
+     */
+    suspend fun putGatewayConfig(
+        merchantId: String,
+        verifyKey: String?,
+        secretKey: String?,
+        isSandbox: Boolean,
+        enabledMethods: List<String>,
+    ): ApiResult<GatewayConfigDto>
+
+    /**
+     * Every payment provider the café can configure, with each one's credential **field spec** so
+     * the settings screen renders the right form without hardcoding one per provider. (PG-REQ-2)
+     *
+     * Supersedes [getGatewayConfig], which could only describe a single aggregator holding one
+     * merchant id + verify key + secret key. Touch 'n Go direct and DuitNow via an acquiring bank
+     * are separate merchant relationships with different credential shapes and a callback each.
+     *
+     * Readable by staff as well as admin: a staff device has no local credential store, so this is
+     * how it learns which channels to offer. No credential **value** is ever returned — only
+     * [GatewayProviderDto.fieldsSet], which reports whether each field has something stored.
+     */
+    suspend fun getGatewayProviders(): ApiResult<List<GatewayProviderDto>>
+    suspend fun getGatewayProvidersAsStaff(): ApiResult<List<GatewayProviderDto>>
+
+    /**
+     * Save one provider's configuration. Admin-only, matching [putGatewayConfig].
+     *
+     * [credentials] is merged server-side, not replaced: a field left out keeps its stored value,
+     * which is what lets the screen show a masked "already set" placeholder without round-tripping
+     * a secret. Sending a field as `""` clears it deliberately.
+     */
+    suspend fun putGatewayProvider(
+        provider: String,
+        credentials: Map<String, String>,
+        enabledMethods: List<String>,
+        isSandbox: Boolean,
+        isEnabled: Boolean,
+    ): ApiResult<Unit>
+
     // ── Settings, branding, tables, location, attendance ──────────────────────────
     suspend fun getSettings(): ApiResult<SettingsResponse>
     suspend fun putSettings(body: JSONObject): ApiResult<Unit>

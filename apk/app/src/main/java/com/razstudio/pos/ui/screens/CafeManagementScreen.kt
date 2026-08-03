@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,6 +47,8 @@ fun CafeManagementScreen(
     onNavigateToTables: () -> Unit,
     onNavigateToQrPdf: () -> Unit = {},
     onNavigateToPrinters: () -> Unit = {},
+    onNavigateToHardwareDevices: () -> Unit = {},
+    onNavigateToPaymentGateway: () -> Unit = {},
     languageViewModel: LanguageViewModel = hiltViewModel(),
     sessionViewModel: AdminSessionViewModel = hiltViewModel(),
     modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel()
@@ -122,6 +126,34 @@ fun CafeManagementScreen(
                 onClick = onNavigateToPrinters,
                 enabled = printersEnabled
             )
+
+            // One entry for all peripherals rather than three siblings: hardware is configured
+            // once when the till is set up, whereas Menu Management is opened daily, and equal
+            // visual weight would misrepresent that. Gated exactly like Printers — a secondary
+            // admin has no local hardware and prints through the Main Admin. (HW-REQ-6)
+            HubCard(
+                icon = Icons.Default.Devices,
+                title = strings.devicesAndHardwareTitle,
+                description = strings.devicesAndHardwareDesc,
+                onClick = onNavigateToHardwareDevices,
+                enabled = printersEnabled
+            )
+
+            // Gateway payments need a live path to the acquirer and are unavailable off-cloud
+            // (ModeCapabilities.gatewayPaymentsEnabled, A1, task 6.4) — hidden here entirely
+            // rather than greyed, same rule as Generate Table QR above: a café that can never use
+            // this has no reason to know it exists. Unlike Printers/Hardware, NOT gated on
+            // secondary-admin — gateway credentials are café-wide configuration, not local
+            // hardware, so a Secondary Admin (full management, per its own RBAC design) can set
+            // them same as the Main Admin.
+            if (capabilities.gatewayPaymentsEnabled) {
+                HubCard(
+                    icon = Icons.Default.Payment,
+                    title = strings.paymentGatewaySettingsTitle,
+                    description = strings.paymentGatewayHubCardDesc,
+                    onClick = onNavigateToPaymentGateway,
+                )
+            }
         }
     }
 }

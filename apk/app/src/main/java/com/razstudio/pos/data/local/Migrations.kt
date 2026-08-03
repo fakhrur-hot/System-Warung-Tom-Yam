@@ -209,3 +209,95 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
     }
 }
 
+/**
+ * v15 → v16: add transport discriminator and drawer-kick field to `printer_configs`.
+ *
+ * Three changes:
+ *  - `macAddress` (NOT NULL TEXT) renamed to `address` (TEXT, nullable — future non-BT drivers
+ *    have no MAC). Existing BT rows keep their MAC value in `address`.
+ *  - `transport TEXT NOT NULL DEFAULT 'BLUETOOTH'` — every existing row defaults to Bluetooth;
+ *    no café loses its printer setup.
+ *  - `drawerKick TEXT NOT NULL DEFAULT 'NONE'` — existing rows default to no drawer.
+ *
+ * SQLite supports `RENAME COLUMN` only from 3.25.0 (Android API 28), but this project's
+ * minSdk = 26.  We therefore use the safe recreate-and-copy pattern, copying columns
+ * explicitly so a future entity change cannot silently reorder them.
+ *
+ * Non-destructive: no row is deleted or rewritten other than gaining the two new columns.
+ */
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // 1. Create the new table with the target schema.
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS printer_configs_new (
+                id             TEXT NOT NULL PRIMARY KEY,
+                name           TEXT NOT NULL,
+                address        TEXT,
+                transport      TEXT NOT NULL DEFAULT 'BLUETOOTH',
+                drawerKick     TEXT NOT NULL DEFAULT 'NONE',
+                paperWidth     TEXT NOT NULL,
+                printerRole    TEXT NOT NULL,
+                isActive       INTEGER NOT NULL,
+                categoryFilter TEXT
+            )
+            """.trimIndent()
+        )
+        // 2. Copy all existing rows; macAddress → address, new columns get their defaults.
+        db.execSQL(
+            """
+            INSERT INTO printer_configs_new
+                (id, name, address, transport, drawerKick, paperWidth, printerRole, isActive, categoryFilter)
+            SELECT
+                id, name, macAddress, 'BLUETOOTH', 'NONE', paperWidth, printerRole, isActive, categoryFilter
+            FROM printer_configs
+            """.trimIndent()
+        )
+        // 3. Swap.
+        db.execSQL("DROP TABLE printer_configs")
+        db.execSQL("ALTER TABLE printer_configs_new RENAME TO printer_configs")
+    }
+}
+
+
+/**
+ * v16 → v17 — the `payment_transactions` table. (PG-REQ-5, task 5.1)
+ *
+ * Purely additive: one new table, nothing existing is touched. In particular **`orders` is not
+ * altered** — `paymentMethod` already exists on it and `OrderStatus` already carries whether a bill
+ * is settled, so the original plan's `payment_method` and `payment_status` columns would have been
+ * a duplicate and a second source of truth respectively. (A4, A5)
+ *
+ * Column types mirror how Room stores the entity: enums as TEXT, the boolean as INTEGER, money as
+ * INTEGER sen. The unique index on `idempotencyKey` is what makes a double-charge a database error
+ * rather than a silent second payment — the constraint belongs here, not only in the client. (A6)
+ */
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS payment_transactions (
+                id                   TEXT    NOT NULL PRIMARY KEY,
+                orderId              TEXT    NOT NULL,
+                paymentMethod        TEXT    NOT NULL,
+                amountSen            INTEGER NOT NULL,
+                status               TEXT    NOT NULL,
+                gatewayTransactionId TEXT,
+                gatewayResponseJson  TEXT,
+                idempotencyKey       TEXT    NOT NULL,
+                isSandbox            INTEGER NOT NULL DEFAULT 0,
+                createdAt            TEXT    NOT NULL,
+                settledAt            TEXT
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_payment_transactions_orderId " +
+                "ON payment_transactions (orderId)"
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_payment_transactions_idempotencyKey " +
+                "ON payment_transactions (idempotencyKey)"
+        )
+    }
+}

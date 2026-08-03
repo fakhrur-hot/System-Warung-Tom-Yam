@@ -19,13 +19,18 @@ import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.local.CancelledSummary
+import com.razstudio.pos.data.local.DrawerKick
 import com.razstudio.pos.data.local.OrderDao
+import com.razstudio.pos.data.local.PaymentMethodTotal
 import com.razstudio.pos.data.local.PaymentSplit
+import com.razstudio.pos.data.local.PrinterConfigDao
+import com.razstudio.pos.data.local.PrinterTransport
 import com.razstudio.pos.data.local.ReportData
 import com.razstudio.pos.data.local.SettingsDao
 import com.razstudio.pos.data.local.TableBreakdown
 import com.razstudio.pos.data.local.TableDao
 import com.razstudio.pos.data.local.TopItem
+import com.razstudio.pos.printing.sunmi.SunmiPrinterDriver
 import com.razstudio.pos.ui.i18n.LanguageManager
 import com.razstudio.pos.ui.i18n.uiStrings
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -51,6 +56,8 @@ class ReportsViewModel @Inject constructor(
     private val orderDao: OrderDao,
     private val tableDao: TableDao,
     private val settingsDao: SettingsDao,
+    private val printerConfigDao: PrinterConfigDao,
+    private val sunmiDriver: SunmiPrinterDriver,
     private val apiClient: BackendGateway,
     private val languageManager: LanguageManager
 ) : ViewModel() {
@@ -165,7 +172,18 @@ class ReportsViewModel @Inject constructor(
                         items.take(topN).map { TopItem(it.nameSnapshot, it.totalQuantity, it.totalRevenue) }
                     }
 
-                // Payment split
+                // Best sellers across the whole menu. getPopularItems() is already ordered by
+                // quantity descending across every category, so the head of that list is the
+                // overall ranking — no second query. Per-category can only say which drink beat
+                // the other drinks; this says what the café actually sells.
+                val topOverall = popularItems
+                    .take(topN)
+                    .map { TopItem(it.nameSnapshot, it.totalQuantity, it.totalRevenue) }
+
+                // Payment split. The query returns EVERY method present in the period, so gateway
+                // codes (DUITNOW_QR, GRABPAY, …) arrive here too. Previously only the CASH and QR
+                // rows were picked out and the rest discarded, which meant gateway takings counted
+                // toward total revenue but appeared in no breakdown line. (task 9.2)
                 val paymentMethods = orderDao.getOrdersByPaymentMethod(startIso, endIso)
                 val cashRow = paymentMethods.find { it.paymentMethod == "CASH" }
                 val qrRow = paymentMethods.find { it.paymentMethod == "QR" }
@@ -173,7 +191,20 @@ class ReportsViewModel @Inject constructor(
                     cashCount = cashRow?.orderCount ?: 0,
                     cashTotal = cashRow?.revenue ?: 0.0,
                     qrCount = qrRow?.orderCount ?: 0,
-                    qrTotal = qrRow?.revenue ?: 0.0
+                    qrTotal = qrRow?.revenue ?: 0.0,
+                    byMethod = paymentMethods
+                        // A null method means an order that completed without one ever being
+                        // recorded. It is real revenue but not attributable, so it is left out of
+                        // the per-method rows rather than shown as a blank label.
+                        .filter { !it.paymentMethod.isNullOrBlank() }
+                        .map {
+                            PaymentMethodTotal(
+                                method = it.paymentMethod!!,
+                                orderCount = it.orderCount,
+                                revenue = it.revenue,
+                            )
+                        }
+                        .sortedByDescending { it.revenue },
                 )
 
                 // Cancelled summary
@@ -189,6 +220,23 @@ class ReportsViewModel @Inject constructor(
                     }
                 )
 
+                // Drawer-opening count (Task 2.4, HW-REQ-3 SHOULD).
+                // Only query when there is at least one active Sunmi AIDL printer with a
+                // SUNMI_AIDL drawer kick — if no such printer is configured, skip the call
+                // entirely so non-Sunmi devices never see a drawer-counter row.
+                val drawerOpeningCount: Int? = run {
+                    val hasSunmiPrinterWithDrawer = printerConfigDao.getActive().any {
+                        it.transport == PrinterTransport.SUNMI_AIDL &&
+                            it.drawerKick == DrawerKick.SUNMI_AIDL
+                    }
+                    if (hasSunmiPrinterWithDrawer) {
+                        val count = sunmiDriver.getOpenDrawerTimes()
+                        if (count >= 0) count else null
+                    } else {
+                        null
+                    }
+                }
+
                 val reportData = ReportData(
                     startDate = startDate,
                     endDate = endDate,
@@ -197,8 +245,10 @@ class ReportsViewModel @Inject constructor(
                     avgOrderValue = avgOrderValue,
                     perTableBreakdown = perTable,
                     topNPerCategory = topNPerCategory,
+                    topOverall = topOverall,
                     paymentSplit = paymentSplit,
-                    cancelledSummary = cancelledSummary
+                    cancelledSummary = cancelledSummary,
+                    drawerOpeningCount = drawerOpeningCount
                 )
 
                 _uiState.value = _uiState.value.copy(isLoading = false, reportData = reportData)
@@ -334,7 +384,17 @@ class ReportsViewModel @Inject constructor(
         // Payment split
         canvas.drawText("Payment Split", margin, y, headerPaint); y += 18f
         canvas.drawText("Cash: ${report.paymentSplit.cashCount} orders (RM %.2f)".format(report.paymentSplit.cashTotal), margin, y, bodyPaint); y += 15f
-        canvas.drawText("QR: ${report.paymentSplit.qrCount} orders (RM %.2f)".format(report.paymentSplit.qrTotal), margin, y, bodyPaint); y += 20f
+        canvas.drawText("QR: ${report.paymentSplit.qrCount} orders (RM %.2f)".format(report.paymentSplit.qrTotal), margin, y, bodyPaint); y += 15f
+        // Gateway channels, once live. Cash/QR already have their own lines above. Raw method
+        // codes here rather than localized labels — the PDF is a fixed-English document, and an
+        // unrecognised code must still appear so the lines add up to total revenue. (task 9.2)
+        for (row in report.paymentSplit.byMethod) {
+            if (row.method.equals("CASH", ignoreCase = true) || row.method.equals("QR", ignoreCase = true)) continue
+            canvas.drawText("${row.method}: ${row.orderCount} orders (RM %.2f)".format(row.revenue), margin, y, bodyPaint)
+            y += 15f
+            if (y > 790f) break
+        }
+        y += 5f
 
         // Per-table
         if (report.perTableBreakdown.isNotEmpty()) {
@@ -364,6 +424,13 @@ class ReportsViewModel @Inject constructor(
             canvas.drawText("Cancelled Orders", margin, y, headerPaint); y += 18f
             canvas.drawText("Total: ${report.cancelledSummary.totalCount} (RM %.2f)".format(report.cancelledSummary.totalValue), margin, y, bodyPaint); y += 15f
             canvas.drawText("By Admin: ${report.cancelledSummary.byAdmin}  |  By Customer: ${report.cancelledSummary.byCustomer}  |  By Staff: ${report.cancelledSummary.byStaff}", margin, y, bodyPaint)
+            y += 20f
+        }
+
+        // Drawer-opening count (only shown when a Sunmi printer with drawer is configured)
+        if (y < 750f && report.drawerOpeningCount != null) {
+            canvas.drawText("Cash Drawer", margin, y, headerPaint); y += 18f
+            canvas.drawText("Drawer openings today: ${report.drawerOpeningCount}", margin, y, bodyPaint)
         }
     }
 

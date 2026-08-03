@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.local.OrderItem
+import com.razstudio.pos.data.local.PaymentMethod
 import com.razstudio.pos.ui.i18n.UiStrings
 import com.razstudio.pos.ui.viewmodels.SplitPaymentPlanner
 
@@ -69,6 +70,9 @@ fun SplitPaymentDialog(
     items: List<OrderItem>,
     strings: UiStrings,
     isLoading: Boolean,
+    /** Gateway channels to offer alongside Cash/QR for this share (task 7.3, A13). Empty by
+     *  default — the whole row disappears with it, same rule as [OrderDetailSheet]'s. */
+    gatewayMethods: List<PaymentMethod> = emptyList(),
     onPay: (SplitPaymentPlanner.Plan, String) -> Unit,
     onReduceItems: (List<VoidLine>) -> Unit,
     onDismiss: () -> Unit,
@@ -154,6 +158,16 @@ fun SplitPaymentDialog(
                 Spacer(modifier = Modifier.height(12.dp))
                 AmountRow(strings.splitThisCustomerPays, amount, emphasised = true)
                 AmountRow(strings.splitRemaining, remainder, emphasised = false)
+
+                if (gatewayMethods.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    GatewayMethodRow(
+                        methods = gatewayMethods,
+                        strings = strings,
+                        enabled = canPay,
+                        onSelect = { method -> onPay(plan, method.code) },
+                    )
+                }
             }
         },
         confirmButton = {

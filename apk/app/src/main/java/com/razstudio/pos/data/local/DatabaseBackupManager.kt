@@ -140,7 +140,9 @@ class DatabaseBackupManager @Inject constructor(
             printerArray.put(JSONObject().apply {
                 put("id", pc.id)
                 put("name", pc.name)
-                put("macAddress", pc.macAddress)
+                put("address", pc.address ?: JSONObject.NULL)
+                put("transport", pc.transport.name)
+                put("drawerKick", pc.drawerKick.name)
                 put("paperWidth", pc.paperWidth.name)
                 put("printerRole", pc.printerRole.name)
                 put("isActive", pc.isActive)
@@ -213,8 +215,15 @@ class DatabaseBackupManager @Inject constructor(
 
     /**
      * Clears all existing data then inserts entities from the backup JSON.
+     *
+     * @param restoreHardwareConfig When true (the default), printer configs from the JSON are
+     *   applied to this device. The Google Drive café-bundle path decides this per restore rather
+     *   than always passing one value — see `SignInViewModel.hardwareConfigFitsThisDevice`. A Sunmi
+     *   till's printer set must not be written onto a replacement phone that has no such hardware,
+     *   or every print silently goes nowhere; but a like-for-like replacement *should* keep its
+     *   printers, which is the point of the bundle. (HW-REQ-8)
      */
-    suspend fun applyImport(json: String) {
+    suspend fun applyImport(json: String, restoreHardwareConfig: Boolean = true) {
         val root = JSONObject(json)
 
         // Clear existing data (order matters due to FK constraints)
@@ -338,6 +347,7 @@ class DatabaseBackupManager @Inject constructor(
         }
 
         // Import printer configs
+        if (restoreHardwareConfig) {
         root.optJSONArray("printerConfigs")?.let { arr ->
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
@@ -345,7 +355,9 @@ class DatabaseBackupManager @Inject constructor(
                     PrinterConfig(
                         id = obj.getString("id"),
                         name = obj.getString("name"),
-                        macAddress = obj.getString("macAddress"),
+                        address = if (obj.isNull("address")) obj.optStringOrNull("macAddress") else obj.optStringOrNull("address"),
+                        transport = PrinterTransport.valueOf(obj.optString("transport", "BLUETOOTH")),
+                        drawerKick = DrawerKick.valueOf(obj.optString("drawerKick", "NONE")),
                         paperWidth = PaperWidth.valueOf(obj.getString("paperWidth")),
                         printerRole = PrinterRole.valueOf(obj.getString("printerRole")),
                         isActive = obj.optBoolean("isActive", true),
@@ -353,6 +365,7 @@ class DatabaseBackupManager @Inject constructor(
                     )
                 )
             }
+        }
         }
 
         // Import pending orders

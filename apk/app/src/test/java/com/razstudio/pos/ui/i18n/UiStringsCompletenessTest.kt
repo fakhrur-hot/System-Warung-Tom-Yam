@@ -93,6 +93,7 @@ class UiStringsCompletenessTest {
             "getSignInKeepAccountCafe" to 1,
             "getSignInKeepDeviceCafe" to 1,
             "getSignInConflictBody" to 2,
+            "getPaymentGatewaySaveFailed" to 1,
         )
         withArgs.forEach { (name, count) ->
             val getter = stringProperties.first { it.name == name }

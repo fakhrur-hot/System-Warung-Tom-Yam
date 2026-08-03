@@ -274,10 +274,134 @@ class DemoBackend @Inject constructor(
         return ApiResult.Success(order.copy(total = total).toDto(kept))
     }
 
+    // ── Payment gateway (task 6.5) — Demo Mode short-circuits ────────────────
+    //
+    // Demos the complete payment flow with no aggregator account and no network.
+    // - initiatePayment: synthetic QR after a 300 ms delay (simulates network latency).
+    // - queryPayment: returns SUCCESS after 2 polls (simulates customer scanning).
+    // - listPaymentTransactions: returns a scripted list for the retry/history panel.
+
+    /** Incremented per queryPayment call to drive the scripted SUCCESS after 2 polls. */
+    private val demoQueryCount = java.util.concurrent.atomic.AtomicInteger(0)
+
+    suspend fun initiatePayment(payload: com.razstudio.pos.data.PosCheckoutPayload): com.razstudio.pos.data.ApiResult<com.razstudio.pos.data.GatewayPaymentResult> {
+        kotlinx.coroutines.delay(300)  // simulate network latency
+        demoQueryCount.set(0)
+        return com.razstudio.pos.data.ApiResult.Success(
+            com.razstudio.pos.data.GatewayPaymentResult(
+                success = true,
+                transactionId = "DEMO-TXN-${payload.idempotencyKey.take(8)}",
+                // A minimal valid EMVCo/DuitNow QR payload for demo purposes
+                qrString = "00020101021226580014my.com.demo.paynet0120DEMO-${payload.orderId.take(8)}520400005303458540${
+                    "%.2f".format(payload.amountSen / 100.0)
+                }5802MY5915Demo Warung Tom6304ABCD",
+                status = "PENDING",
+            )
+        )
+    }
+
+    suspend fun queryPayment(transactionId: String): com.razstudio.pos.data.ApiResult<com.razstudio.pos.data.GatewayPaymentResult> {
+        kotlinx.coroutines.delay(200)
+        val count = demoQueryCount.incrementAndGet()
+        val status = if (count >= 2) "SUCCESS" else "PENDING"
+        return com.razstudio.pos.data.ApiResult.Success(
+            com.razstudio.pos.data.GatewayPaymentResult(
+                success = true,
+                transactionId = transactionId,
+                status = status,
+            )
+        )
+    }
+
+    /**
+     * A fully-configured, all-channels-enabled café — Demo Mode has no aggregator account, so
+     * there is nothing to gate: every gateway tile shows up, matching 6.5's "demos the complete
+     * flow with no aggregator account" intent. Secrets are meaningless here; `hasVerifyKey`/
+     * `hasSecretKey` are simply `true` so the settings screen renders as "configured".
+     */
+    fun getGatewayConfig(): com.razstudio.pos.data.ApiResult<com.razstudio.pos.data.GatewayConfigDto> {
+        return com.razstudio.pos.data.ApiResult.Success(
+            com.razstudio.pos.data.GatewayConfigDto(
+                configured = true,
+                merchantId = "DEMO",
+                hasVerifyKey = true,
+                hasSecretKey = true,
+                isSandbox = true,
+                enabledMethods = com.razstudio.pos.data.local.PaymentMethod.entries
+                    .filter { !it.worksOffline }
+                    .map { it.code },
+            )
+        )
+    }
+
+    /**
+     * A configured Fiuu plus the two providers still awaiting onboarding, so Demo Mode shows the
+     * real shape of the settings screen — including a fail-closed provider — without an account.
+     */
+    fun getGatewayProviders(): com.razstudio.pos.data.ApiResult<List<com.razstudio.pos.data.GatewayProviderDto>> {
+        fun field(key: String, label: String, secret: Boolean) =
+            com.razstudio.pos.data.GatewayCredentialFieldDto(key, label, secret, required = true)
+        return com.razstudio.pos.data.ApiResult.Success(
+            listOf(
+                com.razstudio.pos.data.GatewayProviderDto(
+                    provider = "fiuu",
+                    displayName = "Fiuu (formerly Razer Merchant Services)",
+                    status = "AVAILABLE",
+                    unavailableReason = null,
+                    credentialFields = listOf(
+                        field("merchantId", "Merchant ID", false),
+                        field("verifyKey", "Verify Key", true),
+                        field("secretKey", "Secret Key", true),
+                    ),
+                    configured = true,
+                    fieldsSet = mapOf("merchantId" to true, "verifyKey" to true, "secretKey" to true),
+                    enabledMethods = listOf("DUITNOW_QR", "TNG", "GRABPAY"),
+                    isSandbox = true,
+                    isEnabled = true,
+                ),
+                com.razstudio.pos.data.GatewayProviderDto(
+                    provider = "touchngo",
+                    displayName = "Touch 'n Go eWallet",
+                    status = "AWAITING_ONBOARDING",
+                    unavailableReason = "Touch 'n Go publishes no public merchant API spec — " +
+                        "integration details are issued after merchant approval.",
+                    credentialFields = listOf(
+                        field("merchantId", "Merchant ID", false),
+                        field("verifyKey", "Verify Key", true),
+                        field("secretKey", "Secret Key", true),
+                    ),
+                    configured = false,
+                    fieldsSet = emptyMap(),
+                    enabledMethods = emptyList(),
+                    isSandbox = true,
+                    isEnabled = false,
+                ),
+            )
+        )
+    }
+
+    fun listPaymentTransactions(orderId: String): com.razstudio.pos.data.ApiResult<List<com.razstudio.pos.data.PaymentTransactionDto>> {
+        val now = nowIso()
+        return com.razstudio.pos.data.ApiResult.Success(
+            listOf(
+                com.razstudio.pos.data.PaymentTransactionDto(
+                    id = "demo-pt-001",
+                    orderId = orderId,
+                    paymentMethod = "DUITNOW_QR",
+                    amountSen = 2550L,
+                    status = "SUCCESS",
+                    gatewayTransactionId = "DEMO-TXN-001",
+                    isSandbox = true,
+                    createdAt = now,
+                    settledAt = now,
+                )
+            )
+        )
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
-    private suspend fun orderDtoResult(orderId: String): ApiResult<OrderDto> {
-        val order = db.orderDao().getOrderById(orderId)
+    private suspend fun orderDtoResult(orderId: String): ApiResult<OrderDto> {        val order = db.orderDao().getOrderById(orderId)
             ?: return ApiResult.Error("NOT_FOUND", "Order not found")
         val items = db.orderDao().getItemsForOrder(orderId)
         return ApiResult.Success(order.toDto(items))

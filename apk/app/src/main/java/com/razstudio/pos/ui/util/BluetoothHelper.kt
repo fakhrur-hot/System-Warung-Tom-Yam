@@ -12,6 +12,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import com.razstudio.pos.data.local.SunmiInnerPrinter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -85,6 +86,12 @@ class BluetoothHelper(private val context: Context) {
         if (!hasPermissions()) return emptyList()
         val adapter = bluetoothAdapter ?: return emptyList()
 
+        // `InnerPrinter` — the terminal's own built-in printer, which Sunmi registers as a bonded
+        // Bluetooth device — is deliberately LEFT IN this list. It is where a café looks for it,
+        // and hiding it just made the built-in printer undiscoverable. Selecting it does not
+        // create a Bluetooth printer, though: `PrintersViewModel.addPrinter` recognises it and
+        // stores it on the AIDL transport instead, which is the only route that reaches the cash
+        // drawer, paper detection and the status broadcasts. (designs.md H9)
         return adapter.bondedDevices
             .filter { it.name != null }
             .map { device ->

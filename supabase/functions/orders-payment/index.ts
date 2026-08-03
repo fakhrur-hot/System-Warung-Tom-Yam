@@ -10,7 +10,29 @@ import { verifyAdminToken, verifyOrderingKey } from "../_shared/auth.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
 import { errorResponse, jsonResponse } from "../_shared/errors.ts";
 
-const VALID_METHODS = new Set(["CASH", "QR"]);
+// Cash and static QR (no gateway leg) plus every gateway channel code this app knows about
+// (apk/data/local/PaymentMethod.kt). A gateway payment reaches here only after its own checkout
+// confirmed SUCCESS (task 8.2) — this endpoint completes the order the same way for every method,
+// per designs.md's Integration Points table: "Status transitions unchanged: SENT_TO_KITCHEN →
+// payment → COMPLETED", regardless of which method paid it. (task 6/7/8 audit, A4)
+const VALID_METHODS = new Set([
+  "CASH",
+  "QR",
+  "DUITNOW_QR",
+  "TNG",
+  "GRABPAY",
+  "BOOST",
+  "SHOPEEPAY",
+  "FPX",
+  "CARD",
+]);
+
+// The legacy `payment_transactions` table (0001_initial_schema.sql) has a `method` column typed as
+// the `payment_method` **enum**, which only ever had 'CASH'/'QR'. It predates the gateway ledger
+// (`gateway_transactions`, task 5.4/6.2) and nothing reads it — it is not worth widening its enum
+// just to duplicate what `gateway_transactions` already records in full. Only write it for the two
+// methods it can actually represent.
+const LEGACY_AUDIT_LOG_METHODS = new Set(["CASH", "QR"]);
 
 serve(async (req) => {
   const corsResp = handleCors(req);
@@ -54,7 +76,7 @@ serve(async (req) => {
   }
 
   if (!VALID_METHODS.has(body.method)) {
-    return errorResponse(422, "VALIDATION", "method must be CASH or QR");
+    return errorResponse(422, "VALIDATION", `Unrecognised payment method: ${body.method}`);
   }
 
   const supabase = getSupabaseClient();
@@ -95,18 +117,21 @@ serve(async (req) => {
     return errorResponse(409, "PAYMENT_CONFLICT", "Order cannot be paid in its current status");
   }
 
-  // Write payment transaction
-  const { error: txError } = await supabase
-    .from("payment_transactions")
-    .insert({
-      order_id: orderId,
-      method: body.method,
-      amount: order.total,
-    });
+  // Legacy CASH/QR audit log — see LEGACY_AUDIT_LOG_METHODS above for why gateway methods are
+  // skipped here rather than attempted and logged as a spurious failure on every gateway payment.
+  if (LEGACY_AUDIT_LOG_METHODS.has(body.method)) {
+    const { error: txError } = await supabase
+      .from("payment_transactions")
+      .insert({
+        order_id: orderId,
+        method: body.method,
+        amount: order.total,
+      });
 
-  if (txError) {
-    // Non-critical for the response, but log it
-    console.error("Failed to write payment transaction:", txError.message);
+    if (txError) {
+      // Non-critical for the response, but log it
+      console.error("Failed to write payment transaction:", txError.message);
+    }
   }
 
   // Broadcast completion on order:<orderId>

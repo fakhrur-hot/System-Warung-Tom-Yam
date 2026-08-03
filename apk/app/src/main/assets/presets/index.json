@@ -1,0 +1,14 @@
+{
+ "schema": 1,
+ "presets": [
+  {
+   "file": "tomyam-full.json",
+   "presetId": "tomyam-full",
+   "presetName": "Tom Yam — full menu",
+   "description": "A complete Thai-Malay tom yam house menu: vegetables, kerabu, chicken, beef, prawn and squid, egg, fish, noodles, fried rice, tom yam, freshwater prawn and soups.",
+   "cuisine": "Thai-Malay",
+   "categoryCount": 16,
+   "itemCount": 152
+  }
+ ]
+}

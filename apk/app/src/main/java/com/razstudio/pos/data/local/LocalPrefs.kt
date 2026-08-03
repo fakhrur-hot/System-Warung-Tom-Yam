@@ -43,10 +43,47 @@ class LocalPrefs @Inject constructor(@ApplicationContext context: Context) {
         get() = prefs.getInt(KEY_ORDER_SOUND_VOLUME, 100).coerceIn(0, 100)
         set(value) { prefs.edit().putInt(KEY_ORDER_SOUND_VOLUME, value.coerceIn(0, 100)).apply() }
 
+    // ── Hardware driver selection (HW-REQ-8: device-local, never café-wide) ──────────────────
+
+    /**
+     * The [com.razstudio.pos.data.local.PrinterTransport] name of the selected printer driver
+     * for this device. Null = no explicit selection (first available driver is used).
+     */
+    var selectedPrinterTransport: String?
+        get() = if (prefs.contains(KEY_PRINTER_TRANSPORT)) prefs.getString(KEY_PRINTER_TRANSPORT, null) else null
+        set(value) {
+            if (value != null) prefs.edit().putString(KEY_PRINTER_TRANSPORT, value).apply()
+            else prefs.edit().remove(KEY_PRINTER_TRANSPORT).apply()
+        }
+
+    /**
+     * The selected cash-drawer source for this device — either the printer id that has a
+     * drawer, or null for none.
+     */
+    var selectedDrawerPrinterId: String?
+        get() = if (prefs.contains(KEY_DRAWER_PRINTER_ID)) prefs.getString(KEY_DRAWER_PRINTER_ID, null) else null
+        set(value) {
+            if (value != null) prefs.edit().putString(KEY_DRAWER_PRINTER_ID, value).apply()
+            else prefs.edit().remove(KEY_DRAWER_PRINTER_ID).apply()
+        }
+
+    /**
+     * The selected customer display driver class name for this device. Null = no display.
+     */
+    var selectedDisplayDriver: String?
+        get() = if (prefs.contains(KEY_DISPLAY_DRIVER)) prefs.getString(KEY_DISPLAY_DRIVER, null) else null
+        set(value) {
+            if (value != null) prefs.edit().putString(KEY_DISPLAY_DRIVER, value).apply()
+            else prefs.edit().remove(KEY_DISPLAY_DRIVER).apply()
+        }
+
     companion object {
         private const val KEY_SHOW_PRINT_STATUS = "show_print_status"
         private const val KEY_LOW_STOCK_ALERTS = "low_stock_alerts"
         private const val KEY_ORDER_SOUND_URI = "new_order_sound_uri"
         private const val KEY_ORDER_SOUND_VOLUME = "new_order_sound_volume"
+        private const val KEY_PRINTER_TRANSPORT = "selected_printer_transport"
+        private const val KEY_DRAWER_PRINTER_ID = "selected_drawer_printer_id"
+        private const val KEY_DISPLAY_DRIVER = "selected_display_driver"
     }
 }

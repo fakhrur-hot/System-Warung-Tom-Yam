@@ -2,6 +2,31 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+        Package visibility (Android 11 / API 30+).
+
+        Without this block, `getPackageInfo`, `queryIntentServices` and `bindService` against
+        another app all behave as if that app were not installed — no error, no permission prompt,
+        just NameNotFoundException and an empty query result. targetSdk is 36, so the filtering is
+        active, and every Sunmi integration in this app goes through exactly those calls:
+        `SunmiPrinterDriver.availability()` reported the built-in printer as absent on a terminal
+        that plainly has one, which in turn hid it from Devices & Hardware and from the Printers
+        screen, and would have made the AIDL bind fail even if it had been selected.
+
+        Declaring the package is enough; no permission is involved. QUERY_ALL_PACKAGES is the wrong
+        tool here — it is a Play-policy-sensitive blanket grant, and we need exactly two packages.
+    -->
+    <queries>
+        <!-- Built-in thermal printer and cash drawer (H9). -->
+        <package android:name="woyou.aidlservice.jiuiv5" />
+        <!-- Barcode/QR scanner service (H4). -->
+        <package android:name="com.sunmi.scanner" />
+        <!-- Bind target, declared as an intent too so an OEM that renames the package still resolves. -->
+        <intent>
+            <action android:name="woyou.aidlservice.jiuiv5.IWoyouService" />
+        </intent>
+    </queries>
+
     <!-- Bluetooth permissions: legacy (pre-Android 12) -->
     <uses-permission android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />

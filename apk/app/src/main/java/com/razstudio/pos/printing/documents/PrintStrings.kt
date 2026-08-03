@@ -20,6 +20,10 @@ data class PrintStrings(
     val payment: String,
     val cash: String,
     val thankYou: String,
+    /** Label printed before the gateway transaction ID on receipts (PG-REQ-7, task 9.1). */
+    val txnId: String,
+    /** Label printed before the payment method on receipts when a gateway method was used. */
+    val paidVia: String,
 )
 
 /** Resolve print labels for a print-language code (BM/EN/ZH/TA/TH). Defaults to EN. */
@@ -29,29 +33,34 @@ fun printStrings(lang: String): PrintStrings = when (lang.uppercase()) {
         food = "MAKANAN", beverages = "MINUMAN", sideDishes = "Lauk", others = "Lain-lain",
         added = "TAMBAHAN", total = "JUMLAH", payment = "Bayaran", cash = "Tunai",
         thankYou = "Terima Kasih",
+        txnId = "No. Transaksi", paidVia = "Dibayar melalui",
     )
     "ZH" -> PrintStrings(
         table = "桌号", date = "日期", session = "场次",
         food = "食物", beverages = "饮料", sideDishes = "配菜", others = "其他",
         added = "追加", total = "总计", payment = "付款", cash = "现金",
         thankYou = "谢谢惠顾",
+        txnId = "交易编号", paidVia = "支付方式",
     )
     "TA" -> PrintStrings(
         table = "மேசை", date = "தேதி", session = "அமர்வு",
         food = "உணவு", beverages = "பானங்கள்", sideDishes = "பக்க உணவு", others = "மற்றவை",
         added = "கூடுதல்", total = "மொத்தம்", payment = "கட்டணம்", cash = "பணம்",
         thankYou = "நன்றி",
+        txnId = "பரிவர்த்தனை எண்", paidVia = "கட்டண முறை",
     )
     "TH" -> PrintStrings(
         table = "โต๊ะ", date = "วันที่", session = "รอบ",
         food = "อาหาร", beverages = "เครื่องดื่ม", sideDishes = "กับข้าว", others = "อื่นๆ",
         added = "เพิ่มเติม", total = "รวม", payment = "การชำระเงิน", cash = "เงินสด",
         thankYou = "ขอบคุณ",
+        txnId = "รหัสธุรกรรม", paidVia = "ชำระด้วย",
     )
     else -> PrintStrings(
         table = "Table", date = "Date", session = "Session",
         food = "FOOD", beverages = "BEVERAGES", sideDishes = "Side Dishes", others = "Others",
         added = "ADDED", total = "TOTAL", payment = "Payment", cash = "Cash",
         thankYou = "Thank You",
+        txnId = "Txn ID", paidVia = "Paid via",
     )
 }

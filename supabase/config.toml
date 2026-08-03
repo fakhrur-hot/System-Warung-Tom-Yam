@@ -446,6 +446,12 @@ verify_jwt = false
 [functions.devices-status]
 verify_jwt = false
 
+[functions.gateway-config]
+verify_jwt = false
+
+[functions.gateway-providers]
+verify_jwt = false
+
 [functions.invite]
 verify_jwt = false
 
@@ -474,6 +480,20 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.orders-status]
+verify_jwt = false
+
+[functions.payment-initiate]
+verify_jwt = false
+
+[functions.payment-query]
+verify_jwt = false
+
+[functions.payment-callback]
+# Hit directly by the acquirer's server, never by the POS — there is no Supabase-issued JWT at all
+# here. The `skey` signature (F3) is this endpoint's only authentication.
+verify_jwt = false
+
+[functions.payment-transactions]
 verify_jwt = false
 
 [functions.register]

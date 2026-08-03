@@ -5,7 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ApiResult
+import com.razstudio.pos.data.GatewayConfigDto
+import com.razstudio.pos.data.GatewayPaymentResult
 import com.razstudio.pos.data.NewOrderItem
+import com.razstudio.pos.data.PosCheckoutPayload
 import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.OrderDto
 import com.razstudio.pos.data.json.optStringOrNull
@@ -17,20 +20,33 @@ import com.razstudio.pos.data.local.Order
 import com.razstudio.pos.data.local.OrderDao
 import com.razstudio.pos.data.local.OrderItem
 import com.razstudio.pos.data.local.OrderStatus
+import com.razstudio.pos.data.local.PaymentCategory
+import com.razstudio.pos.data.local.PaymentMethod
+import com.razstudio.pos.data.local.PaymentTransaction
+import com.razstudio.pos.data.local.PaymentTransactionDao
+import com.razstudio.pos.data.local.PaymentTransactionStatus
+import com.razstudio.pos.data.local.createdAtMillis
 import com.razstudio.pos.data.local.PendingOrder
 import com.razstudio.pos.data.local.PendingOrderDao
 import com.razstudio.pos.data.local.SettingsDao
 import com.razstudio.pos.data.local.SystemSettings
 import com.razstudio.pos.data.local.Table
 import com.razstudio.pos.data.local.TableDao
+import com.razstudio.pos.data.toCapabilities
+import com.razstudio.pos.display.CustomerDisplayManager
+import com.razstudio.pos.display.CustomerDisplayState
 import com.razstudio.pos.ui.i18n.LanguageManager
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.tableview.OrderDetailState
 import com.razstudio.pos.ui.tableview.StaffPermissions
 import com.razstudio.pos.ui.tableview.TableState
 import com.razstudio.pos.ui.tableview.TableUiStatus
+import com.razstudio.pos.ui.tableview.paymentMethodLabel
 import com.razstudio.pos.ui.tableview.toTableUiStatus
+import com.razstudio.pos.ui.util.QrCodeUtil
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -68,10 +84,45 @@ class StaffOrderViewModel @Inject constructor(
     private val categoryStore: MenuCategoryStore,
     private val settingsDao: SettingsDao,
     private val pendingOrderDao: PendingOrderDao,
-    private val languageManager: LanguageManager
+    private val languageManager: LanguageManager,
+    private val customerDisplayManager: CustomerDisplayManager,
+    private val paymentTransactionDao: PaymentTransactionDao,
+    private val modeRepository: com.razstudio.pos.data.ModeRepository,
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
+
+    /**
+     * Read-only gateway configuration, refreshed whenever the order sheet is about to open — see
+     * [TableViewViewModel]'s identical rationale. Never holds a secret (task 7.1, 7.2).
+     */
+    private val _gatewayConfig = MutableStateFlow<GatewayConfigDto?>(null)
+
+    /** Gateway tiles to show at checkout — empty in LAN/Kiosk regardless of what the café has
+     *  configured. (A1, PG-REQ-3, 6.4) */
+    val gatewayMethods: StateFlow<List<PaymentMethod>> = combine(
+        _gatewayConfig, modeRepository.activeMode,
+    ) { config, mode ->
+        if (config == null || !mode.toCapabilities().gatewayPaymentsEnabled) emptyList()
+        else config.enabledMethods.mapNotNull { PaymentMethod.fromCode(it) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _gatewayCheckout = MutableStateFlow<GatewayCheckoutState?>(null)
+    val gatewayCheckout: StateFlow<GatewayCheckoutState?> = _gatewayCheckout.asStateFlow()
+    private var gatewayPollJob: Job? = null
+    private var currentPollQuery: (suspend (String) -> ApiResult<GatewayPaymentResult>)? = null
+    private var currentPollOnSuccess: (suspend () -> Unit)? = null
+    private var currentPollLocalRowId: String? = null
+
+    private fun refreshGatewayConfig() {
+        viewModelScope.launch {
+            if (!modeRepository.activeMode.value.toCapabilities().gatewayPaymentsEnabled) return@launch
+            when (val result = apiClient.getGatewayConfigAsStaff()) {
+                is ApiResult.Success -> _gatewayConfig.value = result.data
+                else -> Unit
+            }
+        }
+    }
 
     // --- Cart state for new order entry ---
 
@@ -142,6 +193,7 @@ class StaffOrderViewModel @Inject constructor(
     init {
         loadPermissions()
         performCatchUpSync()
+        refreshGatewayConfig()
     }
 
     // --- Permissions ---
@@ -165,14 +217,19 @@ class StaffOrderViewModel @Inject constructor(
     // --- Order Detail ---
 
     fun loadOrderForTable(tableId: String) {
+        refreshGatewayConfig()
         viewModelScope.launch {
             _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null, successMessage = null)
             val order = orderDao.getActiveOrderForTable(tableId)
             val items = if (order != null) orderDao.getItemsForOrder(order.id) else emptyList()
+            // Crash/resume recovery (task 8.5) — see TableViewViewModel.loadOrderForTable.
+            val pendingGateway = order?.let { paymentTransactionDao.getLatestForOrder(it.id) }
+                ?.takeIf { it.status == PaymentTransactionStatus.PENDING }
             _orderDetail.value = OrderDetailState(
                 order = order,
                 items = items,
-                isLoading = false
+                isLoading = false,
+                pendingGatewayTransaction = pendingGateway,
             )
         }
     }
@@ -298,6 +355,7 @@ class StaffOrderViewModel @Inject constructor(
         tableId: String?,
         plan: SplitPaymentPlanner.Plan.SliceOff,
         method: String,
+        @Suppress("UNUSED_PARAMETER") printReceipt: Boolean = false,
     ) {
         viewModelScope.launch {
             _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null)
@@ -317,34 +375,123 @@ class StaffOrderViewModel @Inject constructor(
                 return@launch
             }
             val shareId = created.data.orderId
+            insertShareIntoRoom(shareId, table, plan)
+            completeSplitShare(orderId, table, shareId, plan, method)
+        }
+    }
 
-            when (apiClient.processPaymentAsStaff(shareId, method)) {
-                is ApiResult.Success -> Unit
-                else -> {
-                    _orderDetail.value = _orderDetail.value.copy(
-                        isLoading = false, error = str().splitShareUnpaid,
-                    )
-                    return@launch
-                }
+    /**
+     * A gateway checkout for one customer's share of a group bill, from a staff device (task 7.3,
+     * 8.1/8.2). Mirrors [TableViewViewModel.startGatewaySplitCheckout] on the staff endpoints.
+     */
+    fun startGatewaySplitCheckout(
+        orderId: String,
+        tableId: String?,
+        plan: SplitPaymentPlanner.Plan.SliceOff,
+        method: PaymentMethod,
+        @Suppress("UNUSED_PARAMETER") printReceipt: Boolean = false,
+        customerAuthCode: String? = null,
+    ) {
+        viewModelScope.launch {
+            _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null)
+            val table = tableId ?: run {
+                _orderDetail.value = _orderDetail.value.copy(
+                    isLoading = false, error = str().splitShareFailed,
+                )
+                return@launch
             }
-            orderDao.completePayment(shareId, method)
+            val created = apiClient.createOrderAsStaff(table, plan.sliceItems)
+            if (created !is ApiResult.Success) {
+                _orderDetail.value = _orderDetail.value.copy(
+                    isLoading = false, error = str().splitShareFailed,
+                )
+                return@launch
+            }
+            val shareId = created.data.orderId
+            insertShareIntoRoom(shareId, table, plan)
+            _orderDetail.value = _orderDetail.value.copy(isLoading = false)
+            startGatewayCheckoutInternal(
+                orderIdForKey = shareId,
+                method = method,
+                amount = plan.amount,
+                customerAuthCode = customerAuthCode,
+                initiate = { payload -> apiClient.initiatePaymentAsStaff(payload) },
+                query = { transactionId -> apiClient.queryPaymentAsStaff(transactionId) },
+                onSuccess = { completeSplitShare(orderId, table, shareId, plan, method.code) },
+            )
+        }
+    }
 
-            when (val shrunk = apiClient.voidOrderItemsAsStaff(orderId, plan.keepLines, SPLIT_REASON)) {
-                is ApiResult.Success -> {
-                    // Destructive: reconcileOrderFromDto only inserts, so a shrunk line would keep
-                    // its old quantity alongside the new one.
-                    orderDao.deleteItemsForOrder(orderId)
-                    reconcileOrderFromDto(shrunk.data)
-                    loadOrderForTable(table)
-                    _orderDetail.value = _orderDetail.value.copy(
-                        isLoading = false,
-                        successMessage = str().splitSharePaid.format(method),
-                    )
-                }
-                else -> _orderDetail.value = _orderDetail.value.copy(
-                    isLoading = false, error = str().splitShareNotRemoved,
+    /** Inserts the newly-created share order into local Room immediately. See
+     *  [TableViewViewModel.insertShareIntoRoom] — staff devices never print, but the row still
+     *  needs to exist locally for `orderDao.completePayment` below to have anything to update. */
+    private suspend fun insertShareIntoRoom(
+        shareId: String,
+        tableId: String?,
+        plan: SplitPaymentPlanner.Plan.SliceOff,
+    ) {
+        orderDao.insertOrder(
+            Order(
+                id = shareId,
+                tableId = tableId,
+                source = "STAFF",
+                status = OrderStatus.RECEIVED,
+                total = plan.amount,
+                createdAt = PaymentTransaction.nowIso(),
+            )
+        )
+        orderDao.insertOrderItems(
+            plan.selections.map { sel ->
+                OrderItem(
+                    id = java.util.UUID.randomUUID().toString(),
+                    orderId = shareId,
+                    menuItemId = sel.item.menuItemId,
+                    nameSnapshot = sel.item.nameSnapshot,
+                    unitPriceSnapshot = sel.item.unitPriceSnapshot,
+                    categorySnapshot = sel.item.categorySnapshot,
+                    quantity = sel.takeQuantity,
+                    note = sel.item.note,
                 )
             }
+        )
+    }
+
+    /** Completion tail shared by every split-share payment method. See
+     *  [TableViewViewModel.completeSplitShare] for the ordering rationale (charge, then shrink).
+     *  No [printReceipt] parameter — staff devices have no printer attached (see [processPayment]). */
+    private suspend fun completeSplitShare(
+        orderId: String,
+        tableId: String?,
+        shareId: String,
+        plan: SplitPaymentPlanner.Plan.SliceOff,
+        method: String,
+    ) {
+        when (apiClient.processPaymentAsStaff(shareId, method)) {
+            is ApiResult.Success -> Unit
+            else -> {
+                _orderDetail.value = _orderDetail.value.copy(
+                    isLoading = false, error = str().splitShareUnpaid,
+                )
+                return
+            }
+        }
+        orderDao.completePayment(shareId, method)
+
+        when (val shrunk = apiClient.voidOrderItemsAsStaff(orderId, plan.keepLines, SPLIT_REASON)) {
+            is ApiResult.Success -> {
+                // Destructive: reconcileOrderFromDto only inserts, so a shrunk line would keep
+                // its old quantity alongside the new one.
+                orderDao.deleteItemsForOrder(orderId)
+                reconcileOrderFromDto(shrunk.data)
+                tableId?.let { loadOrderForTable(it) }
+                _orderDetail.value = _orderDetail.value.copy(
+                    isLoading = false,
+                    successMessage = str().splitSharePaid.format(method),
+                )
+            }
+            else -> _orderDetail.value = _orderDetail.value.copy(
+                isLoading = false, error = str().splitShareNotRemoved,
+            )
         }
     }
 
@@ -374,6 +521,208 @@ class StaffOrderViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    /** Whole-bill gateway checkout from a staff device (task 7.2, 8.1, 8.2). Mirrors
+     *  [TableViewViewModel.startGatewayCheckout] on the staff endpoints. [customerAuthCode] is the
+     *  scanned wallet barcode for merchant-scan channels (task 8.3). */
+    fun startGatewayCheckout(
+        orderId: String,
+        method: PaymentMethod,
+        amount: Double,
+        printReceipt: Boolean,
+        customerAuthCode: String? = null,
+    ) {
+        startGatewayCheckoutInternal(
+            orderIdForKey = orderId,
+            method = method,
+            amount = amount,
+            customerAuthCode = customerAuthCode,
+            initiate = { payload -> apiClient.initiatePaymentAsStaff(payload) },
+            query = { transactionId -> apiClient.queryPaymentAsStaff(transactionId) },
+            onSuccess = { processPayment(orderId, method.code, printReceipt) },
+        )
+    }
+
+    /** Resume a payment PENDING from before this device last closed (task 8.5). See
+     *  [TableViewViewModel.resumeGatewayCheckout] for the rationale. */
+    fun resumeGatewayCheckout(row: PaymentTransaction, printReceipt: Boolean = true) {
+        val method = PaymentMethod.fromCode(row.paymentMethod) ?: return
+        val checkoutUrl = row.gatewayResponse ?: return
+        val qr = QrCodeUtil.encode(checkoutUrl)
+        val expiresAt = row.createdAtMillis() + GatewayPolling.QR_EXPIRY_SECONDS * 1000L
+
+        gatewayPollJob?.cancel()
+        _gatewayCheckout.value = GatewayCheckoutState.AwaitingPayment(
+            transactionId = row.id,
+            method = method,
+            amount = row.ringgit,
+            checkoutUrl = checkoutUrl,
+            qr = qr,
+            expiresAtMillis = expiresAt,
+        )
+        currentPollQuery = { transactionId -> apiClient.queryPaymentAsStaff(transactionId) }
+        currentPollOnSuccess = { processPayment(row.orderId, method.code, printReceipt) }
+        currentPollLocalRowId = row.id
+        gatewayPollJob = viewModelScope.launch {
+            pollGatewayPayment(row.id, method, currentPollQuery!!, currentPollOnSuccess!!)
+        }
+    }
+
+    /** Shared initiate→poll orchestration. See
+     *  [TableViewViewModel.startGatewayCheckoutInternal] for the admin/staff duplication rationale. */
+    private fun startGatewayCheckoutInternal(
+        orderIdForKey: String,
+        method: PaymentMethod,
+        amount: Double,
+        customerAuthCode: String? = null,
+        initiate: suspend (PosCheckoutPayload) -> ApiResult<GatewayPaymentResult>,
+        query: suspend (String) -> ApiResult<GatewayPaymentResult>,
+        onSuccess: suspend () -> Unit,
+    ) {
+        gatewayPollJob?.cancel()
+        _gatewayCheckout.value = GatewayCheckoutState.Initiating(method, amount)
+        gatewayPollJob = viewModelScope.launch {
+            val amountSen = PaymentTransaction.fromRinggit(amount)
+            val idempotencyKey = PaymentTransaction.idempotencyKeyFor(orderIdForKey, amountSen)
+            val isSandbox = _gatewayConfig.value?.isSandbox ?: true
+            val payload = PosCheckoutPayload(
+                orderId = orderIdForKey,
+                amountSen = amountSen,
+                paymentMethodCode = method.code,
+                customerAuthCode = customerAuthCode,
+                idempotencyKey = idempotencyKey,
+                isSandbox = isSandbox,
+            )
+            when (val result = initiate(payload)) {
+                is ApiResult.Success -> {
+                    val body = result.data
+                    val checkoutUrl = body.checkoutUrl
+                    if (!body.success || checkoutUrl == null) {
+                        _gatewayCheckout.value = GatewayCheckoutState.Failed(
+                            method, body.errorMessage ?: str().gatewayPaymentDeclined,
+                        )
+                        return@launch
+                    }
+                    val qr = QrCodeUtil.encode(checkoutUrl)
+                    val transactionId = body.transactionId ?: orderIdForKey
+                    val expiresAt = System.currentTimeMillis() + GatewayPolling.QR_EXPIRY_SECONDS * 1000L
+                    _gatewayCheckout.value = GatewayCheckoutState.AwaitingPayment(
+                        transactionId = transactionId,
+                        method = method,
+                        amount = amount,
+                        checkoutUrl = checkoutUrl,
+                        qr = qr,
+                        expiresAtMillis = expiresAt,
+                    )
+                    if (qr != null && method.category == PaymentCategory.QR_PAYNET) {
+                        customerDisplayManager.show(
+                            CustomerDisplayState.PaymentQr(
+                                qr = qr,
+                                caption = paymentMethodLabel(method, str()),
+                                amount = amount,
+                            )
+                        )
+                    }
+                    paymentTransactionDao.insert(
+                        PaymentTransaction(
+                            id = transactionId,
+                            orderId = orderIdForKey,
+                            paymentMethod = method.code,
+                            amountSen = amountSen,
+                            status = PaymentTransactionStatus.PENDING,
+                            gatewayResponse = checkoutUrl,
+                            idempotencyKey = idempotencyKey,
+                            isSandbox = isSandbox,
+                            createdAt = PaymentTransaction.nowIso(),
+                        )
+                    )
+                    currentPollQuery = query
+                    currentPollOnSuccess = onSuccess
+                    currentPollLocalRowId = transactionId
+                    pollGatewayPayment(transactionId, method, query, onSuccess)
+                }
+                is ApiResult.Error -> _gatewayCheckout.value = GatewayCheckoutState.Failed(method, result.message)
+                is ApiResult.NetworkError -> _gatewayCheckout.value =
+                    GatewayCheckoutState.Failed(method, str().msgNetworkError.format(result.message))
+            }
+        }
+    }
+
+    private suspend fun pollGatewayPayment(
+        transactionId: String,
+        method: PaymentMethod,
+        query: suspend (String) -> ApiResult<GatewayPaymentResult>,
+        onSuccess: suspend () -> Unit,
+    ) {
+        var elapsed = 0
+        while (elapsed < GatewayPolling.TOTAL_TIMEOUT_SECONDS) {
+            when (val result = query(transactionId)) {
+                is ApiResult.Success -> when (result.data.status) {
+                    "SUCCESS" -> {
+                        settleLocalTransaction(transactionId, PaymentTransactionStatus.SUCCESS)
+                        customerDisplayManager.clear()
+                        _gatewayCheckout.value = null
+                        onSuccess()
+                        return
+                    }
+                    "FAILED", "CANCELLED" -> {
+                        settleLocalTransaction(transactionId, PaymentTransactionStatus.FAILED)
+                        customerDisplayManager.clear()
+                        _gatewayCheckout.value = GatewayCheckoutState.Failed(method, str().gatewayPaymentDeclined)
+                        return
+                    }
+                    else -> Unit
+                }
+                else -> Unit
+            }
+            val delayMs = GatewayPolling.nextDelayMillis(elapsed)
+            delay(delayMs)
+            elapsed += (delayMs / 1000).toInt()
+        }
+        settleLocalTransaction(transactionId, PaymentTransactionStatus.TIMEOUT)
+        customerDisplayManager.clear()
+        _gatewayCheckout.value = GatewayCheckoutState.TimedOut
+    }
+
+    private suspend fun settleLocalTransaction(id: String, status: PaymentTransactionStatus) {
+        paymentTransactionDao.settle(
+            id = id,
+            status = status.name,
+            gatewayTransactionId = null,
+            gatewayResponse = paymentTransactionDao.getById(id)?.gatewayResponse,
+            settledAt = PaymentTransaction.nowIso(),
+        )
+    }
+
+    /** Callback-intercept hook (task 8.4). See [TableViewViewModel.nudgeGatewayPoll]. */
+    fun nudgeGatewayPoll() {
+        val awaiting = _gatewayCheckout.value as? GatewayCheckoutState.AwaitingPayment ?: return
+        val query = currentPollQuery ?: return
+        val onSuccess = currentPollOnSuccess ?: return
+        gatewayPollJob?.cancel()
+        gatewayPollJob = viewModelScope.launch {
+            pollGatewayPayment(awaiting.transactionId, awaiting.method, query, onSuccess)
+        }
+    }
+
+    /** Staff taps Cancel on the checkout overlay. See [TableViewViewModel.cancelGatewayCheckout]. */
+    fun cancelGatewayCheckout() {
+        gatewayPollJob?.cancel()
+        gatewayPollJob = null
+        customerDisplayManager.clear()
+        val localRowId = currentPollLocalRowId
+        currentPollLocalRowId = null
+        currentPollQuery = null
+        currentPollOnSuccess = null
+        _gatewayCheckout.value = null
+        if (localRowId != null) {
+            viewModelScope.launch { settleLocalTransaction(localRowId, PaymentTransactionStatus.CANCELLED) }
+        }
+    }
+
+    fun dismissGatewayCheckout() {
+        _gatewayCheckout.value = null
     }
 
     fun cancelOrder(orderId: String, reason: String) {

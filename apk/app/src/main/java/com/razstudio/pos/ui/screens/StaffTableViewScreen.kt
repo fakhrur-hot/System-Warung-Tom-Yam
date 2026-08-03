@@ -1,6 +1,11 @@
 package com.razstudio.pos.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,11 +55,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.data.NewOrderItem
 import com.razstudio.pos.data.local.MenuItem
+import com.razstudio.pos.data.local.PaymentMethod
 import com.razstudio.pos.data.local.Table
 import com.razstudio.pos.ui.components.BlockingLoadingOverlay
 import com.razstudio.pos.ui.components.HoldCountdownOverlay
@@ -63,6 +70,8 @@ import com.razstudio.pos.ui.theme.ThemeButton
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.tableview.CartLine
+import com.razstudio.pos.ui.tableview.GatewayCheckoutOverlay
+import com.razstudio.pos.ui.tableview.MerchantScanRequest
 import com.razstudio.pos.ui.tableview.OrderDetailSheet
 import com.razstudio.pos.ui.tableview.OrderEntrySheet
 import com.razstudio.pos.ui.tableview.TableGrid
@@ -97,6 +106,8 @@ fun StaffTableViewScreen(
     val permissions by viewModel.permissions.collectAsState()
     val pendingCount by viewModel.pendingOrderCount.collectAsState()
     val availableMenu by viewModel.availableMenu.collectAsState()
+    val gatewayMethods by viewModel.gatewayMethods.collectAsState()
+    val gatewayCheckout by viewModel.gatewayCheckout.collectAsState()
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
 
@@ -105,6 +116,19 @@ fun StaffTableViewScreen(
     var showTableSelectForOrder by remember { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Merchant-scan (task 8.3) — see AdminHomeScreen's identical wiring.
+    val context = LocalContext.current
+    var merchantScanRequest by remember { mutableStateOf<MerchantScanRequest?>(null) }
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasCameraPermission = granted }
 
     // Handle order detail messages
     LaunchedEffect(orderDetail.error) {
@@ -256,8 +280,8 @@ fun StaffTableViewScreen(
             // Governed by the café's "Staff can Take Payment" setting: the whole payment block,
             // split included, only renders when permissions.canTakePayment is true.
             allowSplitPayment = true,
-            onSplitShare = { orderId, tableId, plan, method ->
-                viewModel.paySplitShare(orderId, tableId, plan, method)
+            onSplitShare = { orderId, tableId, plan, method, printReceipt ->
+                viewModel.paySplitShare(orderId, tableId, plan, method, printReceipt)
             },
             state = orderDetail,
             tableLabel = selectedTableLabel,
@@ -270,11 +294,64 @@ fun StaffTableViewScreen(
             onConfirmSession = { orderId, sessionNumber -> viewModel.confirmSession(orderId, sessionNumber) },
             onPayment = { orderId, method, printReceipt -> viewModel.processPayment(orderId, method, printReceipt) },
             onVoidItems = { orderId, itemIds, reason -> viewModel.voidItems(orderId, itemIds, reason) },
+            gatewayMethods = gatewayMethods,
+            onGatewayCheckout = { orderId, method, amount, printReceipt ->
+                viewModel.startGatewayCheckout(orderId, method, amount, printReceipt)
+            },
+            onGatewaySplitCheckout = { orderId, tableId, plan, method, printReceipt ->
+                viewModel.startGatewaySplitCheckout(orderId, tableId, plan, method, printReceipt)
+            },
+            onRequestMerchantScan = { orderId, tableId, method, amount, printReceipt ->
+                merchantScanRequest = MerchantScanRequest(orderId, tableId, method, amount, printReceipt)
+            },
+            onRequestMerchantScanSplit = { orderId, tableId, plan, method, printReceipt ->
+                merchantScanRequest = MerchantScanRequest(
+                    orderId = orderId, tableId = tableId, method = method,
+                    amount = plan.amount, printReceipt = printReceipt, splitPlan = plan,
+                )
+            },
+            onResumeGatewayCheckout = { pending -> viewModel.resumeGatewayCheckout(pending) },
             onCancel = { orderId, reason -> viewModel.cancelOrder(orderId, reason) },
             onDismiss = {
                 showOrderSheet = false
                 viewModel.clearOrderDetail()
             }
+        )
+    }
+
+    // Full-screen gateway checkout (task 8.1/8.2) — see GatewayCheckoutOverlay's own doc for why
+    // this is a true Dialog rather than another bottom sheet.
+    gatewayCheckout?.let { checkoutState ->
+        GatewayCheckoutOverlay(
+            state = checkoutState,
+            strings = strings,
+            onCancel = { viewModel.cancelGatewayCheckout() },
+            onDismiss = { viewModel.dismissGatewayCheckout() },
+            onNudgePoll = { viewModel.nudgeGatewayPoll() },
+        )
+    }
+
+    // Merchant-scan camera (task 8.3) — see AdminHomeScreen's identical wiring.
+    merchantScanRequest?.let { req ->
+        QrScannerScreen(
+            hasCameraPermission = hasCameraPermission,
+            onRequestPermission = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+            onQrDecoded = { code ->
+                val plan = req.splitPlan
+                if (plan != null) {
+                    viewModel.startGatewaySplitCheckout(
+                        req.orderId, req.tableId, plan, req.method,
+                        printReceipt = req.printReceipt, customerAuthCode = code,
+                    )
+                } else {
+                    viewModel.startGatewayCheckout(req.orderId, req.method, req.amount, req.printReceipt, code)
+                }
+                merchantScanRequest = null
+            },
+            onCancel = { merchantScanRequest = null },
+            promptText = strings.merchantScanPrompt,
+            cancelText = strings.commonCancel,
+            grantText = strings.cameraPermissionRequired,
         )
     }
 

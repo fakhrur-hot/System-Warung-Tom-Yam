@@ -124,14 +124,16 @@ class PrintService @Inject constructor(
      *
      * @param order The completed order
      * @param items All order items (consolidated at snapshotted prices)
-     * @param paymentMethod "CASH" or "QR"
+     * @param paymentMethod "CASH" or "QR" or a gateway PaymentMethod code
      * @param cafeName The café branding name
+     * @param gatewayTransactionId Optional gateway transaction ID to print on the receipt (PG-REQ-7, task 9.1)
      */
     suspend fun printReceipt(
         order: Order,
         items: List<OrderItem>,
         paymentMethod: String,
-        cafeName: String
+        cafeName: String,
+        gatewayTransactionId: String? = null,
     ) {
         if (!isPrinterHost()) return
 
@@ -154,7 +156,8 @@ class PrintService @Inject constructor(
             printLanguage = printLanguage,
             timezone = timezone,
             tableName = tableName,
-            printLogo = printSettingsStore.getReceiptLogo()
+            printLogo = printSettingsStore.getReceiptLogo(),
+            gatewayTransactionId = gatewayTransactionId,
         )
 
         if (payload.isNotBlank()) {
@@ -162,6 +165,17 @@ class PrintService @Inject constructor(
                 PrinterDispatcher.DOCUMENT_TYPE_RECEIPT,
                 payload
             )
+        }
+
+        // Cash means the cashier needs the till open to give change, so the drawer follows the
+        // receipt without a second tap — the behaviour Loyverse has on this same hardware.
+        //
+        // Cash only, deliberately: a drawer that springs open during a QR or card payment is a
+        // security problem in a busy café, and there is no reason to open it for money that never
+        // becomes notes and coins. A café that wants it on every sale needs a setting, not a
+        // silent default.
+        if (paymentMethod.equals("CASH", ignoreCase = true)) {
+            printerDispatcher.kickCashDrawer()
         }
     }
 

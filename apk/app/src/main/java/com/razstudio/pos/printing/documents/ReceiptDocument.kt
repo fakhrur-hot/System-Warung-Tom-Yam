@@ -3,6 +3,7 @@ package com.razstudio.pos.printing.documents
 import android.content.Context
 import com.razstudio.pos.data.local.Order
 import com.razstudio.pos.data.local.OrderItem
+import com.razstudio.pos.data.local.PaymentMethod
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -28,11 +29,12 @@ object ReceiptDocument {
      * @param context Android context for loading the monochrome logo from internal storage
      * @param order The completed order
      * @param items All consolidated order items (at snapshotted prices)
-     * @param paymentMethod "CASH" or "QR"
+     * @param paymentMethod "CASH" or "QR" or a gateway PaymentMethod code (e.g. "DUITNOW_QR")
      * @param cafeName Branding café name
      * @param charWidth Character width (32 for 58mm, 48 for 80mm)
      * @param pixelWidth Pixel width for images (384 for 58mm, 576 for 80mm)
      * @param printLanguage "EN" or "BM"
+     * @param gatewayTransactionId Optional gateway transaction ID to print on the receipt (PG-REQ-7, task 9.1)
      * @return Formatted text string for DantSu library
      */
     fun generate(
@@ -46,7 +48,8 @@ object ReceiptDocument {
         printLanguage: String,
         timezone: String,
         tableName: String,
-        printLogo: Boolean = false
+        printLogo: Boolean = false,
+        gatewayTransactionId: String? = null,
     ): String {
         val s = printStrings(printLanguage)
         val separator = "=".repeat(charWidth)
@@ -110,9 +113,21 @@ object ReceiptDocument {
         val paymentLabel = s.payment
         val paymentDisplay = when {
             paymentMethod.equals("CASH", ignoreCase = true) -> s.cash
-            else -> "QR"
+            paymentMethod.equals("QR", ignoreCase = true) -> "QR"
+            else -> {
+                // Gateway method — look up the display name, fall back to the raw code.
+                val method = PaymentMethod.fromCode(paymentMethod)
+                if (method != null) "${s.paidVia} ${method.displayName()}" else paymentMethod
+            }
         }
         sb.appendLine("[L]$paymentLabel: $paymentDisplay")
+
+        // Gateway transaction ID (PG-REQ-7, task 9.1) — only when the payment went through a
+        // gateway and the aggregator returned a reference number.
+        if (!gatewayTransactionId.isNullOrBlank()) {
+            sb.appendLine("[L]${s.txnId}: $gatewayTransactionId")
+        }
+
         sb.appendLine("[L]$separator")
 
         // Thank you (localized). Emphasized (taller) so the studio footer below reads smaller.

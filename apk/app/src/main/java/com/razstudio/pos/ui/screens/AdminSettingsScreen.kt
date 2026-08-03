@@ -885,26 +885,98 @@ fun AdminSettingsScreen(
         }
     }
 
-    // Preset replace confirmation
+    // Preset picker, then a confirmation naming the chosen preset.
+    //
+    // Two steps rather than one: the load is destructive, and "replace my menu" is a very
+    // different decision from "replace my menu with these 152 items". The second dialog is where
+    // the café sees what it is actually getting.
     if (showPresetConfirm) {
-        AlertDialog(
-            onDismissRequest = { showPresetConfirm = false },
-            title = { Text(strings.loadPresetConfirmTitle) },
-            text = { Text(strings.loadPresetConfirmBody) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showPresetConfirm = false
-                    presetViewModel.loadSampleMenuPreset()
-                }) {
-                    Text(strings.commonConfirm)
+        val presets by presetViewModel.presets.collectAsState()
+        var chosen by remember { mutableStateOf<com.razstudio.pos.data.local.MenuPreset?>(null) }
+
+        val selected = chosen
+        if (selected == null) {
+            AlertDialog(
+                onDismissRequest = { showPresetConfirm = false },
+                title = { Text(strings.loadPresetConfirmTitle) },
+                text = {
+                    if (presets.isEmpty()) {
+                        Text(strings.presetNoneAvailable)
+                    } else {
+                        Column(
+                            modifier = Modifier.verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = strings.presetPickerHelp,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            presets.forEach { preset ->
+                                OutlinedButton(
+                                    onClick = { chosen = preset },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = preset.presetName,
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        Text(
+                                            text = strings.presetItemCount
+                                                .format(preset.itemCount, preset.categoryCount),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showPresetConfirm = false }) {
+                        Text(strings.commonCancel)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPresetConfirm = false }) {
-                    Text(strings.commonCancel)
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = { chosen = null },
+                title = { Text(selected.presetName) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (selected.description.isNotBlank()) {
+                            Text(selected.description)
+                        }
+                        Text(
+                            text = strings.presetItemCount
+                                .format(selected.itemCount, selected.categoryCount),
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        // The warning belongs here, next to the name, not on the earlier screen —
+                        // this is the tap that destroys the current menu.
+                        Text(
+                            text = strings.loadPresetConfirmBody,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showPresetConfirm = false
+                        presetViewModel.loadPreset(selected)
+                    }) {
+                        Text(strings.commonConfirm)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { chosen = null }) { Text(strings.commonBack) }
                 }
-            }
-        )
+            )
+        }
     }
 
     // Café renamed — prompt to restart so every screen that reads the name once (RoleSelectScreen,

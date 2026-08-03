@@ -59,6 +59,9 @@ class PrinterConnectionManager @Inject constructor(
         // safe on cheap 58mm units. Replaces the old DLE EOT status-request bytes which
         // caused some printers to print blank lines or block waiting for a status reply.
         private val KEEP_ALIVE_BYTES = byteArrayOf(0x1B, 0x40)
+
+        /** Post-send settle for out-of-band raw writes. Matches the confirmed drawer recipe. */
+        private const val RAW_SEND_SETTLE_MS = 100
     }
 
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -101,8 +104,10 @@ class PrinterConnectionManager @Inject constructor(
      * suspends the coroutine rather than blocking an IO thread for 1-5 seconds.
      */
     suspend fun print(macAddress: String, printerName: String, paperWidth: PaperWidth, payload: String) {
-        // Ordering-staff / secondary-admin devices never print locally — no BT socket is ever opened.
-        if (!isPrinterHost()) return
+        // Ordering-staff / secondary-admin devices must never print locally.  Throw so the
+        // dispatcher's retry→FAILED path runs and a real PrintAlert.PrintFailed is emitted
+        // instead of a silent success (Subtask 1.5).
+        if (!isPrinterHost()) throw IllegalStateException("This device is not the printer host")
         mutex.withLock {
             val connection = ensureConnected(macAddress, printerName)
 
@@ -151,6 +156,27 @@ class PrinterConnectionManager @Inject constructor(
         }
     }
 
+    /**
+     * Write raw bytes to the printer at [macAddress], reusing the warm connection like [print].
+     *
+     * Used for out-of-band ESC/POS control that is not part of a document — currently the cash
+     * drawer pulse. Deliberately *not* a general escape hatch for content: documents emit markup
+     * and the renderer owns the byte stream (designs.md H8). A drawer kick is a hardware command,
+     * not printable content, and has nowhere else to go on this transport.
+     */
+    suspend fun sendRaw(macAddress: String, printerName: String, bytes: ByteArray) {
+        if (!isPrinterHost()) return
+        mutex.withLock {
+            val connection = ensureConnected(macAddress, printerName)
+            // write() only APPENDS to DantSu's internal buffer — send() is what puts bytes on the
+            // wire. A write without a send transmits nothing at all, silently. The confirmed
+            // working drawer recipe (DantSu issue #90) is write-then-send(100); the 100 ms is the
+            // library's post-send settle, and a solenoid needs the line held briefly anyway.
+            connection.write(bytes)
+            connection.send(RAW_SEND_SETTLE_MS)
+        }
+    }
+
     /** Get the cached connection if still live, otherwise (re)connect fresh. Caller holds [mutex]. */
     private fun ensureConnected(mac: String, name: String): BluetoothConnection {
         connections[mac]?.let { existing ->
@@ -195,7 +221,14 @@ class PrinterConnectionManager @Inject constructor(
                         val (_, conn) = iterator.next()
                         try {
                             if (conn.isConnected) {
+                                // write() buffers; send() is what actually reaches the printer.
+                                // Without the send this heartbeat pushed nothing onto the socket
+                                // for its whole existence — the link stayed up only because the OS
+                                // had not yet reaped an idle RFCOMM channel, which is luck, not the
+                                // design. That is exactly the "reconnect takes several seconds
+                                // mid-service" failure this loop exists to prevent.
                                 conn.write(KEEP_ALIVE_BYTES)
+                                conn.send()
                             } else {
                                 iterator.remove()
                             }

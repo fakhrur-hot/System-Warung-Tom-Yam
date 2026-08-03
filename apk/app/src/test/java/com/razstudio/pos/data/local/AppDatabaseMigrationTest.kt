@@ -318,4 +318,136 @@ class AppDatabaseMigrationTest {
             assertEquals(7, c.getInt(0))
         }
     }
+
+    /**
+     * v15 → v16 adds transport + drawerKick to `printer_configs` and renames `macAddress` to
+     * `address`.
+     *
+     * **The property being protected**: a café that upgrades with a working Bluetooth printer
+     * configured must not lose that printer setup.  Existing rows must survive with their MAC
+     * value moved to `address` and both new columns filled with the safe defaults
+     * ('BLUETOOTH' / 'NONE').
+     *
+     * All other columns (`name`, `paperWidth`, `printerRole`, `isActive`, `categoryFilter`) must
+     * arrive unchanged.
+     */
+    @Test
+    fun migrate15To16_renamesAddressAndAddsTransportWithoutLosingPrinterSetup() {
+        val printerId = "printer-bt-001"
+        val printerName = "Kitchen Printer"
+        val printerMac = "00:11:22:33:44:55"
+
+        // ── v15: a café with a Bluetooth printer already configured ──────────────────────────────
+        helper.createDatabase(DB_NAME, 15).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO printer_configs
+                    (id, name, macAddress, paperWidth, printerRole, isActive, categoryFilter)
+                VALUES
+                    ('$printerId', '$printerName', '$printerMac',
+                     'EIGHTY_MM', 'KITCHEN_ONLY', 1, 'FOOD')
+                """.trimIndent()
+            )
+        }
+
+        // ── migrate to v16 ────────────────────────────────────────────────────────────────────────
+        val db = helper.runMigrationsAndValidate(DB_NAME, 16, true, MIGRATION_15_16)
+
+        // ── the row survived, MAC moved to `address`, new columns have correct defaults ──────────
+        db.query(
+            """
+            SELECT id, name, address, transport, drawerKick, paperWidth, printerRole, isActive, categoryFilter
+            FROM printer_configs WHERE id = '$printerId'
+            """.trimIndent()
+        ).use { c ->
+            assertTrue("printer row was lost by the migration", c.moveToFirst())
+            assertEquals(printerId, c.getString(0))
+            assertEquals(printerName, c.getString(1))
+            assertEquals(printerMac, c.getString(2))           // MAC preserved in `address`
+            assertEquals("BLUETOOTH", c.getString(3))          // default transport
+            assertEquals("NONE", c.getString(4))               // default drawerKick
+            assertEquals("EIGHTY_MM", c.getString(5))          // paperWidth unchanged
+            assertEquals("KITCHEN_ONLY", c.getString(6))       // printerRole unchanged
+            assertEquals(1, c.getInt(7))                       // isActive unchanged
+            assertEquals("FOOD", c.getString(8))               // categoryFilter unchanged
+            assertEquals("migration duplicated the printer row", 1, c.count)
+        }
+    }
+
+    @Test
+    fun migrate16To17_addsPaymentTransactionsWithoutDisturbingOrders() {
+        val orderId = "order-1"
+
+        // ── seed v16 with a settled order ────────────────────────────────────────────────────────
+        helper.createDatabase(DB_NAME, 16).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO orders (id, tableId, orderNumber, source, status, paymentMethod, total, createdAt)
+                VALUES ('$orderId', 'T1', 7, 'STAFF', 'COMPLETED', 'CASH', 42.50, '2026-08-03T10:00:00Z')
+                """.trimIndent()
+            )
+        }
+
+        // ── migrate to v17 ───────────────────────────────────────────────────────────────────────
+        val db = helper.runMigrationsAndValidate(DB_NAME, 17, true, MIGRATION_16_17)
+
+        // The order is untouched. This migration adds a table and nothing else — in particular it
+        // does NOT add payment_method or payment_status to `orders`, which the original plan called
+        // for and which would have duplicated an existing column and OrderStatus. (A4, A5)
+        db.query("SELECT paymentMethod, total, status FROM orders WHERE id = '$orderId'").use { c ->
+            assertTrue("the migration lost an order", c.moveToFirst())
+            assertEquals("CASH", c.getString(0))
+            assertEquals(42.50, c.getDouble(1), 0.001)
+            assertEquals("COMPLETED", c.getString(2))
+        }
+
+        // The new table accepts a row with money as integer sen.
+        db.execSQL(
+            """
+            INSERT INTO payment_transactions
+                (id, orderId, paymentMethod, amountSen, status, idempotencyKey, isSandbox, createdAt)
+            VALUES ('tx-1', '$orderId', 'DUITNOW_QR', 4250, 'PENDING', '$orderId:4250', 0,
+                    '2026-08-03T10:00:01Z')
+            """.trimIndent()
+        )
+        db.query("SELECT amountSen, status, isSandbox FROM payment_transactions WHERE id = 'tx-1'").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(4250L, c.getLong(0))
+            assertEquals("PENDING", c.getString(1))
+            assertEquals(0, c.getInt(2))
+        }
+    }
+
+    @Test
+    fun migrate16To17_theIdempotencyIndexRejectsADoubleCharge() {
+        helper.createDatabase(DB_NAME, 16).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO orders (id, tableId, orderNumber, source, status, total, createdAt)
+                VALUES ('order-2', 'T2', 8, 'STAFF', 'PENDING', 20.00, '2026-08-03T11:00:00Z')
+                """.trimIndent()
+            )
+        }
+        val db = helper.runMigrationsAndValidate(DB_NAME, 17, true, MIGRATION_16_17)
+
+        fun insert(id: String) = db.execSQL(
+            """
+            INSERT INTO payment_transactions
+                (id, orderId, paymentMethod, amountSen, status, idempotencyKey, isSandbox, createdAt)
+            VALUES ('$id', 'order-2', 'FPX', 2000, 'PENDING', 'order-2:2000', 0, '2026-08-03T11:00:0${id.last()}Z')
+            """.trimIndent()
+        )
+
+        insert("tx-a")
+
+        // The same (order, amount) must not be chargeable twice. Enforcing this in the schema means
+        // the guarantee does not rest on every client call site remembering to check first. (A6)
+        var rejected = false
+        try {
+            insert("tx-b")
+        } catch (e: Exception) {
+            rejected = true
+        }
+        assertTrue("a duplicate idempotency key was accepted — double charge is possible", rejected)
+    }
 }

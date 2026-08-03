@@ -294,6 +294,9 @@ data class UiStringsGroup4(
     val staffLabel: String,
     val exportPdfButton: String,
     val exportCsvButton: String,
+    // ── Cash drawer (Task 2.4) ──
+    val cashDrawerTitle: String,
+    val drawerOpeningsLabel: String,
 )
 
 data class UiStringsGroup5(
@@ -695,6 +698,109 @@ data class UiStringsGroup8(
     val fixItemConfirmBody: String,
     val fixItemConfirmClears: String,
     val fixItemConfirmAction: String,
+
+    // ── Bill History & best sellers ──
+    val billHistoryDesc: String,
+    val billSearchHint: String,
+    val billSearchNoResults: String,
+    val billHistoryEmpty: String,
+    val billItemsCount: String,
+    val billReprintAction: String,
+    val billReprintSent: String,
+    val billStatusPaid: String,
+    val billStatusCancelled: String,
+    val billCancelReason: String,
+    val billLoadMore: String,
+    val billNoTable: String,
+    val billDetailTitle: String,
+    val bestSellersTitle: String,
+)
+
+data class UiStringsGroup9(
+    // ── Devices & Hardware screen (HW-REQ-6, Task 3) ──
+    val devicesAndHardwareTitle: String,
+    val devicesAndHardwareDesc: String,
+    val hardwarePrintersSection: String,
+    val hardwareCashDrawerSection: String,
+    val hardwareCustomerDisplaySection: String,
+    val hardwareDriverUnavailable: String,
+    val hardwareDriverNotDetected: String,
+    val hardwareNoDriversAvailable: String,
+    val hardwareSelectionSaved: String,
+    val hardwareDriverBluetooth: String,
+    val hardwareDriverSunmi: String,
+    val hardwareDriverUsb: String,
+    val hardwareDriverNetwork: String,
+    val hardwareDrawerNone: String,
+    val hardwareDrawerViaPrinter: String,
+    val hardwareDrawerSunmi: String,
+    val hardwareDisplayNone: String,
+    val hardwareDisplayPresentation: String,
+    val hardwareDisplayVfd: String,
+    val hardwareReasonBluetoothOff: String,
+    val hardwareReasonNotImplemented: String,
+    val hardwareReasonNoUsb: String,
+    val hardwareReasonNoDisplay: String,
+    val hardwarePairedCount: String,
+    val hardwareDisplayNoQrNote: String,
+    val customerDisplayWelcome: String,
+    val customerDisplayScanToPay: String,
+    val customerDisplayThankYou: String,
+    val customerDisplayChange: String,
+    val builtInPrinterSection: String,
+    val builtInPrinterDesc: String,
+    val builtInPrinterAdd: String,
+    val builtInPrinterName: String,
+    val presetPickerHelp: String,
+    val presetItemCount: String,
+    val presetNoneAvailable: String,
+
+    // ── Payment gateway checkout (PG-REQ-3/4, tasks 7.2, 7.3, 8.1, 8.2) ──
+    val paymentMethodDuitNowQr: String,
+    val paymentMethodTng: String,
+    val paymentMethodGrabPay: String,
+    val paymentMethodBoost: String,
+    val paymentMethodShopeePay: String,
+    val paymentMethodFpx: String,
+    val paymentMethodCard: String,
+    val gatewayCheckoutInitiating: String,
+    val gatewayCheckoutScanToPay: String,
+    val gatewayCheckoutExpiresIn: String,
+    val gatewayCheckoutOpenLink: String,
+    val gatewayCancelPayment: String,
+    val gatewayCheckoutFailedTitle: String,
+    val gatewayCheckoutTimedOutTitle: String,
+    val gatewayCheckoutTimedOutBody: String,
+    val gatewayCheckoutBackToCheckout: String,
+    val gatewayPaymentDeclined: String,
+
+    // ── Payment gateway settings (PG-REQ-2, PG-REQ-8, task 7.1) ──
+    val paymentGatewaySettingsTitle: String,
+    val paymentGatewayHubCardDesc: String,
+    val paymentGatewayHubCardDisabledReason: String,
+    val paymentGatewayMerchantIdLabel: String,
+    val paymentGatewayVerifyKeyLabel: String,
+    val paymentGatewaySecretKeyLabel: String,
+    val paymentGatewayKeySetPlaceholder: String,
+    val paymentGatewaySandboxLabel: String,
+    val paymentGatewaySandboxOffConfirmTitle: String,
+    val paymentGatewaySandboxOffConfirmBody: String,
+    val paymentGatewayChannelsHeader: String,
+    val paymentGatewaySaveSuccess: String,
+    val paymentGatewaySaveFailed: String,
+    val paymentGatewayKeystoreUnhealthy: String,
+    val paymentGatewayProviderLabel: String,
+    val paymentGatewayEnabledLabel: String,
+    val paymentGatewayAwaitingOnboarding: String,
+    val paymentGatewayNoProviders: String,
+
+    // ── Merchant-scan, hosted checkout, crash/resume recovery (tasks 8.3, 8.4, 8.5) ──
+    val cameraPermissionRequired: String,
+    val merchantScanPrompt: String,
+    val gatewayCheckoutConfirming: String,
+    val gatewayCheckoutLoadingPage: String,
+    val gatewayPendingBannerTitle: String,
+    val gatewayPendingResumeButton: String,
 )
 
 class UiStrings(
@@ -706,6 +812,7 @@ class UiStrings(
     private val g6: UiStringsGroup6,
     private val g7: UiStringsGroup7,
     private val g8: UiStringsGroup8,
+    private val g9: UiStringsGroup9,
 ) {
     val commonCancel: String get() = g1.commonCancel
     val commonSave: String get() = g1.commonSave
@@ -955,6 +1062,8 @@ class UiStrings(
     val staffLabel: String get() = g4.staffLabel
     val exportPdfButton: String get() = g4.exportPdfButton
     val exportCsvButton: String get() = g4.exportCsvButton
+    val cashDrawerTitle: String get() = g4.cashDrawerTitle
+    val drawerOpeningsLabel: String get() = g4.drawerOpeningsLabel
     val signOutClosingTitle: String get() = g5.signOutClosingTitle
     val signOutClosingDesc: String get() = g5.signOutClosingDesc
     val computingAggregateLabel: String get() = g5.computingAggregateLabel
@@ -1311,6 +1420,98 @@ class UiStrings(
     val fixItemConfirmBody: String get() = g8.fixItemConfirmBody
     val fixItemConfirmClears: String get() = g8.fixItemConfirmClears
     val fixItemConfirmAction: String get() = g8.fixItemConfirmAction
+    val billHistoryDesc: String get() = g8.billHistoryDesc
+    val billSearchHint: String get() = g8.billSearchHint
+    val billSearchNoResults: String get() = g8.billSearchNoResults
+    val billHistoryEmpty: String get() = g8.billHistoryEmpty
+    val billItemsCount: String get() = g8.billItemsCount
+    val billReprintAction: String get() = g8.billReprintAction
+    val billReprintSent: String get() = g8.billReprintSent
+    val billStatusPaid: String get() = g8.billStatusPaid
+    val billStatusCancelled: String get() = g8.billStatusCancelled
+    val billCancelReason: String get() = g8.billCancelReason
+    val billLoadMore: String get() = g8.billLoadMore
+    val billNoTable: String get() = g8.billNoTable
+    val billDetailTitle: String get() = g8.billDetailTitle
+    val bestSellersTitle: String get() = g8.bestSellersTitle
+    // ── Devices & Hardware (group 9) ──
+    val devicesAndHardwareTitle: String get() = g9.devicesAndHardwareTitle
+    val devicesAndHardwareDesc: String get() = g9.devicesAndHardwareDesc
+    val hardwarePrintersSection: String get() = g9.hardwarePrintersSection
+    val hardwareCashDrawerSection: String get() = g9.hardwareCashDrawerSection
+    val hardwareCustomerDisplaySection: String get() = g9.hardwareCustomerDisplaySection
+    val hardwareDriverUnavailable: String get() = g9.hardwareDriverUnavailable
+    val hardwareDriverNotDetected: String get() = g9.hardwareDriverNotDetected
+    val hardwareNoDriversAvailable: String get() = g9.hardwareNoDriversAvailable
+    val hardwareSelectionSaved: String get() = g9.hardwareSelectionSaved
+    val hardwareDriverBluetooth: String get() = g9.hardwareDriverBluetooth
+    val hardwareDriverSunmi: String get() = g9.hardwareDriverSunmi
+    val hardwareDriverUsb: String get() = g9.hardwareDriverUsb
+    val hardwareDriverNetwork: String get() = g9.hardwareDriverNetwork
+    val hardwareDrawerNone: String get() = g9.hardwareDrawerNone
+    val hardwareDrawerViaPrinter: String get() = g9.hardwareDrawerViaPrinter
+    val hardwareDrawerSunmi: String get() = g9.hardwareDrawerSunmi
+    val hardwareDisplayNone: String get() = g9.hardwareDisplayNone
+    val hardwareDisplayPresentation: String get() = g9.hardwareDisplayPresentation
+    val hardwareDisplayVfd: String get() = g9.hardwareDisplayVfd
+    val hardwareReasonBluetoothOff: String get() = g9.hardwareReasonBluetoothOff
+    val hardwareReasonNotImplemented: String get() = g9.hardwareReasonNotImplemented
+    val hardwareReasonNoUsb: String get() = g9.hardwareReasonNoUsb
+    val hardwareReasonNoDisplay: String get() = g9.hardwareReasonNoDisplay
+    val hardwarePairedCount: String get() = g9.hardwarePairedCount
+    val hardwareDisplayNoQrNote: String get() = g9.hardwareDisplayNoQrNote
+    val customerDisplayWelcome: String get() = g9.customerDisplayWelcome
+    val customerDisplayScanToPay: String get() = g9.customerDisplayScanToPay
+    val customerDisplayThankYou: String get() = g9.customerDisplayThankYou
+    val customerDisplayChange: String get() = g9.customerDisplayChange
+    val builtInPrinterSection: String get() = g9.builtInPrinterSection
+    val builtInPrinterDesc: String get() = g9.builtInPrinterDesc
+    val builtInPrinterAdd: String get() = g9.builtInPrinterAdd
+    val builtInPrinterName: String get() = g9.builtInPrinterName
+    val presetPickerHelp: String get() = g9.presetPickerHelp
+    val presetItemCount: String get() = g9.presetItemCount
+    val presetNoneAvailable: String get() = g9.presetNoneAvailable
+    val paymentMethodDuitNowQr: String get() = g9.paymentMethodDuitNowQr
+    val paymentMethodTng: String get() = g9.paymentMethodTng
+    val paymentMethodGrabPay: String get() = g9.paymentMethodGrabPay
+    val paymentMethodBoost: String get() = g9.paymentMethodBoost
+    val paymentMethodShopeePay: String get() = g9.paymentMethodShopeePay
+    val paymentMethodFpx: String get() = g9.paymentMethodFpx
+    val paymentMethodCard: String get() = g9.paymentMethodCard
+    val gatewayCheckoutInitiating: String get() = g9.gatewayCheckoutInitiating
+    val gatewayCheckoutScanToPay: String get() = g9.gatewayCheckoutScanToPay
+    val gatewayCheckoutExpiresIn: String get() = g9.gatewayCheckoutExpiresIn
+    val gatewayCheckoutOpenLink: String get() = g9.gatewayCheckoutOpenLink
+    val gatewayCancelPayment: String get() = g9.gatewayCancelPayment
+    val gatewayCheckoutFailedTitle: String get() = g9.gatewayCheckoutFailedTitle
+    val gatewayCheckoutTimedOutTitle: String get() = g9.gatewayCheckoutTimedOutTitle
+    val gatewayCheckoutTimedOutBody: String get() = g9.gatewayCheckoutTimedOutBody
+    val gatewayCheckoutBackToCheckout: String get() = g9.gatewayCheckoutBackToCheckout
+    val gatewayPaymentDeclined: String get() = g9.gatewayPaymentDeclined
+    val paymentGatewaySettingsTitle: String get() = g9.paymentGatewaySettingsTitle
+    val paymentGatewayHubCardDesc: String get() = g9.paymentGatewayHubCardDesc
+    val paymentGatewayHubCardDisabledReason: String get() = g9.paymentGatewayHubCardDisabledReason
+    val paymentGatewayMerchantIdLabel: String get() = g9.paymentGatewayMerchantIdLabel
+    val paymentGatewayVerifyKeyLabel: String get() = g9.paymentGatewayVerifyKeyLabel
+    val paymentGatewaySecretKeyLabel: String get() = g9.paymentGatewaySecretKeyLabel
+    val paymentGatewayKeySetPlaceholder: String get() = g9.paymentGatewayKeySetPlaceholder
+    val paymentGatewaySandboxLabel: String get() = g9.paymentGatewaySandboxLabel
+    val paymentGatewaySandboxOffConfirmTitle: String get() = g9.paymentGatewaySandboxOffConfirmTitle
+    val paymentGatewaySandboxOffConfirmBody: String get() = g9.paymentGatewaySandboxOffConfirmBody
+    val paymentGatewayChannelsHeader: String get() = g9.paymentGatewayChannelsHeader
+    val paymentGatewaySaveSuccess: String get() = g9.paymentGatewaySaveSuccess
+    val paymentGatewaySaveFailed: String get() = g9.paymentGatewaySaveFailed
+    val paymentGatewayKeystoreUnhealthy: String get() = g9.paymentGatewayKeystoreUnhealthy
+    val paymentGatewayProviderLabel: String get() = g9.paymentGatewayProviderLabel
+    val paymentGatewayEnabledLabel: String get() = g9.paymentGatewayEnabledLabel
+    val paymentGatewayAwaitingOnboarding: String get() = g9.paymentGatewayAwaitingOnboarding
+    val paymentGatewayNoProviders: String get() = g9.paymentGatewayNoProviders
+    val cameraPermissionRequired: String get() = g9.cameraPermissionRequired
+    val merchantScanPrompt: String get() = g9.merchantScanPrompt
+    val gatewayCheckoutConfirming: String get() = g9.gatewayCheckoutConfirming
+    val gatewayCheckoutLoadingPage: String get() = g9.gatewayCheckoutLoadingPage
+    val gatewayPendingBannerTitle: String get() = g9.gatewayPendingBannerTitle
+    val gatewayPendingResumeButton: String get() = g9.gatewayPendingResumeButton
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1570,6 +1771,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             staffLabel = "Kakitangan",
             exportPdfButton = "Eksport PDF",
             exportCsvButton = "Eksport CSV",
+            cashDrawerTitle = "Laci Wang Tunai",
+            drawerOpeningsLabel = "Bilangan laci dibuka hari ini",
         ),
         g5 = UiStringsGroup5(
             signOutClosingTitle = "Log Keluar dengan Penutupan",
@@ -1939,6 +2142,99 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             fixItemConfirmBody = "Satu %1\$s akan dibuang daripada bil ini dan tidak dicaj. Tindakan ini tidak boleh dibatalkan.",
             fixItemConfirmClears = "%1\$s ialah yang terakhir pada baris ini. Membuangnya akan mengosongkan baris itu dan ia tidak akan dicaj. Tindakan ini tidak boleh dibatalkan.",
             fixItemConfirmAction = "Buang",
+            billHistoryDesc = "Cari dan cetak semula bil lepas",
+            billSearchHint = "Cari no. bil, meja, item atau bayaran",
+            billSearchNoResults = "Tiada bil sepadan dengan \"%s\"",
+            billHistoryEmpty = "Belum ada bil yang selesai",
+            billItemsCount = "%d item",
+            billReprintAction = "Cetak semula resit",
+            billReprintSent = "Resit dihantar ke pencetak",
+            billStatusPaid = "Dibayar",
+            billStatusCancelled = "Dibatalkan",
+            billCancelReason = "Sebab: %s",
+            billLoadMore = "Muat lagi",
+            billNoTable = "Tiada meja",
+            billDetailTitle = "Bil #%s",
+            bestSellersTitle = "Paling Laris",
+        ),
+        g9 = UiStringsGroup9(
+            devicesAndHardwareTitle = "Peranti & Perkakasan",
+            devicesAndHardwareDesc = "Pilih pencetak, laci tunai dan paparan pelanggan untuk peranti ini",
+            hardwarePrintersSection = "Pencetak resit",
+            hardwareCashDrawerSection = "Laci tunai",
+            hardwareCustomerDisplaySection = "Paparan pelanggan",
+            hardwareDriverUnavailable = "Tidak tersedia",
+            hardwareDriverNotDetected = "Tidak dikesan pada peranti ini",
+            hardwareNoDriversAvailable = "Tiada perkakasan dikesan pada peranti ini",
+            hardwareSelectionSaved = "Disimpan",
+            hardwareDriverBluetooth = "Pencetak terma Bluetooth",
+            hardwareDriverSunmi = "Pencetak dalaman Sunmi",
+            hardwareDriverUsb = "Pencetak USB / bersiri",
+            hardwareDriverNetwork = "Pencetak rangkaian (9100)",
+            hardwareDrawerNone = "Tiada",
+            hardwareDrawerViaPrinter = "Buka melalui %s",
+            hardwareDrawerSunmi = "Laci dalaman Sunmi",
+            hardwareDisplayNone = "Tiada",
+            hardwareDisplayPresentation = "Skrin kedua (800 × 480)",
+            hardwareDisplayVfd = "Tiang VFD (20 × 2)",
+            hardwareReasonBluetoothOff = "Bluetooth dimatikan",
+            hardwareReasonNotImplemented = "Belum tersedia",
+            hardwareReasonNoUsb = "Tiada peranti USB",
+            hardwareReasonNoDisplay = "Tiada skrin kedua dikesan",
+            hardwarePairedCount = "%d berpasangan",
+            hardwareDisplayNoQrNote = "Tidak boleh memaparkan QR pembayaran",
+            customerDisplayWelcome = "Selamat datang",
+            customerDisplayScanToPay = "Imbas untuk bayar",
+            customerDisplayThankYou = "Terima kasih",
+            customerDisplayChange = "Baki",
+            builtInPrinterSection = "Pencetak dalaman",
+            builtInPrinterDesc = "Terminal ini ada pencetak terbina dalam. Ia tidak muncul dalam imbasan Bluetooth kerana ia bukan peranti Bluetooth.",
+            builtInPrinterAdd = "Tambah pencetak dalaman",
+            builtInPrinterName = "Pencetak Dalaman",
+            presetPickerHelp = "Pilih menu permulaan. Menu semasa akan diganti.",
+            presetItemCount = "%1\$d item dalam %2\$d kategori",
+            presetNoneAvailable = "Tiada menu permulaan tersedia.",
+            paymentMethodDuitNowQr = "DuitNow QR",
+            paymentMethodTng = "TNG eWallet",
+            paymentMethodGrabPay = "GrabPay",
+            paymentMethodBoost = "Boost",
+            paymentMethodShopeePay = "ShopeePay",
+            paymentMethodFpx = "FPX",
+            paymentMethodCard = "Kad",
+            gatewayCheckoutInitiating = "Memulakan pembayaran…",
+            gatewayCheckoutScanToPay = "Imbas dengan e-dompet anda, atau buka pautan di bawah",
+            gatewayCheckoutExpiresIn = "Tamat tempoh dalam",
+            gatewayCheckoutOpenLink = "Buka halaman pembayaran",
+            gatewayCancelPayment = "Batalkan Pembayaran",
+            gatewayCheckoutFailedTitle = "Pembayaran Gagal",
+            gatewayCheckoutTimedOutTitle = "Pembayaran Tamat Masa",
+            gatewayCheckoutTimedOutBody = "Tiada pengesahan diterima tepat pada masanya. Semak Sejarah Transaksi sebelum mencuba semula, jika pelanggan sudah membayar.",
+            gatewayCheckoutBackToCheckout = "Kembali ke Pembayaran",
+            gatewayPaymentDeclined = "Pembayaran ditolak atau dibatalkan oleh pelanggan.",
+            paymentGatewaySettingsTitle = "Get Pembayaran",
+            paymentGatewayHubCardDesc = "Konfigurasikan DuitNow QR, e-dompet, FPX dan kad",
+            paymentGatewayHubCardDisabledReason = "Memerlukan Mod Awan",
+            paymentGatewayMerchantIdLabel = "ID Peniaga",
+            paymentGatewayVerifyKeyLabel = "Kunci Pengesahan",
+            paymentGatewaySecretKeyLabel = "Kunci Rahsia",
+            paymentGatewayKeySetPlaceholder = "Sudah ditetapkan — biarkan kosong untuk mengekalkannya",
+            paymentGatewaySandboxLabel = "Mod Sandbox / Ujian",
+            paymentGatewaySandboxOffConfirmTitle = "Tukar ke pembayaran sebenar?",
+            paymentGatewaySandboxOffConfirmBody = "Kunci pengeluaran akan menerima pembayaran sebenar pelanggan. Pastikan anda telah mengujinya dalam mod sandbox dahulu.",
+            paymentGatewayChannelsHeader = "Kaedah Pembayaran Diaktifkan",
+            paymentGatewaySaveSuccess = "Tetapan get pembayaran disimpan",
+            paymentGatewaySaveFailed = "Tidak dapat menyimpan: %1\$s",
+            paymentGatewayKeystoreUnhealthy = "Storan selamat tidak tersedia pada peranti ini — kelayakan tidak dapat disimpan.",
+            paymentGatewayProviderLabel = "Penyedia Pembayaran",
+            paymentGatewayEnabledLabel = "Aktifkan di kaunter",
+            paymentGatewayAwaitingOnboarding = "Menunggu pendaftaran pedagang",
+            paymentGatewayNoProviders = "Tiada penyedia pembayaran dikonfigurasikan.",
+            cameraPermissionRequired = "Benarkan akses kamera",
+            merchantScanPrompt = "Arahkan kamera ke kod e-dompet pelanggan",
+            gatewayCheckoutConfirming = "Mengesahkan pembayaran…",
+            gatewayCheckoutLoadingPage = "Memuatkan halaman pembayaran…",
+            gatewayPendingBannerTitle = "Pembayaran sedang berjalan",
+            gatewayPendingResumeButton = "Sambung",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -2197,6 +2493,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             staffLabel = "Staff",
             exportPdfButton = "Export PDF",
             exportCsvButton = "Export CSV",
+            cashDrawerTitle = "Cash Drawer",
+            drawerOpeningsLabel = "Drawer openings today",
         ),
         g5 = UiStringsGroup5(
             signOutClosingTitle = "Sign Out with Closing",
@@ -2566,6 +2864,99 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             fixItemConfirmBody = "One %1\$s will be taken off this bill and not charged. This cannot be undone.",
             fixItemConfirmClears = "%1\$s is the last one on this line. Removing it clears the line and it will not be charged. This cannot be undone.",
             fixItemConfirmAction = "Remove",
+            billHistoryDesc = "Find and reprint a past bill",
+            billSearchHint = "Search bill no., table, item or payment",
+            billSearchNoResults = "No bills match \"%s\"",
+            billHistoryEmpty = "No completed bills yet",
+            billItemsCount = "%d items",
+            billReprintAction = "Reprint receipt",
+            billReprintSent = "Receipt sent to printer",
+            billStatusPaid = "Paid",
+            billStatusCancelled = "Cancelled",
+            billCancelReason = "Reason: %s",
+            billLoadMore = "Load more",
+            billNoTable = "No table",
+            billDetailTitle = "Bill #%s",
+            bestSellersTitle = "Best Sellers",
+        ),
+        g9 = UiStringsGroup9(
+            devicesAndHardwareTitle = "Devices & Hardware",
+            devicesAndHardwareDesc = "Choose the printer, cash drawer and customer display this device uses",
+            hardwarePrintersSection = "Receipt printer",
+            hardwareCashDrawerSection = "Cash drawer",
+            hardwareCustomerDisplaySection = "Customer display",
+            hardwareDriverUnavailable = "Unavailable",
+            hardwareDriverNotDetected = "Not detected on this device",
+            hardwareNoDriversAvailable = "No hardware detected on this device",
+            hardwareSelectionSaved = "Saved",
+            hardwareDriverBluetooth = "Bluetooth thermal printer",
+            hardwareDriverSunmi = "Sunmi built-in printer",
+            hardwareDriverUsb = "USB / serial printer",
+            hardwareDriverNetwork = "Network printer (9100)",
+            hardwareDrawerNone = "None",
+            hardwareDrawerViaPrinter = "Kick through %s",
+            hardwareDrawerSunmi = "Sunmi built-in drawer",
+            hardwareDisplayNone = "None",
+            hardwareDisplayPresentation = "Second screen (800 × 480)",
+            hardwareDisplayVfd = "VFD pole (20 × 2)",
+            hardwareReasonBluetoothOff = "Bluetooth is off",
+            hardwareReasonNotImplemented = "Not available yet",
+            hardwareReasonNoUsb = "No USB device",
+            hardwareReasonNoDisplay = "No second screen detected",
+            hardwarePairedCount = "%d paired",
+            hardwareDisplayNoQrNote = "Cannot show a payment QR",
+            customerDisplayWelcome = "Welcome",
+            customerDisplayScanToPay = "Scan to pay",
+            customerDisplayThankYou = "Thank you",
+            customerDisplayChange = "Change",
+            builtInPrinterSection = "Built-in printer",
+            builtInPrinterDesc = "This terminal has a printer built in. It does not appear in the Bluetooth scan because it is not a Bluetooth device.",
+            builtInPrinterAdd = "Add built-in printer",
+            builtInPrinterName = "Built-in Printer",
+            presetPickerHelp = "Choose a starter menu. Your current menu will be replaced.",
+            presetItemCount = "%1\$d items in %2\$d categories",
+            presetNoneAvailable = "No starter menus available.",
+            paymentMethodDuitNowQr = "DuitNow QR",
+            paymentMethodTng = "TNG eWallet",
+            paymentMethodGrabPay = "GrabPay",
+            paymentMethodBoost = "Boost",
+            paymentMethodShopeePay = "ShopeePay",
+            paymentMethodFpx = "FPX",
+            paymentMethodCard = "Card",
+            gatewayCheckoutInitiating = "Starting payment…",
+            gatewayCheckoutScanToPay = "Scan with your e-wallet, or open the link below",
+            gatewayCheckoutExpiresIn = "Expires in",
+            gatewayCheckoutOpenLink = "Open payment page",
+            gatewayCancelPayment = "Cancel Payment",
+            gatewayCheckoutFailedTitle = "Payment Failed",
+            gatewayCheckoutTimedOutTitle = "Payment Timed Out",
+            gatewayCheckoutTimedOutBody = "No confirmation was received in time. Check Transaction History before retrying, in case the customer already paid.",
+            gatewayCheckoutBackToCheckout = "Back to Checkout",
+            gatewayPaymentDeclined = "The payment was declined or cancelled by the customer.",
+            paymentGatewaySettingsTitle = "Payment Gateway",
+            paymentGatewayHubCardDesc = "Configure DuitNow QR, e-wallets, FPX and card payments",
+            paymentGatewayHubCardDisabledReason = "Requires Cloud Mode",
+            paymentGatewayMerchantIdLabel = "Merchant ID",
+            paymentGatewayVerifyKeyLabel = "Verify Key",
+            paymentGatewaySecretKeyLabel = "Secret Key",
+            paymentGatewayKeySetPlaceholder = "Already set — leave blank to keep it",
+            paymentGatewaySandboxLabel = "Sandbox / Test Mode",
+            paymentGatewaySandboxOffConfirmTitle = "Switch to live payments?",
+            paymentGatewaySandboxOffConfirmBody = "Production keys will take real customer payments. Make sure you've tested this in sandbox mode first.",
+            paymentGatewayChannelsHeader = "Enabled Payment Channels",
+            paymentGatewaySaveSuccess = "Payment gateway settings saved",
+            paymentGatewaySaveFailed = "Could not save: %1\$s",
+            paymentGatewayKeystoreUnhealthy = "Secure storage is unavailable on this device — credentials cannot be saved.",
+            paymentGatewayProviderLabel = "Payment Provider",
+            paymentGatewayEnabledLabel = "Enable at the counter",
+            paymentGatewayAwaitingOnboarding = "Awaiting merchant onboarding",
+            paymentGatewayNoProviders = "No payment providers configured.",
+            cameraPermissionRequired = "Grant camera access",
+            merchantScanPrompt = "Point the camera at the customer's wallet barcode",
+            gatewayCheckoutConfirming = "Confirming payment…",
+            gatewayCheckoutLoadingPage = "Loading payment page…",
+            gatewayPendingBannerTitle = "Payment in progress",
+            gatewayPendingResumeButton = "Resume",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -2824,6 +3215,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             staffLabel = "员工",
             exportPdfButton = "导出PDF",
             exportCsvButton = "导出CSV",
+            cashDrawerTitle = "收银抽屉",
+            drawerOpeningsLabel = "今日抽屉开启次数",
         ),
         g5 = UiStringsGroup5(
             signOutClosingTitle = "结账退出",
@@ -3191,6 +3584,99 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             fixItemConfirmBody = "将从本账单移除一份%1\$s且不收费。此操作无法撤销。",
             fixItemConfirmClears = "%1\$s 是该项的最后一份。移除后将清除该项且不收费。此操作无法撤销。",
             fixItemConfirmAction = "移除",
+            billHistoryDesc = "查找并重新打印过往账单",
+            billSearchHint = "搜索单号、桌号、菜品或付款方式",
+            billSearchNoResults = "没有符合「%s」的账单",
+            billHistoryEmpty = "尚无已完成的账单",
+            billItemsCount = "%d 项",
+            billReprintAction = "重新打印收据",
+            billReprintSent = "收据已发送到打印机",
+            billStatusPaid = "已付款",
+            billStatusCancelled = "已取消",
+            billCancelReason = "原因：%s",
+            billLoadMore = "加载更多",
+            billNoTable = "无桌号",
+            billDetailTitle = "账单 #%s",
+            bestSellersTitle = "热销榜",
+        ),
+        g9 = UiStringsGroup9(
+            devicesAndHardwareTitle = "设备与硬件",
+            devicesAndHardwareDesc = "选择本设备使用的打印机、钱箱和顾客显示屏",
+            hardwarePrintersSection = "收据打印机",
+            hardwareCashDrawerSection = "钱箱",
+            hardwareCustomerDisplaySection = "顾客显示屏",
+            hardwareDriverUnavailable = "不可用",
+            hardwareDriverNotDetected = "本设备未检测到",
+            hardwareNoDriversAvailable = "本设备未检测到硬件",
+            hardwareSelectionSaved = "已保存",
+            hardwareDriverBluetooth = "蓝牙热敏打印机",
+            hardwareDriverSunmi = "Sunmi 内置打印机",
+            hardwareDriverUsb = "USB / 串口打印机",
+            hardwareDriverNetwork = "网络打印机 (9100)",
+            hardwareDrawerNone = "无",
+            hardwareDrawerViaPrinter = "通过 %s 弹出",
+            hardwareDrawerSunmi = "Sunmi 内置钱箱",
+            hardwareDisplayNone = "无",
+            hardwareDisplayPresentation = "副屏 (800 × 480)",
+            hardwareDisplayVfd = "VFD 客显屏 (20 × 2)",
+            hardwareReasonBluetoothOff = "蓝牙已关闭",
+            hardwareReasonNotImplemented = "尚未提供",
+            hardwareReasonNoUsb = "无 USB 设备",
+            hardwareReasonNoDisplay = "未检测到副屏",
+            hardwarePairedCount = "已配对 %d 台",
+            hardwareDisplayNoQrNote = "无法显示付款二维码",
+            customerDisplayWelcome = "欢迎光临",
+            customerDisplayScanToPay = "扫码付款",
+            customerDisplayThankYou = "谢谢惨顾",
+            customerDisplayChange = "找零",
+            builtInPrinterSection = "内置打印机",
+            builtInPrinterDesc = "本机已内置打印机。它不是蓝牙设备，因此不会出现在蓝牙搜索列表中。",
+            builtInPrinterAdd = "添加内置打印机",
+            builtInPrinterName = "内置打印机",
+            presetPickerHelp = "选择一份起始菜单。当前菜单将被替换。",
+            presetItemCount = "%2\$d 个分类，共 %1\$d 道菜",
+            presetNoneAvailable = "没有可用的起始菜单。",
+            paymentMethodDuitNowQr = "DuitNow QR",
+            paymentMethodTng = "TNG eWallet",
+            paymentMethodGrabPay = "GrabPay",
+            paymentMethodBoost = "Boost",
+            paymentMethodShopeePay = "ShopeePay",
+            paymentMethodFpx = "FPX",
+            paymentMethodCard = "银行卡",
+            gatewayCheckoutInitiating = "正在启动付款…",
+            gatewayCheckoutScanToPay = "使用电子钱包扫描,或打开下方链接",
+            gatewayCheckoutExpiresIn = "将在以下时间后失效",
+            gatewayCheckoutOpenLink = "打开付款页面",
+            gatewayCancelPayment = "取消付款",
+            gatewayCheckoutFailedTitle = "付款失败",
+            gatewayCheckoutTimedOutTitle = "付款超时",
+            gatewayCheckoutTimedOutBody = "未能及时收到确认。重试前请先查看交易记录,以防顾客已经付款。",
+            gatewayCheckoutBackToCheckout = "返回结账",
+            gatewayPaymentDeclined = "顾客拒绝或取消了此付款。",
+            paymentGatewaySettingsTitle = "支付网关",
+            paymentGatewayHubCardDesc = "设置 DuitNow QR、电子钱包、FPX 与银行卡付款",
+            paymentGatewayHubCardDisabledReason = "需要云端模式",
+            paymentGatewayMerchantIdLabel = "商户编号",
+            paymentGatewayVerifyKeyLabel = "验证密钥",
+            paymentGatewaySecretKeyLabel = "密钥",
+            paymentGatewayKeySetPlaceholder = "已设置 — 留空以保持不变",
+            paymentGatewaySandboxLabel = "沙盒/测试模式",
+            paymentGatewaySandboxOffConfirmTitle = "切换到正式付款?",
+            paymentGatewaySandboxOffConfirmBody = "正式密钥将处理顾客的真实付款。请确保您已先在沙盒模式下测试过。",
+            paymentGatewayChannelsHeader = "已启用的付款渠道",
+            paymentGatewaySaveSuccess = "支付网关设置已保存",
+            paymentGatewaySaveFailed = "无法保存:%1\$s",
+            paymentGatewayKeystoreUnhealthy = "此设备上的安全存储不可用 — 无法保存凭证。",
+            paymentGatewayProviderLabel = "支付服务商",
+            paymentGatewayEnabledLabel = "在收银台启用",
+            paymentGatewayAwaitingOnboarding = "等待商户开通",
+            paymentGatewayNoProviders = "尚未配置任何支付服务商。",
+            cameraPermissionRequired = "允许使用相机",
+            merchantScanPrompt = "将相机对准顾客的电子钱包条码",
+            gatewayCheckoutConfirming = "正在确认付款…",
+            gatewayCheckoutLoadingPage = "正在加载付款页面…",
+            gatewayPendingBannerTitle = "付款进行中",
+            gatewayPendingResumeButton = "继续",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -3449,6 +3935,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             staffLabel = "பணியாளர்",
             exportPdfButton = "PDF ஏற்றுமதி",
             exportCsvButton = "CSV ஏற்றுமதி",
+            cashDrawerTitle = "பண இழுப்பறை",
+            drawerOpeningsLabel = "இன்று இழுப்பறை திறந்த எண்ணிக்கை",
         ),
         g5 = UiStringsGroup5(
             signOutClosingTitle = "மூடலுடன் வெளியேறு",
@@ -3818,6 +4306,99 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             fixItemConfirmBody = "ஒரு %1\$s இந்தப் பில்லிலிருந்து நீக்கப்பட்டு கட்டணம் வசூலிக்கப்படாது. இதை மீட்டேல் முடியாது.",
             fixItemConfirmClears = "%1\$s இந்த வரிசையின் கடைசியானது. நீக்கினால் வரிசை அகற்றப்படும், கட்டணமும் வசூலிக்கப்படாது. இதை மீட்டேல் முடியாது.",
             fixItemConfirmAction = "நீக்கு",
+            billHistoryDesc = "பழைய பில்லைத் தேடி மீண்டும் அச்சிடு",
+            billSearchHint = "பில் எண், மேசை, உணவு அல்லது கட்டணத்தைத் தேடுங்கள்",
+            billSearchNoResults = "\"%s\" உடன் பொருந்தும் பில் இல்லை",
+            billHistoryEmpty = "நிறைவு பெற்ற பில் இதுவரை இல்லை",
+            billItemsCount = "%d பொருட்கள்",
+            billReprintAction = "ரசீதை மீண்டும் அச்சிடு",
+            billReprintSent = "ரசீது அச்சுப்பொறிக்கு அனுப்பப்பட்டது",
+            billStatusPaid = "செலுத்தப்பட்டது",
+            billStatusCancelled = "ரத்து செய்யப்பட்டது",
+            billCancelReason = "காரணம்: %s",
+            billLoadMore = "மேலும் ஏற்று",
+            billNoTable = "மேசை இல்லை",
+            billDetailTitle = "பில் #%s",
+            bestSellersTitle = "அதிகம் விற்பனையானவை",
+        ),
+        g9 = UiStringsGroup9(
+            devicesAndHardwareTitle = "சாதனங்கள் & வன்பொருள்",
+            devicesAndHardwareDesc = "இந்தச் சாதனம் பயன்படுத்தும் அச்சுப்பொறி, பணப்பெட்டி மற்றும் வாடிக்கையாளர் திரையைத் தேர்ந்தெடுக்கவும்",
+            hardwarePrintersSection = "ரசீது அச்சுப்பொறி",
+            hardwareCashDrawerSection = "பணப்பெட்டி",
+            hardwareCustomerDisplaySection = "வாடிக்கையாளர் திரை",
+            hardwareDriverUnavailable = "கிடைக்கவில்லை",
+            hardwareDriverNotDetected = "இந்தச் சாதனத்தில் கண்டறியப்படவில்லை",
+            hardwareNoDriversAvailable = "இந்தச் சாதனத்தில் வன்பொருள் எதுவும் கண்டறியப்படவில்லை",
+            hardwareSelectionSaved = "சேமிக்கப்பட்டது",
+            hardwareDriverBluetooth = "புளூடூத் வெப்ப அச்சுப்பொறி",
+            hardwareDriverSunmi = "Sunmi உள்ளமைந்த அச்சுப்பொறி",
+            hardwareDriverUsb = "USB / சீரியல் அச்சுப்பொறி",
+            hardwareDriverNetwork = "நெட்வொர்க் அச்சுப்பொறி (9100)",
+            hardwareDrawerNone = "இல்லை",
+            hardwareDrawerViaPrinter = "%s வழியாகத் திற",
+            hardwareDrawerSunmi = "Sunmi உள்ளமைந்த பணப்பெட்டி",
+            hardwareDisplayNone = "இல்லை",
+            hardwareDisplayPresentation = "இரண்டாம் திரை (800 × 480)",
+            hardwareDisplayVfd = "VFD கம்பம் (20 × 2)",
+            hardwareReasonBluetoothOff = "புளூடூத் அணைக்கப்பட்டுள்ளது",
+            hardwareReasonNotImplemented = "இன்னும் கிடைக்கவில்லை",
+            hardwareReasonNoUsb = "USB சாதனம் இல்லை",
+            hardwareReasonNoDisplay = "இரண்டாம் திரை கண்டறியப்படவில்லை",
+            hardwarePairedCount = "%d இணைக்கப்பட்டது",
+            hardwareDisplayNoQrNote = "கட்டண QR ஐக் காட்ட முடியாது",
+            customerDisplayWelcome = "வரவேற்கிறோம்",
+            customerDisplayScanToPay = "ச்கேன் செய்து செலுத்துங்கள்",
+            customerDisplayThankYou = "நன்றி",
+            customerDisplayChange = "மீதி",
+            builtInPrinterSection = "உள்ளமைந்த அச்சுப்பொறி",
+            builtInPrinterDesc = "இந்தச் சாதனத்தில் அச்சுப்பொறி உள்ளது. அது புளூடூத் சாதனம் அல்ல, எனவே புளூடூத் தேடலில் காணிக்காது.",
+            builtInPrinterAdd = "உள்ளமைந்த அச்சுப்பொறியைச் சேர்",
+            builtInPrinterName = "உள்ளமைந்த அச்சுப்பொறி",
+            presetPickerHelp = "தொடக்க மெனுவைத் தேர்ந்தெடுக்கவும். தற்போதைய மெனு மாற்றப்படும்.",
+            presetItemCount = "%2\$d பிரிவுகளில் %1\$d உணவுகள்",
+            presetNoneAvailable = "தொடக்க மெனுக்கள் ஏதும் இல்லை.",
+            paymentMethodDuitNowQr = "DuitNow QR",
+            paymentMethodTng = "TNG eWallet",
+            paymentMethodGrabPay = "GrabPay",
+            paymentMethodBoost = "Boost",
+            paymentMethodShopeePay = "ShopeePay",
+            paymentMethodFpx = "FPX",
+            paymentMethodCard = "அட்டை",
+            gatewayCheckoutInitiating = "பணம் செலுத்துதல் தொடங்குகிறது…",
+            gatewayCheckoutScanToPay = "உங்கள் இ-வாலெட் மூலம் ஸ்கேன் செய்யவும், அல்லது கீழே உள்ள இணைப்பைத் திறக்கவும்",
+            gatewayCheckoutExpiresIn = "காலாவதியாகும் நேரம்",
+            gatewayCheckoutOpenLink = "பணம் செலுத்தும் பக்கத்தைத் திறக்கவும்",
+            gatewayCancelPayment = "பணம் செலுத்துவதை ரத்து செய்",
+            gatewayCheckoutFailedTitle = "பணம் செலுத்துதல் தோல்வியடைந்தது",
+            gatewayCheckoutTimedOutTitle = "பணம் செலுத்துதல் நேரம் முடிந்தது",
+            gatewayCheckoutTimedOutBody = "சரியான நேரத்தில் உறுதிப்படுத்தல் பெறப்படவில்லை. வாடிக்கையாளர் ஏற்கனவே பணம் செலுத்தியிருக்கலாம் என்பதால், மீண்டும் முயற்சிக்கும் முன் பரிவர்த்தனை வரலாற்றைச் சரிபார்க்கவும்.",
+            gatewayCheckoutBackToCheckout = "செக்அவுட்டுக்குத் திரும்பு",
+            gatewayPaymentDeclined = "வாடிக்கையாளரால் பணம் செலுத்துதல் நிராகரிக்கப்பட்டது அல்லது ரத்து செய்யப்பட்டது.",
+            paymentGatewaySettingsTitle = "பணம் செலுத்தும் நுழைவாயில்",
+            paymentGatewayHubCardDesc = "DuitNow QR, இ-வாலெட், FPX மற்றும் அட்டை பணம் செலுத்துதலை அமைக்கவும்",
+            paymentGatewayHubCardDisabledReason = "கிளவுட் பயன்முறை தேவை",
+            paymentGatewayMerchantIdLabel = "வணிகர் ஐடி",
+            paymentGatewayVerifyKeyLabel = "சரிபார்ப்பு விசை",
+            paymentGatewaySecretKeyLabel = "இரகசிய விசை",
+            paymentGatewayKeySetPlaceholder = "ஏற்கனவே அமைக்கப்பட்டுள்ளது — அப்படியே வைத்திருக்க வெறுமையாக விடவும்",
+            paymentGatewaySandboxLabel = "சாண்ட்பாக்ஸ் / சோதனை முறை",
+            paymentGatewaySandboxOffConfirmTitle = "நேரடி பணம் செலுத்துதலுக்கு மாறவா?",
+            paymentGatewaySandboxOffConfirmBody = "தயாரிப்பு விசைகள் வாடிக்கையாளர்களிடமிருந்து உண்மையான பணத்தைப் பெறும். முதலில் சாண்ட்பாக்ஸ் முறையில் சோதித்துவிட்டீர்களா என்பதை உறுதிசெய்யவும்.",
+            paymentGatewayChannelsHeader = "இயக்கப்பட்ட பணம் செலுத்தும் வழிகள்",
+            paymentGatewaySaveSuccess = "பணம் செலுத்தும் நுழைவாயில் அமைப்புகள் சேமிக்கப்பட்டன",
+            paymentGatewaySaveFailed = "சேமிக்க முடியவில்லை: %1\$s",
+            paymentGatewayKeystoreUnhealthy = "இந்த சாதனத்தில் பாதுகாப்பான சேமிப்பு கிடைக்கவில்லை — நற்சான்றிதழ்களைச் சேமிக்க முடியவில்லை.",
+            paymentGatewayProviderLabel = "கட்டண வழங்குநர்",
+            paymentGatewayEnabledLabel = "கவுண்டரில் இயக்கு",
+            paymentGatewayAwaitingOnboarding = "வணிகர் பதிவு நிலுவையில் உள்ளது",
+            paymentGatewayNoProviders = "கட்டண வழங்குநர் எதுவும் அமைக்கப்படவில்லை.",
+            cameraPermissionRequired = "கேமரா அணுகலை அனுமதிக்கவும்",
+            merchantScanPrompt = "வாடிக்கையாளரின் இ-வாலெட் பார்கோடில் கேமராவை குறிவைக்கவும்",
+            gatewayCheckoutConfirming = "பணம் செலுத்துதல் உறுதிசெய்யப்படுகிறது…",
+            gatewayCheckoutLoadingPage = "பணம் செலுத்தும் பக்கம் ஏற்றப்படுகிறது…",
+            gatewayPendingBannerTitle = "பணம் செலுத்துதல் நடந்துகொண்டிருக்கிறது",
+            gatewayPendingResumeButton = "தொடரவும்",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -4076,6 +4657,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             staffLabel = "พนักงาน",
             exportPdfButton = "ส่งออก PDF",
             exportCsvButton = "ส่งออก CSV",
+            cashDrawerTitle = "ลิ้นชักเงินสด",
+            drawerOpeningsLabel = "จำนวนครั้งที่เปิดลิ้นชักวันนี้",
         ),
         g5 = UiStringsGroup5(
             signOutClosingTitle = "ออกจากระบบพร้อมปิดร้าน",
@@ -4445,6 +5028,99 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             fixItemConfirmBody = "%1\$s หนึ่งรายการจะถูกนำออกจากบิลนี้และไม่เรียกเก็บเงิน การกระทำนี้ย้อนกลับไม่ได้",
             fixItemConfirmClears = "%1\$s เป็นชิ้นสุดท้ายของรายการนี้ การนำออกจะลบรายการนี้และไม่เรียกเก็บเงิน การกระทำนี้ย้อนกลับไม่ได้",
             fixItemConfirmAction = "นำออก",
+            billHistoryDesc = "ค้นหาและพิมพ์บิลย้อนหลัง",
+            billSearchHint = "ค้นหาเลขที่บิล โต๊ะ รายการ หรือการชำระเงิน",
+            billSearchNoResults = "ไม่พบบิลที่ตรงกับ \"%s\"",
+            billHistoryEmpty = "ยังไม่มีบิลที่ชำระแล้ว",
+            billItemsCount = "%d รายการ",
+            billReprintAction = "พิมพ์ใบเสร็จซ้ำ",
+            billReprintSent = "ส่งใบเสร็จไปยังเครื่องพิมพ์แล้ว",
+            billStatusPaid = "ชำระแล้ว",
+            billStatusCancelled = "ยกเลิกแล้ว",
+            billCancelReason = "เหตุผล: %s",
+            billLoadMore = "โหลดเพิ่ม",
+            billNoTable = "ไม่มีโต๊ะ",
+            billDetailTitle = "บิล #%s",
+            bestSellersTitle = "ขายดีที่สุด",
+        ),
+        g9 = UiStringsGroup9(
+            devicesAndHardwareTitle = "อุปกรณ์และฮาร์ดแวร์",
+            devicesAndHardwareDesc = "เลือกเครื่องพิมพ์ ลิ้นชักเก็บเงิน และจอลูกค้าที่อุปกรณ์นี้ใช้",
+            hardwarePrintersSection = "เครื่องพิมพ์ใบเสร็จ",
+            hardwareCashDrawerSection = "ลิ้นชักเก็บเงิน",
+            hardwareCustomerDisplaySection = "จอแสดงผลลูกค้า",
+            hardwareDriverUnavailable = "ไม่พร้อมใช้งาน",
+            hardwareDriverNotDetected = "ไม่พบบนอุปกรณ์นี้",
+            hardwareNoDriversAvailable = "ไม่พบฮาร์ดแวร์บนอุปกรณ์นี้",
+            hardwareSelectionSaved = "บันทึกแล้ว",
+            hardwareDriverBluetooth = "เครื่องพิมพ์ความร้อนบลูทูธ",
+            hardwareDriverSunmi = "เครื่องพิมพ์ในตัว Sunmi",
+            hardwareDriverUsb = "เครื่องพิมพ์ USB / อนุกรม",
+            hardwareDriverNetwork = "เครื่องพิมพ์เครือข่าย (9100)",
+            hardwareDrawerNone = "ไม่มี",
+            hardwareDrawerViaPrinter = "เปิดผ่าน %s",
+            hardwareDrawerSunmi = "ลิ้นชักในตัว Sunmi",
+            hardwareDisplayNone = "ไม่มี",
+            hardwareDisplayPresentation = "จอที่สอง (800 × 480)",
+            hardwareDisplayVfd = "เสา VFD (20 × 2)",
+            hardwareReasonBluetoothOff = "บลูทูธปิดอยู่",
+            hardwareReasonNotImplemented = "ยังไม่พร้อมใช้งาน",
+            hardwareReasonNoUsb = "ไม่มีอุปกรณ์ USB",
+            hardwareReasonNoDisplay = "ไม่พบจอที่สอง",
+            hardwarePairedCount = "จับคู่แล้ว %d เครื่อง",
+            hardwareDisplayNoQrNote = "แสดง QR ชำระเงินไม่ได้",
+            customerDisplayWelcome = "ยินดีต้อนรับ",
+            customerDisplayScanToPay = "สแกนเพื่อชำระเงิน",
+            customerDisplayThankYou = "ขอบคุณ",
+            customerDisplayChange = "เงินทอน",
+            builtInPrinterSection = "เครื่องพิมพ์ในตัว",
+            builtInPrinterDesc = "เครื่องนี้มีเครื่องพิมพ์ในตัว ไม่แสดงในการค้นหาบลูทูธ เพราะไม่ใช่อุปกรณ์บลูทูธ",
+            builtInPrinterAdd = "เพิ่มเครื่องพิมพ์ในตัว",
+            builtInPrinterName = "เครื่องพิมพ์ในตัว",
+            presetPickerHelp = "เลือกเมนูเริ่มต้น เมนูปัจจุบันจะถูกแทนที่",
+            presetItemCount = "%1\$d รายการ ใน %2\$d หมวดหมู่",
+            presetNoneAvailable = "ไม่มีเมนูเริ่มต้น",
+            paymentMethodDuitNowQr = "DuitNow QR",
+            paymentMethodTng = "TNG eWallet",
+            paymentMethodGrabPay = "GrabPay",
+            paymentMethodBoost = "Boost",
+            paymentMethodShopeePay = "ShopeePay",
+            paymentMethodFpx = "FPX",
+            paymentMethodCard = "บัตร",
+            gatewayCheckoutInitiating = "กำลังเริ่มการชำระเงิน…",
+            gatewayCheckoutScanToPay = "สแกนด้วยอีวอลเล็ตของคุณ หรือเปิดลิงก์ด้านล่าง",
+            gatewayCheckoutExpiresIn = "หมดอายุใน",
+            gatewayCheckoutOpenLink = "เปิดหน้าชำระเงิน",
+            gatewayCancelPayment = "ยกเลิกการชำระเงิน",
+            gatewayCheckoutFailedTitle = "การชำระเงินล้มเหลว",
+            gatewayCheckoutTimedOutTitle = "การชำระเงินหมดเวลา",
+            gatewayCheckoutTimedOutBody = "ไม่ได้รับการยืนยันภายในเวลาที่กำหนด กรุณาตรวจสอบประวัติการทำรายการก่อนลองใหม่ เผื่อลูกค้าชำระเงินไปแล้ว",
+            gatewayCheckoutBackToCheckout = "กลับไปหน้าชำระเงิน",
+            gatewayPaymentDeclined = "การชำระเงินถูกปฏิเสธหรือยกเลิกโดยลูกค้า",
+            paymentGatewaySettingsTitle = "เกตเวย์การชำระเงิน",
+            paymentGatewayHubCardDesc = "ตั้งค่า DuitNow QR, อีวอลเล็ต, FPX และการชำระด้วยบัตร",
+            paymentGatewayHubCardDisabledReason = "ต้องใช้โหมดคลาวด์",
+            paymentGatewayMerchantIdLabel = "รหัสร้านค้า",
+            paymentGatewayVerifyKeyLabel = "คีย์ยืนยัน",
+            paymentGatewaySecretKeyLabel = "คีย์ลับ",
+            paymentGatewayKeySetPlaceholder = "ตั้งค่าไว้แล้ว — เว้นว่างไว้เพื่อคงค่าเดิม",
+            paymentGatewaySandboxLabel = "โหมดแซนด์บ็อกซ์/ทดสอบ",
+            paymentGatewaySandboxOffConfirmTitle = "เปลี่ยนเป็นการชำระเงินจริงหรือไม่?",
+            paymentGatewaySandboxOffConfirmBody = "คีย์การใช้งานจริงจะรับการชำระเงินจริงจากลูกค้า โปรดตรวจสอบให้แน่ใจว่าคุณได้ทดสอบในโหมดแซนด์บ็อกซ์แล้ว",
+            paymentGatewayChannelsHeader = "ช่องทางการชำระเงินที่เปิดใช้งาน",
+            paymentGatewaySaveSuccess = "บันทึกการตั้งค่าเกตเวย์การชำระเงินแล้ว",
+            paymentGatewaySaveFailed = "ไม่สามารถบันทึกได้: %1\$s",
+            paymentGatewayKeystoreUnhealthy = "ที่จัดเก็บข้อมูลปลอดภัยไม่พร้อมใช้งานบนอุปกรณ์นี้ — ไม่สามารถบันทึกข้อมูลรับรองได้",
+            paymentGatewayProviderLabel = "ผู้ให้บริการชำระเงิน",
+            paymentGatewayEnabledLabel = "เปิดใช้งานที่เคาน์เตอร์",
+            paymentGatewayAwaitingOnboarding = "รอการอนุมัติร้านค้า",
+            paymentGatewayNoProviders = "ยังไม่ได้ตั้งค่าผู้ให้บริการชำระเงิน",
+            cameraPermissionRequired = "อนุญาตให้ใช้กล้อง",
+            merchantScanPrompt = "เล็งกล้องไปที่บาร์โค้ดอีวอลเล็ตของลูกค้า",
+            gatewayCheckoutConfirming = "กำลังยืนยันการชำระเงิน…",
+            gatewayCheckoutLoadingPage = "กำลังโหลดหน้าชำระเงิน…",
+            gatewayPendingBannerTitle = "การชำระเงินกำลังดำเนินการ",
+            gatewayPendingResumeButton = "ดำเนินการต่อ",
         ),
     )
 }

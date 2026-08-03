@@ -174,4 +174,45 @@ interface OrderDao {
         ORDER BY totalQuantity DESC
     """)
     suspend fun getPopularItems(startDate: String, endDate: String): List<PopularItemRow>
+
+    /**
+     * Past bills (settled or cancelled) for the Bill History screen, newest first.
+     *
+     * One free-text box searches four things a café actually remembers about a bill: the order
+     * number, the table it was on, how it was paid, and — via the join — **any item that was on
+     * it**. "the table that had the tom yam" is a realistic way to look for a bill, and the item
+     * name is often the only detail anyone recalls.
+     *
+     * `LEFT JOIN` (not `INNER`) so a bill whose lines were all voided still appears; `DISTINCT`
+     * because the join multiplies a bill by its line count. [query] must be lower-cased by the
+     * caller — SQLite's `LOWER()` is ASCII-only, so folding non-Latin item names has to happen in
+     * Kotlin, which handles Chinese, Tamil and Thai correctly.
+     *
+     * [limit] caps the result set. Unlike [getAllOrders] (used only by backup) this is a screen
+     * query, and a café two years in has tens of thousands of bills.
+     */
+    @Query("""
+        SELECT DISTINCT o.* FROM orders o
+        LEFT JOIN order_items oi ON oi.orderId = o.id
+        LEFT JOIN tables t ON t.id = o.tableId
+        WHERE o.status IN ('COMPLETED', 'CANCELLED')
+          AND o.createdAt >= :startDate AND o.createdAt < :endDate
+          AND (:query = ''
+               OR CAST(o.orderNumber AS TEXT) LIKE '%' || :query || '%'
+               OR LOWER(t.label) LIKE '%' || :query || '%'
+               OR LOWER(o.paymentMethod) LIKE '%' || :query || '%'
+               OR LOWER(oi.nameSnapshot) LIKE '%' || :query || '%')
+        ORDER BY o.createdAt DESC
+        LIMIT :limit
+    """)
+    suspend fun searchBills(
+        startDate: String,
+        endDate: String,
+        query: String,
+        limit: Int
+    ): List<Order>
+
+    /** Line items for several bills at once, so the list can show a one-line summary per bill. */
+    @Query("SELECT * FROM order_items WHERE orderId IN (:orderIds)")
+    suspend fun getItemsForOrders(orderIds: List<String>): List<OrderItem>
 }

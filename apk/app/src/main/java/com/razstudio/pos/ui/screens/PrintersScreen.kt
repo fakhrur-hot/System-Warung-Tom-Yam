@@ -83,6 +83,7 @@ fun PrintersScreen(
     val printers by viewModel.printers.collectAsState()
     val discoveredDevices by viewModel.discoveredDevices.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+    val canAddBuiltIn by viewModel.canAddBuiltInPrinter.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val language by languageViewModel.language.collectAsState()
@@ -302,6 +303,38 @@ fun PrintersScreen(
                 )
             }
 
+            // Built-in printer. Offered above the Bluetooth scan because on a terminal that has
+            // one it is almost always the right answer — and because the scan deliberately does
+            // not list it: Sunmi exposes the internal printer as a bonded Bluetooth device, and
+            // adding it that way loses the cash drawer, paper detection and status broadcasts.
+            if (canAddBuiltIn) {
+                item {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    Text(
+                        text = strings.builtInPrinterSection,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = strings.builtInPrinterDesc,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            viewModel.addBuiltInPrinter(
+                                name = strings.builtInPrinterName,
+                                printerRole = PrinterRole.BOTH
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(strings.builtInPrinterAdd)
+                    }
+                }
+            }
+
             // Scan section
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -341,7 +374,7 @@ fun PrintersScreen(
                     )
                 }
                 items(discoveredDevices, key = { it.macAddress }) { device ->
-                    val alreadyAdded = printers.any { it.macAddress == device.macAddress }
+                    val alreadyAdded = printers.any { it.address == device.macAddress }
                     DiscoveredDeviceRow(
                         device = device,
                         alreadyAdded = alreadyAdded,
@@ -378,7 +411,7 @@ fun PrintersScreen(
         AddEditPrinterDialog(
             title = strings.editPrinterTitle,
             initialName = printer.name,
-            macAddress = printer.macAddress,
+            macAddress = printer.address ?: "",
             initialPaperWidth = printer.paperWidth,
             initialRole = printer.printerRole,
             strings = strings,
@@ -441,7 +474,7 @@ private fun PrinterCard(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = printer.macAddress,
+                        text = printer.address ?: "",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

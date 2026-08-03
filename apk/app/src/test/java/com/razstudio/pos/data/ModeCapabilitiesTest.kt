@@ -93,7 +93,8 @@ class ModeCapabilitiesTest {
     @Test
     fun everyOperatingModeResolvesAllCapabilities() {
         val expected = flagsOf(OperatingMode.CLOUD.toCapabilities()).size
-        assertEquals("expected the eight documented capability flags", 8, expected)
+        // Was 8 before gatewayPaymentsEnabled (task 6.4, PG-REQ-3) added a ninth.
+        assertEquals("expected the nine documented capability flags", 9, expected)
         OperatingMode.entries.forEach { mode ->
             assertEquals(
                 "every capability must be decided for $mode",

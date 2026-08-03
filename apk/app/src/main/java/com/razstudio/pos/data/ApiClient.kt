@@ -2307,6 +2307,494 @@ class ApiClient @Inject constructor(
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
     }
+
+    // --- Payment gateway (task 6.1, 6.3) ---
+
+    /**
+     * Initiate a gateway payment attempt using admin bearer token.
+     *
+     * Forwards [PosCheckoutPayload] to the `payment-initiate` Edge Function, which holds the
+     * aggregator secret and computes the gateway signature server-side. The POS never sees
+     * the merchant secret key. (PG-REQ-4, PG-REQ-8, F3)
+     *
+     * **Money boundary**: [PosCheckoutPayload.amountSen] must already be in sen. The caller
+     * must use [com.razstudio.pos.data.local.PaymentTransaction.fromRinggit] exactly once,
+     * converting [Order.total] at the BackendGateway layer. No second conversion anywhere. (A8)
+     *
+     * **Idempotency**: [PosCheckoutPayload.idempotencyKey] must equal the
+     * [com.razstudio.pos.data.local.PaymentTransaction.id] minted for this attempt — a UUID
+     * stable across retries. (A6, 6.3)
+     */
+    override suspend fun initiatePayment(payload: PosCheckoutPayload): ApiResult<GatewayPaymentResult> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.initiatePayment(payload)
+            try {
+                val token = adminBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+                initiatePaymentRequest(payload, token)
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    /** Staff-auth variant of [initiatePayment] — ordering API key, otherwise identical. */
+    override suspend fun initiatePaymentAsStaff(payload: PosCheckoutPayload): ApiResult<GatewayPaymentResult> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.initiatePayment(payload)
+            try {
+                val token = orderingBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
+                initiatePaymentRequest(payload, token)
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    /** Shared body of both initiatePayment variants — only the bearer differs. */
+    private fun initiatePaymentRequest(payload: PosCheckoutPayload, bearer: String): ApiResult<GatewayPaymentResult> {
+        val body = JSONObject().apply {
+            put("orderId", payload.orderId)
+            // amountSen is already sen — converted once via PaymentTransaction.fromRinggit (A8)
+            put("amountSen", payload.amountSen)
+            put("paymentMethodCode", payload.paymentMethodCode)
+            put("currency", payload.currency)
+            put("idempotencyKey", payload.idempotencyKey)
+            put("isSandbox", payload.isSandbox)
+            if (payload.customerAuthCode != null) put("customerAuthCode", payload.customerAuthCode)
+        }.toString()
+
+        val request = Request.Builder()
+            .url("${baseUrl()}/payment-initiate")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("apikey", anonKey())
+            .addHeader("Authorization", "Bearer $bearer")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        val response = client.newCall(request).execute()
+        val responseBody = response.body?.string() ?: ""
+
+        return when (response.code) {
+            200 -> ApiResult.Success(parseGatewayPaymentResult(JSONObject(responseBody)))
+            401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired credentials")
+            402 -> ApiResult.Error("GATEWAY_REJECTED", "Gateway rejected the payment request")
+            422 -> {
+                val json = runCatching { JSONObject(responseBody) }.getOrDefault(JSONObject())
+                ApiResult.Error(
+                    json.optString("error", "VALIDATION"),
+                    json.optString("message", "Invalid payment request")
+                )
+            }
+            else -> unexpectedStatus(response.code)
+        }
+    }
+
+    /**
+     * Query the gateway for a transaction's current status. Called by the polling loop.
+     * Persisted status from the callback is authoritative after 24 h — do not rely on this
+     * beyond that window. (F5, 6.2c)
+     */
+    override suspend fun queryPayment(transactionId: String): ApiResult<GatewayPaymentResult> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.queryPayment(transactionId)
+            try {
+                val token = adminBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+                queryPaymentRequest(transactionId, token)
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    /** Staff-auth variant of [queryPayment]. */
+    override suspend fun queryPaymentAsStaff(transactionId: String): ApiResult<GatewayPaymentResult> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.queryPayment(transactionId)
+            try {
+                val token = orderingBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
+                queryPaymentRequest(transactionId, token)
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    private fun queryPaymentRequest(transactionId: String, bearer: String): ApiResult<GatewayPaymentResult> {
+        val body = JSONObject().apply {
+            put("transactionId", transactionId)
+        }.toString()
+
+        val request = Request.Builder()
+            .url("${baseUrl()}/payment-query")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("apikey", anonKey())
+            .addHeader("Authorization", "Bearer $bearer")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        val response = client.newCall(request).execute()
+        val responseBody = response.body?.string() ?: ""
+
+        return when (response.code) {
+            200 -> ApiResult.Success(parseGatewayPaymentResult(JSONObject(responseBody)))
+            401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired credentials")
+            404 -> ApiResult.Error("NOT_FOUND", "Transaction not found at gateway")
+            else -> unexpectedStatus(response.code)
+        }
+    }
+
+    /**
+     * List all payment attempts for an order. Used for retry history and crash-recovery. (8.5)
+     */
+    override suspend fun listPaymentTransactions(orderId: String): ApiResult<List<PaymentTransactionDto>> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.listPaymentTransactions(orderId)
+            try {
+                val token = adminBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+                listTransactionsRequest(orderId, token)
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    /** Staff-auth variant of [listPaymentTransactions]. */
+    override suspend fun listPaymentTransactionsAsStaff(orderId: String): ApiResult<List<PaymentTransactionDto>> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.listPaymentTransactions(orderId)
+            try {
+                val token = orderingBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
+                listTransactionsRequest(orderId, token)
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    private fun listTransactionsRequest(orderId: String, bearer: String): ApiResult<List<PaymentTransactionDto>> {
+        val request = Request.Builder()
+            .url("${baseUrl()}/payment-transactions?orderId=$orderId")
+            .addHeader("apikey", anonKey())
+            .addHeader("Authorization", "Bearer $bearer")
+            .get()
+            .build()
+
+        val response = client.newCall(request).execute()
+        val responseBody = response.body?.string() ?: ""
+
+        return when (response.code) {
+            200 -> {
+                val json = JSONObject(responseBody)
+                val arr = json.getJSONArray("transactions")
+                val list = mutableListOf<PaymentTransactionDto>()
+                for (i in 0 until arr.length()) {
+                    list.add(parsePaymentTransactionDto(arr.getJSONObject(i)))
+                }
+                ApiResult.Success(list)
+            }
+            401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired credentials")
+            else -> unexpectedStatus(response.code)
+        }
+    }
+
+    /**
+     * Read-only gateway configuration — never a secret's value, only whether one is set.
+     * (PG-REQ-2, PG-REQ-8, task 7.1)
+     */
+    override suspend fun getGatewayConfig(): ApiResult<GatewayConfigDto> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.getGatewayConfig()
+            try {
+                val token = adminBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+                getGatewayConfigRequest(token)
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    /** Staff-auth variant of [getGatewayConfig] — used to decide which gateway tiles to show. */
+    override suspend fun getGatewayConfigAsStaff(): ApiResult<GatewayConfigDto> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.getGatewayConfig()
+            try {
+                val token = orderingBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
+                getGatewayConfigRequest(token)
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    private fun getGatewayConfigRequest(bearer: String): ApiResult<GatewayConfigDto> {
+        val request = Request.Builder()
+            .url("${baseUrl()}/gateway-config")
+            .addHeader("apikey", anonKey())
+            .addHeader("Authorization", "Bearer $bearer")
+            .get()
+            .build()
+
+        val response = client.newCall(request).execute()
+        val responseBody = response.body?.string() ?: ""
+
+        return when (response.code) {
+            200 -> ApiResult.Success(parseGatewayConfigDto(JSONObject(responseBody)))
+            401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired credentials")
+            else -> unexpectedStatus(response.code)
+        }
+    }
+
+    /** Admin-only — there is no staff variant. See [BackendGateway.putGatewayConfig]. */
+    override suspend fun putGatewayConfig(
+        merchantId: String,
+        verifyKey: String?,
+        secretKey: String?,
+        isSandbox: Boolean,
+        enabledMethods: List<String>,
+    ): ApiResult<GatewayConfigDto> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getGatewayConfig()
+        try {
+            val token = adminBearerToken()
+                ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+
+            val body = JSONObject().apply {
+                put("merchantId", merchantId)
+                if (verifyKey != null) put("verifyKey", verifyKey)
+                if (secretKey != null) put("secretKey", secretKey)
+                put("isSandbox", isSandbox)
+                put("enabledMethods", JSONArray(enabledMethods))
+            }.toString()
+
+            val request = Request.Builder()
+                .url("${baseUrl()}/gateway-config")
+                .addHeader("Content-Type", "application/json")
+                .addHeader("apikey", anonKey())
+                .addHeader("Authorization", "Bearer $token")
+                .put(body.toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+
+            when (response.code) {
+                200 -> ApiResult.Success(parseGatewayConfigDto(JSONObject(responseBody)))
+                401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired credentials")
+                403 -> ApiResult.Error("FORBIDDEN", "Only the admin device can change gateway settings")
+                422 -> {
+                    val json = runCatching { JSONObject(responseBody) }.getOrDefault(JSONObject())
+                    ApiResult.Error(
+                        json.optString("error", "VALIDATION"),
+                        json.optString("message", "Invalid gateway configuration")
+                    )
+                }
+                else -> unexpectedStatus(response.code)
+            }
+        } catch (e: IOException) {
+            networkError(e)
+        } catch (e: Exception) {
+            ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+        }
+    }
+
+    override suspend fun getGatewayProviders(): ApiResult<List<GatewayProviderDto>> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.getGatewayProviders()
+            try {
+                val token = adminBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+                getGatewayProvidersRequest(token)
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    override suspend fun getGatewayProvidersAsStaff(): ApiResult<List<GatewayProviderDto>> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) return@withContext demoBackend.getGatewayProviders()
+            try {
+                val token = orderingBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No ordering API key")
+                getGatewayProvidersRequest(token)
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    private fun getGatewayProvidersRequest(bearer: String): ApiResult<List<GatewayProviderDto>> {
+        val request = Request.Builder()
+            .url("${baseUrl()}/gateway-providers")
+            .addHeader("apikey", anonKey())
+            .addHeader("Authorization", "Bearer $bearer")
+            .get()
+            .build()
+
+        val response = client.newCall(request).execute()
+        val responseBody = response.body?.string() ?: ""
+
+        return when (response.code) {
+            200 -> {
+                val arr = JSONObject(responseBody).getJSONArray("providers")
+                val list = mutableListOf<GatewayProviderDto>()
+                for (i in 0 until arr.length()) list.add(parseGatewayProviderDto(arr.getJSONObject(i)))
+                ApiResult.Success(list)
+            }
+            401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired credentials")
+            else -> unexpectedStatus(response.code)
+        }
+    }
+
+    override suspend fun putGatewayProvider(
+        provider: String,
+        credentials: Map<String, String>,
+        enabledMethods: List<String>,
+        isSandbox: Boolean,
+        isEnabled: Boolean,
+    ): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext ApiResult.Success(Unit)
+        try {
+            val token = adminBearerToken()
+                ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+
+            val body = JSONObject().apply {
+                put("provider", provider)
+                // Only the fields the admin actually typed are sent. An omitted field keeps its
+                // stored value server-side, which is how a masked secret survives a save.
+                put("credentials", JSONObject().apply {
+                    credentials.forEach { (k, v) -> put(k, v) }
+                })
+                put("enabledMethods", JSONArray(enabledMethods))
+                put("isSandbox", isSandbox)
+                put("isEnabled", isEnabled)
+            }.toString()
+
+            val request = Request.Builder()
+                .url("${baseUrl()}/gateway-providers")
+                .addHeader("Content-Type", "application/json")
+                .addHeader("apikey", anonKey())
+                .addHeader("Authorization", "Bearer $token")
+                .put(body.toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+
+            when (response.code) {
+                200 -> ApiResult.Success(Unit)
+                401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired credentials")
+                403 -> ApiResult.Error("FORBIDDEN", "Only the admin device can change gateway settings")
+                422 -> {
+                    val json = runCatching { JSONObject(responseBody) }.getOrDefault(JSONObject())
+                    ApiResult.Error(
+                        json.optString("error", "VALIDATION"),
+                        json.optString("message", "Invalid provider configuration")
+                    )
+                }
+                else -> unexpectedStatus(response.code)
+            }
+        } catch (e: IOException) {
+            networkError(e)
+        } catch (e: Exception) {
+            ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+        }
+    }
+
+    private fun parseGatewayProviderDto(json: JSONObject): GatewayProviderDto {
+        val fields = mutableListOf<GatewayCredentialFieldDto>()
+        json.optJSONArray("credentialFields")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val f = arr.getJSONObject(i)
+                fields.add(
+                    GatewayCredentialFieldDto(
+                        key = f.getString("key"),
+                        label = f.getString("label"),
+                        secret = f.optBoolean("secret", false),
+                        required = f.optBoolean("required", false),
+                        hint = f.optStringOrNull("hint"),
+                    )
+                )
+            }
+        }
+        val fieldsSet = mutableMapOf<String, Boolean>()
+        json.optJSONObject("fieldsSet")?.let { obj ->
+            obj.keys().forEach { key -> fieldsSet[key] = obj.optBoolean(key, false) }
+        }
+        val methods = mutableListOf<String>()
+        json.optJSONArray("enabledMethods")?.let { arr ->
+            for (i in 0 until arr.length()) methods.add(arr.getString(i))
+        }
+        return GatewayProviderDto(
+            provider = json.getString("provider"),
+            displayName = json.optString("displayName", json.getString("provider")),
+            status = json.optString("status", "AWAITING_ONBOARDING"),
+            unavailableReason = json.optStringOrNull("unavailableReason"),
+            credentialFields = fields,
+            configured = json.optBoolean("configured", false),
+            fieldsSet = fieldsSet,
+            enabledMethods = methods,
+            isSandbox = json.optBoolean("isSandbox", true),
+            isEnabled = json.optBoolean("isEnabled", false),
+        )
+    }
+
+    private fun parseGatewayConfigDto(json: JSONObject): GatewayConfigDto {
+        val methods = mutableListOf<String>()
+        val arr = json.optJSONArray("enabledMethods")
+        if (arr != null) for (i in 0 until arr.length()) methods.add(arr.getString(i))
+        return GatewayConfigDto(
+            configured = json.optBoolean("configured", false),
+            merchantId = json.optString("merchantId", ""),
+            hasVerifyKey = json.optBoolean("hasVerifyKey", false),
+            hasSecretKey = json.optBoolean("hasSecretKey", false),
+            isSandbox = json.optBoolean("isSandbox", true),
+            enabledMethods = methods,
+        )
+    }
+
+    /** Parse a gateway result object from a JSON response. No @Serializable — hand-rolled (A16). */
+    private fun parseGatewayPaymentResult(json: JSONObject): GatewayPaymentResult =
+        GatewayPaymentResult(
+            success = json.optBoolean("success", false),
+            transactionId = json.optStringOrNull("transactionId"),
+            qrString = json.optStringOrNull("qrString"),
+            checkoutUrl = json.optStringOrNull("checkoutUrl"),
+            status = json.optStringOrNull("status"),
+            errorMessage = json.optStringOrNull("errorMessage"),
+        )
+
+    /** Parse a payment transaction DTO from a JSON response. */
+    private fun parsePaymentTransactionDto(json: JSONObject): PaymentTransactionDto =
+        PaymentTransactionDto(
+            id = json.getString("id"),
+            orderId = json.getString("orderId"),
+            paymentMethod = json.getString("paymentMethod"),
+            amountSen = json.getLong("amountSen"),
+            status = json.getString("status"),
+            gatewayTransactionId = json.optStringOrNull("gatewayTransactionId"),
+            gatewayResponse = json.optStringOrNull("gatewayResponse"),
+            isSandbox = json.optBoolean("isSandbox", false),
+            createdAt = json.getString("createdAt"),
+            settledAt = json.optStringOrNull("settledAt"),
+        )
 }
 
 // --- Data classes ---
@@ -2496,4 +2984,129 @@ data class SettingsResponse(
     val defaultLangAdmin: String = "BM",
     val defaultLangOrdering: String = "BM",
     val defaultLangCustomer: String = "BM"
+)
+
+// --- Payment gateway data classes (task 6.1) ---
+
+/**
+ * The payload sent to `payment-initiate` via [BackendGateway.initiatePayment].
+ *
+ * No @Serializable — this codebase hand-rolls JSON with org.json (A16). See [ApiClient]'s
+ * implementation for the hand-rolled serialisation.
+ *
+ * **No `merchantId` field.** The Edge Function reads its own merchant identity from the
+ * service-role-only `gateway_config` row — never from the client — which is the whole point of
+ * A2/F3: the POS selects a payment *method*, not an *aggregator account*.
+ *
+ * [idempotencyKey] MUST equal [com.razstudio.pos.data.local.PaymentTransaction.idempotencyKeyFor]
+ * `(orderId, amountSen)`: stable for this (order, amount) pair, replayed verbatim on every retry.
+ * A timestamp-based key is a new key on every retry — the precise double-charge this field exists
+ * to prevent. (A6, 6.3)
+ */
+data class PosCheckoutPayload(
+    val orderId: String,
+    /** Amount in **sen** (integer). Conversion from [Order.total] ringgit happens at the
+     *  [ApiClient] boundary and nowhere else — [com.razstudio.pos.data.local.PaymentTransaction.fromRinggit]. (A8) */
+    val amountSen: Long,
+    val paymentMethodCode: String,
+    val currency: String = "MYR",
+    /** Barcode presented by the customer's wallet, for merchant-scan flows. */
+    val customerAuthCode: String? = null,
+    /** == PaymentTransaction.id. Stable across retries. (A6) */
+    val idempotencyKey: String,
+    val isSandbox: Boolean = false,
+)
+
+/**
+ * The response from `payment-initiate` or `payment-query`.
+ *
+ * No @Serializable — parsed by hand in [ApiClient]. (A16)
+ */
+data class GatewayPaymentResult(
+    val success: Boolean,
+    val transactionId: String? = null,
+    /** EMVCo/DuitNow QR string for the customer to scan (QR and e-wallet flows). */
+    val qrString: String? = null,
+    /** Hosted checkout URL (FPX / Card flows). */
+    val checkoutUrl: String? = null,
+    val status: String? = null,
+    val errorMessage: String? = null,
+)
+
+/**
+ * A single [com.razstudio.pos.data.local.PaymentTransaction] row, serialised for transport by
+ * `payment-transactions`. Mirrors the Room entity's fields without the Room annotations.
+ */
+data class PaymentTransactionDto(
+    val id: String,
+    val orderId: String,
+    val paymentMethod: String,
+    val amountSen: Long,
+    val status: String,
+    val gatewayTransactionId: String? = null,
+    val gatewayResponse: String? = null,
+    val isSandbox: Boolean = false,
+    val createdAt: String,
+    val settledAt: String? = null,
+)
+
+/**
+ * Read-only view of the café's gateway configuration — **never** carries a secret's value, only
+ * whether one is set. Drives which gateway tiles task 7.2 shows at checkout, and lets the admin
+ * settings screen (7.1) render "already configured" without ever re-displaying a secret. (PG-REQ-2,
+ * PG-REQ-8)
+ */
+/**
+ * One credential input a provider needs, as declared by that provider's server-side adapter.
+ *
+ * The settings screen renders its form from these rather than hardcoding one layout per provider —
+ * which is the whole point: Touch 'n Go issues merchant id + verify/secret key, a bank's DuitNow
+ * rail issues OAuth client id + secret, and neither is known until onboarding completes.
+ */
+data class GatewayCredentialFieldDto(
+    val key: String,
+    val label: String,
+    /** Masked on entry and never returned once stored — see [GatewayProviderDto.fieldsSet]. */
+    val secret: Boolean,
+    val required: Boolean,
+    val hint: String? = null,
+)
+
+/**
+ * A payment provider the café can configure. (PG-REQ-2, PG-REQ-8)
+ *
+ * Carries **no credential values** — [fieldsSet] reports only which fields have something stored,
+ * which is what lets the screen show a masked "already set" placeholder without a secret ever
+ * leaving the server.
+ */
+data class GatewayProviderDto(
+    val provider: String,
+    val displayName: String,
+    /** `AVAILABLE` — adapter implemented. `AWAITING_ONBOARDING` — fail-closed placeholder. */
+    val status: String,
+    /** Why the provider cannot be used yet, when [status] is `AWAITING_ONBOARDING`. */
+    val unavailableReason: String?,
+    val credentialFields: List<GatewayCredentialFieldDto>,
+    /** True when every required field has a stored value. */
+    val configured: Boolean,
+    /** field key → whether a value is stored. Never the value itself. */
+    val fieldsSet: Map<String, Boolean>,
+    val enabledMethods: List<String>,
+    val isSandbox: Boolean,
+    /** Server forces this false unless the adapter is AVAILABLE and [configured] — a stub can
+     *  never look live at the counter. */
+    val isEnabled: Boolean,
+)
+
+data class GatewayConfigDto(
+    /** True once a merchant id and both keys are set — [BackendGateway.initiatePayment] otherwise
+     *  fails closed with `GATEWAY_NOT_CONFIGURED`. */
+    val configured: Boolean,
+    /** Not secret — the evaluated aggregator puts it in the payment URL path itself (F2). */
+    val merchantId: String,
+    val hasVerifyKey: Boolean,
+    val hasSecretKey: Boolean,
+    val isSandbox: Boolean,
+    /** [com.razstudio.pos.data.local.PaymentMethod.code] values this café has enabled. */
+    val enabledMethods: List<String>,
 )

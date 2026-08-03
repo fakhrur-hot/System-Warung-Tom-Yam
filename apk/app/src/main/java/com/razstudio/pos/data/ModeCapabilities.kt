@@ -43,6 +43,16 @@ data class ModeCapabilities(
      * behaviour already runs off the periodic catch-up poll.
      */
     val realtimeWebSocket: Boolean,
+    /**
+     * Whether gateway payment methods (DuitNow QR, e-wallets, FPX, Card) are available at checkout.
+     *
+     * False in LAN and Kiosk: every gateway flow requires a live internet path to the acquirer, and
+     * `NoInternetGuard` blocks all non-local hosts in those modes by design. Showing gateway tiles
+     * that can never succeed is worse than hiding them — a greyed tile that the owner has no way to
+     * un-grey tells them their configuration is broken when it is working exactly as designed. Cash
+     * and the static merchant QR remain available in all three modes. (A1, PG-REQ-3, task 6.4)
+     */
+    val gatewayPaymentsEnabled: Boolean,
 )
 
 /**
@@ -63,6 +73,9 @@ fun OperatingMode.toCapabilities(): ModeCapabilities = when (this) {
         websiteInvites = true,
         cloudImageHosting = true,
         realtimeWebSocket = true,
+        // Gateway payments require a live internet path to the acquirer — available in Cloud only.
+        // (A1, PG-REQ-3, task 6.4)
+        gatewayPaymentsEnabled = true,
     )
 
     OperatingMode.LAN -> ModeCapabilities(
@@ -74,6 +87,8 @@ fun OperatingMode.toCapabilities(): ModeCapabilities = when (this) {
         websiteInvites = false,
         cloudImageHosting = false,
         realtimeWebSocket = false,
+        // NoInternetGuard blocks the aggregator host in LAN Mode. (A1, PG-REQ-3)
+        gatewayPaymentsEnabled = false,
     )
 
     OperatingMode.KIOSK -> ModeCapabilities(
@@ -85,5 +100,7 @@ fun OperatingMode.toCapabilities(): ModeCapabilities = when (this) {
         websiteInvites = false,
         cloudImageHosting = false,
         realtimeWebSocket = false,
+        // NoInternetGuard blocks the aggregator host in Kiosk Mode. (A1, PG-REQ-3)
+        gatewayPaymentsEnabled = false,
     )
 }

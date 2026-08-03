@@ -8,6 +8,9 @@ import com.razstudio.pos.data.CafeLocationResponse
 import com.razstudio.pos.data.CreateOrderResponse
 import com.razstudio.pos.data.DeviceDto
 import com.razstudio.pos.data.DeviceStatusResponse
+import com.razstudio.pos.data.GatewayConfigDto
+import com.razstudio.pos.data.GatewayPaymentResult
+import com.razstudio.pos.data.GatewayProviderDto
 import com.razstudio.pos.data.InviteResponse
 import com.razstudio.pos.data.KitchenResponse
 import com.razstudio.pos.data.MenuImageUploadResponse
@@ -19,6 +22,8 @@ import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.OrderDto
 import com.razstudio.pos.data.OrderItemDto
 import com.razstudio.pos.data.OrdersSyncResponse
+import com.razstudio.pos.data.PaymentTransactionDto
+import com.razstudio.pos.data.PosCheckoutPayload
 import com.razstudio.pos.data.RegisterResponse
 import com.razstudio.pos.data.SessionResponse
 import com.razstudio.pos.data.SettingsResponse
@@ -1118,6 +1123,59 @@ class LocalBackend @Inject constructor(
 
     override suspend fun postAttendance(event: String, lat: Double, lng: Double, forced: Boolean): ApiResult<Unit> =
         unsupportedInThisMode("postAttendance")
+
+    // ── Payment gateway (task 6.1) — unsupported off-cloud ───────────────────
+    //
+    // Gateway calls need a live internet path to the acquirer. LAN and Kiosk modes run with
+    // NoInternetGuard blocking all non-local hosts, so a gateway call would hang then fail.
+    // ModeCapabilities.gatewayPaymentsEnabled is false for these modes; UI must not show the
+    // tiles at all. These stubs are the safety net, not the guard. (A1, PG-REQ-3, 6.4)
+
+    override suspend fun initiatePayment(payload: PosCheckoutPayload): ApiResult<GatewayPaymentResult> =
+        unsupportedInThisMode("initiatePayment")
+
+    override suspend fun initiatePaymentAsStaff(payload: PosCheckoutPayload): ApiResult<GatewayPaymentResult> =
+        unsupportedInThisMode("initiatePaymentAsStaff")
+
+    override suspend fun queryPayment(transactionId: String): ApiResult<GatewayPaymentResult> =
+        unsupportedInThisMode("queryPayment")
+
+    override suspend fun queryPaymentAsStaff(transactionId: String): ApiResult<GatewayPaymentResult> =
+        unsupportedInThisMode("queryPaymentAsStaff")
+
+    override suspend fun listPaymentTransactions(orderId: String): ApiResult<List<PaymentTransactionDto>> =
+        unsupportedInThisMode("listPaymentTransactions")
+
+    override suspend fun listPaymentTransactionsAsStaff(orderId: String): ApiResult<List<PaymentTransactionDto>> =
+        unsupportedInThisMode("listPaymentTransactionsAsStaff")
+
+    override suspend fun getGatewayConfig(): ApiResult<GatewayConfigDto> =
+        unsupportedInThisMode("getGatewayConfig")
+
+    override suspend fun getGatewayConfigAsStaff(): ApiResult<GatewayConfigDto> =
+        unsupportedInThisMode("getGatewayConfigAsStaff")
+
+    override suspend fun putGatewayConfig(
+        merchantId: String,
+        verifyKey: String?,
+        secretKey: String?,
+        isSandbox: Boolean,
+        enabledMethods: List<String>,
+    ): ApiResult<GatewayConfigDto> = unsupportedInThisMode("putGatewayConfig")
+
+    override suspend fun getGatewayProviders(): ApiResult<List<GatewayProviderDto>> =
+        unsupportedInThisMode("getGatewayProviders")
+
+    override suspend fun getGatewayProvidersAsStaff(): ApiResult<List<GatewayProviderDto>> =
+        unsupportedInThisMode("getGatewayProvidersAsStaff")
+
+    override suspend fun putGatewayProvider(
+        provider: String,
+        credentials: Map<String, String>,
+        enabledMethods: List<String>,
+        isSandbox: Boolean,
+        isEnabled: Boolean,
+    ): ApiResult<Unit> = unsupportedInThisMode("putGatewayProvider")
 
     // ── Private helpers ───────────────────────────────────────────────────────
 

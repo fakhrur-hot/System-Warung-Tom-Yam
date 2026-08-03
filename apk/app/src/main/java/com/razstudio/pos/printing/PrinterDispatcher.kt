@@ -1,5 +1,6 @@
 package com.razstudio.pos.printing
 
+import com.razstudio.pos.data.local.DrawerKick
 import com.razstudio.pos.data.local.PaperWidth
 import com.razstudio.pos.data.local.PrintJob
 import com.razstudio.pos.data.local.PrintJobDao
@@ -38,7 +39,7 @@ import javax.inject.Singleton
 class PrinterDispatcher @Inject constructor(
     private val printerConfigDao: PrinterConfigDao,
     private val printJobDao: PrintJobDao,
-    private val connectionManager: PrinterConnectionManager,
+    private val drivers: Set<@JvmSuppressWildcards PrinterDriver>,   // runtime-selected driver set
     private val languageManager: LanguageManager
 ) {
 
@@ -140,19 +141,20 @@ class PrinterDispatcher @Inject constructor(
     }
 
     /**
-     * Execute a single print job: connect to BT device, send data, handle retries.
-     * Actual ESC/POS command formatting is handled by Task 22's document renderers.
+     * Execute a single print job: select the appropriate driver by transport, send data,
+     * handle retries. Actual ESC/POS command formatting is handled by document renderers.
      * This method handles the connection lifecycle and status tracking.
      */
     suspend fun executePrintJob(job: PrintJob, printer: PrinterConfig) {
         printJobDao.updateStatus(job.id, PrintJobStatus.PRINTING.name)
 
         try {
-            // Connect to the Bluetooth printer using the DantSu library.
-            // The actual print commands (formatted ESC/POS text) come from the payload.
-            // Task 22 will produce the formatted text; here we just establish connection
-            // and send whatever payload is provided.
-            connectAndPrint(printer, job.payload)
+            // Route to the driver registered for this printer's transport.
+            val driver = drivers.firstOrNull { it.transport == printer.transport }
+                ?: throw IllegalStateException(
+                    "No driver registered for transport ${printer.transport} (printer: ${printer.name})"
+                )
+            driver.print(printer, job.payload)
             printJobDao.updateStatus(job.id, PrintJobStatus.COMPLETED.name)
             _alerts.emit(PrintAlert.PrintSucceeded(printer.name, job.documentType))
         } catch (e: Exception) {
@@ -238,23 +240,64 @@ class PrinterDispatcher @Inject constructor(
      * Delegates to [PrinterConnectionManager], which keeps a warm persistent link (fast mode)
      * or reconnects on demand (eco mode) per the admin's choice. Throws on failure so the
      * retry/FAILED handling above still applies.
+     *
+     * Kept as a private helper so [testPrint] can still bypass the driver set and go directly
+     * to the connection manager (backward compatibility — testPrint predates the driver set).
+     */
+    /**
+     * Kick the cash drawer, if the café has assigned one to a printer.
+     *
+     * Called after a cash receipt prints, which is the behaviour every counter expects — the till
+     * has to be open to give change, and a cashier should not need a second tap while holding a
+     * customer's note. Loyverse on this same hardware does exactly this.
+     *
+     * The drawer is a **property of a printer**, never a standalone device: on Sunmi it is
+     * `openDrawer()` on the same AIDL that prints, and on a Bluetooth printer it is a pulse to the
+     * RJ11 port. So the drawer is found by looking for the printer that owns it. (designs.md D3, H9)
+     *
+     * Silent on failure. A drawer that does not open is a cashier reaching for a key; an exception
+     * here would fail the sale, which is far worse.
+     */
+    suspend fun kickCashDrawer() {
+        try {
+            val owner = printerConfigDao.getAll().firstOrNull {
+                it.isActive && it.drawerKick != DrawerKick.NONE
+            } ?: return
+            val driver = drivers.firstOrNull { it.transport == owner.transport } ?: return
+            driver.openDrawer(owner)
+        } catch (e: Exception) {
+            android.util.Log.w("PrinterDispatcher", "Cash drawer did not open", e)
+        }
+    }
+
+    /**
+     * Send [payload] to [printer] through whichever driver owns its transport.
+     *
+     * This used to call `connectionManager.print(macAddress = printer.address!!)` directly, which
+     * meant **Test Print was still Bluetooth-only** long after [executePrintJob] had moved to the
+     * driver set: an AIDL printer has no address by definition, so it threw
+     * "printer has no MAC address" before reaching any driver, and the screen reported a generic
+     * connection failure. Task 1.4 converted the dispatch path and left this one behind.
+     *
+     * Test Print must exercise the same path a real receipt takes, or it verifies nothing.
      */
     private suspend fun connectAndPrint(printer: PrinterConfig, payload: String) {
-        connectionManager.print(
-            macAddress = printer.macAddress,
-            printerName = printer.name,
-            paperWidth = printer.paperWidth,
-            payload = payload
-        )
+        val driver = drivers.firstOrNull { it.transport == printer.transport }
+            ?: throw IllegalStateException(
+                "No driver registered for transport ${printer.transport} (printer: ${printer.name})"
+            )
+        driver.print(printer, payload)
     }
 
     private fun buildTestPayload(printer: PrinterConfig): String {
         val width = printer.paperWidth.charWidth
         val separator = "-".repeat(width)
+        val addressDisplay = printer.address ?: "(internal)"
         return "[C]<b>TEST PRINT</b>\n" +
             "[L]$separator\n" +
             "[L]Printer: ${printer.name}\n" +
-            "[L]MAC: ${printer.macAddress}\n" +
+            "[L]Address: $addressDisplay\n" +
+            "[L]Transport: ${printer.transport.name}\n" +
             "[L]Paper: ${if (printer.paperWidth == PaperWidth.FIFTY_EIGHT_MM) "58mm" else "80mm"}\n" +
             "[L]Chars/line: $width\n" +
             "[L]Role: ${printer.printerRole.name}\n" +

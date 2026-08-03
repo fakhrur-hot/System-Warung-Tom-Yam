@@ -8,6 +8,8 @@ import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.local.MenuCategoryStore
 import com.razstudio.pos.data.local.MenuDao
+import com.razstudio.pos.data.local.MenuPreset
+import com.razstudio.pos.data.local.MenuPresetCatalog
 import com.razstudio.pos.data.local.MenuItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,34 +24,74 @@ import org.json.JSONObject
 import javax.inject.Inject
 
 /**
- * Loads a bundled menu preset from the assets/presets folder into Room, persists its category
- * order, pushes the snapshot to the backend, then performs a clean "soft reboot" so all
- * app state re-initialises from the freshly loaded menu.
+ * Loads a starter menu into Room, persists its category order, pushes the snapshot to the backend,
+ * then performs a clean "soft reboot" so all app state re-initialises from the new menu.
+ *
+ * Presets come from [MenuPresetCatalog] — bundled in `assets/presets/`, plus published ones in
+ * Cloud Mode. This used to load a single hardcoded asset; a café choosing its own starting point is
+ * the difference between a useful head start and one café's menu imposed on everybody.
  */
 @HiltViewModel
 class MenuPresetViewModel @Inject constructor(
     private val menuDao: MenuDao,
     private val apiClient: BackendGateway,
     private val categoryStore: MenuCategoryStore,
+    private val catalog: MenuPresetCatalog,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
+    private val _presets = MutableStateFlow<List<MenuPreset>>(emptyList())
+
     /**
-     * Load the bundled sample menu and soft-restart the app on completion.
-     *
-     * The asset was named after one café and the function after it — a starter menu every café
-     * inherits should not be, and could not be, that café's. The content is unchanged: a generic
-     * Malaysian menu whose own `presetName` already read "Sample Menu".
+     * Starter menus this device can offer. Empty until [refreshPresets] completes — remote entries
+     * need a network round-trip, so the list cannot be built synchronously.
      */
-    fun loadSampleMenuPreset() {
+    val presets: StateFlow<List<MenuPreset>> = _presets.asStateFlow()
+
+    /** Non-null when a preset load failed, for the screen to surface. */
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    fun clearError() { _error.value = null }
+
+    // After the properties above are initialised — refreshPresets() touches _presets.
+    init { refreshPresets() }
+
+    fun refreshPresets() {
+        viewModelScope.launch {
+            _presets.value = runCatching { catalog.list() }.getOrElse {
+                android.util.Log.w("MenuPreset", "Could not list presets", it)
+                emptyList()
+            }
+        }
+    }
+
+    /**
+     * Replace the café's menu with [preset], then soft-restart so every screen re-reads it.
+     *
+     * **This is destructive** — the existing menu and category order are deleted first. That is
+     * why the screen confirms before calling it, and why it is presented as a fresh-install
+     * convenience rather than an import.
+     *
+     * A remote preset is fetched *before* anything is deleted: a download that fails must leave the
+     * café's current menu exactly as it was, not wipe it and then discover there is nothing to
+     * replace it with.
+     */
+    fun loadPreset(preset: MenuPreset) {
         if (_loading.value) return
         _loading.value = true
         viewModelScope.launch {
+            val payload = runCatching { catalog.payload(preset) }.getOrElse { e ->
+                android.util.Log.e("MenuPreset", "Preset '${preset.presetId}' could not be read", e)
+                _error.value = preset.presetName
+                _loading.value = false
+                return@launch
+            }
             withContext(Dispatchers.IO) {
-                val root = JSONObject(readAsset("presets/sample-menu.json"))
+                val root = JSONObject(payload)
 
                 // Category order from the preset (sorted by sortOrder).
                 val categoriesArray = root.optJSONArray("categories") ?: JSONArray()
@@ -110,9 +152,6 @@ class MenuPresetViewModel @Inject constructor(
             softRestart()
         }
     }
-
-    private fun readAsset(path: String): String =
-        context.assets.open(path).bufferedReader().use { it.readText() }
 
     /** Relaunch the app cleanly so all state re-initialises from the new menu. */
     private fun softRestart() {

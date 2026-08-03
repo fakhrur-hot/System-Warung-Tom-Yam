@@ -37,6 +37,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class SignInViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val signInService: GoogleSignInService,
     private val bundleStore: CafeBundleStore,
     private val appConfigStore: AppConfigStore,
@@ -330,7 +331,10 @@ class SignInViewModel @Inject constructor(
         // in underneath them, which reads as data loss even though nothing was lost.
         if (deviceWasBlank && payload.setupData.isNotBlank()) {
             try {
-                backupManager.applyImport(payload.setupData)
+                backupManager.applyImport(
+                    payload.setupData,
+                    restoreHardwareConfig = hardwareConfigFitsThisDevice(payload.setupData)
+                )
             } catch (e: Exception) {
                 // The café is already configured and reachable at this point; a failed setup import
                 // costs the owner a menu re-entry, not their café.
@@ -344,6 +348,51 @@ class SignInViewModel @Inject constructor(
             State.Problem(Reason.RESTORE_INCOMPLETE)
         }
     }
+
+    /**
+     * True when the printer set in [setupData] can actually work on this device. (HW-REQ-8, task 3.4)
+     *
+     * The case this exists for: a café's Sunmi till dies and the owner signs in on a phone. The
+     * bundle carries a `SUNMI_AIDL` printer with no MAC address, and importing it produces a till
+     * that looks configured and prints nowhere — the worst kind of failure, because nothing reports
+     * an error. Withholding it leaves the owner on a visible "no printer configured" alert, which
+     * they can act on.
+     *
+     * The inverse matters too, and is why this is not simply hardcoded false: replacing a Sunmi
+     * with another Sunmi, or a phone with another phone, *should* carry the printer set across.
+     * That is the whole point of the bundle.
+     *
+     * Only Sunmi is checked. Bluetooth, USB and network printers are addressed by MAC, VID/PID or
+     * host — all re-pairable on any device — whereas the Sunmi AIDL is either present on the
+     * hardware or it is not. A malformed bundle is treated as unfit rather than throwing: this runs
+     * inside the restore path, and failing the whole café restore over a printer row would be a
+     * poor trade.
+     */
+    internal fun hardwareConfigFitsThisDevice(setupData: String): Boolean = try {
+        val printers = org.json.JSONObject(setupData).optJSONArray("printerConfigs")
+        val needsSunmi = (0 until (printers?.length() ?: 0)).any { i ->
+            when (printers!!.getJSONObject(i).optString("transport", "BLUETOOTH")) {
+                // Both spellings are accepted: bundles written before the transport enum settled
+                // may carry either, and guessing wrong here silently restores an unusable printer.
+                "SUNMI_AIDL", "SUNMI_INTERNAL" -> true
+                else -> false
+            }
+        }
+        !needsSunmi || sunmiServicePresent()
+    } catch (e: Exception) {
+        android.util.Log.w("SignInViewModel", "Could not inspect printer configs; withholding", e)
+        false
+    }
+
+    /** Does this device expose Sunmi's printer AIDL? (designs.md H9) */
+    private fun sunmiServicePresent(): Boolean =
+        context.packageManager
+            .queryIntentServices(
+                android.content.Intent("woyou.aidlservice.jiuiv5.IWoyouService")
+                    .setPackage("woyou.aidlservice.jiuiv5"),
+                0
+            )
+            .isNotEmpty()
 
     /** Dismiss a [State.Problem] back to the opening screen. Never a dead end. */
     fun dismissProblem() {

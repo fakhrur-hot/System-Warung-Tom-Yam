@@ -8,6 +8,8 @@ import com.razstudio.pos.data.local.MIGRATION_11_12
 import com.razstudio.pos.data.local.MIGRATION_12_13
 import com.razstudio.pos.data.local.MIGRATION_13_14
 import com.razstudio.pos.data.local.MIGRATION_14_15
+import com.razstudio.pos.data.local.MIGRATION_15_16
+import com.razstudio.pos.data.local.MIGRATION_16_17
 import com.razstudio.pos.data.local.MIGRATION_8_9
 import com.razstudio.pos.data.local.MIGRATION_9_10
 import com.razstudio.pos.data.local.CafeSessionDao
@@ -17,6 +19,7 @@ import com.razstudio.pos.data.local.OrderDao
 import com.razstudio.pos.data.local.OrderNumberSequenceDao
 import com.razstudio.pos.data.local.PairedDeviceDao
 import com.razstudio.pos.data.local.PairingTokenDao
+import com.razstudio.pos.data.local.PaymentTransactionDao
 import com.razstudio.pos.data.local.PendingOrderDao
 import com.razstudio.pos.data.local.PrintJobDao
 import com.razstudio.pos.data.local.PrinterConfigDao
@@ -55,6 +58,8 @@ object DatabaseModule {
                 MIGRATION_12_13,
                 MIGRATION_13_14,
                 MIGRATION_14_15,
+                MIGRATION_15_16,
+                MIGRATION_16_17,
             )
             .build()
     }
@@ -117,5 +122,10 @@ object DatabaseModule {
     @Provides
     fun providePairingTokenDao(database: AppDatabase): PairingTokenDao {
         return database.pairingTokenDao()
+    }
+
+    @Provides
+    fun providePaymentTransactionDao(database: AppDatabase): PaymentTransactionDao {
+        return database.paymentTransactionDao()
     }
 }

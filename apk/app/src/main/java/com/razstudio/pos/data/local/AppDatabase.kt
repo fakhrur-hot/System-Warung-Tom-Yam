@@ -33,9 +33,10 @@ import androidx.room.TypeConverters
         PairedDevice::class,
         PairingToken::class,
         CafeSession::class,
-        DailyAggregate::class
+        DailyAggregate::class,
+        PaymentTransaction::class
     ],
-    version = 15,
+    version = 17,
     // exportSchema = true so MigrationTestHelper can validate the schema after migration.
     // Schema JSON files are written to app/schemas/ and committed to source control so that
     // future migration tests can verify against a stable baseline (Requirement 8.1, 12.6).
@@ -55,4 +56,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pairingTokenDao(): PairingTokenDao
     abstract fun cafeSessionDao(): CafeSessionDao
     abstract fun dailyAggregateDao(): DailyAggregateDao
+    abstract fun paymentTransactionDao(): PaymentTransactionDao
 }

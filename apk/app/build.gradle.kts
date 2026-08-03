@@ -162,6 +162,18 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        // Generates woyou.aidlservice.jiuiv5.IWoyouService.Stub from src/main/aidl.
+        //
+        // Required, not optional. The Sunmi printer interface lives in *another* app, so
+        // `Class.forName("…IWoyouService$Stub")` against our own classloader always failed and the
+        // driver silently fell back to a raw IBinder that has none of the printer methods — every
+        // AIDL call was a logged no-op. Declaring the .aidl makes the build generate the stub
+        // locally, which is what `asInterface(binder)` needs.
+        //
+        // Method ORDER in the .aidl is load-bearing: it assigns Binder transaction codes, so a
+        // stale copy calls the wrong method on the service. The bundled files are the current
+        // revision, cross-checked between two independent published copies. Do not reorder them.
+        aidl = true
     }
 
     // Room schema export: KSP writes schema JSON files here so MigrationTestHelper can validate
@@ -183,6 +195,7 @@ android {
     // JSON out of the release APK, which would otherwise ship a few KB it has no use for.
     sourceSets {
         getByName("debug") { assets.srcDirs("$projectDir/schemas") }
+        getByName("release") { assets.srcDirs("$projectDir/schemas") }
 
         // CAFE_PROFILE_DIR: when present, add the café profile's res/ directory as an extra
         // resource source set. Android's resource merger automatically overlays profile resources

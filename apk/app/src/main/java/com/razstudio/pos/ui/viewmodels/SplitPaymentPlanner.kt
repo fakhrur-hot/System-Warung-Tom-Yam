@@ -55,11 +55,18 @@ object SplitPaymentPlanner {
         /**
          * A share. Create [sliceItems] as their own order, pay it, then shrink the original to
          * [keepLines].
+         *
+         * [selections] carries the same lines as [sliceItems] but as the original [OrderItem]
+         * snapshots (name, category) rather than the network-shaped [NewOrderItem] — [sliceItems]
+         * has only a `menuItemId`, which is not enough to print a receipt for the new share order
+         * without a round trip. Kept alongside rather than replacing [sliceItems], since the
+         * network call needs exactly that shape and nothing more.
          */
         data class SliceOff(
             val sliceItems: List<NewOrderItem>,
             val keepLines: List<VoidLine>,
             val amount: Double,
+            val selections: List<Selection>,
         ) : Plan()
 
         /** Nothing selected. The pay buttons stay disabled rather than doing nothing on tap. */
@@ -104,6 +111,7 @@ object SplitPaymentPlanner {
                 VoidLine(itemId = item.id, keepQuantity = item.quantity - q)
             },
             amount = amount,
+            selections = selections,
         )
     }
 

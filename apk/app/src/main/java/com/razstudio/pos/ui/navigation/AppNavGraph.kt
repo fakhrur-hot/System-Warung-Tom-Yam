@@ -42,6 +42,8 @@ import androidx.navigation.navArgument
 import com.razstudio.pos.ui.screens.AddMenuItemScreen
 import com.razstudio.pos.ui.screens.AdminConnectScreen
 import com.razstudio.pos.ui.screens.AdminHomeScreen
+import com.razstudio.pos.ui.screens.BillHistoryScreen
+import com.razstudio.pos.ui.screens.HardwareDevicesScreen
 import com.razstudio.pos.ui.screens.AdminLockScreen
 import com.razstudio.pos.ui.screens.AdminSettingsScreen
 import com.razstudio.pos.ui.screens.BackupScreen
@@ -52,6 +54,7 @@ import com.razstudio.pos.ui.screens.ManualDineInScreen
 import com.razstudio.pos.ui.screens.MenuManagementScreen
 import com.razstudio.pos.ui.screens.OrderingConnectScreen
 import com.razstudio.pos.ui.screens.OrderingHomeScreen
+import com.razstudio.pos.ui.screens.PaymentGatewaySettingsScreen
 import com.razstudio.pos.ui.screens.PendingApprovalScreen
 import com.razstudio.pos.ui.screens.PrintersScreen
 import com.razstudio.pos.ui.screens.QrPdfScreen
@@ -472,6 +475,27 @@ fun AppNavGraph(
         // Reports
         composable(NavRoutes.REPORTS) {
             ReportsScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateToBillHistory = { navController.navigate(NavRoutes.BILL_HISTORY) }
+            )
+        }
+
+        // Bill History — search past bills, view one, reprint its receipt.
+        composable(NavRoutes.BILL_HISTORY) {
+            BillHistoryScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // Devices & Hardware — printer transport, cash drawer and customer display (HW-REQ-6).
+        composable(NavRoutes.HARDWARE_DEVICES) {
+            HardwareDevicesScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(NavRoutes.PAYMENT_GATEWAY_SETTINGS) {
+            PaymentGatewaySettingsScreen(
                 onBack = { navController.popBackStack() }
             )
         }
@@ -503,8 +527,14 @@ fun AppNavGraph(
                 onNavigateToQrPdf = {
                     navController.navigate(NavRoutes.QR_PDF)
                 },
+                onNavigateToHardwareDevices = {
+                    navController.navigate(NavRoutes.HARDWARE_DEVICES)
+                },
                 onNavigateToPrinters = {
                     navController.navigate(NavRoutes.PRINTERS)
+                },
+                onNavigateToPaymentGateway = {
+                    navController.navigate(NavRoutes.PAYMENT_GATEWAY_SETTINGS)
                 }
             )
         }

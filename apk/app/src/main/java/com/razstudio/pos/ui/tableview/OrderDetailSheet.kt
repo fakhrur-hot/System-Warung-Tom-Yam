@@ -79,6 +79,9 @@ import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.local.MenuItem
 import com.razstudio.pos.data.local.OrderActions
 import com.razstudio.pos.data.local.OrderItem
+import com.razstudio.pos.data.local.PaymentCategory
+import com.razstudio.pos.data.local.PaymentMethod
+import com.razstudio.pos.data.local.PaymentTransaction
 import com.razstudio.pos.ui.i18n.AppLanguage
 import com.razstudio.pos.ui.i18n.UiStrings
 import com.razstudio.pos.ui.viewmodels.SplitPaymentPlanner
@@ -117,21 +120,75 @@ fun OrderDetailSheet(
     onPayment: (orderId: String, method: String, printReceipt: Boolean) -> Unit,
     onVoidItems: (orderId: String, lines: List<VoidLine>, reason: String) -> Unit = { _, _, _ -> },
     /**
-     * Settle one customer's share of a group bill. Only ever called with a SliceOff plan — the last
-     * share goes through [onPayment], which is what ends the table session and offers the receipt.
+     * Settle one customer's share of a group bill. Only ever called with a SliceOff plan.
+     * [printReceipt] comes from the same print-confirm dialog every payment method shows — every
+     * split-off customer gets the choice, not just whoever pays the last share.
      */
     onSplitShare: (
         orderId: String,
         tableId: String?,
         plan: SplitPaymentPlanner.Plan.SliceOff,
         method: String,
-    ) -> Unit = { _, _, _, _ -> },
+        printReceipt: Boolean,
+    ) -> Unit = { _, _, _, _, _ -> },
     /**
      * Whether this caller can settle shares. Off by default, and the whole split UI disappears with
      * it — the staff table view has no handler wired, and a radio that leads to a pay button doing
      * nothing is worse than no radio at all.
      */
     allowSplitPayment: Boolean = false,
+    /**
+     * Gateway channels to show alongside Pay Cash / Pay QR (task 7.2, A13). Empty by default, and
+     * the whole row disappears with it — the caller computes this from
+     * `ModeCapabilities.gatewayPaymentsEnabled` and the café's enabled channels, never read here
+     * directly, so this sheet stays free of a `BackendGateway`/`ModeViewModel` dependency.
+     */
+    gatewayMethods: List<PaymentMethod> = emptyList(),
+    /**
+     * Start a gateway checkout for the whole bill (task 8.1/8.2). Unlike [onPayment], this does
+     * not complete the order immediately — the caller polls the acquirer first and only then calls
+     * the equivalent of [onPayment] itself.
+     */
+    onGatewayCheckout: (
+        orderId: String,
+        method: PaymentMethod,
+        amount: Double,
+        printReceipt: Boolean,
+    ) -> Unit = { _, _, _, _ -> },
+    /** Gateway equivalent of [onSplitShare] — only ever called with a SliceOff plan. */
+    onGatewaySplitCheckout: (
+        orderId: String,
+        tableId: String?,
+        plan: SplitPaymentPlanner.Plan.SliceOff,
+        method: PaymentMethod,
+        printReceipt: Boolean,
+    ) -> Unit = { _, _, _, _, _ -> },
+    /**
+     * A merchant-scan channel (`PaymentCategory.E_WALLET` — TNG/GrabPay/Boost/ShopeePay) was
+     * chosen for the whole bill (task 8.3). The caller opens a camera scanner and, once a barcode
+     * is captured, starts the checkout itself — this sheet never touches the camera directly.
+     */
+    onRequestMerchantScan: (
+        orderId: String,
+        tableId: String?,
+        method: PaymentMethod,
+        amount: Double,
+        printReceipt: Boolean,
+    ) -> Unit = { _, _, _, _, _ -> },
+    /** Merchant-scan equivalent of [onGatewaySplitCheckout]. */
+    onRequestMerchantScanSplit: (
+        orderId: String,
+        tableId: String?,
+        plan: SplitPaymentPlanner.Plan.SliceOff,
+        method: PaymentMethod,
+        printReceipt: Boolean,
+    ) -> Unit = { _, _, _, _, _ -> },
+    /**
+     * A gateway attempt is still PENDING from before this order was last open (task 8.5) — offers
+     * to resume it. Absent (null) once nothing is pending, same "absent, not disabled" rule as
+     * everywhere else in this sheet.
+     */
+    onResumeGatewayCheckout: (PaymentTransaction) -> Unit = {},
     onCancel: (String, String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -140,10 +197,16 @@ fun OrderDetailSheet(
     var showAddItemPicker by remember(state.order?.id) { mutableStateOf(false) }
     var stagedCart by remember(state.order?.id) { mutableStateOf(listOf<StagedCartLine>()) }
     var pendingPaymentMethod by remember { mutableStateOf<String?>(null) }
+    var pendingGatewayMethod by remember { mutableStateOf<PaymentMethod?>(null) }
     // Split state lives here rather than in the ViewModel: it is a cashier's working scratchpad for
     // one customer standing at the counter, and it must not survive the sheet closing.
     var splitMode by remember { mutableStateOf(false) }
     var showSplitDialog by remember { mutableStateOf(false) }
+    // A SliceOff (not the final share) waiting on the same print-confirm choice every other
+    // payment method gets, before it is handed to onSplitShare/onGatewaySplitCheckout/
+    // onRequestMerchantScanSplit. SplitPaymentDialog hides while this is set so the two dialogs
+    // never stack.
+    var pendingSplitAction by remember { mutableStateOf<PendingSplitAction?>(null) }
 
     // ── Voiding unserved lines at payment time ─────────────────────────────────────
     // The café's actual counter situation: the customer is leaving, says a dish never came, and wants
@@ -552,6 +615,42 @@ fun OrderDetailSheet(
             if (!editItemsMode &&
                 permissions.canTakePayment && OrderActions.canTakePayment(order.status)
             ) {
+                // ── Crash/resume recovery (task 8.5) ─────────────────────────────────────────
+                // A gateway attempt left PENDING when this device last closed the sheet (or
+                // crashed) — surfaced here rather than silently re-showing the ordinary Pay
+                // Cash/QR row as though nothing were in flight, which would invite a second,
+                // duplicate charge attempt for the same bill.
+                state.pendingGatewayTransaction?.let { pending ->
+                    val pendingMethod = PaymentMethod.fromCode(pending.paymentMethod)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column {
+                            Text(
+                                strings.gatewayPendingBannerTitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            if (pendingMethod != null) {
+                                Text(
+                                    "${paymentMethodLabel(pendingMethod, strings)} · RM %.2f".format(pending.ringgit),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = { onResumeGatewayCheckout(pending) },
+                            enabled = !state.isLoading,
+                        ) {
+                            Text(strings.gatewayPendingResumeButton)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
                 // ── Two ways to settle, chosen before the money moves ────────────────────────
                 //
                 // Whole-bill stays first and stays the default: most tables pay once, and a cashier
@@ -597,6 +696,16 @@ fun OrderDetailSheet(
                         ) {
                             Text(strings.payQR)
                         }
+                    }
+
+                    if (gatewayMethods.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        GatewayMethodRow(
+                            methods = gatewayMethods,
+                            strings = strings,
+                            enabled = !state.isLoading,
+                            onSelect = { method -> pendingGatewayMethod = method },
+                        )
                     }
                 }
 
@@ -794,22 +903,36 @@ fun OrderDetailSheet(
     // planner returns SettleWholeOrder, and this hands it to `pendingPaymentMethod` — the ordinary
     // path, which shows the 10-second receipt prompt, ends the table session and returns to the
     // table grid. Closing a table in two different places would give two behaviours to keep in step.
-    if (showSplitDialog) {
+    // Hidden rather than dismissed while a split-off share is waiting on the print-confirm
+    // dialog below — the two must never stack, and the split dialog reappears (still open, still
+    // showing the shrunk list) the moment the choice resolves, for the next customer in the group.
+    if (showSplitDialog && pendingSplitAction == null) {
         SplitPaymentDialog(
             items = state.items,
             strings = strings,
             isLoading = state.isLoading,
+            gatewayMethods = gatewayMethods,
             onPay = { plan, method ->
+                // A gateway method code routes to the async checkout+poll flow instead of
+                // completing immediately — same generic (Plan, String) callback either way, so
+                // this dialog itself needs no gateway-specific branching (task 7.3: "nothing
+                // special beyond appearing there").
                 when (plan) {
                     is SplitPaymentPlanner.Plan.SettleWholeOrder -> {
                         showSplitDialog = false
                         splitMode = false
-                        pendingPaymentMethod = method
+                        val gatewayMethod = PaymentMethod.fromCode(method)?.takeIf { !it.worksOffline }
+                        if (gatewayMethod != null) pendingGatewayMethod = gatewayMethod
+                        else pendingPaymentMethod = method
                     }
                     is SplitPaymentPlanner.Plan.SliceOff -> {
-                        // The sheet stays open: the next customer in the group is already waiting,
-                        // and the list they need has just shrunk in front of them.
-                        state.order?.let { onSplitShare(it.id, it.tableId, plan, method) }
+                        // Every split-off share gets the same print-confirm choice as a whole-bill
+                        // payment, not just whoever settles the last one — resolved below, which
+                        // is what actually dispatches to onSplitShare/onGatewaySplitCheckout/
+                        // onRequestMerchantScanSplit.
+                        state.order?.let { order ->
+                            pendingSplitAction = PendingSplitAction(order.id, order.tableId, plan, method)
+                        }
                     }
                     SplitPaymentPlanner.Plan.NothingSelected -> Unit
                 }
@@ -829,6 +952,54 @@ fun OrderDetailSheet(
             onResolve = { shouldPrint ->
                 onPayment(state.order.id, paymentMethod, shouldPrint)
                 pendingPaymentMethod = null
+            },
+        )
+    }
+
+    // ── Split-share receipt-print confirm dialog ──────────────────────────────────
+    val splitAction = pendingSplitAction
+    if (splitAction != null) {
+        ReceiptPrintConfirmDialog(
+            strings = strings,
+            onResolve = { shouldPrint ->
+                val gatewayMethod = PaymentMethod.fromCode(splitAction.method)?.takeIf { !it.worksOffline }
+                when {
+                    gatewayMethod?.category == PaymentCategory.E_WALLET ->
+                        onRequestMerchantScanSplit(
+                            splitAction.orderId, splitAction.tableId, splitAction.plan, gatewayMethod, shouldPrint,
+                        )
+                    gatewayMethod != null ->
+                        onGatewaySplitCheckout(
+                            splitAction.orderId, splitAction.tableId, splitAction.plan, gatewayMethod, shouldPrint,
+                        )
+                    else ->
+                        onSplitShare(
+                            splitAction.orderId, splitAction.tableId, splitAction.plan, splitAction.method, shouldPrint,
+                        )
+                }
+                pendingSplitAction = null
+            },
+        )
+    }
+
+    // ── Gateway checkout receipt-print confirm dialog ─────────────────────────────
+    // Asked BEFORE the checkout starts rather than after, unlike Cash/QR — a gateway payment
+    // confirms asynchronously (task 8.1/8.2), and interrupting that with a second dialog once the
+    // acquirer answers would be a worse counter experience than asking up front.
+    val gatewayMethod = pendingGatewayMethod
+    if (gatewayMethod != null && state.order != null) {
+        ReceiptPrintConfirmDialog(
+            strings = strings,
+            onResolve = { shouldPrint ->
+                // Merchant-scan channels (task 8.3) need a barcode captured before there is
+                // anything to initiate — the caller opens the camera; every other category goes
+                // straight to the checkout overlay as before.
+                if (gatewayMethod.category == PaymentCategory.E_WALLET) {
+                    onRequestMerchantScan(state.order.id, state.order.tableId, gatewayMethod, state.order.total, shouldPrint)
+                } else {
+                    onGatewayCheckout(state.order.id, gatewayMethod, state.order.total, shouldPrint)
+                }
+                pendingGatewayMethod = null
             },
         )
     }
@@ -869,6 +1040,15 @@ private data class StagedCartLine(
     val note: String? = null,
     val size: String? = null,
     val unitPrice: Double? = null,
+)
+
+/** A split-off share (not the final one) waiting on the print-confirm dialog before it is handed
+ *  to whichever of onSplitShare/onGatewaySplitCheckout/onRequestMerchantScanSplit fits [method]. */
+private data class PendingSplitAction(
+    val orderId: String,
+    val tableId: String?,
+    val plan: SplitPaymentPlanner.Plan.SliceOff,
+    val method: String,
 )
 
 private fun categoryLabel(category: String, strings: UiStrings): String = when (category.uppercase()) {

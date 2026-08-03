@@ -1,6 +1,11 @@
 package com.razstudio.pos.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,7 +65,10 @@ import com.razstudio.pos.ui.theme.ThemeButton
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.UiStrings
 import com.razstudio.pos.ui.i18n.uiStrings
+import com.razstudio.pos.data.local.PaymentMethod
 import com.razstudio.pos.ui.tableview.CartLine
+import com.razstudio.pos.ui.tableview.GatewayCheckoutOverlay
+import com.razstudio.pos.ui.tableview.MerchantScanRequest
 import com.razstudio.pos.ui.tableview.OrderDetailSheet
 import com.razstudio.pos.ui.tableview.OrderEntrySheet
 import com.razstudio.pos.ui.tableview.StaffPermissions
@@ -115,6 +123,8 @@ fun AdminHomeScreen(
     val availableMenu by tableViewModel.availableMenu.collectAsState()
     val cafeName by tableViewModel.cafeName.collectAsState()
     val activeMode by tableViewModel.activeMode.collectAsState()
+    val gatewayMethods by tableViewModel.gatewayMethods.collectAsState()
+    val gatewayCheckout by tableViewModel.gatewayCheckout.collectAsState()
     val pendingPrints by tableViewModel.pendingKitchenPrints.collectAsState()
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
@@ -150,6 +160,20 @@ fun AdminHomeScreen(
         // In Demo Mode there is no backend to subscribe to; keep the app fully offline.
         if (!com.razstudio.pos.data.demo.DemoSession.active) RealtimeService.start(context)
     }
+
+    // Merchant-scan (task 8.3) — cashier scans the customer's e-wallet barcode before a TNG/
+    // GrabPay/Boost/ShopeePay attempt is initiated. Screen-level state because the camera needs a
+    // full-screen surface OrderDetailSheet's ModalBottomSheet cannot host.
+    var merchantScanRequest by remember { mutableStateOf<MerchantScanRequest?>(null) }
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasCameraPermission = granted }
 
     // Open session on first composition
     LaunchedEffect(Unit) {
@@ -456,8 +480,8 @@ fun AdminHomeScreen(
     if (showOrderSheet) {
         OrderDetailSheet(
             allowSplitPayment = true,
-            onSplitShare = { orderId, tableId, plan, method ->
-                tableViewModel.paySplitShare(orderId, tableId, plan, method)
+            onSplitShare = { orderId, tableId, plan, method, printReceipt ->
+                tableViewModel.paySplitShare(orderId, tableId, plan, method, printReceipt)
             },
             state = orderDetail,
             tableLabel = selectedTableLabel,
@@ -470,11 +494,65 @@ fun AdminHomeScreen(
             onConfirmSession = { orderId, sessionNumber -> tableViewModel.confirmSession(orderId, sessionNumber) },
             onPayment = { orderId, method, printReceipt -> tableViewModel.processPayment(orderId, method, printReceipt) },
             onVoidItems = { orderId, itemIds, reason -> tableViewModel.voidItems(orderId, itemIds, reason) },
+            gatewayMethods = gatewayMethods,
+            onGatewayCheckout = { orderId, method, amount, printReceipt ->
+                tableViewModel.startGatewayCheckout(orderId, method, amount, printReceipt)
+            },
+            onGatewaySplitCheckout = { orderId, tableId, plan, method, printReceipt ->
+                tableViewModel.startGatewaySplitCheckout(orderId, tableId, plan, method, printReceipt)
+            },
+            onRequestMerchantScan = { orderId, tableId, method, amount, printReceipt ->
+                merchantScanRequest = MerchantScanRequest(orderId, tableId, method, amount, printReceipt)
+            },
+            onRequestMerchantScanSplit = { orderId, tableId, plan, method, printReceipt ->
+                merchantScanRequest = MerchantScanRequest(
+                    orderId = orderId, tableId = tableId, method = method,
+                    amount = plan.amount, printReceipt = printReceipt, splitPlan = plan,
+                )
+            },
+            onResumeGatewayCheckout = { pending -> tableViewModel.resumeGatewayCheckout(pending) },
             onCancel = { orderId, reason -> tableViewModel.cancelOrder(orderId, reason) },
             onDismiss = {
                 showOrderSheet = false
                 tableViewModel.clearOrderDetail()
             }
+        )
+    }
+
+    // Full-screen gateway checkout (task 8.1/8.2) — sits above the order sheet; back/outside-tap
+    // is disabled while a payment is pending, see GatewayCheckoutOverlay's own doc.
+    gatewayCheckout?.let { checkoutState ->
+        GatewayCheckoutOverlay(
+            state = checkoutState,
+            strings = strings,
+            onCancel = { tableViewModel.cancelGatewayCheckout() },
+            onDismiss = { tableViewModel.dismissGatewayCheckout() },
+            onNudgePoll = { tableViewModel.nudgeGatewayPoll() },
+        )
+    }
+
+    // Merchant-scan camera (task 8.3) — full-screen, above everything else while a barcode is
+    // being captured. Cancelling drops the request with no side effect: nothing was initiated yet.
+    merchantScanRequest?.let { req ->
+        QrScannerScreen(
+            hasCameraPermission = hasCameraPermission,
+            onRequestPermission = { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) },
+            onQrDecoded = { code ->
+                val plan = req.splitPlan
+                if (plan != null) {
+                    tableViewModel.startGatewaySplitCheckout(
+                        req.orderId, req.tableId, plan, req.method,
+                        printReceipt = req.printReceipt, customerAuthCode = code,
+                    )
+                } else {
+                    tableViewModel.startGatewayCheckout(req.orderId, req.method, req.amount, req.printReceipt, code)
+                }
+                merchantScanRequest = null
+            },
+            onCancel = { merchantScanRequest = null },
+            promptText = strings.merchantScanPrompt,
+            cancelText = strings.commonCancel,
+            grantText = strings.cameraPermissionRequired,
         )
     }
 
