@@ -1,80 +1,70 @@
+/**
+ * Shopee affiliate placements for the customer-facing ordering page.
+ *
+ * ### What this is, and what it is not
+ *
+ * Unlike RollerAds or AdSense there is no ad server here and no script to load — an affiliate
+ * placement is just the café's own referral link, rendered by us. That has two consequences worth
+ * stating: nothing here can be blocked by an ad blocker's script filters, and nothing here reports
+ * a fill rate. A tile shows because the café configured it, full stop.
+ *
+ * ### Where the links come from
+ *
+ * `app-config.json` at runtime (see [loadRuntimeConfig]), never `VITE_*` inlined at build. Same
+ * reason as the RollerAds tag: a link set is per-café, and baking it in would force one build per
+ * café. Unlike a tag id, this one is a *list*, so the build generator reads it from a single JSON
+ * env var (`VITE_SHOPEE_PRODUCTS`) rather than a field per product.
+ *
+ * ### Sub-ids
+ *
+ * Shopee's affiliate reporting splits earnings by `sub_id`, which is how a café tells "someone
+ * scanned a table QR and bought something" apart from its other channels. [withSubId] appends it
+ * only when the configured link does not already carry one — a link pasted straight out of the
+ * affiliate dashboard may already have its own, and overwriting that would silently retarget
+ * someone else's reporting.
+ *
+ * ### Failure is silent, like every other ad path here
+ *
+ * A malformed link is dropped rather than rendered. The page's job is taking a food order; an
+ * affiliate tile is the least important thing on it and must never be able to break the flow.
+ */
+
 import { useEffect, useState } from 'react'
+import { catalogEntryFor, loadPartnerCatalog } from './partnerCatalog'
 import { loadRuntimeConfig } from './runtimeConfig'
 
-/**
- * Shopee affiliate banners — hand-picked products shown between menu items.
- *
- * By far the best-fitting ad format for this page. Unlike a network, the café chooses every
- * product, so nothing unexpected appears next to their food; Shopee is where Malaysian customers
- * already shop; and it pays per sale rather than per impression, so it does not need volume or
- * intrusive formats to be worth anything.
- *
- * ### Links must come from the affiliate portal
- *
- * Use the short link Shopee generates (`https://s.shopee.com.my/XXXX`) — it already carries your
- * attribution. Do NOT hand-build `shopee.com.my/product/{id}?affiliate_id=...`: that is not a
- * documented tracking form, and a link that looks affiliated but is not earns nothing while
- * appearing to work. Shopee's own documented alternative is the `an_redir?origin_link=` form.
- *
- * [subId] is optional and genuinely useful: Shopee reports it back, so tagging placements lets you
- * see which menu position actually converts rather than guessing.
- */
+/** One affiliate placement. [img] is optional — see [ShopeeBanner] for what renders without it. */
 export interface ShopeeProduct {
-  /** The short link from the Shopee affiliate portal, verbatim. */
+  /** Absolute https affiliate URL (a Shopee short link, or a network's tracking link). */
   href: string
-  /** Product image URL. */
-  img: string
-  /** Alt text — also what a customer sees if the image fails to load. */
-  alt: string
+  /** Product image URL. Empty or absent renders the text form instead of a thumbnail row. */
+  img?: string
+  /** Human label. Used as the card text and as the image's alt text. */
+  alt?: string
 }
 
 export interface ShopeeAffiliateConfig {
-  products: ShopeeProduct[]
-  /** Appended as `sub_id` for per-placement reporting. Optional. */
+  /** Shopee affiliate sub-id for attributing these taps, e.g. `"tani-menu"`. */
   subId?: string
+  products?: ShopeeProduct[]
 }
 
 /**
- * Resolves the product list from runtime config, so each café curates its own without a rebuild —
- * the same contract as the rest of this app's configuration.
- */
-export function useShopeeProducts(): { loaded: boolean; config?: ShopeeAffiliateConfig } {
-  const [state, setState] = useState<{ loaded: boolean; config?: ShopeeAffiliateConfig }>({
-    loaded: false,
-  })
-
-  useEffect(() => {
-    let alive = true
-    loadRuntimeConfig().then((cfg) => {
-      if (!alive) return
-      const raw = cfg.shopeeAffiliate
-      const products = (raw?.products ?? []).filter(
-        (p): p is ShopeeProduct => Boolean(p && p.href && p.img),
-      )
-      setState({
-        loaded: true,
-        config: products.length ? { products, subId: raw?.subId } : undefined,
-      })
-    })
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  return state
-}
-
-/**
- * Adds `sub_id` for reporting, leaving everything else untouched.
+ * Append `sub_id` unless the link already has one.
  *
- * Deliberately does NOT add `affiliate_id`: a portal-generated short link already encodes the
- * affiliate, and bolting a second attribution parameter onto it risks conflicting with what Shopee
- * already resolves server-side. Nothing is appended when there is no sub id.
+ * Returns [href] untouched when it is not a parseable absolute URL — the caller has already
+ * dropped those, so this is belt-and-braces rather than the real guard.
  */
 export function withSubId(href: string, subId?: string): string {
   if (!subId) return href
-  const sep = href.includes('?') ? '&' : '?'
-  return `${href}${sep}sub_id=${encodeURIComponent(subId)}`
+  try {
+    const url = new URL(href)
+    if (url.searchParams.has('sub_id')) return href
+    url.searchParams.set('sub_id', subId)
+    return url.toString()
+  } catch {
+    return href
+  }
 }
 
 /**
@@ -91,4 +81,86 @@ export function pickProduct(products: ShopeeProduct[], slotIndex: number): Shope
   // A per-session offset so a returning customer does not always meet the same first product.
   const offset = Math.floor(Math.random() * products.length)
   return products[(offset + slotIndex) % products.length]
+}
+
+/**
+ * Keep only placements we are willing to send a paying customer to.
+ *
+ * `https` is required: the ordering page is served over https, and a mixed-content link is both a
+ * browser warning and a downgrade of someone's shopping session. Anything without a usable href is
+ * dropped silently rather than rendered as a dead tile.
+ *
+ * The host is deliberately NOT restricted to shopee.com.my — Malaysian affiliate links are
+ * routinely issued through networks (Involve Asia's `invol.co`, for one), and rejecting those
+ * would break the common case in the name of a check that a typo'd host would pass anyway.
+ *
+ * An empty `img` is explicitly NOT a reason to drop a placement. Requiring one is what kept this
+ * feature invisible while its config looked complete; [ShopeeBanner] renders a text form instead.
+ */
+export function validProducts(products: ShopeeProduct[] | undefined): ShopeeProduct[] {
+  if (!Array.isArray(products)) return []
+  return products.filter((p) => {
+    if (!p || typeof p.href !== 'string') return false
+    try {
+      return new URL(p.href).protocol === 'https:'
+    } catch {
+      return false
+    }
+  })
+}
+
+/**
+ * The Shopee placements for THIS deployment, with sub-ids already applied.
+ *
+ * ### Two sources, in order
+ *
+ * 1. This café's own `shopeeAffiliate` block, if it has one — the escape hatch for a café that
+ *    curates its own list or wants none.
+ * 2. Otherwise the central catalog on `main` (see [loadPartnerCatalog]), which is what a freshly
+ *    registered café gets with no setup at all.
+ *
+ * A café with a LOCAL block never falls through to the catalog, even if its own list is empty after
+ * validation. "I set this myself" has to mean something, or opting out would be impossible.
+ *
+ * Returns `loaded: false` until both fetches settle, so a slot renders nothing rather than flashing
+ * the AdSense unit behind it and then replacing it. Both fetches are cached module-side, so all
+ * slots on a page share one of each.
+ */
+export function useShopeeAffiliate(): { loaded: boolean; products: ShopeeProduct[] } {
+  const [state, setState] = useState<{ loaded: boolean; products: ShopeeProduct[] }>({
+    loaded: false,
+    products: [],
+  })
+
+  useEffect(() => {
+    let alive = true
+
+    loadRuntimeConfig()
+      .then(async (cfg) => {
+        const local = cfg.shopeeAffiliate
+        // A local block present at all — even with an empty product list — is deliberate, and ends
+        // the lookup here.
+        if (local) return local
+        const catalog = await loadPartnerCatalog(cfg.partnerCatalogUrl)
+        return catalogEntryFor(catalog, cfg.cafeName)
+      })
+      .then((affiliate) => {
+        if (!alive) return
+        const products = validProducts(affiliate?.products).map((p) => ({
+          ...p,
+          href: withSubId(p.href, affiliate?.subId),
+        }))
+        setState({ loaded: true, products })
+      })
+      .catch(() => {
+        // Belt-and-braces: both loaders already swallow their own failures.
+        if (alive) setState({ loaded: true, products: [] })
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  return state
 }

@@ -23,6 +23,8 @@
  * able to break the ordering flow.
  */
 
+import type { ShopeeAffiliateConfig } from './shopee'
+
 export interface RuntimeConfig {
   supabaseUrl?: string
   supabaseAnonKey?: string
@@ -30,9 +32,9 @@ export interface RuntimeConfig {
   /**
    * Full `src` of the RollerAds tag, verbatim from my.rollerads.com → your site → get code.
    *
-   * Deliberately the whole URL rather than an id to assemble one from: the host and path are
-   * issued by RollerAds and are not derivable from the numeric site id, so a constructed URL
-   * would load nothing while looking configured. See `lib/rollerads.ts`.
+   * Deliberately the whole URL rather than an id to assemble one from: the host and path are issued
+   * by RollerAds and are not derivable from the numeric site id, so a constructed URL would load
+   * nothing while looking configured. See `lib/rollerads.ts`.
    *
    * RollerAds is page-level only (push / in-page push / popunder) — it has no in-page display
    * format, so nothing here feeds `AdSlot`.
@@ -41,17 +43,25 @@ export interface RuntimeConfig {
   /** RollerAds site id. Informational — the tag URL already embeds it. */
   rolleradsSiteId?: string
   /**
-   * Hand-picked Shopee affiliate products shown between menu items.
+   * Where to fetch the central affiliate catalog from — see `lib/partnerCatalog.ts`.
    *
-   * Lives in runtime config so a café curates its own list without a rebuild, and so the list can
-   * be swapped seasonally. `products[].href` must be a short link from the Shopee affiliate
-   * portal — it already carries attribution. See `lib/shopee.ts`.
+   * Here rather than hardcoded so the catalog can move (GitHub raw → Cloudflare Pages → R2) by
+   * editing this file, with no code change and no café rebuild.
    */
-  shopeeAffiliate?: {
-    products?: Array<{ href: string; img: string; alt: string }>
-    /** Optional `sub_id` for per-placement reporting in Shopee's dashboard. */
-    subId?: string
-  }
+  partnerCatalogUrl?: string
+  /**
+   * Shopee affiliate links for THIS café, overriding the central catalog.
+   *
+   * Normally absent: a café inherits its placements from the catalog on `main`, so a freshly
+   * registered one needs no ad setup at all. Setting this block is the escape hatch — a café
+   * curating its own list, or opting out with `products: []`. Present-but-empty still wins, so
+   * opting out is possible. See `lib/shopee.ts` and `lib/partnerCatalog.ts`.
+   *
+   * A key present in `app-config.json` but ABSENT from this interface is silently dropped, which is
+   * exactly how an earlier hand-edited `shopeeAffiliate` block sat on the live site rendering
+   * nothing at all. Anything the page must read has to be declared here.
+   */
+  shopeeAffiliate?: ShopeeAffiliateConfig
 }
 
 let cached: RuntimeConfig | null = null
