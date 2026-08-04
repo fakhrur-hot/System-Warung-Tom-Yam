@@ -1,0 +1,19 @@
+{
+  "_comment": "Central affiliate catalog. Edit THIS file (on main) to change what every cafe shows. See README.md in this folder.",
+  "default": {
+    "subId": "menu",
+    "products": []
+  },
+  "byCafe": {
+    "Tani Tom Yam": {
+      "subId": "tani-menu",
+      "products": [
+        {
+          "href": "https://s.shopee.com.my/AUsvIMpRzN",
+          "img": "",
+          "alt": "Shopee pick"
+        }
+      ]
+    }
+  }
+}

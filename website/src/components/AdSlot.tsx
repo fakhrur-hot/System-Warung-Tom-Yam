@@ -1,10 +1,8 @@
 import { ADSENSE_STATUS_SLOT } from '../lib/adsense'
-import { ADSTERRA_BANNER_KEY, ADSTERRA_SMARTLINK_URL, useAdsterraNative } from '../lib/adsterra'
-import AdsterraBanner from './AdsterraBanner'
-import AdsterraNative from './AdsterraNative'
+import { useShopeeAffiliate } from '../lib/shopee'
 import DisplayAd from './DisplayAd'
 import InFeedAd from './InFeedAd'
-import SmartLinkPromo from './SmartLinkPromo'
+import ShopeeBanner from './ShopeeBanner'
 
 interface AdSlotProps {
   /**
@@ -12,40 +10,39 @@ interface AdSlotProps {
    * `status` — a waiting or dead-end view, where the customer has real dwell time.
    */
   placement: 'feed' | 'status'
+  /** Distinguishes slots on one page so rotating units never repeat a product. */
+  slotIndex?: number
 }
 
 /**
- * The single decision point for which ad network fills a slot.
+ * The single decision point for what fills an in-page ad slot.
  *
- * Order: Adsterra Native → Adsterra Banner → SmartLink → AdSense. Adsterra wins whenever it is
- * configured, because running it alongside AdSense on one page view is the combination worth
- * avoiding — AdSense holds publishers responsible for what appears beside its units, and a strike
- * costs more than the extra impression. Nothing is force-disabled: unset the Adsterra values and
- * the AdSense units return on their own.
+ * Order: Shopee affiliate → AdSense. Shopee wins when there are curated products, because on a
+ * restaurant's own ordering page a hand-picked product is strictly better inventory than a network
+ * unit: the café controls exactly what appears beside its food, it is locally relevant, and it pays
+ * per sale rather than needing volume.
  *
- * Native config is fetched at runtime (`app-config.json`), so this waits for that fetch before
- * choosing. Rendering nothing while it resolves avoids flashing an AdSense unit for a frame and
- * then swapping it for an Adsterra one.
+ * RollerAds does not appear here at all — it has no in-page display format. It is a page-level
+ * script loaded once in `App.tsx` (see `lib/rollerads.ts`) and does not compete for this space,
+ * which is also why AdSense is no longer suppressed the way the old Adsterra integration required.
  *
- * Every branch renders `null` when its own network is unconfigured, so a deployment with no ad
- * setup ships no ad markup rather than empty boxes.
+ * Products come from the central catalog on `main` unless this café overrides them locally — see
+ * `lib/partnerCatalog.ts`. So a freshly registered café shows affiliate placements with no ad setup
+ * of its own.
+ *
+ * Renders `null` when nothing is configured, so a deployment with no ad setup ships no ad markup
+ * rather than empty boxes. Waits for the config fetch before choosing, so a slot never flashes an
+ * AdSense unit and then swaps it for a Shopee banner.
  */
-export default function AdSlot({ placement }: AdSlotProps) {
-  const native = useAdsterraNative()
+export default function AdSlot({ placement, slotIndex = 0 }: AdSlotProps) {
+  const shopee = useShopeeAffiliate()
 
   // Config still in flight. Nothing renders yet — see the note above.
-  if (!native.loaded) return null
+  if (!shopee.loaded) return null
 
-  // Native first: it flows inline at page width, so it suits both placements better than a
-  // fixed-size iframe banner. Only one can exist per page; AdsterraNative enforces that itself.
-  if (native.src && native.container) {
-    return <AdsterraNative src={native.src} container={native.container} />
+  if (shopee.products.length > 0) {
+    return <ShopeeBanner products={shopee.products} slotIndex={slotIndex} />
   }
-  if (ADSTERRA_BANNER_KEY) return <AdsterraBanner />
-
-  // SmartLink last among Adsterra options: a labelled tap target rather than a rendered ad, so it
-  // earns only when a customer chooses it. Useful while a Native zone is still being approved.
-  if (ADSTERRA_SMARTLINK_URL) return <SmartLinkPromo />
 
   return placement === 'feed' ? <InFeedAd /> : <DisplayAd slot={ADSENSE_STATUS_SLOT} />
 }

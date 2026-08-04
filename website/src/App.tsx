@@ -12,7 +12,8 @@ import StatusView from './components/StatusView'
 import ConfirmDialog from './components/ConfirmDialog'
 import QrScanner from './components/QrScanner'
 import { loadAdSense } from './lib/adsense'
-import { ADSTERRA_SOCIAL_BAR_SRC, adsterraEnabled, loadAdsterraSocialBar } from './lib/adsterra'
+import { loadRollerAds } from './lib/rollerads'
+import { loadRuntimeConfig } from './lib/runtimeConfig'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -152,15 +153,16 @@ export default function App() {
   // Load page-level ad scripts — only from this component, which the router renders solely for
   // customer-facing paths (/order and the unmatched-path fallback), never any /admin/* route.
   //
-  // Both no-op when unconfigured. AdSense auto-ads are skipped entirely once Adsterra is running:
-  // AdSense holds publishers responsible for what appears alongside its units, so serving both on
-  // one page view risks a strike worth more than the extra impression.
+  // Both no-op when unconfigured, and both run together on purpose. RollerAds' formats are push,
+  // in-page push and popunder -- none of which occupy in-page real estate or sit beside an AdSense
+  // unit, and RollerAds market push as AdSense-friendly. The Adsterra integration this replaced DID
+  // compete for in-page space, which is why it had to suppress AdSense outright.
+  //
+  // The RollerAds tag src comes from runtime config so one build serves many cafes; `lib/rollerads`
+  // falls back to the build-time env when the fetch yields nothing.
   useEffect(() => {
-    if (adsterraEnabled || ADSTERRA_SOCIAL_BAR_SRC) {
-      loadAdsterraSocialBar()
-    } else {
-      loadAdSense()
-    }
+    loadRuntimeConfig().then((cfg) => loadRollerAds(cfg.rolleradsTagSrc))
+    loadAdSense()
   }, [])
 
   // Clean up realtime subscription on unmount

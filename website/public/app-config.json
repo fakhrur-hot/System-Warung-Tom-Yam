@@ -2,6 +2,8 @@
   "supabaseUrl": "",
   "supabaseAnonKey": "",
   "cafeName": "RAZ POS",
-  "adsterraSrc": "",
-  "adsterraContainer": ""
+  "rolleradsTagSrc": "",
+  "rolleradsSiteId": "",
+  "partnerCatalogUrl": "https://raw.githubusercontent.com/fakhrur-hot/System-Warung-Tom-Yam/main/promos/partners.json",
+  "shopeeAffiliate": null
 }

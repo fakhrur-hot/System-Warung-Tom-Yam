@@ -18,6 +18,58 @@ import path from 'node:path'
  * Vite copies from `public/` earlier in the build. The static copies serve as dev-server
  * placeholders and carry no real café data.
  */
+/**
+ * Where a café fetches the central affiliate catalog from when nothing overrides it.
+ *
+ * GitHub raw on `main`: public, sends `Access-Control-Allow-Origin: *`, and caches for 5 minutes —
+ * so a daily edit to `promos/partners.json` reaches every café within minutes with no rebuild. It
+ * is not a CDN with an SLA and anonymous raw is rate-limited, which is exactly why the URL is
+ * overridable per café (`partnerCatalogUrl`, or `VITE_PARTNER_CATALOG_URL`): moving to a Cloudflare
+ * Pages project or R2 later is a config edit, not a code change in every café branch.
+ */
+const DEFAULT_CATALOG_URL =
+  'https://raw.githubusercontent.com/fakhrur-hot/System-Warung-Tom-Yam/main/promos/partners.json'
+
+/**
+ * The café's OWN Shopee placements, for `app-config.json` — an override of the central catalog.
+ *
+ * Normally empty: a café inherits the catalog. Set `VITE_SHOPEE_PRODUCTS` only for a café that
+ * curates its own list.
+ *
+ * A link SET does not fit the one-env-var-per-field shape the other values use, so the products
+ * arrive as a single JSON array in `VITE_SHOPEE_PRODUCTS`, e.g.
+ *
+ *   [{"href":"https://s.shopee.com.my/AbCdEf","img":"","alt":"Shopee pick"}]
+ *
+ * Emitting this from the generator is the whole point: `closeBundle` OVERWRITES
+ * `dist/app-config.json`, so a `shopeeAffiliate` block added to the deployed file by hand survives
+ * only until the next build. Anything expected to outlive a deploy has to be produced here.
+ *
+ * Malformed JSON yields an empty product list rather than failing the build — a bad ad config must
+ * not be able to stop a café's ordering page from shipping. The page drops invalid links again on
+ * its own side (`lib/shopee.ts`).
+ */
+function shopeeAffiliate(): { subId: string; products: unknown[] } | null {
+  const subId = process.env.VITE_SHOPEE_SUB_ID?.trim() ?? ''
+  const raw = process.env.VITE_SHOPEE_PRODUCTS?.trim()
+
+  // `null`, NOT an empty block. The page treats ANY present block as "this café overrides the
+  // catalog" -- that is what makes opting out possible -- so emitting `{products: []}` by default
+  // would have every café override the catalog with nothing and the central list would never be
+  // read by anyone. The key stays present (the app-config contract test requires it); its value
+  // says "no local override".
+  if (!raw && !subId) return null
+
+  if (!raw) return { subId, products: [] }
+  try {
+    const parsed = JSON.parse(raw)
+    return { subId, products: Array.isArray(parsed) ? parsed : [] }
+  } catch {
+    console.warn('[generate-static-json] VITE_SHOPEE_PRODUCTS is not valid JSON — ignoring it')
+    return { subId, products: [] }
+  }
+}
+
 function generateStaticJsonPlugin(): Plugin {
   let resolvedConfig: ResolvedConfig
 
@@ -72,8 +124,8 @@ function generateStaticJsonPlugin(): Plugin {
       )
 
       // ── app-config.json ──────────────────────────────────────────────────────────
-      // Adsterra ids are published here rather than inlined from `VITE_*` so that ONE build can
-      // serve many cafés: this is a plain static file, so a deployment can swap it (by hand, from
+      // Ad ids are published here rather than inlined from `VITE_*` so that ONE build can serve
+      // many cafés: this is a plain static file, so a deployment can swap it (by hand, from
       // Supabase, or from a Worker keyed on hostname) without rebuilding. They are safe to publish
       // — an ad unit id appears in every visitor's page source by definition — and the
       // service-role guard above still governs what may never appear in this file.
@@ -84,8 +136,10 @@ function generateStaticJsonPlugin(): Plugin {
             supabaseUrl,
             supabaseAnonKey: supabaseKey,
             cafeName,
-            adsterraSrc: process.env.VITE_ADSTERRA_NATIVE_SRC?.trim() ?? '',
-            adsterraContainer: process.env.VITE_ADSTERRA_NATIVE_CONTAINER?.trim() ?? '',
+            rolleradsTagSrc: process.env.VITE_ROLLERADS_TAG_SRC?.trim() ?? '',
+            rolleradsSiteId: process.env.VITE_ROLLERADS_SITE_ID?.trim() ?? '',
+            partnerCatalogUrl: process.env.VITE_PARTNER_CATALOG_URL?.trim() || DEFAULT_CATALOG_URL,
+            shopeeAffiliate: shopeeAffiliate(),
           },
           null,
           2

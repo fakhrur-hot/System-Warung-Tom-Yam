@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Task 3.4 — `/app-config.json` publishes exactly five public fields, and can never carry a secret.
+ * Task 3.4 — `/app-config.json` publishes exactly seven public fields, and can never carry a secret.
  *
  * The endpoint's whole justification is that it discloses nothing new: the live bundle already
  * serves the project URL and publishable key in plain text, because Vite inlines
@@ -33,7 +33,18 @@ console.log('app-config.json contract\n')
 // Widened from three to five when Adsterra ids moved out of build-time `VITE_*` and into this
 // runtime file, so one build can serve many cafes. Ad unit ids are public by definition -- they
 // appear in every visitor's page source -- so they do not weaken the no-secrets rule below.
-const EXPECTED = ['supabaseUrl', 'supabaseAnonKey', 'cafeName', 'adsterraSrc', 'adsterraContainer']
+// The Adsterra pair was then replaced by the RollerAds tag/site id, and `shopeeAffiliate` plus
+// `partnerCatalogUrl` were added -- all public for the same reason: an ad id, a referral link and
+// the URL of a public catalog all appear in the rendered page or its network log anyway.
+const EXPECTED = [
+  'supabaseUrl',
+  'supabaseAnonKey',
+  'cafeName',
+  'rolleradsTagSrc',
+  'rolleradsSiteId',
+  'partnerCatalogUrl',
+  'shopeeAffiliate',
+]
 
 // ── The static placeholder shipped in public/ ─────────────────────────────────────────────────
 const placeholderPath = join(ROOT, 'public', 'app-config.json')
@@ -69,7 +80,16 @@ check('generator reads the same env the bundle uses',
 
 check('generator emits exactly the expected fields',
   EXPECTED.every((k) => cfg.includes(k)),
-  'a fourth field would break the "discloses nothing new" argument')
+  'an undeclared field would break the "discloses nothing new" argument')
+
+// The failure this catches, from the field's own history: `shopeeAffiliate` was hand-added to the
+// DEPLOYED app-config.json while neither the generator nor RuntimeConfig knew about it. Nothing
+// broke and nothing rendered -- it just sat there being dropped, and the next build would have
+// erased it. A key the page reads must be produced by the generator and declared in the interface.
+const runtimeCfg = readFileSync(join(ROOT, 'src', 'lib', 'runtimeConfig.ts'), 'utf8')
+check('every published field is declared in RuntimeConfig',
+  EXPECTED.filter((k) => k !== 'supabaseAnonKey').every((k) => runtimeCfg.includes(k)),
+  'an undeclared field is silently dropped at runtime -- present in the JSON, invisible to the page')
 
 check('a service-role key is refused at build time',
   /sb_secret|service_role/.test(cfg) && /throw\s+new\s+Error/.test(cfg),

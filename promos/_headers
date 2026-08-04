@@ -1,0 +1,14 @@
+# Cloudflare Pages headers for the central affiliate catalog.
+#
+# Every café's ordering page is a DIFFERENT origin from this one, so the catalog fetch is
+# cross-origin and dies without an explicit CORS header. This is the entire reason this file exists.
+#
+# `*` is correct here rather than lax: the payload is a list of public affiliate links — every one
+# of them is visible in the rendered page source of any café that shows it — so there is nothing to
+# restrict, and enumerating café origins would mean editing this file on every new café.
+/partners.json
+  Access-Control-Allow-Origin: *
+  Content-Type: application/json; charset=utf-8
+  # Five minutes: long enough that a busy lunch service is not re-fetching this constantly, short
+  # enough that a daily edit is live in minutes without a single café rebuilding.
+  Cache-Control: public, max-age=300
