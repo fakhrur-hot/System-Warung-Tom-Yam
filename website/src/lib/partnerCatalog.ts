@@ -86,7 +86,14 @@ export function loadPartnerCatalog(url: string | undefined): Promise<PartnerCata
 }
 
 /**
- * The catalog entry for [cafeName], falling back to `default`.
+ * The catalog entry for [cafeName], merged FIELD-WISE over `default`.
+ *
+ * Field-wise, not whole-entry: `sub_id` is how Shopee's reporting tells one café's earnings from
+ * another's, so a café needs its own while still sharing the one product list that gets updated
+ * daily. A replace-the-whole-entry rule forced a choice between the two — either duplicate every
+ * product under each café just to change a sub-id, or give every café the same sub-id and lose the
+ * ability to tell them apart. So a `byCafe` entry can carry `subId` alone and inherit the products,
+ * or its own `products` to genuinely curate.
  *
  * Matching is case-insensitive and trimmed because the key is a human-typed café name that has to
  * agree with another human-typed café name in a different file — an exact-match rule would fail on
@@ -96,12 +103,18 @@ export function catalogEntryFor(
   catalog: PartnerCatalog,
   cafeName: string | undefined,
 ): ShopeeAffiliateConfig | undefined {
+  const fallback = catalog.default
   const byCafe = catalog.byCafe
   if (byCafe && cafeName) {
     const wanted = cafeName.trim().toLowerCase()
     for (const [key, value] of Object.entries(byCafe)) {
-      if (key.trim().toLowerCase() === wanted) return value
+      if (key.trim().toLowerCase() === wanted) {
+        return {
+          subId: value.subId ?? fallback?.subId,
+          products: value.products ?? fallback?.products,
+        }
+      }
     }
   }
-  return catalog.default
+  return fallback
 }

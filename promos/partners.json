@@ -1,19 +1,44 @@
 {
   "_comment": "Central affiliate catalog. Edit THIS file (on main) to change what every cafe shows. See README.md in this folder.",
+  "_todo": "alt/img are placeholders. Shopee serves a JS landing page to non-browser fetches, so product names and images cannot be resolved from a short link -- fill them in from the affiliate portal. alt is the line a customer reads; img upgrades the placement from a text card to a thumbnail row.",
   "default": {
     "subId": "menu",
-    "products": []
+    "products": [
+      {
+        "href": "https://s.shopee.com.my/LmAVVh9Vm",
+        "img": "",
+        "alt": "Shopee pick"
+      },
+      {
+        "href": "https://s.shopee.com.my/3VjCHrcOH4",
+        "img": "",
+        "alt": "Shopee pick"
+      },
+      {
+        "href": "https://s.shopee.com.my/3g2cUBoYEu",
+        "img": "",
+        "alt": "Shopee pick"
+      },
+      {
+        "href": "https://s.shopee.com.my/40fSsvK46E",
+        "img": "",
+        "alt": "Shopee pick"
+      },
+      {
+        "href": "https://s.shopee.com.my/BSkJtvczO",
+        "img": "",
+        "alt": "Shopee pick"
+      },
+      {
+        "href": "https://s.shopee.com.my/BSkJvlbkW",
+        "img": "",
+        "alt": "Shopee pick"
+      }
+    ]
   },
   "byCafe": {
     "Tani Tom Yam": {
-      "subId": "tani-menu",
-      "products": [
-        {
-          "href": "https://s.shopee.com.my/AUsvIMpRzN",
-          "img": "",
-          "alt": "Shopee pick"
-        }
-      ]
+      "subId": "tani-menu"
     }
   }
 }
