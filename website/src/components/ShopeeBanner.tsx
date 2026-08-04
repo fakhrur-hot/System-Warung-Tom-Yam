@@ -45,7 +45,7 @@ export default function ShopeeBanner({ products, slotIndex }: ShopeeBannerProps)
       className="mx-auto block w-full max-w-sm overflow-hidden rounded-lg border border-emerald-100 bg-white py-2"
     >
       <div className="flex items-center gap-3 px-3">
-        {showImage && (
+        {showImage ? (
           <img
             src={product.img}
             alt={label}
@@ -56,6 +56,8 @@ export default function ShopeeBanner({ products, slotIndex }: ShopeeBannerProps)
             onError={() => setImageBroken(true)}
             className="h-16 w-16 flex-shrink-0 rounded object-cover"
           />
+        ) : (
+          <ShopeeGlyphTile />
         )}
         <div className="min-w-0 flex-1">
           <span className="mb-1 inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-800">
@@ -64,10 +66,40 @@ export default function ShopeeBanner({ products, slotIndex }: ShopeeBannerProps)
           <p className="truncate text-sm text-emerald-900">{label}</p>
           {/* Without a thumbnail the row needs something that reads as tappable. */}
           {!showImage && (
-            <p className="text-xs font-medium text-emerald-600">Shop on Shopee →</p>
+            <p className="text-xs font-medium text-[#EE4D2D]">Shop on Shopee →</p>
           )}
         </div>
       </div>
     </a>
+  )
+}
+
+/**
+ * Stand-in for a missing product photo: a shopping-bag glyph on a Shopee-orange tint, at exactly
+ * the thumbnail's 64px.
+ *
+ * Two reasons this exists rather than collapsing the row. A row with no left-hand element reads as
+ * a photo that failed to load — the customer sees a broken café site, not a promotion. And keeping
+ * the tile means the layout is identical with and without an image, so adding `img` later changes
+ * one element instead of reflowing the card.
+ *
+ * Shopee orange rather than the café palette, deliberately: this is the one element on the page that
+ * should NOT look like the café's own menu. Alongside the "Ad" chip it tells a customer where the
+ * tap goes before they take it.
+ *
+ * Inline SVG, not an emoji — 🛍 renders differently on every platform and is a font dependency for
+ * something that has to look identical on every phone that scans a table QR.
+ */
+function ShopeeGlyphTile() {
+  return (
+    <div
+      aria-hidden="true"
+      className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded bg-[#EE4D2D]/10"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="#EE4D2D" strokeWidth="1.6" className="h-7 w-7">
+        <path d="M3 7h18l-1.5 13H4.5L3 7Z" strokeLinejoin="round" />
+        <path d="M8.5 7V5.5a3.5 3.5 0 0 1 7 0V7" strokeLinecap="round" />
+      </svg>
+    </div>
   )
 }
