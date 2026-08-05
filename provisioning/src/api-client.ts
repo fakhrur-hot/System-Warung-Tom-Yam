@@ -22,6 +22,29 @@ export const provisionApi = {
       projectRef: s.supabaseProjectRef,
     }),
 
+  secrets: (s: WizardState) =>
+    post('/api/provision/secrets', {
+      personalAccessToken: s.supabasePersonalAccessToken,
+      projectRef: s.supabaseProjectRef,
+      secrets: {
+        BREVO_API_KEY: s.brevoApiKey,
+        WEBSITE_ORIGIN: s.websiteUrl,
+      },
+    }),
+
+  storage: (s: WizardState) =>
+    post('/api/provision/storage', {
+      projectRef: s.supabaseProjectRef,
+      serviceRoleKey: s.supabaseServiceRoleKey,
+    }),
+
+  auth: (s: WizardState) =>
+    post('/api/provision/auth', {
+      personalAccessToken: s.supabasePersonalAccessToken,
+      projectRef: s.supabaseProjectRef,
+      websiteUrl: s.websiteUrl,
+    }),
+
   pages: (s: WizardState) =>
     post('/api/provision/pages', {
       cloudflareAccountId: s.cloudflareAccountId,

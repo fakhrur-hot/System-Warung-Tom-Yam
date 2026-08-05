@@ -122,6 +122,8 @@ data class UiStringsGroup2(
     val cafeClosedDesc: String,
     val tapToReopenDesc: String,
     val reopenCafeButton: String,
+    val lockSignInWithOwnerKey: String,
+    val lockSignInWithOwnerKeyDesc: String,
     // ── Admin Settings ──
     val settingsTitle: String,
     val staffInvitationSection: String,
@@ -189,6 +191,9 @@ data class UiStringsGroup3(
     val lastOnlineLabel: String,
     // ── Keep-Alive Setup ──
     val backgroundSetupTitle: String,
+    val backgroundSetupDesc: String,
+    val licenceGeneratorNote: String,
+    val licenceExtraNotices: String,
     val keepAliveExplanation: String,
     val detectedLabel: String,
     val batteryOptDisabled: String,
@@ -297,6 +302,21 @@ data class UiStringsGroup4(
     // ── Cash drawer (Task 2.4) ──
     val cashDrawerTitle: String,
     val drawerOpeningsLabel: String,
+    val salesReportTitle: String,
+    val colMetric: String,
+    val colValue: String,
+    val totalPayByFormat: String,
+    val topItemsMergedTitle: String,
+    val colCategory: String,
+    val colItem: String,
+    val colQty: String,
+    val colRevenue: String,
+    val colSource: String,
+    val colCount: String,
+    val colTable: String,
+    val colOrders: String,
+    val pageOfFormat: String,
+    val cancelledLabel: String,
 )
 
 data class UiStringsGroup5(
@@ -415,6 +435,24 @@ data class UiStringsGroup6(
     val tableWord: String,
     val sessionPendingConfirmation: String,
     val addItemCd: String,
+    val loginAsSecondaryAdmin: String,
+    // ── First-run permission gate (mandatory, before the app opens) ──
+    val permissionsTitle: String,
+    val permissionsIntro: String,
+    val permissionLocationLabel: String,
+    val permissionLocationWhy: String,
+    val permissionNearbyLabel: String,
+    val permissionNearbyWhy: String,
+    val permissionNotificationsLabel: String,
+    val permissionNotificationsWhy: String,
+    val permissionGrantAction: String,
+    val permissionSettingsAction: String,
+    val permissionBlockedNote: String,
+    // ── Order dialogs: hand-typed "custom charge" line (name + price, no menu item) ──
+    val customChargeButton: String,
+    val customChargeNameLabel: String,
+    val customChargePriceLabel: String,
+    val customChargeAddButton: String,
     val cancelReasonLabel: String,
     val enterReasonHint: String,
     val noReasonGiven: String,
@@ -429,6 +467,8 @@ data class UiStringsGroup6(
     val selectTableForOrder: String,
     val noFreeTables: String,
     // ── Cafe management ──
+    val cafeProfileDesc: String,
+    val settingsHardwareSection: String,
     val menuManagementDesc: String,
     val tablesManagementTitle: String,
     val tablesManagementDesc: String,
@@ -449,9 +489,35 @@ data class UiStringsGroup6(
     val reportEmailLabel: String,
     val reportEmailHint: String,
     val businessDayStartLabel: String,
+    val businessDayEndLabel: String,
+    val reportSavedToDownloads: String,
+    val businessDayHoursHint: String,
     val businessDayStartHint: String,
     val securitySection: String,
     val pinLockLabel: String,
+    val calculatorTitle: String,
+    val screenSection: String,
+    val unlinkDeviceLabel: String,
+    val unlinkDeviceDesc: String,
+    val unlinkDeviceButton: String,
+    val unlinkConfirmTitle: String,
+    val unlinkConfirmBody: String,
+    val ownerQrNoBackend: String,
+    val fullscreenLabel: String,
+    val fullscreenDesc: String,
+    val calculatorMemoryHint: String,
+    val drawerPinLabel: String,
+    val drawerPinDesc: String,
+    val drawerPinSetButton: String,
+    val drawerPinChangeButton: String,
+    val drawerPinCurrentPrompt: String,
+    val drawerPinNewPrompt: String,
+    val drawerPinConfirmTitle: String,
+    val drawerPinConfirmBody: String,
+    val drawerPinTooShort: String,
+    val drawerPinWrongCurrent: String,
+    val drawerPinSaved: String,
+    val drawerPinHowTo: String,
     val pinLockDesc: String,
     val changePinButton: String,
     val showPrintStatusLabel: String,
@@ -722,6 +788,9 @@ data class UiStringsGroup9(
     val devicesAndHardwareDesc: String,
     val hardwarePrintersSection: String,
     val hardwareCashDrawerSection: String,
+    val hardwareReceiptPaperSection: String,
+    val hardwareAutoCutLabel: String,
+    val hardwareAutoCutDesc: String,
     val hardwareCustomerDisplaySection: String,
     val hardwareDriverUnavailable: String,
     val hardwareDriverNotDetected: String,
@@ -803,6 +872,54 @@ data class UiStringsGroup9(
     val gatewayPendingResumeButton: String,
 )
 
+data class UiStringsGroup10(
+    // ── Setup / wizard (task 9.2, 10.1, 21.1) ──
+    val setupTitle: String,
+    val setupBack: String,
+    val setupGuideTitle: String,
+    val setupGuideClose: String,
+    val setupHowCafeRuns: String,
+    val setupModeDecidesHint: String,
+    val setupConnection: String,
+    val setupCafeWebsiteUrl: String,
+    val setupCafeWebsiteUrlHint: String,
+    val setupCafeWebsitePlaceholder: String,
+    val setupConnect: String,
+    val setupConnecting: String,
+    val setupConnected: String,
+    val setupEnterManually: String,
+    val setupHideManualFields: String,
+    val setupManualHint: String,
+    val setupSupabaseUrl: String,
+    val setupSupabaseUrlPlaceholder: String,
+    val setupSupabaseAnonKey: String,
+    val setupSupabaseAnonKeyPlaceholder: String,
+    val setupCafeName: String,
+    val setupCafeNamePlaceholder: String,
+    val setupSave: String,
+    val setupSaved: String,
+    val setupCheckConnection: String,
+    val setupChecking: String,
+    val setupConnectionOk: String,
+    val setupWifiForStaff: String,
+    val setupHotspotHint: String,
+    val setupOpenHotspotSettings: String,
+    val setupWifiRouterHint: String,
+    val setupOffCloudHint: String,
+    val setupNextPrinterHint: String,
+    val setupNextPrinterDevicesHint: String,
+    val setupModeCloudTitle: String,
+    val setupModeCloudBlurb: String,
+    val setupModeLanTitle: String,
+    val setupModeLanBlurb: String,
+    val setupModeKioskTitle: String,
+    val setupModeKioskBlurb: String,
+    val setupSwitchTitleFormat: String,
+    val setupSwitchIntro: String,
+    val setupSwitchToFormat: String,
+    val setupCancel: String,
+)
+
 class UiStrings(
     private val g1: UiStringsGroup1,
     private val g2: UiStringsGroup2,
@@ -813,6 +930,7 @@ class UiStrings(
     private val g7: UiStringsGroup7,
     private val g8: UiStringsGroup8,
     private val g9: UiStringsGroup9,
+    private val g10: UiStringsGroup10,
 ) {
     val commonCancel: String get() = g1.commonCancel
     val commonSave: String get() = g1.commonSave
@@ -909,6 +1027,8 @@ class UiStrings(
     val cafeClosedDesc: String get() = g2.cafeClosedDesc
     val tapToReopenDesc: String get() = g2.tapToReopenDesc
     val reopenCafeButton: String get() = g2.reopenCafeButton
+    val lockSignInWithOwnerKey: String get() = g2.lockSignInWithOwnerKey
+    val lockSignInWithOwnerKeyDesc: String get() = g2.lockSignInWithOwnerKeyDesc
     val settingsTitle: String get() = g2.settingsTitle
     val staffInvitationSection: String get() = g2.staffInvitationSection
     val shareButton: String get() = g2.shareButton
@@ -968,6 +1088,9 @@ class UiStrings(
     val currentDeviceLabel: String get() = g3.currentDeviceLabel
     val lastOnlineLabel: String get() = g3.lastOnlineLabel
     val backgroundSetupTitle: String get() = g3.backgroundSetupTitle
+    val backgroundSetupDesc: String get() = g3.backgroundSetupDesc
+    val licenceGeneratorNote: String get() = g3.licenceGeneratorNote
+    val licenceExtraNotices: String get() = g3.licenceExtraNotices
     val keepAliveExplanation: String get() = g3.keepAliveExplanation
     val detectedLabel: String get() = g3.detectedLabel
     val batteryOptDisabled: String get() = g3.batteryOptDisabled
@@ -1064,6 +1187,21 @@ class UiStrings(
     val exportCsvButton: String get() = g4.exportCsvButton
     val cashDrawerTitle: String get() = g4.cashDrawerTitle
     val drawerOpeningsLabel: String get() = g4.drawerOpeningsLabel
+    val salesReportTitle: String get() = g4.salesReportTitle
+    val colMetric: String get() = g4.colMetric
+    val colValue: String get() = g4.colValue
+    val totalPayByFormat: String get() = g4.totalPayByFormat
+    val topItemsMergedTitle: String get() = g4.topItemsMergedTitle
+    val colCategory: String get() = g4.colCategory
+    val colItem: String get() = g4.colItem
+    val colQty: String get() = g4.colQty
+    val colRevenue: String get() = g4.colRevenue
+    val colSource: String get() = g4.colSource
+    val colCount: String get() = g4.colCount
+    val colTable: String get() = g4.colTable
+    val colOrders: String get() = g4.colOrders
+    val pageOfFormat: String get() = g4.pageOfFormat
+    val cancelledLabel: String get() = g4.cancelledLabel
     val signOutClosingTitle: String get() = g5.signOutClosingTitle
     val signOutClosingDesc: String get() = g5.signOutClosingDesc
     val computingAggregateLabel: String get() = g5.computingAggregateLabel
@@ -1167,6 +1305,22 @@ class UiStrings(
     val tableWord: String get() = g6.tableWord
     val sessionPendingConfirmation: String get() = g6.sessionPendingConfirmation
     val addItemCd: String get() = g6.addItemCd
+    val loginAsSecondaryAdmin: String get() = g6.loginAsSecondaryAdmin
+    val permissionsTitle: String get() = g6.permissionsTitle
+    val permissionsIntro: String get() = g6.permissionsIntro
+    val permissionLocationLabel: String get() = g6.permissionLocationLabel
+    val permissionLocationWhy: String get() = g6.permissionLocationWhy
+    val permissionNearbyLabel: String get() = g6.permissionNearbyLabel
+    val permissionNearbyWhy: String get() = g6.permissionNearbyWhy
+    val permissionNotificationsLabel: String get() = g6.permissionNotificationsLabel
+    val permissionNotificationsWhy: String get() = g6.permissionNotificationsWhy
+    val permissionGrantAction: String get() = g6.permissionGrantAction
+    val permissionSettingsAction: String get() = g6.permissionSettingsAction
+    val permissionBlockedNote: String get() = g6.permissionBlockedNote
+    val customChargeButton: String get() = g6.customChargeButton
+    val customChargeNameLabel: String get() = g6.customChargeNameLabel
+    val customChargePriceLabel: String get() = g6.customChargePriceLabel
+    val customChargeAddButton: String get() = g6.customChargeAddButton
     val cancelReasonLabel: String get() = g6.cancelReasonLabel
     val enterReasonHint: String get() = g6.enterReasonHint
     val noReasonGiven: String get() = g6.noReasonGiven
@@ -1179,6 +1333,8 @@ class UiStrings(
     val askAdminAddTables: String get() = g6.askAdminAddTables
     val selectTableForOrder: String get() = g6.selectTableForOrder
     val noFreeTables: String get() = g6.noFreeTables
+    val cafeProfileDesc: String get() = g6.cafeProfileDesc
+    val settingsHardwareSection: String get() = g6.settingsHardwareSection
     val menuManagementDesc: String get() = g6.menuManagementDesc
     val tablesManagementTitle: String get() = g6.tablesManagementTitle
     val tablesManagementDesc: String get() = g6.tablesManagementDesc
@@ -1198,9 +1354,35 @@ class UiStrings(
     val reportEmailLabel: String get() = g6.reportEmailLabel
     val reportEmailHint: String get() = g6.reportEmailHint
     val businessDayStartLabel: String get() = g6.businessDayStartLabel
+    val businessDayEndLabel: String get() = g6.businessDayEndLabel
+    val reportSavedToDownloads: String get() = g6.reportSavedToDownloads
+    val businessDayHoursHint: String get() = g6.businessDayHoursHint
     val businessDayStartHint: String get() = g6.businessDayStartHint
     val securitySection: String get() = g6.securitySection
     val pinLockLabel: String get() = g6.pinLockLabel
+    val calculatorTitle: String get() = g6.calculatorTitle
+    val screenSection: String get() = g6.screenSection
+    val unlinkDeviceLabel: String get() = g6.unlinkDeviceLabel
+    val unlinkDeviceDesc: String get() = g6.unlinkDeviceDesc
+    val unlinkDeviceButton: String get() = g6.unlinkDeviceButton
+    val unlinkConfirmTitle: String get() = g6.unlinkConfirmTitle
+    val unlinkConfirmBody: String get() = g6.unlinkConfirmBody
+    val ownerQrNoBackend: String get() = g6.ownerQrNoBackend
+    val fullscreenLabel: String get() = g6.fullscreenLabel
+    val fullscreenDesc: String get() = g6.fullscreenDesc
+    val calculatorMemoryHint: String get() = g6.calculatorMemoryHint
+    val drawerPinLabel: String get() = g6.drawerPinLabel
+    val drawerPinDesc: String get() = g6.drawerPinDesc
+    val drawerPinSetButton: String get() = g6.drawerPinSetButton
+    val drawerPinChangeButton: String get() = g6.drawerPinChangeButton
+    val drawerPinCurrentPrompt: String get() = g6.drawerPinCurrentPrompt
+    val drawerPinNewPrompt: String get() = g6.drawerPinNewPrompt
+    val drawerPinConfirmTitle: String get() = g6.drawerPinConfirmTitle
+    val drawerPinConfirmBody: String get() = g6.drawerPinConfirmBody
+    val drawerPinTooShort: String get() = g6.drawerPinTooShort
+    val drawerPinWrongCurrent: String get() = g6.drawerPinWrongCurrent
+    val drawerPinSaved: String get() = g6.drawerPinSaved
+    val drawerPinHowTo: String get() = g6.drawerPinHowTo
     val pinLockDesc: String get() = g6.pinLockDesc
     val changePinButton: String get() = g6.changePinButton
     val showPrintStatusLabel: String get() = g6.showPrintStatusLabel
@@ -1439,6 +1621,9 @@ class UiStrings(
     val devicesAndHardwareDesc: String get() = g9.devicesAndHardwareDesc
     val hardwarePrintersSection: String get() = g9.hardwarePrintersSection
     val hardwareCashDrawerSection: String get() = g9.hardwareCashDrawerSection
+    val hardwareReceiptPaperSection: String get() = g9.hardwareReceiptPaperSection
+    val hardwareAutoCutLabel: String get() = g9.hardwareAutoCutLabel
+    val hardwareAutoCutDesc: String get() = g9.hardwareAutoCutDesc
     val hardwareCustomerDisplaySection: String get() = g9.hardwareCustomerDisplaySection
     val hardwareDriverUnavailable: String get() = g9.hardwareDriverUnavailable
     val hardwareDriverNotDetected: String get() = g9.hardwareDriverNotDetected
@@ -1512,6 +1697,51 @@ class UiStrings(
     val gatewayCheckoutLoadingPage: String get() = g9.gatewayCheckoutLoadingPage
     val gatewayPendingBannerTitle: String get() = g9.gatewayPendingBannerTitle
     val gatewayPendingResumeButton: String get() = g9.gatewayPendingResumeButton
+    // ── Setup / wizard (group 10) ──
+    val setupTitle: String get() = g10.setupTitle
+    val setupBack: String get() = g10.setupBack
+    val setupGuideTitle: String get() = g10.setupGuideTitle
+    val setupGuideClose: String get() = g10.setupGuideClose
+    val setupHowCafeRuns: String get() = g10.setupHowCafeRuns
+    val setupModeDecidesHint: String get() = g10.setupModeDecidesHint
+    val setupConnection: String get() = g10.setupConnection
+    val setupCafeWebsiteUrl: String get() = g10.setupCafeWebsiteUrl
+    val setupCafeWebsiteUrlHint: String get() = g10.setupCafeWebsiteUrlHint
+    val setupCafeWebsitePlaceholder: String get() = g10.setupCafeWebsitePlaceholder
+    val setupConnect: String get() = g10.setupConnect
+    val setupConnecting: String get() = g10.setupConnecting
+    val setupConnected: String get() = g10.setupConnected
+    val setupEnterManually: String get() = g10.setupEnterManually
+    val setupHideManualFields: String get() = g10.setupHideManualFields
+    val setupManualHint: String get() = g10.setupManualHint
+    val setupSupabaseUrl: String get() = g10.setupSupabaseUrl
+    val setupSupabaseUrlPlaceholder: String get() = g10.setupSupabaseUrlPlaceholder
+    val setupSupabaseAnonKey: String get() = g10.setupSupabaseAnonKey
+    val setupSupabaseAnonKeyPlaceholder: String get() = g10.setupSupabaseAnonKeyPlaceholder
+    val setupCafeName: String get() = g10.setupCafeName
+    val setupCafeNamePlaceholder: String get() = g10.setupCafeNamePlaceholder
+    val setupSave: String get() = g10.setupSave
+    val setupSaved: String get() = g10.setupSaved
+    val setupCheckConnection: String get() = g10.setupCheckConnection
+    val setupChecking: String get() = g10.setupChecking
+    val setupConnectionOk: String get() = g10.setupConnectionOk
+    val setupWifiForStaff: String get() = g10.setupWifiForStaff
+    val setupHotspotHint: String get() = g10.setupHotspotHint
+    val setupOpenHotspotSettings: String get() = g10.setupOpenHotspotSettings
+    val setupWifiRouterHint: String get() = g10.setupWifiRouterHint
+    val setupOffCloudHint: String get() = g10.setupOffCloudHint
+    val setupNextPrinterHint: String get() = g10.setupNextPrinterHint
+    val setupNextPrinterDevicesHint: String get() = g10.setupNextPrinterDevicesHint
+    val setupModeCloudTitle: String get() = g10.setupModeCloudTitle
+    val setupModeCloudBlurb: String get() = g10.setupModeCloudBlurb
+    val setupModeLanTitle: String get() = g10.setupModeLanTitle
+    val setupModeLanBlurb: String get() = g10.setupModeLanBlurb
+    val setupModeKioskTitle: String get() = g10.setupModeKioskTitle
+    val setupModeKioskBlurb: String get() = g10.setupModeKioskBlurb
+    val setupSwitchTitleFormat: String get() = g10.setupSwitchTitleFormat
+    val setupSwitchIntro: String get() = g10.setupSwitchIntro
+    val setupSwitchToFormat: String get() = g10.setupSwitchToFormat
+    val setupCancel: String get() = g10.setupCancel
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -1555,7 +1785,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sendToKitchen = "Hantar ke Dapur",
             payCash = "Bayar Tunai",
             payQR = "Bayar QR",
-            showQrButton = "Tunjuk QR",
+            showQrButton = "QR",
             cancelOrder = "Batal Pesanan",
             status = "Status",
             emptyCart = "Troli kosong — pilih barangan menu",
@@ -1614,6 +1844,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeClosedDesc = "Sesi kafe kini ditutup.",
             tapToReopenDesc = "Ketik untuk buka semula sesi admin. Pastikan tiada pelanggan dapat melihat skrin anda.",
             reopenCafeButton = "Buka Semula Kafe",
+            lockSignInWithOwnerKey = "Log masuk dengan kunci pemilik",
+            lockSignInWithOwnerKeyDesc = "Imbas kunci pemilik kafe untuk membuka semula pada peranti ini.",
             settingsTitle = "Tetapan",
             staffInvitationSection = "Jemputan Kakitangan",
             shareButton = "Kongsi",
@@ -1675,6 +1907,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             currentDeviceLabel = "(Peranti ini)",
             lastOnlineLabel = "Dalam talian terakhir",
             backgroundSetupTitle = "Persediaan Latar Belakang",
+            backgroundSetupDesc = "Halang Android daripada menidurkan apl supaya pesanan terus masuk",
+            licenceGeneratorNote = "The full list is generated from the build. Debug builds show only a placeholder — install a release build to read all 200 component licences.",
+            licenceExtraNotices = "Not detected by the generator, reproduced here as required by Apache 2.0 — ZXing (Zebra Crossing), Copyright ZXing authors, licensed under the Apache License, Version 2.0: http://www.apache.org/licenses/LICENSE-2.0",
             keepAliveExplanation = "Untuk menerima pesanan dengan boleh dipercayai, aplikasi ini perlu terus berjalan di latar belakang. Ciri penjimatan kuasa telefon anda mungkin perlu diselaraskan.",
             detectedLabel = "Dikesan:",
             batteryOptDisabled = "Pengoptimuman bateri dilumpuhkan (baik)",
@@ -1773,6 +2008,21 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             exportCsvButton = "Eksport CSV",
             cashDrawerTitle = "Laci Wang Tunai",
             drawerOpeningsLabel = "Bilangan laci dibuka hari ini",
+            salesReportTitle = "Laporan Jualan",
+            colMetric = "Metrik",
+            colValue = "Nilai",
+            totalPayByFormat = "Jumlah Bayaran %s",
+            topItemsMergedTitle = "Barangan Terlaris (3 teratas setiap kategori)",
+            colCategory = "Kategori",
+            colItem = "Barangan",
+            colQty = "Kuantiti",
+            colRevenue = "Hasil",
+            colSource = "Sumber",
+            colCount = "Bilangan",
+            colTable = "Meja",
+            colOrders = "Pesanan",
+            pageOfFormat = "Halaman %d daripada %d",
+            cancelledLabel = "Dibatalkan",
         ),
         g5 = UiStringsGroup5(
             signOutClosingTitle = "Log Keluar dengan Penutupan",
@@ -1801,7 +2051,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             orderHistoryTitle = "Sejarah Pesanan",
             noOrdersYet = "Belum ada pesanan",
             orderSessionLabel = "Sesi",
-            reprintToKitchenButton = "Cetak Semula ke Dapur",
+            reprintToKitchenButton = "Cetak Dapur",
             addItemsToOrderButton = "Tambah ke Pesanan",
             receiptPrintQuestion = "Cetak resit pelanggan?",
             receiptPrintYes = "Ya, Cetak",
@@ -1882,6 +2132,22 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             tableWord = "Meja",
             sessionPendingConfirmation = "Menunggu pengesahan",
             addItemCd = "Tambah barang",
+            loginAsSecondaryAdmin = "Masuk sebagai Admin Kedua",
+            permissionsTitle = "Kebenaran diperlukan",
+            permissionsIntro = "Aplikasi ini perlukan ketiga-tiganya untuk berfungsi. Benarkan sekali sahaja.",
+            permissionLocationLabel = "Lokasi",
+            permissionLocationWhy = "Daftar masuk pekerja di kafe, dan mencari pencetak Bluetooth.",
+            permissionNearbyLabel = "Peranti berdekatan",
+            permissionNearbyWhy = "Menyambung ke pencetak resit.",
+            permissionNotificationsLabel = "Pemberitahuan",
+            permissionNotificationsWhy = "Amaran pesanan baharu dan status cetakan dapur.",
+            permissionGrantAction = "Benarkan",
+            permissionSettingsAction = "Buka tetapan aplikasi",
+            permissionBlockedNote = "Ditolak. Buka tetapan aplikasi dan benarkan di sana.",
+            customChargeButton = "Tersuai",
+            customChargeNameLabel = "Keterangan caj",
+            customChargePriceLabel = "Harga (RM)",
+            customChargeAddButton = "Tambah caj",
             cancelReasonLabel = "Sebab pembatalan:",
             enterReasonHint = "Masukkan sebab…",
             noReasonGiven = "Tiada sebab diberi",
@@ -1894,6 +2160,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             askAdminAddTables = "Minta admin menambah meja.",
             selectTableForOrder = "Pilih Meja untuk Pesanan Baharu",
             noFreeTables = "Tiada meja kosong. Semua meja penuh.",
+            cafeProfileDesc = "Nama kafe, logo, lokasi, pratetap menu dan QR pembayaran",
+            settingsHardwareSection = "Cetakan & perkakasan",
             menuManagementDesc = "Tambah, edit dan susun item menu dan kategori",
             tablesManagementTitle = "Pengurusan Meja",
             tablesManagementDesc = "Konfigur meja makan dan susun atur tempat duduk",
@@ -1913,9 +2181,35 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             reportEmailLabel = "E-mel laporan",
             reportEmailHint = "Laporan penutup/bulanan dihantar ke sini (dihantar dari pelayan).",
             businessDayStartLabel = "Hari perniagaan bermula pada (jam 0–23)",
+            businessDayEndLabel = "Hari perniagaan berakhir pada",
+            reportSavedToDownloads = "Laporan penutupan disimpan ke folder Muat Turun peranti apabila anda Log Keluar dengan Penutupan. Nama fail: nama_kafe-YYMMDDHHMM.html",
+            businessDayHoursHint = "Waktu tutup boleh lebih awal daripada waktu buka — kafe yang berniaga melepasi tengah malam.",
             businessDayStartHint = "cth. 15 = 3 PM. Jualan selepas tengah malam masih dikira untuk hari pembukaan.",
             securitySection = "Keselamatan",
             pinLockLabel = "Kunci PIN untuk Tetapan",
+            calculatorTitle = "Kalkulator",
+            screenSection = "Skrin",
+            unlinkDeviceLabel = "Nyahpaut peranti",
+            unlinkDeviceDesc = "Lupakan kafe ini supaya peranti boleh disediakan untuk kafe lain.",
+            unlinkDeviceButton = "Nyahpaut peranti ini",
+            unlinkConfirmTitle = "Nyahpaut peranti ini?",
+            unlinkConfirmBody = "Peranti ini akan melupakan kafe, sesi log masuk, menu, meja, sejarah pesanan, pencetak dan QR pembayaran. Data kafe di pelayan tidak disentuh. Anda perlu mengimbas kunci pemilik semula selepas ini.",
+            ownerQrNoBackend = "Kod QR ini tidak membawa butiran pelayan, dan laman web kafe tidak dapat dihubungi. Jana semula kunci pemilik dari peranti kafe yang sedia ada.",
+            fullscreenLabel = "Mod skrin penuh",
+            fullscreenDesc = "Sembunyikan bar status dan bar navigasi Android. Leret dari tepi skrin untuk memaparkannya semula seketika.",
+            calculatorMemoryHint = "Ketik memori untuk memanggil semula, tekan dan tahan untuk simpan. Memori tidak pernah dikosongkan.",
+            drawerPinLabel = "PIN laci tunai",
+            drawerPinDesc = "Membuka laci dari kalkulator tanpa merekod jualan.",
+            drawerPinSetButton = "Tetapkan PIN laci",
+            drawerPinChangeButton = "Tukar PIN laci",
+            drawerPinCurrentPrompt = "Masukkan PIN laci semasa",
+            drawerPinNewPrompt = "Masukkan PIN baharu (4–8 digit)",
+            drawerPinConfirmTitle = "Sahkan PIN baharu",
+            drawerPinConfirmBody = "Masukkan semula PIN baharu untuk mengesahkan perubahan.",
+            drawerPinTooShort = "PIN mesti 4 hingga 8 digit",
+            drawerPinWrongCurrent = "Itu bukan PIN laci semasa",
+            drawerPinSaved = "PIN laci disimpan",
+            drawerPinHowTo = "PIN lalai ialah 666666 — tukarkannya. Cara guna: buka Kalkulator dari paparan meja, taip PIN seperti nombor biasa, kemudian tekan =. Laci akan terbuka dan skrin dikosongkan. Ia hanya berfungsi pada nombor kosong — jika pengiraan sedang berjalan, = akan mengira seperti biasa.",
             pinLockDesc = "Perlukan PIN 4 digit sebelum membuka Tetapan pada peranti ini.",
             changePinButton = "Tukar PIN",
             showPrintStatusLabel = "Tunjuk status cetakan dapur",
@@ -2162,6 +2456,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             devicesAndHardwareDesc = "Pilih pencetak, laci tunai dan paparan pelanggan untuk peranti ini",
             hardwarePrintersSection = "Pencetak resit",
             hardwareCashDrawerSection = "Laci tunai",
+            hardwareReceiptPaperSection = "Kertas resit",
+            hardwareAutoCutLabel = "Potong automatik selepas cetak",
+            hardwareAutoCutDesc = "Matikan jika pencetak ini hanya ada bar koyak dan bukan pemotong — menjimatkan tiga baris kertas bagi setiap resit.",
             hardwareCustomerDisplaySection = "Paparan pelanggan",
             hardwareDriverUnavailable = "Tidak tersedia",
             hardwareDriverNotDetected = "Tidak dikesan pada peranti ini",
@@ -2236,6 +2533,52 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             gatewayPendingBannerTitle = "Pembayaran sedang berjalan",
             gatewayPendingResumeButton = "Sambung",
         ),
+        g10 = UiStringsGroup10(
+            setupTitle = "Persediaan",
+            setupBack = "Kembali",
+            setupGuideTitle = "Panduan persediaan",
+            setupGuideClose = "Tutup",
+            setupHowCafeRuns = "Bagaimana kafe ini beroperasi",
+            setupModeDecidesHint = "Ini menentukan soalan lain pada skrin ini.",
+            setupConnection = "Sambungan",
+            setupCafeWebsiteUrl = "URL laman web kafe",
+            setupCafeWebsiteUrlHint = "Masukkan alamat laman web kafe dan ketik Sambung. Yang lain akan diisi sendiri.",
+            setupCafeWebsitePlaceholder = "https://kafe-anda.pages.dev",
+            setupConnect = "Sambung",
+            setupConnecting = "Menyambung…",
+            setupConnected = "✓ Bersambung — ketik Simpan untuk guna.",
+            setupEnterManually = "▼ Masukkan secara manual",
+            setupHideManualFields = "▲ Sembunyikan ruangan manual",
+            setupManualHint = "Masukkan butiran daripada papan pemuka projek Supabase anda. Guna ini jika laman web belum dilancarkan.",
+            setupSupabaseUrl = "URL Supabase",
+            setupSupabaseUrlPlaceholder = "https://projek-anda.supabase.co",
+            setupSupabaseAnonKey = "Kunci awam Supabase",
+            setupSupabaseAnonKeyPlaceholder = "eyJhbGci…",
+            setupCafeName = "Nama kafe",
+            setupCafeNamePlaceholder = "Kafe Anda",
+            setupSave = "Simpan",
+            setupSaved = "Tersimpan ✓",
+            setupCheckConnection = "Semak sambungan",
+            setupChecking = "Menyemak…",
+            setupConnectionOk = "Sambungan OK ✓",
+            setupWifiForStaff = "Wi-Fi untuk peranti kakitangan",
+            setupHotspotHint = "Telefon kakitangan mesti dalam rangkaian yang sama dengan peranti ini. Hidupkan hotspot, kemudian sambungkan setiap telefon. Guna nama dan kata laluan yang boleh dikongsi — kafe akan guna rangkaian ini setiap hari.",
+            setupOpenHotspotSettings = "Buka tetapan hotspot",
+            setupWifiRouterHint = "Penghala Wi-Fi sedia ada juga berfungsi — jika kafe sudah ada, sambungkan peranti ini dan telefon kakitangan kepadanya dan langkau hotspot.",
+            setupOffCloudHint = "Peranti ini menyimpan data kafe dan mencetak dengan pencetaknya sendiri. Tiada internet diperlukan.",
+            setupNextPrinterHint = "Seterusnya: pasangkan pencetak dalam Pengurusan Kafe → Pencetak.",
+            setupNextPrinterDevicesHint = " Kemudian tambah telefon kakitangan dalam Peranti.",
+            setupModeCloudTitle = "Dalam talian penuh dengan pesanan QR",
+            setupModeCloudBlurb = "Pelanggan memesan dari telefon sendiri dengan mengimbas QR meja. Perlu internet.",
+            setupModeLanTitle = "AP (W)LAN tanpa pesanan QR",
+            setupModeLanBlurb = "Telefon kakitangan memesan melalui Wi-Fi anda sendiri. Peranti ini menyimpan data dan pencetak.",
+            setupModeKioskTitle = "Mod Kiosk",
+            setupModeKioskBlurb = "Peranti ini sahaja. Tiada meja dan tiada telefon kakitangan — setiap pesanan mendapat nombor berjalan.",
+            setupSwitchTitleFormat = "Tukar dari %1\$s ke %2\$s?",
+            setupSwitchIntro = "Ini menukar cara keseluruhan kafe beroperasi. Sebelum anda teruskan:",
+            setupSwitchToFormat = "Tukar ke %1\$s",
+            setupCancel = "Batal",
+        ),
     )
     AppLanguage.EN -> UiStrings(
         g1 = UiStringsGroup1(
@@ -2277,7 +2620,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sendToKitchen = "Send to Kitchen",
             payCash = "Pay Cash",
             payQR = "Pay QR",
-            showQrButton = "Show QR",
+            showQrButton = "QR",
             cancelOrder = "Cancel Order",
             status = "Status",
             emptyCart = "Cart is empty — pick menu items",
@@ -2336,6 +2679,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeClosedDesc = "The café session is currently closed.",
             tapToReopenDesc = "Tap to re-open admin session. Ensure no customers can see your screen.",
             reopenCafeButton = "Reopen Café",
+            lockSignInWithOwnerKey = "Sign in with owner key",
+            lockSignInWithOwnerKeyDesc = "Scan the café owner key to reopen on this device.",
             settingsTitle = "Settings",
             staffInvitationSection = "Staff Invitation",
             shareButton = "Share",
@@ -2397,6 +2742,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             currentDeviceLabel = "(Current)",
             lastOnlineLabel = "Last online",
             backgroundSetupTitle = "Background Setup",
+            backgroundSetupDesc = "Stop Android from sleeping the app so orders keep arriving",
+            licenceGeneratorNote = "The full list is generated from the build. Debug builds show only a placeholder — install a release build to read all 200 component licences.",
+            licenceExtraNotices = "Not detected by the generator, reproduced here as required by Apache 2.0 — ZXing (Zebra Crossing), Copyright ZXing authors, licensed under the Apache License, Version 2.0: http://www.apache.org/licenses/LICENSE-2.0",
             keepAliveExplanation = "To receive orders reliably, this app needs to stay running in the background. Your phone's power-saving features may need to be adjusted.",
             detectedLabel = "Detected:",
             batteryOptDisabled = "Battery optimization disabled (good)",
@@ -2495,6 +2843,21 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             exportCsvButton = "Export CSV",
             cashDrawerTitle = "Cash Drawer",
             drawerOpeningsLabel = "Drawer openings today",
+            salesReportTitle = "Sales Report",
+            colMetric = "Metric",
+            colValue = "Value",
+            totalPayByFormat = "Total Pay by %s",
+            topItemsMergedTitle = "Top Items (top 3 per category)",
+            colCategory = "Category",
+            colItem = "Item",
+            colQty = "Qty",
+            colRevenue = "Revenue",
+            colSource = "Source",
+            colCount = "Count",
+            colTable = "Table",
+            colOrders = "Orders",
+            pageOfFormat = "Page %d of %d",
+            cancelledLabel = "Cancelled",
         ),
         g5 = UiStringsGroup5(
             signOutClosingTitle = "Sign Out with Closing",
@@ -2523,7 +2886,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             orderHistoryTitle = "Order History",
             noOrdersYet = "No orders yet",
             orderSessionLabel = "Session",
-            reprintToKitchenButton = "Reprint to Kitchen",
+            reprintToKitchenButton = "Print Kitchen",
             addItemsToOrderButton = "Add to Order",
             receiptPrintQuestion = "Print customer receipt?",
             receiptPrintYes = "Yes, Print",
@@ -2604,6 +2967,22 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             tableWord = "Table",
             sessionPendingConfirmation = "Pending confirmation",
             addItemCd = "Add item",
+            loginAsSecondaryAdmin = "Log in as Secondary Admin",
+            permissionsTitle = "Permissions needed",
+            permissionsIntro = "This app needs all three to run. Grant them once and you will not be asked again.",
+            permissionLocationLabel = "Location",
+            permissionLocationWhy = "Staff clock-in inside the café, and finding Bluetooth printers.",
+            permissionNearbyLabel = "Nearby devices",
+            permissionNearbyWhy = "Connecting to the receipt printer.",
+            permissionNotificationsLabel = "Notifications",
+            permissionNotificationsWhy = "New-order alerts and kitchen print status.",
+            permissionGrantAction = "Allow",
+            permissionSettingsAction = "Open app settings",
+            permissionBlockedNote = "Denied. Open app settings and allow them there.",
+            customChargeButton = "Customized",
+            customChargeNameLabel = "Charge description",
+            customChargePriceLabel = "Price (RM)",
+            customChargeAddButton = "Add charge",
             cancelReasonLabel = "Reason for cancellation:",
             enterReasonHint = "Enter reason…",
             noReasonGiven = "No reason given",
@@ -2616,6 +2995,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             askAdminAddTables = "Ask the admin to add tables.",
             selectTableForOrder = "Select Table for New Order",
             noFreeTables = "No free tables available. All tables are occupied.",
+            cafeProfileDesc = "Café name, logo, location, menu preset and payment QR",
+            settingsHardwareSection = "Printing & hardware",
             menuManagementDesc = "Add, edit, and organise menu items and categories",
             tablesManagementTitle = "Tables Management",
             tablesManagementDesc = "Configure dining tables and seating layout",
@@ -2635,9 +3016,35 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             reportEmailLabel = "Report email",
             reportEmailHint = "Closing/monthly reports are emailed here (sent from the server).",
             businessDayStartLabel = "Business day starts at (hour 0–23)",
+            businessDayEndLabel = "Business day ends at",
+            reportSavedToDownloads = "The closing report is saved to this device's Downloads folder when you Sign Out with Closing. File name: cafe_name-YYMMDDHHMM.html",
+            businessDayHoursHint = "The closing time may be earlier than the opening time — for a café that trades past midnight.",
             businessDayStartHint = "e.g. 15 = 3 PM. Sales after midnight still count toward the opening day.",
             securitySection = "Security",
             pinLockLabel = "PIN lock for Settings",
+            calculatorTitle = "Calculator",
+            screenSection = "Screen",
+            unlinkDeviceLabel = "Unlink device",
+            unlinkDeviceDesc = "Forget this café so the device can be set up for a different one.",
+            unlinkDeviceButton = "Unlink this device",
+            unlinkConfirmTitle = "Unlink this device?",
+            unlinkConfirmBody = "This device will forget the café, its sign-in, the menu, tables, order history, printers and payment QR. Nothing on the server is touched. You will need to scan an owner key again afterwards.",
+            ownerQrNoBackend = "This QR carries no backend details, and the café's website could not be reached. Generate the owner key again from a device that is already set up.",
+            fullscreenLabel = "Fullscreen mode",
+            fullscreenDesc = "Hide the Android status bar and navigation bar. Swipe in from the screen edge to bring them back temporarily.",
+            calculatorMemoryHint = "Tap a memory to recall it, press and hold to store. Memories are never cleared.",
+            drawerPinLabel = "Cash drawer PIN",
+            drawerPinDesc = "Opens the till from the calculator without recording a sale.",
+            drawerPinSetButton = "Set drawer PIN",
+            drawerPinChangeButton = "Change drawer PIN",
+            drawerPinCurrentPrompt = "Enter the current drawer PIN",
+            drawerPinNewPrompt = "Enter a new PIN (4–8 digits)",
+            drawerPinConfirmTitle = "Confirm the new PIN",
+            drawerPinConfirmBody = "Re-enter the new PIN to confirm the change.",
+            drawerPinTooShort = "PIN must be 4 to 8 digits",
+            drawerPinWrongCurrent = "That is not the current drawer PIN",
+            drawerPinSaved = "Drawer PIN saved",
+            drawerPinHowTo = "The default PIN is 666666 — change it. How to use it: open the Calculator from the table view, type the PIN as an ordinary number, then press =. The drawer opens and the screen clears. It only works on a bare number — if a sum is part-way through, = does arithmetic as normal.",
             pinLockDesc = "Require a 4-digit PIN before opening Settings on this device.",
             changePinButton = "Change PIN",
             showPrintStatusLabel = "Show kitchen print status",
@@ -2884,6 +3291,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             devicesAndHardwareDesc = "Choose the printer, cash drawer and customer display this device uses",
             hardwarePrintersSection = "Receipt printer",
             hardwareCashDrawerSection = "Cash drawer",
+            hardwareReceiptPaperSection = "Receipt paper",
+            hardwareAutoCutLabel = "Auto-cut after printing",
+            hardwareAutoCutDesc = "Turn off if this printer has a tear bar rather than a cutter — it saves three lines of paper on every receipt.",
             hardwareCustomerDisplaySection = "Customer display",
             hardwareDriverUnavailable = "Unavailable",
             hardwareDriverNotDetected = "Not detected on this device",
@@ -2958,6 +3368,52 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             gatewayPendingBannerTitle = "Payment in progress",
             gatewayPendingResumeButton = "Resume",
         ),
+        g10 = UiStringsGroup10(
+            setupTitle = "Setup",
+            setupBack = "Back",
+            setupGuideTitle = "Setup guide",
+            setupGuideClose = "Close",
+            setupHowCafeRuns = "How this café runs",
+            setupModeDecidesHint = "This decides what the rest of the screen asks for.",
+            setupConnection = "Connection",
+            setupCafeWebsiteUrl = "Café website URL",
+            setupCafeWebsiteUrlHint = "Enter the café's website address and tap Connect. The rest fills in itself.",
+            setupCafeWebsitePlaceholder = "https://your-cafe.pages.dev",
+            setupConnect = "Connect",
+            setupConnecting = "Connecting…",
+            setupConnected = "✓ Connected — tap Save to apply.",
+            setupEnterManually = "▼ Enter manually",
+            setupHideManualFields = "▲ Hide manual fields",
+            setupManualHint = "Enter the details from your Supabase project dashboard. Use this if your website isn't deployed yet.",
+            setupSupabaseUrl = "Supabase URL",
+            setupSupabaseUrlPlaceholder = "https://your-project.supabase.co",
+            setupSupabaseAnonKey = "Supabase anon key",
+            setupSupabaseAnonKeyPlaceholder = "eyJhbGci…",
+            setupCafeName = "Café name",
+            setupCafeNamePlaceholder = "Your Café",
+            setupSave = "Save",
+            setupSaved = "Saved ✓",
+            setupCheckConnection = "Check connection",
+            setupChecking = "Checking…",
+            setupConnectionOk = "Connection OK ✓",
+            setupWifiForStaff = "Wi-Fi for staff devices",
+            setupHotspotHint = "Staff phones must be on the same network as this device. Turn on its hotspot, then connect each phone to it. Use a name and password you can share — the café will use this network every day.",
+            setupOpenHotspotSettings = "Open hotspot settings",
+            setupWifiRouterHint = "An existing Wi-Fi router works just as well — if the café already has one, connect this device and the staff phones to it and skip the hotspot.",
+            setupOffCloudHint = "This device holds the café's data and prints to its own printer. No internet needed.",
+            setupNextPrinterHint = "Next: pair the printer in Café Management → Printers.",
+            setupNextPrinterDevicesHint = " Then add staff phones in Devices.",
+            setupModeCloudTitle = "Full Online with QR ordering",
+            setupModeCloudBlurb = "Customers order from their own phone by scanning a table QR. Needs internet.",
+            setupModeLanTitle = "(W)LAN AP without QR ordering",
+            setupModeLanBlurb = "Staff phones order over your own Wi-Fi. This device holds the data and the printer.",
+            setupModeKioskTitle = "Kiosk Mode",
+            setupModeKioskBlurb = "This device alone. No tables and no staff phones — each order gets a running number.",
+            setupSwitchTitleFormat = "Switch from %1\$s to %2\$s?",
+            setupSwitchIntro = "This changes how the whole café runs. Before you continue:",
+            setupSwitchToFormat = "Switch to %1\$s",
+            setupCancel = "Cancel",
+        ),
     )
     AppLanguage.ZH -> UiStrings(
         g1 = UiStringsGroup1(
@@ -2999,7 +3455,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sendToKitchen = "送往厨房",
             payCash = "现金支付",
             payQR = "扫码支付",
-            showQrButton = "显示二维码",
+            showQrButton = "QR",
             cancelOrder = "取消订单",
             status = "状态",
             emptyCart = "购物车是空的 — 请选择菜单项目",
@@ -3058,6 +3514,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeClosedDesc = "咖啡馆营业时段目前已关闭。",
             tapToReopenDesc = "点击以重新开启管理员会话。请确保没有顾客能看到您的屏幕。",
             reopenCafeButton = "重新开启咖啡馆",
+            lockSignInWithOwnerKey = "使用店主密钥登录",
+            lockSignInWithOwnerKeyDesc = "扫描店主密钥以在此设备上重新开启。",
             settingsTitle = "设置",
             staffInvitationSection = "员工邀请",
             shareButton = "分享",
@@ -3119,6 +3577,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             currentDeviceLabel = "(当前设备)",
             lastOnlineLabel = "最后在线",
             backgroundSetupTitle = "后台运行设置",
+            backgroundSetupDesc = "阻止 Android 休眠应用，确保订单持续接收",
+            licenceGeneratorNote = "The full list is generated from the build. Debug builds show only a placeholder — install a release build to read all 200 component licences.",
+            licenceExtraNotices = "Not detected by the generator, reproduced here as required by Apache 2.0 — ZXing (Zebra Crossing), Copyright ZXing authors, licensed under the Apache License, Version 2.0: http://www.apache.org/licenses/LICENSE-2.0",
             keepAliveExplanation = "为了可靠地接收订单，此应用需要在后台持续运行。您的手机省电功能可能需要调整。",
             detectedLabel = "检测到：",
             batteryOptDisabled = "电池优化已禁用（良好）",
@@ -3217,6 +3678,21 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             exportCsvButton = "导出CSV",
             cashDrawerTitle = "收银抽屉",
             drawerOpeningsLabel = "今日抽屉开启次数",
+            salesReportTitle = "销售报告",
+            colMetric = "项目",
+            colValue = "数值",
+            totalPayByFormat = "%s 收款总额",
+            topItemsMergedTitle = "热销商品（每类前 3）",
+            colCategory = "类别",
+            colItem = "商品",
+            colQty = "数量",
+            colRevenue = "收入",
+            colSource = "来源",
+            colCount = "数量",
+            colTable = "餐台",
+            colOrders = "订单",
+            pageOfFormat = "第 %d 页，共 %d 页",
+            cancelledLabel = "已取消",
         ),
         g5 = UiStringsGroup5(
             signOutClosingTitle = "结账退出",
@@ -3245,7 +3721,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             orderHistoryTitle = "订单历史",
             noOrdersYet = "暂无订单",
             orderSessionLabel = "场次",
-            reprintToKitchenButton = "重新打印到厨房",
+            reprintToKitchenButton = "打印厨房",
             addItemsToOrderButton = "添加到订单",
             receiptPrintQuestion = "打印顾客收据？",
             receiptPrintYes = "是，打印",
@@ -3326,6 +3802,22 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             tableWord = "餐桌",
             sessionPendingConfirmation = "待确认",
             addItemCd = "添加项目",
+            loginAsSecondaryAdmin = "以副管理员登录",
+            permissionsTitle = "需要权限",
+            permissionsIntro = "此应用需要全部三项权限才能运行。授权一次即可。",
+            permissionLocationLabel = "位置",
+            permissionLocationWhy = "员工在店内打卡，以及查找蓝牙打印机。",
+            permissionNearbyLabel = "附近设备",
+            permissionNearbyWhy = "连接小票打印机。",
+            permissionNotificationsLabel = "通知",
+            permissionNotificationsWhy = "新订单提醒和厨房打印状态。",
+            permissionGrantAction = "允许",
+            permissionSettingsAction = "打开应用设置",
+            permissionBlockedNote = "已拒绝。请在应用设置中允许。",
+            customChargeButton = "自定义",
+            customChargeNameLabel = "费用说明",
+            customChargePriceLabel = "价格 (RM)",
+            customChargeAddButton = "添加费用",
             cancelReasonLabel = "取消原因：",
             enterReasonHint = "输入原因…",
             noReasonGiven = "未提供原因",
@@ -3338,6 +3830,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             askAdminAddTables = "请管理员添加餐桌。",
             selectTableForOrder = "为新订单选择餐桌",
             noFreeTables = "没有空桌，所有餐桌已被占用。",
+            cafeProfileDesc = "咖啡厅名称、标志、位置、菜单预设和付款二维码",
+            settingsHardwareSection = "打印与硬件",
             menuManagementDesc = "添加、编辑和整理菜单项目及类别",
             tablesManagementTitle = "餐桌管理",
             tablesManagementDesc = "配置餐桌和座位布局",
@@ -3357,9 +3851,35 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             reportEmailLabel = "报告邮箱",
             reportEmailHint = "结账/月度报告将发送到此邮箱（由服务器发送）。",
             businessDayStartLabel = "营业日开始时间（0–23 时）",
+            businessDayEndLabel = "营业日结束于",
+            reportSavedToDownloads = "结账报告会在您「登出并结账」时保存到本机的下载文件夹。文件名：cafe_name-YYMMDDHHMM.html",
+            businessDayHoursHint = "结束时间可以早于开始时间 — 适用于营业至午夜后的店铺。",
             businessDayStartHint = "例如 15 = 下午 3 点。午夜后的销售仍计入开门当天。",
             securitySection = "安全",
             pinLockLabel = "设置的 PIN 锁",
+            calculatorTitle = "计算器",
+            screenSection = "屏幕",
+            unlinkDeviceLabel = "解除设备绑定",
+            unlinkDeviceDesc = "让此设备忘记该咖啡厅，以便配置到另一家。",
+            unlinkDeviceButton = "解除此设备绑定",
+            unlinkConfirmTitle = "解除此设备绑定？",
+            unlinkConfirmBody = "此设备将忘记咖啡厅、登录信息、菜单、餐台、订单记录、打印机和付款二维码。服务器数据不受影响。之后需要重新扫描店主密钥。",
+            ownerQrNoBackend = "此二维码不含后端信息，且无法访问咖啡厅网站。请从已配置的设备重新生成店主密钥。",
+            fullscreenLabel = "全屏模式",
+            fullscreenDesc = "隐藏 Android 状态栏和导航栏。从屏幕边缘向内滑动可暂时显示它们。",
+            calculatorMemoryHint = "点按记忆位调用，长按存储。记忆位永不清除。",
+            drawerPinLabel = "钱箱密码",
+            drawerPinDesc = "无需记录销售即可从计算器打开钱箱。",
+            drawerPinSetButton = "设置钱箱密码",
+            drawerPinChangeButton = "更改钱箱密码",
+            drawerPinCurrentPrompt = "输入当前钱箱密码",
+            drawerPinNewPrompt = "输入新密码（4–8 位）",
+            drawerPinConfirmTitle = "确认新密码",
+            drawerPinConfirmBody = "请再次输入新密码以确认更改。",
+            drawerPinTooShort = "密码必须为 4 至 8 位",
+            drawerPinWrongCurrent = "这不是当前的钱箱密码",
+            drawerPinSaved = "钱箱密码已保存",
+            drawerPinHowTo = "默认密码为 666666 — 请更改。使用方法：从餐台视图打开计算器，像普通数字一样输入密码，然后按 =。钱箱将打开，屏幕清空。仅在输入纯数字时有效 — 若正在计算，= 仍按普通运算处理。",
             pinLockDesc = "在此设备上打开设置前需要输入 4 位 PIN。",
             changePinButton = "更改 PIN",
             showPrintStatusLabel = "显示厨房打印状态",
@@ -3604,6 +4124,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             devicesAndHardwareDesc = "选择本设备使用的打印机、钱箱和顾客显示屏",
             hardwarePrintersSection = "收据打印机",
             hardwareCashDrawerSection = "钱箱",
+            hardwareReceiptPaperSection = "小票纸",
+            hardwareAutoCutLabel = "打印后自动切纸",
+            hardwareAutoCutDesc = "如果打印机只有撕纸条而没有切刀，请关闭 — 每张小票可省三行纸。",
             hardwareCustomerDisplaySection = "顾客显示屏",
             hardwareDriverUnavailable = "不可用",
             hardwareDriverNotDetected = "本设备未检测到",
@@ -3678,6 +4201,52 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             gatewayPendingBannerTitle = "付款进行中",
             gatewayPendingResumeButton = "继续",
         ),
+        g10 = UiStringsGroup10(
+            setupTitle = "设置",
+            setupBack = "返回",
+            setupGuideTitle = "设置指南",
+            setupGuideClose = "关闭",
+            setupHowCafeRuns = "此咖啡馆运行方式",
+            setupModeDecidesHint = "这将决定本屏幕其余部分询问的内容。",
+            setupConnection = "连接",
+            setupCafeWebsiteUrl = "咖啡馆网站网址",
+            setupCafeWebsiteUrlHint = "输入咖啡馆网站地址并点击连接。其余内容将自动填充。",
+            setupCafeWebsitePlaceholder = "https://your-cafe.pages.dev",
+            setupConnect = "连接",
+            setupConnecting = "连接中…",
+            setupConnected = "✓ 已连接 — 点击保存应用。",
+            setupEnterManually = "▼ 手动输入",
+            setupHideManualFields = "▲ 隐藏手动字段",
+            setupManualHint = "从 Supabase 项目面板输入详情。若网站尚未部署，请使用此项。",
+            setupSupabaseUrl = "Supabase 网址",
+            setupSupabaseUrlPlaceholder = "https://your-project.supabase.co",
+            setupSupabaseAnonKey = "Supabase 匿名密钥",
+            setupSupabaseAnonKeyPlaceholder = "eyJhbGci…",
+            setupCafeName = "咖啡馆名称",
+            setupCafeNamePlaceholder = "您的咖啡馆",
+            setupSave = "保存",
+            setupSaved = "已保存 ✓",
+            setupCheckConnection = "检查连接",
+            setupChecking = "检查中…",
+            setupConnectionOk = "连接正常 ✓",
+            setupWifiForStaff = "员工设备 Wi-Fi",
+            setupHotspotHint = "员工手机必须与本设备处于同一网络。开启热点，然后将每部手机连接上去。使用可共享的名称和密码 — 咖啡馆每天都会使用此网络。",
+            setupOpenHotspotSettings = "打开热点设置",
+            setupWifiRouterHint = "现有 Wi-Fi 路由器同样可用 — 若咖啡馆已有，请将本设备和员工手机连接到该路由器并跳过热点。",
+            setupOffCloudHint = "本设备保存咖啡馆数据并使用自己的打印机打印。无需互联网。",
+            setupNextPrinterHint = "下一步：在“咖啡馆管理 → 打印机”中配对打印机。",
+            setupNextPrinterDevicesHint = " 然后在“设备”中添加员工手机。",
+            setupModeCloudTitle = "全在线 QR 点餐",
+            setupModeCloudBlurb = "顾客扫描桌台 QR 后用自己的手机点餐。需要互联网。",
+            setupModeLanTitle = "（无线）局域网 AP，无 QR 点餐",
+            setupModeLanBlurb = "员工手机通过您的 Wi-Fi 点餐。本设备保存数据和打印机。",
+            setupModeKioskTitle = " kiosk 模式",
+            setupModeKioskBlurb = "仅此设备。没有桌台，没有员工手机 — 每个订单获得一个流水号。",
+            setupSwitchTitleFormat = "从 %1\$s 切换到 %2\$s？",
+            setupSwitchIntro = "这将改变整个咖啡馆的运行方式。继续之前：",
+            setupSwitchToFormat = "切换到 %1\$s",
+            setupCancel = "取消",
+        ),
     )
     AppLanguage.TA -> UiStrings(
         g1 = UiStringsGroup1(
@@ -3719,7 +4288,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sendToKitchen = "சமையலறைக்கு அனுப்பு",
             payCash = "பணம் செலுத்து",
             payQR = "QR செலுத்து",
-            showQrButton = "QR காட்டு",
+            showQrButton = "QR",
             cancelOrder = "ஆர்டரை ரத்து செய்",
             status = "நிலை",
             emptyCart = "வண்டி காலியாக உள்ளது — மெனுவைத் தேர்ந்தெடுக்கவும்",
@@ -3778,6 +4347,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeClosedDesc = "கஃபே அமர்வு தற்போது மூடப்பட்டுள்ளது.",
             tapToReopenDesc = "நிர்வாக அமர்வை மீண்டும் திறக்க தட்டவும். வாடிக்கையாளர்கள் உங்கள் திரையைக் காண முடியாது என்பதை உறுதிப்படுத்தவும்.",
             reopenCafeButton = "கஃபேவை மீண்டும் திற",
+            lockSignInWithOwnerKey = "உரிமையாளர் விசையுடன் உள்நுழை",
+            lockSignInWithOwnerKeyDesc = "இந்தச் சாதனத்தில் மீண்டும் திறக்க கஃபே உரிமையாளர் விசையை ஸ்கேன் செய்யவும்.",
             settingsTitle = "அமைப்புகள்",
             staffInvitationSection = "பணியாளர் அழைப்பு",
             shareButton = "பகிர்",
@@ -3839,6 +4410,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             currentDeviceLabel = "(இந்தச் சாதனம்)",
             lastOnlineLabel = "கடைசியாக ஆன்லைனில்",
             backgroundSetupTitle = "பின்னணி அமைப்பு",
+            backgroundSetupDesc = "ஆர்டர்கள் தொடர்ந்து வர Android செயலியை உறங்க விடாமல் தடு",
+            licenceGeneratorNote = "The full list is generated from the build. Debug builds show only a placeholder — install a release build to read all 200 component licences.",
+            licenceExtraNotices = "Not detected by the generator, reproduced here as required by Apache 2.0 — ZXing (Zebra Crossing), Copyright ZXing authors, licensed under the Apache License, Version 2.0: http://www.apache.org/licenses/LICENSE-2.0",
             keepAliveExplanation = "ஆர்டர்களை நம்பகமாகப் பெற, இந்த ஆப் பின்னணியில் தொடர்ந்து இயங்க வேண்டும். உங்கள் தொலைபேசியின் மின் சேமிப்பு அம்சங்களை சரிசெய்ய வேண்டியிருக்கலாம்.",
             detectedLabel = "கண்டறியப்பட்டது:",
             batteryOptDisabled = "பேட்டரி மேம்படுத்தல் முடக்கப்பட்டது (நல்லது)",
@@ -3937,6 +4511,21 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             exportCsvButton = "CSV ஏற்றுமதி",
             cashDrawerTitle = "பண இழுப்பறை",
             drawerOpeningsLabel = "இன்று இழுப்பறை திறந்த எண்ணிக்கை",
+            salesReportTitle = "விற்பனை அறிக்கை",
+            colMetric = "அளவுகோல்",
+            colValue = "மதிப்பு",
+            totalPayByFormat = "%s மூலம் மொத்தம்",
+            topItemsMergedTitle = "அதிகம் விற்பனையானவை (ஒவ்வொரு வகையிலும் முதல் 3)",
+            colCategory = "வகை",
+            colItem = "உருப்படி",
+            colQty = "எண்ணிக்கை",
+            colRevenue = "வருவாய்",
+            colSource = "மூலம்",
+            colCount = "எண்",
+            colTable = "மேசை",
+            colOrders = "ஆர்டர்கள்",
+            pageOfFormat = "பக்கம் %d / %d",
+            cancelledLabel = "ரத்து செய்யப்பட்டது",
         ),
         g5 = UiStringsGroup5(
             signOutClosingTitle = "மூடலுடன் வெளியேறு",
@@ -3965,7 +4554,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             orderHistoryTitle = "ஆர்டர் வரலாறு",
             noOrdersYet = "இன்னும் ஆர்டர்கள் இல்லை",
             orderSessionLabel = "அமர்வு",
-            reprintToKitchenButton = "சமையலறைக்கு மீண்டும் அச்சிடு",
+            reprintToKitchenButton = "சமையலறை அச்சிடு",
             addItemsToOrderButton = "ஆர்டரில் சேர்",
             receiptPrintQuestion = "வாடிக்கையாளர் ரசீதை அச்சிடவா?",
             receiptPrintYes = "ஆம், அச்சிடு",
@@ -4046,6 +4635,22 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             tableWord = "மேசை",
             sessionPendingConfirmation = "உறுதிப்படுத்தல் நிலுவையில்",
             addItemCd = "உருப்படியைச் சேர்",
+            loginAsSecondaryAdmin = "இரண்டாம் நிர்வாகியாக உள்நுழை",
+            permissionsTitle = "அனுமதிகள் தேவை",
+            permissionsIntro = "இயங்க மூன்று அனுமதிகளும் தேவை. ஒரு முறை வழங்கினால் போதும்.",
+            permissionLocationLabel = "இருப்பிடம்",
+            permissionLocationWhy = "ஊழியர் வரவு பதிவு மற்றும் புளூடூத் அச்சுப்பொறி தேடல்.",
+            permissionNearbyLabel = "அருகில் உள்ள சாதனங்கள்",
+            permissionNearbyWhy = "ரசீது அச்சுப்பொறியுடன் இணைக்க.",
+            permissionNotificationsLabel = "அறிவிப்புகள்",
+            permissionNotificationsWhy = "புதிய ஆர்டர் அறிவிப்பு மற்றும் அச்சு நிலை.",
+            permissionGrantAction = "அனுமதி",
+            permissionSettingsAction = "ஆப் அமைப்புகளைத் திற",
+            permissionBlockedNote = "மறுக்கப்பட்டது. ஆப் அமைப்புகளில் அனுமதிக்கவும்.",
+            customChargeButton = "தனிப்பயன்",
+            customChargeNameLabel = "கட்டண விவரம்",
+            customChargePriceLabel = "விலை (RM)",
+            customChargeAddButton = "கட்டணம் சேர்",
             cancelReasonLabel = "ரத்து செய்வதற்கான காரணம்:",
             enterReasonHint = "காரணத்தை உள்ளிடவும்…",
             noReasonGiven = "காரணம் தரப்படவில்லை",
@@ -4058,6 +4663,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             askAdminAddTables = "மேசைகளைச் சேர்க்க நிர்வாகியிடம் கேளுங்கள்.",
             selectTableForOrder = "புதிய ஆர்டருக்கு மேசையைத் தேர்ந்தெடுக்கவும்",
             noFreeTables = "காலி மேசைகள் இல்லை. அனைத்து மேசைகளும் நிரம்பியுள்ளன.",
+            cafeProfileDesc = "கஃபே பெயர், சின்னம், இருப்பிடம், மெனு முன்னமைவு மற்றும் கட்டண QR",
+            settingsHardwareSection = "அச்சிடுதல் & வன்பொருள்",
             menuManagementDesc = "மெனு உருப்படிகள் மற்றும் வகைகளைச் சேர், திருத்து, ஒழுங்கமை",
             tablesManagementTitle = "மேசை மேலாண்மை",
             tablesManagementDesc = "உணவு மேசைகள் மற்றும் இருக்கை அமைப்பை உள்ளமை",
@@ -4077,9 +4684,35 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             reportEmailLabel = "அறிக்கை மின்னஞ்சல்",
             reportEmailHint = "மூடல்/மாதாந்திர அறிக்கைகள் இங்கு மின்னஞ்சல் செய்யப்படும் (சேவையகத்திலிருந்து அனுப்பப்படும்).",
             businessDayStartLabel = "வணிக நாள் தொடங்கும் நேரம் (மணி 0–23)",
+            businessDayEndLabel = "வணிக நாள் முடிவு",
+            reportSavedToDownloads = "நீங்கள் மூடலுடன் வெளியேறும்போது இறுதி அறிக்கை இச்சாதனத்தின் Downloads கோப்புறையில் சேமிக்கப்படும். கோப்புப் பெயர்: cafe_name-YYMMDDHHMM.html",
+            businessDayHoursHint = "மூடும் நேரம் திறக்கும் நேரத்தை விட முந்தையதாக இருக்கலாம் — நள்ளிரவைக் கடந்து இயங்கும் கஃபேக்களுக்கு.",
             businessDayStartHint = "எ.கா. 15 = மாலை 3 மணி. நள்ளிரவுக்குப் பிந்தைய விற்பனை திறந்த நாளுக்கே கணக்கிடப்படும்.",
             securitySection = "பாதுகாப்பு",
             pinLockLabel = "அமைப்புகளுக்கான PIN பூட்டு",
+            calculatorTitle = "கணிப்பான்",
+            screenSection = "திரை",
+            unlinkDeviceLabel = "சாதனத்தைத் துண்டி",
+            unlinkDeviceDesc = "இந்தக் கஃபேயை மறந்து, சாதனத்தை வேறொன்றுக்கு அமைக்க அனுமதி.",
+            unlinkDeviceButton = "இந்தச் சாதனத்தைத் துண்டி",
+            unlinkConfirmTitle = "இந்தச் சாதனத்தைத் துண்டிக்கவா?",
+            unlinkConfirmBody = "இந்தச் சாதனம் கஃபே, உள்நுழைவு, மெனு, மேசைகள், ஆர்டர் வரலாறு, அச்சுப்பொறிகள் மற்றும் கட்டண QR ஐ மறக்கும். சேவையகத்தில் எதுவும் மாறாது. பின்னர் உரிமையாளர் விசையை மீண்டும் ஸ்கேன் செய்ய வேண்டும்.",
+            ownerQrNoBackend = "இந்த QR இல் சேவையக விவரங்கள் இல்லை, கஃபேயின் இணையதளத்தையும் அணுக முடியவில்லை. ஏற்கனவே அமைக்கப்பட்ட சாதனத்திலிருந்து உரிமையாளர் விசையை மீண்டும் உருவாக்கவும்.",
+            fullscreenLabel = "முழுத்திரை பயன்முறை",
+            fullscreenDesc = "Android நிலைப் பட்டி மற்றும் வழிசெலுத்தல் பட்டியை மறை. திரை விளிம்பிலிருந்து உள்ளே இழுத்தால் அவை தற்காலிகமாக மீண்டும் தோன்றும்.",
+            calculatorMemoryHint = "நினைவகத்தை அழைக்க தட்டவும், சேமிக்க அழுத்திப் பிடிக்கவும். நினைவகங்கள் ஒருபோதும் அழிக்கப்படுவதில்லை.",
+            drawerPinLabel = "பணப்பெட்டி PIN",
+            drawerPinDesc = "விற்பனையைப் பதிவு செய்யாமல் கணிப்பானிலிருந்து பணப்பெட்டியைத் திறக்கும்.",
+            drawerPinSetButton = "பணப்பெட்டி PIN அமை",
+            drawerPinChangeButton = "பணப்பெட்டி PIN மாற்று",
+            drawerPinCurrentPrompt = "தற்போதைய பணப்பெட்டி PIN ஐ உள்ளிடவும்",
+            drawerPinNewPrompt = "புதிய PIN ஐ உள்ளிடவும் (4–8 இலக்கங்கள்)",
+            drawerPinConfirmTitle = "புதிய PIN ஐ உறுதிப்படுத்தவும்",
+            drawerPinConfirmBody = "மாற்றத்தை உறுதிப்படுத்த புதிய PIN ஐ மீண்டும் உள்ளிடவும்.",
+            drawerPinTooShort = "PIN 4 முதல் 8 இலக்கங்கள் இருக்க வேண்டும்",
+            drawerPinWrongCurrent = "அது தற்போதைய பணப்பெட்டி PIN அல்ல",
+            drawerPinSaved = "பணப்பெட்டி PIN சேமிக்கப்பட்டது",
+            drawerPinHowTo = "இயல்புநிலை PIN 666666 — அதை மாற்றவும். பயன்படுத்தும் முறை: மேசைக் காட்சியிலிருந்து கணிப்பானைத் திறந்து, PIN ஐ ஒரு சாதாரண எண்ணாகத் தட்டச்சு செய்து = ஐ அழுத்தவும். பணப்பெட்டி திறக்கும், திரை அழிக்கப்படும். வெறும் எண்ணில் மட்டுமே வேலை செய்யும் — கணக்கீடு நடந்து கொண்டிருந்தால், = வழக்கம் போல் கணக்கிடும்.",
             pinLockDesc = "இந்தச் சாதனத்தில் அமைப்புகளைத் திறப்பதற்கு முன் 4-இலக்க PIN தேவை.",
             changePinButton = "PIN மாற்று",
             showPrintStatusLabel = "சமையலறை அச்சு நிலையைக் காட்டு",
@@ -4326,6 +4959,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             devicesAndHardwareDesc = "இந்தச் சாதனம் பயன்படுத்தும் அச்சுப்பொறி, பணப்பெட்டி மற்றும் வாடிக்கையாளர் திரையைத் தேர்ந்தெடுக்கவும்",
             hardwarePrintersSection = "ரசீது அச்சுப்பொறி",
             hardwareCashDrawerSection = "பணப்பெட்டி",
+            hardwareReceiptPaperSection = "ரசீது தாள்",
+            hardwareAutoCutLabel = "அச்சிட்ட பின் தானாக வெட்டு",
+            hardwareAutoCutDesc = "இந்த அச்சுப்பானியில் வெட்டும் கருவி இல்லை எனில் நிறுத்துக — ரசீதுக்கு மூன்று வரி தாள் மிச்சம்.",
             hardwareCustomerDisplaySection = "வாடிக்கையாளர் திரை",
             hardwareDriverUnavailable = "கிடைக்கவில்லை",
             hardwareDriverNotDetected = "இந்தச் சாதனத்தில் கண்டறியப்படவில்லை",
@@ -4400,6 +5036,52 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             gatewayPendingBannerTitle = "பணம் செலுத்துதல் நடந்துகொண்டிருக்கிறது",
             gatewayPendingResumeButton = "தொடரவும்",
         ),
+        g10 = UiStringsGroup10(
+            setupTitle = "அமைப்பு",
+            setupBack = "பின்செல்",
+            setupGuideTitle = "அமைப்பு வழிகாட்டி",
+            setupGuideClose = "மூடு",
+            setupHowCafeRuns = "இந்த கஃபே எவ்வாறு இயங்குகிறது",
+            setupModeDecidesHint = "இது மீதமுள்ள திரை என்ன கேட்கிறது என்பதை தீர்மானிக்கிறது.",
+            setupConnection = "இணைப்பு",
+            setupCafeWebsiteUrl = "கஃபே இணையதள URL",
+            setupCafeWebsiteUrlHint = "கஃபே இணையதள முகவரியை உள்ளிட்டு இணை என்பதைத் தட்டவும். மீதமுள்ளவை தானாக நிரப்பப்படும்.",
+            setupCafeWebsitePlaceholder = "https://your-cafe.pages.dev",
+            setupConnect = "இணை",
+            setupConnecting = "இணைக்கிறது…",
+            setupConnected = "✓ இணைக்கப்பட்டது — பயன்படுத்த சேமி என்பதைத் தட்டவும்.",
+            setupEnterManually = "▼ கைமுறையாக உள்ளிடவும்",
+            setupHideManualFields = "▲ கைமுறை புலங்களை மறை",
+            setupManualHint = "உங்கள் Supabase திட்ட முகப்பிலிருந்து விவரங்களை உள்ளிடவும். உங்கள் இணையதளம் இன்னும் வெளியிடப்படவில்லை எனில் இதைப் பயன்படுத்தவும்.",
+            setupSupabaseUrl = "Supabase URL",
+            setupSupabaseUrlPlaceholder = "https://your-project.supabase.co",
+            setupSupabaseAnonKey = "Supabase anon விசை",
+            setupSupabaseAnonKeyPlaceholder = "eyJhbGci…",
+            setupCafeName = "கஃபே பெயர்",
+            setupCafeNamePlaceholder = "உங்கள் கஃபே",
+            setupSave = "சேமி",
+            setupSaved = "சேமிக்கப்பட்டது ✓",
+            setupCheckConnection = "இணைப்பைச் சரிபார்",
+            setupChecking = "சரிபார்க்கிறது…",
+            setupConnectionOk = "இணைப்பு சரி ✓",
+            setupWifiForStaff = "ஊழியர் சாதனங்களுக்கான Wi-Fi",
+            setupHotspotHint = "ஊழியர் தொலைபேசிகள் இந்த சாதனத்துடன் ஒரே பிணையத்தில் இருக்க வேண்டும். அதன் ஹாட்ஸ்பாட்டை இயக்கி, பின்னர் ஒவ்வொரு தொலைபேசியையும் இணைக்கவும். பகிரக்கூடிய பெயரையும் கடவுச்சொல்லையும் பயன்படுத்தவும் — கஃபே ஒவ்வொரு நாளும் இந்த பிணையத்தைப் பயன்படுத்தும்.",
+            setupOpenHotspotSettings = "ஹாட்ஸ்பாட் அமைப்புகளைத் திற",
+            setupWifiRouterHint = "ஏற்கனவே உள்ள Wi-Fi ரவுட்டர் அதேபோல் வேலை செய்கிறது — கஃபேவிற்கு ஏற்கனவே ஒன்று இருந்தால், இந்த சாதனத்தையும் ஊழியர் தொலைபேசிகளையும் அதற்கு இணைத்து ஹாட்ஸ்பாட்டைத் தவிர்க்கவும்.",
+            setupOffCloudHint = "இந்த சாதனம் கஃபே தரவுகளை சேமித்து, சொந்த பிரிண்டரில் அச்சிடுகிறது. இணையம் தேவையில்லை.",
+            setupNextPrinterHint = "அடுத்தது: கஃபே மேலாண்மை → பிரிண்டர்களில் பிரிண்டரை இணைக்கவும்.",
+            setupNextPrinterDevicesHint = " பின்னர் சாதனங்களில் ஊழியர் தொலைபேசிகளைச் சேர்க்கவும்.",
+            setupModeCloudTitle = "QR ஆர்டருடன் முழு ஆன்லைன்",
+            setupModeCloudBlurb = "வாடிக்கையாளர்கள் டேபிள் QR-ஐ ச்கேன் செய்து தங்கள் சொந்த தொலைபேசியில் ஆர்டர் செய்கிறார்கள். இணையம் தேவை.",
+            setupModeLanTitle = "QR ஆர்டர் இல்லாமல் (W)LAN AP",
+            setupModeLanBlurb = "ஊழியர் தொலைபேசிகள் உங்கள் சொந்த Wi-Fi மூலம் ஆர்டர் செய்கின்றன. இந்த சாதனம் தரவுகளையும் பிரிண்டரையும் வைத்திருக்கிறது.",
+            setupModeKioskTitle = "கியாஸ்க் பயன்முறை",
+            setupModeKioskBlurb = "இந்த சாதனம் மட்டுமே. மேசைகளும் ஊழியர் தொலைபேசிகளும் இல்லை — ஒவ்வொரு ஆர்டருக்கும் ஒரு ஓடும் எண் கிடைக்கிறது.",
+            setupSwitchTitleFormat = "%1\$s இலிருந்து %2\$s க்கு மாறவா?",
+            setupSwitchIntro = "இது முழு கஃபேவின் செயல்பாட்டையும் மாற்றுகிறது. தொடர்வதற்கு முன்:",
+            setupSwitchToFormat = "%1\$s க்கு மாறு",
+            setupCancel = "ரத்து செய்",
+        ),
     )
     AppLanguage.TH -> UiStrings(
         g1 = UiStringsGroup1(
@@ -4441,7 +5123,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sendToKitchen = "ส่งไปยังครัว",
             payCash = "ชำระด้วยเงินสด",
             payQR = "ชำระด้วย QR",
-            showQrButton = "แสดง QR",
+            showQrButton = "QR",
             cancelOrder = "ยกเลิกออเดอร์",
             status = "สถานะ",
             emptyCart = "ตะกร้าว่างเปล่า — เลือกรายการเมนู",
@@ -4500,6 +5182,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             cafeClosedDesc = "ขณะนี้ร้านปิดให้บริการ",
             tapToReopenDesc = "แตะเพื่อเปิดเซสชันผู้ดูแลระบบอีกครั้ง ตรวจสอบให้แน่ใจว่าลูกค้าไม่สามารถเห็นหน้าจอของคุณ",
             reopenCafeButton = "เปิดร้านอีกครั้ง",
+            lockSignInWithOwnerKey = "เข้าสู่ระบบด้วยกุญแจเจ้าของ",
+            lockSignInWithOwnerKeyDesc = "สแกนกุญแจเจ้าของร้านเพื่อเปิดใหม่บนอุปกรณ์นี้",
             settingsTitle = "การตั้งค่า",
             staffInvitationSection = "คำเชิญพนักงาน",
             shareButton = "แชร์",
@@ -4561,6 +5245,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             currentDeviceLabel = "(อุปกรณ์นี้)",
             lastOnlineLabel = "ออนไลน์ล่าสุด",
             backgroundSetupTitle = "ตั้งค่าการทำงานเบื้องหลัง",
+            backgroundSetupDesc = "ป้องกันไม่ให้ Android พักแอป เพื่อให้ออร์เดอร์เข้ามาต่อเนื่อง",
+            licenceGeneratorNote = "The full list is generated from the build. Debug builds show only a placeholder — install a release build to read all 200 component licences.",
+            licenceExtraNotices = "Not detected by the generator, reproduced here as required by Apache 2.0 — ZXing (Zebra Crossing), Copyright ZXing authors, licensed under the Apache License, Version 2.0: http://www.apache.org/licenses/LICENSE-2.0",
             keepAliveExplanation = "เพื่อรับออเดอร์ได้อย่างน่าเชื่อถือ แอปนี้ต้องทำงานต่อเนื่องในเบื้องหลัง อาจต้องปรับคุณสมบัติประหยัดพลังงานของโทรศัพท์ของคุณ",
             detectedLabel = "ตรวจพบ:",
             batteryOptDisabled = "ปิดใช้งานการเพิ่มประสิทธิภาพแบตเตอรี่แล้ว (ดี)",
@@ -4659,6 +5346,21 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             exportCsvButton = "ส่งออก CSV",
             cashDrawerTitle = "ลิ้นชักเงินสด",
             drawerOpeningsLabel = "จำนวนครั้งที่เปิดลิ้นชักวันนี้",
+            salesReportTitle = "รายงานการขาย",
+            colMetric = "รายการ",
+            colValue = "ค่า",
+            totalPayByFormat = "ยอดชำระโดย %s",
+            topItemsMergedTitle = "สินค้าขายดี (3 อันดับแรกต่อหมวด)",
+            colCategory = "หมวดหมู่",
+            colItem = "รายการ",
+            colQty = "จำนวน",
+            colRevenue = "รายได้",
+            colSource = "แหล่งที่มา",
+            colCount = "จำนวน",
+            colTable = "โต๊ะ",
+            colOrders = "ออร์เดอร์",
+            pageOfFormat = "หน้า %d จาก %d",
+            cancelledLabel = "ยกเลิก",
         ),
         g5 = UiStringsGroup5(
             signOutClosingTitle = "ออกจากระบบพร้อมปิดร้าน",
@@ -4687,7 +5389,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             orderHistoryTitle = "ประวัติออเดอร์",
             noOrdersYet = "ยังไม่มีออเดอร์",
             orderSessionLabel = "รอบ",
-            reprintToKitchenButton = "พิมพ์ซ้ำไปยังครัว",
+            reprintToKitchenButton = "พิมพ์ครัว",
             addItemsToOrderButton = "เพิ่มลงในออเดอร์",
             receiptPrintQuestion = "พิมพ์ใบเสร็จให้ลูกค้าหรือไม่?",
             receiptPrintYes = "ใช่ พิมพ์",
@@ -4768,6 +5470,22 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             tableWord = "โต๊ะ",
             sessionPendingConfirmation = "รอการยืนยัน",
             addItemCd = "เพิ่มรายการ",
+            loginAsSecondaryAdmin = "เข้าสู่ระบบเป็นผู้ดูแลรอง",
+            permissionsTitle = "ต้องการสิทธิ์",
+            permissionsIntro = "แอปนี้ต้องใช้ทั้งสามอย่างเพื่อทำงาน อนุญาตครั้งเดียวพอ",
+            permissionLocationLabel = "ตำแหน่ง",
+            permissionLocationWhy = "การลงเวลาพนักงานในร้าน และค้นหาเครื่องพิมพ์บลูทูธ",
+            permissionNearbyLabel = "อุปกรณ์ใกล้เคียง",
+            permissionNearbyWhy = "เชื่อมต่อเครื่องพิมพ์ใบเสร็จ",
+            permissionNotificationsLabel = "การแจ้งเตือน",
+            permissionNotificationsWhy = "แจ้งเตือนออเดอร์ใหม่และสถานะการพิมพ์",
+            permissionGrantAction = "อนุญาต",
+            permissionSettingsAction = "เปิดการตั้งค่าแอป",
+            permissionBlockedNote = "ถูกปฏิเสธ เปิดการตั้งค่าแอปและอนุญาตที่นั่น",
+            customChargeButton = "กำหนดเอง",
+            customChargeNameLabel = "รายละเอียดค่าใช้จ่าย",
+            customChargePriceLabel = "ราคา (RM)",
+            customChargeAddButton = "เพิ่มค่าใช้จ่าย",
             cancelReasonLabel = "เหตุผลในการยกเลิก:",
             enterReasonHint = "ระบุเหตุผล…",
             noReasonGiven = "ไม่ได้ระบุเหตุผล",
@@ -4780,6 +5498,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             askAdminAddTables = "ขอให้ผู้ดูแลเพิ่มโต๊ะ",
             selectTableForOrder = "เลือกโต๊ะสำหรับออร์เดอร์ใหม่",
             noFreeTables = "ไม่มีโต๊ะว่าง โต๊ะทั้งหมดถูกใช้งานแล้ว",
+            cafeProfileDesc = "ชื่อร้าน โลโก้ ตำแหน่ง เมนูสำเร็จรูป และ QR ชำระเงิน",
+            settingsHardwareSection = "การพิมพ์และฮาร์ดแวร์",
             menuManagementDesc = "เพิ่ม แก้ไข และจัดระเบียบรายการเมนูและหมวดหมู่",
             tablesManagementTitle = "การจัดการโต๊ะ",
             tablesManagementDesc = "กำหนดค่าโต๊ะอาหารและผังที่นั่ง",
@@ -4799,9 +5519,35 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             reportEmailLabel = "อีเมลรายงาน",
             reportEmailHint = "รายงานปิดร้าน/รายเดือนจะถูกส่งมาที่นี่ (ส่งจากเซิร์ฟเวอร์)",
             businessDayStartLabel = "วันทำการเริ่มเวลา (ชั่วโมง 0–23)",
+            businessDayEndLabel = "วันทำการสิ้นสุดเวลา",
+            reportSavedToDownloads = "รายงานปิดร้านจะถูกบันทึกลงโฟลเดอร์ Downloads ของเครื่องเมื่อคุณออกจากระบบพร้อมปิดร้าน ชื่อไฟล์: cafe_name-YYMMDDHHMM.html",
+            businessDayHoursHint = "เวลาปิดอาจเร็วกว่าเวลาเปิดได้ — สำหรับร้านที่เปิดเลยเที่ยงคืน",
             businessDayStartHint = "เช่น 15 = บ่าย 3 โมง ยอดขายหลังเที่ยงคืนยังนับเป็นวันเปิดร้าน",
             securitySection = "ความปลอดภัย",
             pinLockLabel = "ล็อก PIN สำหรับการตั้งค่า",
+            calculatorTitle = "เครื่องคิดเลข",
+            screenSection = "หน้าจอ",
+            unlinkDeviceLabel = "ยกเลิกการเชื่อมโยงอุปกรณ์",
+            unlinkDeviceDesc = "ให้อุปกรณ์ลืมร้านนี้ เพื่อตั้งค่าสำหรับร้านอื่น",
+            unlinkDeviceButton = "ยกเลิกการเชื่อมโยงอุปกรณ์นี้",
+            unlinkConfirmTitle = "ยกเลิกการเชื่อมโยงอุปกรณ์นี้?",
+            unlinkConfirmBody = "อุปกรณ์นี้จะลืมร้าน การเข้าสู่ระบบ เมนู โต๊ะ ประวัติการสั่ง เครื่องพิมพ์ และ QR ชำระเงิน ข้อมูลบนเซิร์ฟเวอร์ไม่ถูกแตะต้อง หลังจากนี้ต้องสแกนกุญแจเจ้าของอีกครั้ง",
+            ownerQrNoBackend = "QR นี้ไม่มีรายละเอียดเซิร์ฟเวอร์ และไม่สามารถเข้าถึงเว็บไซต์ของร้านได้ กรุณาสร้างกุญแจเจ้าของใหม่จากอุปกรณ์ที่ตั้งค่าแล้ว",
+            fullscreenLabel = "โหมดเต็มหน้าจอ",
+            fullscreenDesc = "ซ่อนแถบสถานะและแถบนำทางของ Android ปัดจากขอบหน้าจอเพื่อแสดงชั่วคราว",
+            calculatorMemoryHint = "แตะหน่วยความจำเพื่อเรียกคืน กดค้างเพื่อบันทึก หน่วยความจำจะไม่ถูกล้าง",
+            drawerPinLabel = "PIN ลิ้นชักเก็บเงิน",
+            drawerPinDesc = "เปิดลิ้นชักจากเครื่องคิดเลขโดยไม่บันทึกการขาย",
+            drawerPinSetButton = "ตั้ง PIN ลิ้นชัก",
+            drawerPinChangeButton = "เปลี่ยน PIN ลิ้นชัก",
+            drawerPinCurrentPrompt = "ใส่ PIN ลิ้นชักปัจจุบัน",
+            drawerPinNewPrompt = "ใส่ PIN ใหม่ (4–8 หลัก)",
+            drawerPinConfirmTitle = "ยืนยัน PIN ใหม่",
+            drawerPinConfirmBody = "ใส่ PIN ใหม่อีกครั้งเพื่อยืนยันการเปลี่ยนแปลง",
+            drawerPinTooShort = "PIN ต้องมี 4 ถึง 8 หลัก",
+            drawerPinWrongCurrent = "นั่นไม่ใช่ PIN ลิ้นชักปัจจุบัน",
+            drawerPinSaved = "บันทึก PIN ลิ้นชักแล้ว",
+            drawerPinHowTo = "PIN เริ่มต้นคือ 666666 — โปรดเปลี่ยน วิธีใช้: เปิดเครื่องคิดเลขจากหน้าโต๊ะ พิมพ์ PIN เหมือนตัวเลขธรรมดา แล้วกด = ลิ้นชักจะเปิดและหน้าจอจะถูกล้าง ใช้ได้เฉพาะกับตัวเลขล้วน — หากกำลังคำนวณอยู่ = จะคำนวณตามปกติ",
             pinLockDesc = "ต้องใช้ PIN 4 หลักก่อนเปิดการตั้งค่าบนอุปกรณ์นี้",
             changePinButton = "เปลี่ยน PIN",
             showPrintStatusLabel = "แสดงสถานะการพิมพ์ครัว",
@@ -5048,6 +5794,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             devicesAndHardwareDesc = "เลือกเครื่องพิมพ์ ลิ้นชักเก็บเงิน และจอลูกค้าที่อุปกรณ์นี้ใช้",
             hardwarePrintersSection = "เครื่องพิมพ์ใบเสร็จ",
             hardwareCashDrawerSection = "ลิ้นชักเก็บเงิน",
+            hardwareReceiptPaperSection = "กระดาษใบเสร็จ",
+            hardwareAutoCutLabel = "ตัดกระดาษอัตโนมัติหลังพิมพ์",
+            hardwareAutoCutDesc = "ปิดหากเครื่องพิมพ์มีแค่ที่ฉีกกระดาษ ไม่มีใบมีด — ช่วยประหยัดกระดาษสามบรรทัดต่อใบเสร็จ",
             hardwareCustomerDisplaySection = "จอแสดงผลลูกค้า",
             hardwareDriverUnavailable = "ไม่พร้อมใช้งาน",
             hardwareDriverNotDetected = "ไม่พบบนอุปกรณ์นี้",
@@ -5121,6 +5870,52 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             gatewayCheckoutLoadingPage = "กำลังโหลดหน้าชำระเงิน…",
             gatewayPendingBannerTitle = "การชำระเงินกำลังดำเนินการ",
             gatewayPendingResumeButton = "ดำเนินการต่อ",
+        ),
+        g10 = UiStringsGroup10(
+            setupTitle = "ตั้งค่า",
+            setupBack = "ย้อนกลับ",
+            setupGuideTitle = "คู่มือการตั้งค่า",
+            setupGuideClose = "ปิด",
+            setupHowCafeRuns = "คาเฟ่นี้ทำงานอย่างไร",
+            setupModeDecidesHint = "สิ่งนี้กำหนดสิ่งที่ส่วนที่เหลือของหน้าจอถาม",
+            setupConnection = "การเชื่อมต่อ",
+            setupCafeWebsiteUrl = "URL เว็บไซต์คาเฟ่",
+            setupCafeWebsiteUrlHint = "ป้อนที่อยู่เว็บไซต์คาเฟ่แล้วแตะเชื่อมต่อ ส่วนที่เหลือจะกรอกให้เอง",
+            setupCafeWebsitePlaceholder = "https://your-cafe.pages.dev",
+            setupConnect = "เชื่อมต่อ",
+            setupConnecting = "กำลังเชื่อมต่อ…",
+            setupConnected = "✓ เชื่อมต่อแล้ว — แตะบันทึกเพื่อใช้งาน",
+            setupEnterManually = "▼ ป้อนด้วยตนเอง",
+            setupHideManualFields = "▲ ซ่อนช่องป้อนด้วยตนเอง",
+            setupManualHint = "ป้อนข้อมูลจากแดชบอร์ดโครงการ Supabase ของคุณ ใช้ตัวเลือกนี้หากเว็บไซต์ของคุณยังไม่ได้เผยแพร่",
+            setupSupabaseUrl = "URL Supabase",
+            setupSupabaseUrlPlaceholder = "https://your-project.supabase.co",
+            setupSupabaseAnonKey = "กุญแจสาธารณะ Supabase",
+            setupSupabaseAnonKeyPlaceholder = "eyJhbGci…",
+            setupCafeName = "ชื่อคาเฟ่",
+            setupCafeNamePlaceholder = "คาเฟ่ของคุณ",
+            setupSave = "บันทึก",
+            setupSaved = "บันทึกแล้ว ✓",
+            setupCheckConnection = "ตรวจสอบการเชื่อมต่อ",
+            setupChecking = "กำลังตรวจสอบ…",
+            setupConnectionOk = "การเชื่อมต่อ OK ✓",
+            setupWifiForStaff = "Wi-Fi สำหรับอุปกรณ์พนักงาน",
+            setupHotspotHint = "โทรศัพท์ของพนักงานต้องอยู่ในเครือข่ายเดียวกับอุปกรณ์นี้ เปิดฮอตสปอต แล้วเชื่อมต่อโทรศัพท์แต่ละเครื่อง ใช้ชื่อและรหัสผ่านที่สามารถแชร์ได้ — คาเฟ่จะใช้เครือข่ายนี้ทุกวัน",
+            setupOpenHotspotSettings = "เปิดการตั้งค่าฮอตสปอต",
+            setupWifiRouterHint = "เราเตอร์ Wi-Fi ที่มีอยู่ก็ใช้งานได้เช่นกัน — หากคาเฟ่มีอยู่แล้ว ให้เชื่อมต่ออุปกรณ์นี้และโทรศัพท์ของพนักงานเข้ากับเราเตอร์และข้ามฮอตสปอต",
+            setupOffCloudHint = "อุปกรณ์นี้เก็บข้อมูลคาเฟ่และพิมพ์ด้วยเครื่องพิมพ์ของตัวเอง ไม่ต้องใช้อินเทอร์เน็ต",
+            setupNextPrinterHint = "ถัดไป: จับคู่เครื่องพิมพ์ใน การจัดการคาเฟ่ → เครื่องพิมพ์",
+            setupNextPrinterDevicesHint = " จากนั้นเพิ่มโทรศัพท์พนักงานใน อุปกรณ์",
+            setupModeCloudTitle = "ออนไลน์เต็มรูปแบบพร้อมสั่งผ่าน QR",
+            setupModeCloudBlurb = "ลูกค้าสั่งอาหารจากโทรศัพท์ของตนเองโดยสแกน QR โต๊ะ ต้องใช้อินเทอร์เน็ต",
+            setupModeLanTitle = "AP (W)LAN ไม่มีสั่งผ่าน QR",
+            setupModeLanBlurb = "โทรศัพท์ของพนักงานสั่งผ่าน Wi-Fi ของคุณเอง อุปกรณ์นี้เก็บข้อมูลและเครื่องพิมพ์",
+            setupModeKioskTitle = "โหมดคีออสก์",
+            setupModeKioskBlurb = "อุปกรณ์นี้เครื่องเดียว ไม่มีโต๊ะและไม่มีโทรศัพท์ของพนักงาน — แต่ละคำสั่งซื้อได้รับหมายเลขลำดับ",
+            setupSwitchTitleFormat = "เปลี่ยนจาก %1\$s เป็น %2\$s?",
+            setupSwitchIntro = "สิ่งนี้จะเปลี่ยนวิธีที่คาเฟ่ทั้งหมดทำงาน ก่อนที่คุณจะดำเนินการต่อ:",
+            setupSwitchToFormat = "เปลี่ยนเป็น %1\$s",
+            setupCancel = "ยกเลิก",
         ),
     )
 }

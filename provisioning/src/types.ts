@@ -22,6 +22,7 @@ export interface WizardState {
   supabaseConnectionString: string
   supabasePersonalAccessToken: string
   supabaseAnonKey: string
+  supabaseServiceRoleKey: string
   // Cloudflare
   cloudflareAccountId: string
   cloudflareApiToken: string
@@ -30,6 +31,9 @@ export interface WizardState {
   // Café identity
   cafeSlug: string
   cafeName: string
+  // Secrets / integrations
+  brevoApiKey: string
+  websiteUrl: string
 }
 
 export const EMPTY_WIZARD_STATE: WizardState = {
@@ -37,10 +41,13 @@ export const EMPTY_WIZARD_STATE: WizardState = {
   supabaseConnectionString: '',
   supabasePersonalAccessToken: '',
   supabaseAnonKey: '',
+  supabaseServiceRoleKey: '',
   cloudflareAccountId: '',
   cloudflareApiToken: '',
   cloudflareZoneId: '',
   customDomain: '',
   cafeSlug: '',
   cafeName: '',
+  brevoApiKey: '',
+  websiteUrl: '',
 }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,6 +31,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -91,6 +93,11 @@ fun SetupScreen(
     /** Invoked after a successful save, so the operator lands back on the home screen and
      *  sees the mode button they just unlocked. */
     onSaved: () -> Unit = onBack,
+    /**
+     * Open the affiliate catalog editor. Wired only in debug builds — the caller does not register
+     * the route in release, so the button below stays hidden there.
+     */
+    onOpenPromoCatalog: (() -> Unit)? = null,
     viewModel: SetupViewModel = hiltViewModel(),
     // NOTE: the rest of this screen is still hardcoded English — a pre-existing gap, not one this
     // change introduces. The new controls below are translated; the older labels around them are
@@ -147,6 +154,7 @@ fun SetupScreen(
     // successful switch the button stops warning about a change that has already happened.
     var savedMode by rememberSaveable { mutableStateOf(state.operatingMode) }
     var showModeChangeConfirm by rememberSaveable { mutableStateOf(false) }
+    var showGuide by rememberSaveable { mutableStateOf(false) }
 
     // Return to the home screen the moment a save lands, so the operator sees the mode button
     // they just unlocked rather than having to find their own way back and wonder if it took.
@@ -157,10 +165,15 @@ fun SetupScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Setup") },
+                title = { Text(strings.setupTitle) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.setupBack)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showGuide = true }) {
+                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = strings.setupGuideTitle)
                     }
                 },
             )
@@ -175,14 +188,15 @@ fun SetupScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             // ── Task 9.2: the topology comes first, because it decides what else is worth asking ──
-            SectionHeader("How this café runs")
-            HelpText("This decides what the rest of the screen asks for.")
+            SectionHeader(strings.setupHowCafeRuns)
+            HelpText(strings.setupModeDecidesHint)
             ModeChoice(
                 selected = state.operatingMode,
                 onSelect = { viewModel.selectMode(it) },
+                strings = strings,
             )
 
-            SectionHeader("Connection")
+            SectionHeader(strings.setupConnection)
             if (state.operatingMode == OperatingMode.CLOUD) {
                 // ── Two ways in, and the fast one goes first ─────────────────────────────────────
                 //
@@ -228,6 +242,7 @@ fun SetupScreen(
                             OwnerKeyLoginViewModel.Reason.NO_QR_IN_IMAGE -> strings.ownerQrNoQrInImage
                             OwnerKeyLoginViewModel.Reason.REJECTED -> strings.ownerQrRejected
                             OwnerKeyLoginViewModel.Reason.UNREACHABLE -> strings.ownerQrUnreachable
+                            OwnerKeyLoginViewModel.Reason.NO_BACKEND_IN_QR -> strings.ownerQrNoBackend
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
@@ -241,11 +256,11 @@ fun SetupScreen(
                 state.connectionTab == ConnectionTab.MANUAL
             ) {
                 // ── Task 4.2: single website URL field as the primary input ──────────────────────
-                HelpText("Enter the café's website address and tap Connect. The rest fills in itself.")
+                HelpText(strings.setupCafeWebsiteUrlHint)
 
                 Field(
-                    label = "Café website URL",
-                    placeholder = "https://your-cafe.pages.dev",
+                    label = strings.setupCafeWebsiteUrl,
+                    placeholder = strings.setupCafeWebsitePlaceholder,
                     value = state.websiteUrl,
                     keyboardType = KeyboardType.Uri,
                     onChange = { v -> viewModel.update { it.copy(websiteUrl = v) } },
@@ -262,7 +277,7 @@ fun SetupScreen(
                         enabled = !state.isFetching,
                         modifier = Modifier.weight(1f),
                     ) {
-                        Text(if (state.isFetching) "Connecting…" else "Connect")
+                        Text(if (state.isFetching) strings.setupConnecting else strings.setupConnect)
                     }
                     if (state.isFetching) {
                         CircularProgressIndicator(modifier = Modifier.width(24.dp))
@@ -283,7 +298,7 @@ fun SetupScreen(
                     && state.supabaseUrl.isNotBlank()
                 ) {
                     Text(
-                        text = "✓ Connected — tap Save to apply.",
+                        text = strings.setupConnected,
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -295,8 +310,8 @@ fun SetupScreen(
                     modifier = Modifier.padding(top = 4.dp),
                 ) {
                     Text(
-                        if (state.showManualFields) "▲ Hide manual fields"
-                        else "▼ Enter manually"
+                        if (state.showManualFields) strings.setupHideManualFields
+                        else strings.setupEnterManually
                     )
                 }
 
@@ -307,20 +322,17 @@ fun SetupScreen(
                     exit = shrinkVertically(),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        HelpText(
-                            "Enter the details from your Supabase project dashboard. " +
-                                "Use this if your website isn't deployed yet."
-                        )
+                        HelpText(strings.setupManualHint)
                         Field(
-                            label = "Supabase URL",
-                            placeholder = "https://your-project.supabase.co",
+                            label = strings.setupSupabaseUrl,
+                            placeholder = strings.setupSupabaseUrlPlaceholder,
                             value = state.supabaseUrl,
                             keyboardType = KeyboardType.Uri,
                             onChange = { v -> viewModel.update { it.copy(supabaseUrl = v) } },
                         )
                         Field(
-                            label = "Supabase anon key",
-                            placeholder = "eyJhbGci…",
+                            label = strings.setupSupabaseAnonKey,
+                            placeholder = strings.setupSupabaseAnonKeyPlaceholder,
                             value = state.supabaseAnonKey,
                             keyboardType = KeyboardType.Text,
                             secret = true,
@@ -334,14 +346,7 @@ fun SetupScreen(
             // `else` also caught Cloud-on-the-owner-QR-tab and showed a Full QR café the off-cloud
             // copy: "No internet backend. This device holds the café's data." Wrong, and alarming.
             if (state.operatingMode != OperatingMode.CLOUD) {
-                // Requirement 2.4: an off-cloud café is never asked for a Supabase URL. Not merely
-                // optional — absent. A field that can be filled in and then ignored is how an owner
-                // ends up believing their LAN café is syncing somewhere.
-                // The old copy ended "Saving will clear any Supabase details previously stored on
-                // this device." On the screen an owner actually meets — a fresh install, nothing
-                // ever saved — that sentence describes an event that cannot happen, and warns about
-                // losing data that does not exist. It is gone.
-                HelpText("This device holds the café's data and prints to its own printer. No internet needed.")
+                HelpText(strings.setupOffCloudHint)
             }
             // Hidden on the owner-QR tab. The name arrives from `branding` the moment the key is
             // accepted, so a field here would be overwritten seconds after it was filled in — and a
@@ -349,23 +354,21 @@ fun SetupScreen(
             if (!(state.operatingMode == OperatingMode.CLOUD &&
                     state.connectionTab == ConnectionTab.OWNER_QR)
             ) {
-                Field("Café name", "Your Café", state.cafeName,
+                Field(strings.setupCafeName, strings.setupCafeNamePlaceholder, state.cafeName,
                     KeyboardType.Text) { v -> viewModel.update { it.copy(cafeName = v) } }
             }
 
             if (state.operatingMode == OperatingMode.LAN) {
                 // ── Task 21.1: the network the café will actually run on ─────────────────────────
-                SectionHeader("Wi-Fi for staff devices")
-                HotspotGuidance()
+                SectionHeader(strings.setupWifiForStaff)
+                HotspotGuidance(strings)
             }
 
             if (state.operatingMode != OperatingMode.CLOUD) {
                 HelpText(
-                    // The Kiosk branch used to repeat this screen's own mode description back at
-                    // the owner. What is useful after saving is the next action, not a recap.
-                    "Next: pair the printer in Café Management → Printers." +
+                    strings.setupNextPrinterHint +
                         if (state.operatingMode == OperatingMode.LAN) {
-                            " Then add staff phones in Devices."
+                            strings.setupNextPrinterDevicesHint
                         } else {
                             ""
                         }
@@ -389,9 +392,9 @@ fun SetupScreen(
                 ) {
                     Text(
                         when {
-                            state.isVerifying -> "Checking…"
-                            state.verified -> "Connection OK ✓"
-                            else -> "Check connection"
+                            state.isVerifying -> strings.setupChecking
+                            state.verified -> strings.setupConnectionOk
+                            else -> strings.setupCheckConnection
                         }
                     )
                 }
@@ -431,15 +434,47 @@ fun SetupScreen(
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 24.dp),
             ) {
-                Text(if (state.saved) "Saved ✓" else "Save")
+                Text(if (state.saved) strings.setupSaved else strings.setupSave)
+            }
+
+            // ── Affiliate catalog (debug builds only) ────────────────────────────────────
+            // Last in the wizard on purpose: it configures what CUSTOMERS see on the ordering
+            // website, not how this device runs, so it must not sit between the operator and Save.
+            if (com.razstudio.pos.BuildConfig.DEBUG && onOpenPromoCatalog != null) {
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Affiliate catalog (debug)",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Edit the Shopee placements every café's ordering page shows. Publishes " +
+                        "to promos/partners.json on main; live everywhere in about five minutes.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onOpenPromoCatalog,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                ) { Text("Open catalog editor") }
             }
         }
+    }
+
+    if (showGuide) {
+        SetupGuideDialog(
+            strings = strings,
+            onDismiss = { showGuide = false },
+        )
     }
 
     if (showModeChangeConfirm) {
         ModeChangeConfirmDialog(
             from = savedMode,
             to = state.operatingMode,
+            strings = strings,
             onConfirm = {
                 showModeChangeConfirm = false
                 viewModel.save()
@@ -532,6 +567,7 @@ fun SetupScreen(
 private fun ModeChangeConfirmDialog(
     from: OperatingMode,
     to: OperatingMode,
+    strings: com.razstudio.pos.ui.i18n.UiStrings,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -587,11 +623,11 @@ private fun ModeChangeConfirmDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Switch from ${from.name} to ${to.name}?") },
+        title = { Text(strings.setupSwitchTitleFormat.format(from.name, to.name)) },
         text = {
             Column {
                 Text(
-                    "This changes how the whole café runs. Before you continue:",
+                    strings.setupSwitchIntro,
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(modifier = Modifier.padding(top = 8.dp))
@@ -603,10 +639,10 @@ private fun ModeChangeConfirmDialog(
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Switch to ${to.name}", color = MaterialTheme.colorScheme.error)
+                Text(strings.setupSwitchToFormat.format(to.name), color = MaterialTheme.colorScheme.error)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.setupCancel) } },
     )
 }
 
@@ -635,26 +671,19 @@ private fun ModeChangeConfirmDialog(
  * build, and a dead button is worse than a plain instruction.
  */
 @Composable
-private fun HotspotGuidance() {
+private fun HotspotGuidance(strings: com.razstudio.pos.ui.i18n.UiStrings) {
     val context = LocalContext.current
 
-    HelpText(
-        "Staff phones must be on the same network as this device. Turn on its hotspot, then " +
-            "connect each phone to it. Use a name and password you can share — the café will use " +
-            "this network every day."
-    )
+    HelpText(strings.setupHotspotHint)
 
     OutlinedButton(
         onClick = { context.openHotspotSettings() },
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text("Open hotspot settings")
+        Text(strings.setupOpenHotspotSettings)
     }
 
-    HelpText(
-        "An existing Wi-Fi router works just as well — if the café already has one, connect this " +
-            "device and the staff phones to it and skip the hotspot."
-    )
+    HelpText(strings.setupWifiRouterHint)
 }
 
 /**
@@ -702,22 +731,23 @@ private fun SectionHeader(text: String) {
 private fun ModeChoice(
     selected: OperatingMode,
     onSelect: (OperatingMode) -> Unit,
+    strings: com.razstudio.pos.ui.i18n.UiStrings,
 ) {
     val options = listOf(
         Triple(
             OperatingMode.CLOUD,
-            "Full Online with QR ordering",
-            "Customers order from their own phone by scanning a table QR. Needs internet.",
+            strings.setupModeCloudTitle,
+            strings.setupModeCloudBlurb,
         ),
         Triple(
             OperatingMode.LAN,
-            "(W)LAN AP without QR ordering",
-            "Staff phones order over your own Wi-Fi. This device holds the data and the printer.",
+            strings.setupModeLanTitle,
+            strings.setupModeLanBlurb,
         ),
         Triple(
             OperatingMode.KIOSK,
-            "Kiosk Mode",
-            "This device alone. No tables and no staff phones — each order gets a running number.",
+            strings.setupModeKioskTitle,
+            strings.setupModeKioskBlurb,
         ),
     )
 

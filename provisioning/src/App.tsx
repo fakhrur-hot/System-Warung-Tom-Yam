@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { provisionApi } from './api-client'
 import type { StepResult, WizardState } from './types'
 import { EMPTY_WIZARD_STATE } from './types'
 
-type StepKey = 'schema' | 'functions' | 'pages' | 'dns'
+type StepKey = 'schema' | 'functions' | 'secrets' | 'storage' | 'auth' | 'pages' | 'dns'
 
 interface StepDef {
   key: StepKey
@@ -30,15 +30,38 @@ const STEPS: StepDef[] = [
     verified: false,
   },
   {
+    key: 'secrets',
+    title: '3. Set Edge Function secrets',
+    description: 'Writes BREVO_API_KEY and WEBSITE_ORIGIN so the deployed functions can send email and build redirects.',
+    ready: (s) =>
+      !!s.supabasePersonalAccessToken && !!s.supabaseProjectRef && !!s.brevoApiKey && !!s.websiteUrl,
+    verified: false,
+  },
+  {
+    key: 'storage',
+    title: '4. Create public Storage buckets',
+    description: 'Creates logos and menu-images buckets using the service role key.',
+    ready: (s) => !!s.supabaseProjectRef && !!s.supabaseServiceRoleKey,
+    verified: false,
+  },
+  {
+    key: 'auth',
+    title: '5. Configure Auth URLs',
+    description: 'Sets the Supabase Auth site URL and redirect URLs to the café website.',
+    ready: (s) => !!s.supabasePersonalAccessToken && !!s.supabaseProjectRef && !!s.websiteUrl,
+    verified: false,
+  },
+  {
     key: 'pages',
-    title: '3. Create the ordering website',
+    title: '6. Create the ordering website',
     description: 'Creates a Cloudflare Pages project for your café — no GitHub account needed.',
-    ready: (s) => !!s.cloudflareAccountId && !!s.cloudflareApiToken && !!s.cafeSlug && !!s.supabaseAnonKey,
+    ready: (s) =>
+      !!s.cloudflareAccountId && !!s.cloudflareApiToken && !!s.cafeSlug && !!s.supabaseAnonKey,
     verified: true,
   },
   {
     key: 'dns',
-    title: '4. Point your domain (optional)',
+    title: '7. Point your domain (optional)',
     description: 'Only needed if you want a custom domain instead of <slug>.pages.dev.',
     ready: (s) => !!s.cloudflareZoneId && !!s.customDomain && !!s.cloudflareApiToken,
     verified: true,
@@ -52,8 +75,24 @@ export default function App() {
   const [state, setState] = useState<WizardState>(EMPTY_WIZARD_STATE)
   const [results, setResults] = useState<Partial<Record<StepKey, StepResult[]>>>({})
   const [running, setRunning] = useState<StepKey | null>(null)
+  const [websiteUrlTouched, setWebsiteUrlTouched] = useState(false)
+
+  // Derive the public website URL from the slug or custom domain. It can be overridden until the
+  // user edits it, after which we leave their value alone so a custom Pages URL can be entered.
+  useEffect(() => {
+    if (!websiteUrlTouched) {
+      setState((prev) => ({
+        ...prev,
+        websiteUrl:
+          prev.customDomain || (prev.cafeSlug ? `https://${prev.cafeSlug}.pages.dev` : ''),
+      }))
+    }
+  }, [state.cafeSlug, state.customDomain, websiteUrlTouched])
 
   function set<K extends keyof WizardState>(key: K, value: WizardState[K]) {
+    if (key === 'websiteUrl' && value !== state.websiteUrl) {
+      setWebsiteUrlTouched(true)
+    }
     setState((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -68,7 +107,6 @@ export default function App() {
   }
 
   const pagesSucceeded = results.pages?.every((r) => r.status === 'ok') ?? false
-  const websiteUrl = state.customDomain || `${state.cafeSlug}.pages.dev`
 
   return (
     <div className="wizard">
@@ -97,6 +135,13 @@ export default function App() {
           onChange={(v) => set('supabaseAnonKey', v)}
         />
         <Field
+          label="Service role key"
+          hint="Project Settings → API → service role secret — used once to create Storage buckets"
+          secret
+          value={state.supabaseServiceRoleKey}
+          onChange={(v) => set('supabaseServiceRoleKey', v)}
+        />
+        <Field
           label="Postgres connection string"
           hint="Project Settings → Database → Connection string (URI) — used once, then discarded"
           secret
@@ -109,6 +154,13 @@ export default function App() {
           secret
           value={state.supabasePersonalAccessToken}
           onChange={(v) => set('supabasePersonalAccessToken', v)}
+        />
+        <Field
+          label="Brevo API key"
+          hint=" brevo.com → SMTP & API → API keys — stored as BREVO_API_KEY in Edge Function secrets"
+          secret
+          value={state.brevoApiKey}
+          onChange={(v) => set('brevoApiKey', v)}
         />
       </fieldset>
 
@@ -150,6 +202,12 @@ export default function App() {
           onChange={(v) => set('cafeSlug', v)}
         />
         <Field label="Café name" value={state.cafeName} onChange={(v) => set('cafeName', v)} />
+        <Field
+          label="Website URL"
+          hint="Used for Auth redirects and Edge Function secrets. Fills in from the slug or custom domain."
+          value={state.websiteUrl}
+          onChange={(v) => set('websiteUrl', v)}
+        />
       </fieldset>
 
       <section className="checklist">
@@ -178,7 +236,7 @@ export default function App() {
             <dt>Supabase anon key</dt>
             <dd>{state.supabaseAnonKey}</dd>
             <dt>Website URL</dt>
-            <dd>https://{websiteUrl}</dd>
+            <dd>{state.websiteUrl}</dd>
             <dt>Café name</dt>
             <dd>{state.cafeName}</dd>
           </dl>
