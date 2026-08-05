@@ -44,7 +44,18 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
 
       if (!response.ok) {
         const detail = await response.text().catch(() => `HTTP ${response.status}`)
-        results.push({ step: `bucket:${id}`, status: 'error', detail })
+        // Supabase Storage may return HTTP 400 with a JSON body whose statusCode is "409" for a
+        // duplicate bucket. Treat that as ok so the step is idempotent.
+        const isDuplicate =
+          response.status === 409 ||
+          (response.status === 400 &&
+            detail.includes('"statusCode":"409"') &&
+            detail.includes('"code":"BucketAlreadyExists"'))
+        if (isDuplicate) {
+          results.push({ step: `bucket:${id}`, status: 'ok', detail: 'already exists' })
+        } else {
+          results.push({ step: `bucket:${id}`, status: 'error', detail })
+        }
       } else {
         results.push({ step: `bucket:${id}`, status: 'ok', detail: 'public, 5 MB, images only' })
       }

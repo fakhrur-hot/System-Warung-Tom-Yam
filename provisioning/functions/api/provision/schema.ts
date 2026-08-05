@@ -1,25 +1,29 @@
-// Applies supabase/migrations/*.sql to the café's new Supabase project over a direct Postgres
-// connection — the SAME approach supabase/apply-migration.mjs already uses, chosen because the
-// obvious Management API endpoint (POST /v1/projects/{ref}/database/migrations) is access-gated
-// to "select customers" per Supabase's own docs and would silently fail for most accounts.
+// Applies supabase/migrations/*.sql to the café's new Supabase project via the Management API
+// SQL query endpoint.
 //
-// UNVERIFIED (Requirement R8 / tasks.md 2.2): this endpoint's code follows Cloudflare's own
-// official tutorial pattern (developers.cloudflare.com/workers/tutorials/postgres/ — plain `pg`
-// package + the `nodejs_compat` compatibility flag in wrangler.toml), but has NOT been run against
-// a real Supabase project from inside an actual deployed Cloudflare Pages Function. Do not treat
-// this as production-ready until that live check passes — see design.md's Testing Strategy.
+// This avoids asking the operator for the Postgres password and connection string. The Supabase
+// Management API exposes `POST /v1/projects/{ref}/database/query`, which the Supabase CLI itself
+// uses for `supabase db query --linked`. It accepts arbitrary DDL and returns one JSON result row
+// per statement. Live verification confirmed it runs the full 0001_initial_schema.sql migration.
+//
+// The previous approach used a direct Postgres connection string with the `pg` package, but that
+// required the operator to reveal and copy a password. The Management API call only needs the
+// same Personal Access Token already used for functions/secrets/auth.
 
-import { Client } from 'pg'
 import { MIGRATIONS } from '../../_generated/migrations'
 import type { PagesContext, ProvisionResponse, StepResult } from '../../_shared-ts/types'
 
 interface ProvisionSchemaRequest {
-  connectionString: string
+  /** Supabase Personal Access Token (account.supabase.com/tokens) */
+  personalAccessToken: string
+  /** Project reference ID, e.g. jxxzdmbvazxfbhkittlm */
+  projectRef: string
 }
 
 export async function onRequestPost(context: PagesContext): Promise<Response> {
-  const { connectionString } = (await context.request.json()) as ProvisionSchemaRequest
-  const results = await applyMigrations(connectionString)
+  const body = (await context.request.json()) as ProvisionSchemaRequest
+  const { personalAccessToken, projectRef } = body
+  const results = await applyMigrations(personalAccessToken, projectRef)
   return new Response(JSON.stringify({ results } satisfies ProvisionResponse), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -27,35 +31,37 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
 }
 
 /**
- * Applies each bundled migration file in order, reporting one result per file (Requirement R2.3)
- * rather than a single pass/fail for the whole batch — these migrations are first-run-only
- * (`create table`/`create type` errors if the object already exists, same caveat
- * apply-migration.mjs documents), so a failure partway through must be diagnosable per-statement.
+ * Applies each bundled migration file in order via the Management API query endpoint, reporting
+ * one result per file (Requirement R2.3) rather than a single pass/fail for the whole batch —
+ * these migrations are first-run-only, so a failure partway through must be diagnosable per-file.
  */
-async function applyMigrations(connectionString: string): Promise<StepResult[]> {
-  const client = new Client({ connectionString })
+async function applyMigrations(
+  personalAccessToken: string,
+  projectRef: string,
+): Promise<StepResult[]> {
   const results: StepResult[] = []
+  const url = `https://api.supabase.com/v1/projects/${encodeURIComponent(projectRef)}/database/query`
 
-  try {
-    await client.connect()
-  } catch (e) {
-    return [{ step: 'connect', status: 'error', detail: String(e) }]
-  }
+  for (const { file, sql } of MIGRATIONS) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${personalAccessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: sql }),
+      })
 
-  try {
-    for (const { file, sql } of MIGRATIONS) {
-      try {
-        await client.query(sql)
+      if (!response.ok) {
+        const detail = await response.text().catch(() => `HTTP ${response.status}`)
+        results.push({ step: file, status: 'error', detail })
+      } else {
         results.push({ step: file, status: 'ok' })
-      } catch (e) {
-        // Do NOT abort the loop — a later migration might not depend on this one, and per-file
-        // reporting (rather than throwing) is what lets the operator see exactly which statement
-        // failed instead of the whole run going dark after the first error.
-        results.push({ step: file, status: 'error', detail: String(e) })
       }
+    } catch (e) {
+      results.push({ step: file, status: 'error', detail: String(e) })
     }
-  } finally {
-    await client.end().catch(() => {})
   }
 
   return results

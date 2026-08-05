@@ -2,7 +2,7 @@
 //
 // Supabase Management API docs:
 //   POST /v1/projects/{ref}/secrets
-//   Body: { secrets: [{ name, value }] }
+//   Body: [{ name, value }]  (array, not wrapped in an object)
 //
 // Each secret becomes one row in the step results so a failure in one value does not hide the
 // state of the others. Re-running this endpoint with the same name updates the value in place.
@@ -41,9 +41,9 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
           Authorization: `Bearer ${personalAccessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          secrets: entries.map(([name, value]) => ({ name, value })),
-        }),
+        body: JSON.stringify(
+          entries.map(([name, value]) => ({ name, value })),
+        ),
       },
     )
 

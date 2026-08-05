@@ -17,16 +17,20 @@ import type { PagesContext, ProvisionResponse, StepResult } from '../../_shared-
 interface ProvisionFunctionsRequest {
   personalAccessToken: string
   projectRef: string
+  /** Optional slug to deploy only one function for live verification. */
+  only?: string
 }
 
 export async function onRequestPost(context: PagesContext): Promise<Response> {
-  const { personalAccessToken, projectRef } = (await context.request.json()) as ProvisionFunctionsRequest
+  const { personalAccessToken, projectRef, only } = (await context.request.json()) as ProvisionFunctionsRequest
   const results: StepResult[] = []
+
+  const targets = only ? EDGE_FUNCTIONS.filter((fn) => fn.name === only) : EDGE_FUNCTIONS
 
   // Sequential, not parallel: keeps the per-step checklist meaningful (results arrive in a
   // predictable order) and avoids hammering the Management API with 26 concurrent requests, which
   // risks rate-limiting mid-batch on an operation the operator is watching live.
-  for (const fn of EDGE_FUNCTIONS) {
+  for (const fn of targets) {
     results.push(await deployFunction({ personalAccessToken, projectRef, name: fn.name, content: fn.content }))
   }
 

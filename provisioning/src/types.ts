@@ -19,7 +19,6 @@ export interface ProvisionResponse {
 export interface WizardState {
   // Supabase
   supabaseProjectRef: string
-  supabaseConnectionString: string
   supabasePersonalAccessToken: string
   supabaseAnonKey: string
   supabaseServiceRoleKey: string
@@ -38,7 +37,6 @@ export interface WizardState {
 
 export const EMPTY_WIZARD_STATE: WizardState = {
   supabaseProjectRef: '',
-  supabaseConnectionString: '',
   supabasePersonalAccessToken: '',
   supabaseAnonKey: '',
   supabaseServiceRoleKey: '',

@@ -14,7 +14,10 @@ async function post(path: string, body: unknown): Promise<ProvisionResponse> {
 
 export const provisionApi = {
   schema: (s: WizardState) =>
-    post('/api/provision/schema', { connectionString: s.supabaseConnectionString }),
+    post('/api/provision/schema', {
+      personalAccessToken: s.supabasePersonalAccessToken,
+      projectRef: s.supabaseProjectRef,
+    }),
 
   functions: (s: WizardState) =>
     post('/api/provision/functions', {

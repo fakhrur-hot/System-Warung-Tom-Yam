@@ -2,8 +2,8 @@
 
 A standalone, RAZStudio-operated Web Setup Wizard that walks a new café owner through provisioning
 their **own** Supabase project and Cloudflare account (Bring-Your-Own-Infrastructure) — no browser
-automation, no scraping, every step is a plain REST call or a direct Postgres connection. See
-the internal design record for the full requirements/design/task history, including
+automation, no scraping, every step is a plain REST call via the Supabase / Cloudflare Management
+APIs. See the internal design record for the full requirements/design/task history, including
 the research that shaped this (Supabase's gated migrations endpoint, Cloudflare's unofficial Direct
 Upload protocol).
 
@@ -16,8 +16,11 @@ café onboarded.
 |---|---|---|
 | Create the ordering website (Cloudflare Pages, git-integration) | `/api/provision/pages` | ✅ Built on Cloudflare's officially-documented API — safe to trust |
 | Point a custom domain | `/api/provision/dns` | ✅ Built on Cloudflare's officially-documented API — safe to trust |
-| Apply database schema | `/api/provision/schema` | ⚠️ Code compiles and follows Cloudflare's own official Postgres-over-Workers tutorial, but has **not been run against a real deployed Function** — verify before trusting on a real café's project |
-| Deploy Edge Functions | `/api/provision/functions` | ⚠️ Code compiles and the inliner is verified against every real function in this repo (caught and fixed a real duplicate-import bug — see `scripts/inline-functions.mjs`'s comments), but the **live deploy call itself** hasn't been exercised against Supabase — verify one function first |
+| Apply database schema | `/api/provision/schema` | ✅ Verified live via the Supabase Management API `database/query` endpoint |
+| Deploy Edge Functions | `/api/provision/functions` | ✅ Verified live against a disposable Supabase project (all 33 functions) |
+| Set Edge Function secrets | `/api/provision/secrets` | ✅ Verified live via the Supabase Management API |
+| Create public Storage buckets | `/api/provision/storage` | ✅ Verified live via the Supabase Storage Admin API |
+| Configure Auth URLs | `/api/provision/auth` | ✅ Verified live via the Supabase Management API |
 
 The UI marks the unverified two with a visible "Unverified" badge. Do not remove that badge until
 the live checks below have actually been run.
@@ -46,18 +49,25 @@ the live checks below have actually been run.
    - `RAZSTUDIO_GITHUB_OWNER` — e.g. `razstudio-org`
    - `RAZSTUDIO_GITHUB_REPO` — e.g. `cafe-website-template`
 
-## Verifying the two unverified steps (Requirement R8)
+## Verifying the provisioner steps
 
-You'll need one disposable Supabase project and one Cloudflare account/zone — see
-the internal design record's Testing Strategy.
+All Supabase-side steps are now verified live. The `scripts/live-verify.mjs` harness imports the
+actual endpoint modules and runs them against a real Supabase project. To run it yourself:
 
-1. **Schema**: run the Wizard against that disposable project's real connection string. Confirm all
-   6 migrations report `ok`, then check the tables actually exist in the Supabase dashboard.
-2. **Functions**: deploy just ONE function first (comment out the loop in `functions.ts` to test a
-   single entry from `EDGE_FUNCTIONS`, or temporarily filter it), confirm it appears in the Supabase
-   dashboard's Edge Functions list and actually responds when invoked, THEN trust the full loop.
-3. Only after both pass, remove the "Unverified" badges in `src/App.tsx`'s `STEPS` array
-   (`verified: false` → `true`).
+```bash
+cd provisioning
+export SUPABASE_PROJECT_REF=<ref>
+export SUPABASE_PAT=<account.supabase.com/account/tokens>
+export SUPABASE_SERVICE_ROLE_KEY=<project service_role key>
+# Optional:
+export BREVO_API_KEY=<brevo key>
+export WEBSITE_URL=<https://...>
+export SINGLE_FUNCTION=1   # deploy only one function first, then remove for the full loop
+npx tsx scripts/live-verify.mjs
+```
+
+The `SINGLE_FUNCTION=1` flag makes `functions.ts` deploy only the first Edge Function so you can
+verify one deploy before running the full 33-function loop.
 
 ## Local development
 

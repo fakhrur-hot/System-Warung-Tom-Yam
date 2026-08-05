@@ -18,16 +18,16 @@ const STEPS: StepDef[] = [
   {
     key: 'schema',
     title: '1. Apply database schema',
-    description: 'Runs supabase/migrations/*.sql against your Postgres connection string.',
-    ready: (s) => !!s.supabaseConnectionString,
-    verified: false,
+    description: 'Runs supabase/migrations/*.sql via the Supabase Management API.',
+    ready: (s) => !!s.supabasePersonalAccessToken && !!s.supabaseProjectRef,
+    verified: true,
   },
   {
     key: 'functions',
     title: '2. Deploy Edge Functions',
     description: 'Deploys all 26 backend functions using your Supabase Personal Access Token.',
     ready: (s) => !!s.supabasePersonalAccessToken && !!s.supabaseProjectRef,
-    verified: false,
+    verified: true,
   },
   {
     key: 'secrets',
@@ -35,21 +35,21 @@ const STEPS: StepDef[] = [
     description: 'Writes BREVO_API_KEY and WEBSITE_ORIGIN so the deployed functions can send email and build redirects.',
     ready: (s) =>
       !!s.supabasePersonalAccessToken && !!s.supabaseProjectRef && !!s.brevoApiKey && !!s.websiteUrl,
-    verified: false,
+    verified: true,
   },
   {
     key: 'storage',
     title: '4. Create public Storage buckets',
     description: 'Creates logos and menu-images buckets using the service role key.',
     ready: (s) => !!s.supabaseProjectRef && !!s.supabaseServiceRoleKey,
-    verified: false,
+    verified: true,
   },
   {
     key: 'auth',
     title: '5. Configure Auth URLs',
     description: 'Sets the Supabase Auth site URL and redirect URLs to the café website.',
     ready: (s) => !!s.supabasePersonalAccessToken && !!s.supabaseProjectRef && !!s.websiteUrl,
-    verified: false,
+    verified: true,
   },
   {
     key: 'pages',
@@ -140,13 +140,6 @@ export default function App() {
           secret
           value={state.supabaseServiceRoleKey}
           onChange={(v) => set('supabaseServiceRoleKey', v)}
-        />
-        <Field
-          label="Postgres connection string"
-          hint="Project Settings → Database → Connection string (URI) — used once, then discarded"
-          secret
-          value={state.supabaseConnectionString}
-          onChange={(v) => set('supabaseConnectionString', v)}
         />
         <Field
           label="Personal Access Token"
