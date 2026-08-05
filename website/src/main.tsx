@@ -10,6 +10,7 @@ import DevicesPage from './admin/pages/DevicesPage.tsx'
 import OrdersPage from './admin/pages/OrdersPage.tsx'
 import SettingsPage from './admin/pages/SettingsPage.tsx'
 import QrSheetsPage from './admin/pages/QrSheetsPage.tsx'
+import MenuManagementPage from './admin/pages/MenuManagementPage.tsx'
 import AdminLayout from './admin/components/AdminLayout.tsx'
 import ProtectedRoute from './admin/components/ProtectedRoute.tsx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
@@ -43,6 +44,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="orders" element={<OrdersPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="qr-sheets" element={<QrSheetsPage />} />
+          <Route path="menu" element={<MenuManagementPage />} />
           {/* Default redirect for /admin */}
           <Route index element={<DashboardPage />} />
         </Route>

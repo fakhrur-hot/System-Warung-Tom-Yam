@@ -1,6 +1,7 @@
 /**
  * 🌶 TOM YAM (default) — tailwind color preset
- * The original Tom Yam deep red. This is the active preset in tailwind.config.js.
+ * Spicy orange-red broth ramp: creamy lights, chilli-orange mids, and a deep
+ * savoury red-brown. This is the active preset in tailwind.config.js.
  * Included here so it can be referenced like all other presets.
  *
  * Usage:
@@ -8,14 +9,14 @@
  *   export default { theme: { extend: { colors: { emerald: tomYam } } } }
  */
 export default {
-  50:  '#FEF3F1',
-  100: '#FADEDB',
-  200: '#F0B2AC',
-  300: '#E0786E',
-  400: '#C83C30',
-  500: '#B0160C',
-  600: '#9B0600',
-  700: '#7A0500',
-  800: '#5C0400',
-  900: '#400200',
+  50:  '#FFF5F0',  // creamy broth page background
+  100: '#FFE6D9',  // light peach containers
+  200: '#FFC4B0',  // soft coral
+  300: '#FF9B7A',  // fresh tomato
+  400: '#F36B44',  // spicy orange-red
+  500: '#D94824',  // chilli
+  600: '#B52D10',  // Tom Yam red — primary accent
+  700: '#8F210A',  // deep chilli hover
+  800: '#691808',  // dark
+  900: '#430F05',  // rich red-brown headings
 }

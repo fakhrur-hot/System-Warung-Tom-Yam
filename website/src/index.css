@@ -5,3 +5,15 @@
 :root {
   color-scheme: light dark;
 }
+
+@layer utilities {
+  /* Safe-area padding for fixed bottom elements on notched phones. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Bottom clearance reserved for the fixed CartBar (7rem) plus the home-indicator area. */
+  .pb-cart-safe {
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+  }
+}

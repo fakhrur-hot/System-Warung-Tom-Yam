@@ -39,7 +39,7 @@ export default function SplashScreen({ cafeName, logoUrl }: SplashScreenProps) {
       </div>
 
       {/* Skeleton menu preview */}
-      <div className="mt-8 w-full max-w-md space-y-3">
+      <div className="mt-8 w-full max-w-md space-y-4">
         {[0, 1, 2].map((i) => (
           <div key={i} className="flex gap-3 rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
             <div className="h-20 w-28 flex-shrink-0 animate-pulse rounded-md bg-emerald-100" />

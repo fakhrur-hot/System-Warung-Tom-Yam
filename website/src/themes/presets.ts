@@ -139,20 +139,22 @@ export const themes: Record<string, ThemeRamp> = {
   },
 
   /**
-   * 🌶 TOM YAM (default) — The original Tom Yam deep red.
-   * The house default shipped with every template build.
+   * 🌶 TOM YAM (default) — Spicy orange-red broth with fresh herb garnish.
+   * The house default shipped with every template build. The ramp moves from creamy
+   * broth lights through chilli-orange mids to a deep, savoury red-brown, so the
+   * whole UI reads "Tom Yam" rather than flat crimson.
    */
   tomYam: {
-    50:  '#FEF3F1',
-    100: '#FADEDB',
-    200: '#F0B2AC',
-    300: '#E0786E',
-    400: '#C83C30',
-    500: '#B0160C',
-    600: '#9B0600',  // Tom Yam red primary
-    700: '#7A0500',
-    800: '#5C0400',
-    900: '#400200',
+    50:  '#FFF5F0',  // creamy broth page background
+    100: '#FFE6D9',  // light peach containers
+    200: '#FFC4B0',  // soft coral
+    300: '#FF9B7A',  // fresh tomato
+    400: '#F36B44',  // spicy orange-red
+    500: '#D94824',  // chilli
+    600: '#B52D10',  // Tom Yam red — primary accent
+    700: '#8F210A',  // deep chilli hover
+    800: '#691808',  // dark
+    900: '#430F05',  // rich red-brown headings
   },
 }
 

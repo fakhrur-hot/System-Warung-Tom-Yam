@@ -1,24 +1,29 @@
+import tomYam from './src/themes/tailwind-presets/tom-yam'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Brand accent: "Tom Yam" striking deep red, anchored on #9B0600 at 600 (the primary
-        // accent used for buttons/active tabs/headings). The whole app was authored on Tailwind's
-        // `emerald` scale, so overriding that scale here recolors every screen from one place.
-        // Fully reversible — delete this `emerald` block to restore the original green.
-        emerald: {
-          50: '#FEF3F1',
-          100: '#FADEDB',
-          200: '#F0B2AC',
-          300: '#E0786E',
-          400: '#C83C30',
-          500: '#B0160C',
-          600: '#9B0600',
-          700: '#7A0500',
-          800: '#5C0400',
-          900: '#400200',
+        // Brand accent: "Tom Yam" spicy orange-red broth. The whole app was authored on
+        // Tailwind's `emerald` scale, so overriding that scale here recolours every screen
+        // from one place. Fully reversible — delete this `emerald` block to restore green.
+        emerald: tomYam,
+
+        // Fresh herb / lime garnish accent for highlights on customer-facing pages.
+        // Used sparingly for things that should feel like the coriander/lime on top of Tom Yam.
+        herb: {
+          50:  '#F7FEE7',
+          100: '#ECFCCB',
+          200: '#D9F99D',
+          300: '#BEF264',
+          400: '#A3E635',
+          500: '#84CC16',
+          600: '#65A30D',
+          700: '#4D7C0F',
+          800: '#3F6212',
+          900: '#365314',
         },
       },
     },

@@ -581,8 +581,8 @@ export default function App() {
               </div>
             )}
             {todaysSpecial.trim() && (
-              <div className="mx-3 mt-3 rounded-xl bg-amber-100 px-4 py-3 text-amber-900">
-                <span className="mr-1" aria-hidden="true">⭐</span>
+              <div className="mx-3 mt-3 flex items-start gap-2 rounded-xl bg-herb-100 px-4 py-3 text-herb-900">
+                <span aria-hidden="true">🌿</span>
                 <span className="font-semibold">{todaysSpecial}</span>
               </div>
             )}

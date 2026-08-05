@@ -17,7 +17,7 @@ The website uses Tailwind's `emerald` scale everywhere (`bg-emerald-50`, `text-e
 
 | Preset | File | Description |
 |--------|------|-------------|
-| 🌶 Tom Yam | `tom-yam.js` | Deep red — the default |
+| 🌶 Tom Yam | `tom-yam.js` | Spicy orange-red broth — the default |
 | 🎩 Luxury | `luxury.js` | Warm ivory + antique gold |
 | 💎 Elegant | `elegant.js` | Champagne + rose gold |
 | ⬜ Minimalist | `minimalist.js` | Pure white + charcoal |

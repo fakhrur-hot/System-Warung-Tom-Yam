@@ -73,8 +73,9 @@ async function handlePutMenu(req: Request): Promise<Response> {
   }
 
   const body = await req.json().catch(() => null);
-  if (!body || !Array.isArray(body.items)) {
-    return errorResponse(422, "VALIDATION", "Body must contain an items array");
+  const validation = validateMenuSnapshot(body);
+  if (!validation.ok) {
+    return errorResponse(422, "VALIDATION", validation.error);
   }
 
   const supabase = getSupabaseClient();
@@ -90,4 +91,65 @@ async function handlePutMenu(req: Request): Promise<Response> {
   }
 
   return jsonResponse({ updatedAt: now });
+}
+
+// Lightweight server-side guard so a malformed admin save cannot corrupt the customer menu.
+function validateMenuSnapshot(body: unknown): { ok: true } | { ok: false; error: string } {
+  if (!body || typeof body !== "object") {
+    return { ok: false, error: "Body must be an object" };
+  }
+  const snapshot = body as Record<string, unknown>;
+
+  if (!Array.isArray(snapshot.items)) {
+    return { ok: false, error: "Body must contain an items array" };
+  }
+  if (snapshot.categories !== undefined && !Array.isArray(snapshot.categories)) {
+    return { ok: false, error: "categories must be an array when provided" };
+  }
+
+  const seenIds = new Set<string>();
+  for (let i = 0; i < snapshot.items.length; i++) {
+    const item = snapshot.items[i];
+    if (!item || typeof item !== "object") {
+      return { ok: false, error: `Item ${i} must be an object` };
+    }
+    const it = item as Record<string, unknown>;
+
+    if (typeof it.id !== "string" || it.id.trim() === "") {
+      return { ok: false, error: `Item ${i} must have a non-empty id` };
+    }
+    if (seenIds.has(it.id)) {
+      return { ok: false, error: `Duplicate item id: ${it.id}` };
+    }
+    seenIds.add(it.id);
+
+    if (typeof it.category !== "string" || it.category.trim() === "") {
+      return { ok: false, error: `Item ${i} (${it.id}) must have a category` };
+    }
+    if (typeof it.price !== "number" || it.price < 0) {
+      return { ok: false, error: `Item ${i} (${it.id}) must have a non-negative price` };
+    }
+    if (typeof it.available !== "boolean") {
+      return { ok: false, error: `Item ${i} (${it.id}) must have an available boolean` };
+    }
+    if (typeof it.askMeDaily !== "boolean") {
+      return { ok: false, error: `Item ${i} (${it.id}) must have an askMeDaily boolean` };
+    }
+    if (!it.name || typeof it.name !== "object" || typeof (it.name as Record<string, string>).en !== "string") {
+      return { ok: false, error: `Item ${i} (${it.id}) must have a name map with an English value` };
+    }
+
+    // Optional shape checks
+    if (it.description !== undefined && typeof it.description !== "object") {
+      return { ok: false, error: `Item ${i} (${it.id}) description must be a language map` };
+    }
+    if (it.image !== undefined && typeof it.image !== "string") {
+      return { ok: false, error: `Item ${i} (${it.id}) image must be a string URL` };
+    }
+    if (it.categories !== undefined && !Array.isArray(it.categories)) {
+      return { ok: false, error: `Item ${i} (${it.id}) categories must be an array` };
+    }
+  }
+
+  return { ok: true };
 }

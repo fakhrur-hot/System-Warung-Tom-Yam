@@ -3,6 +3,7 @@ import { getSupabase } from '../../lib/supabase'
 
 const navItems = [
   { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
+  { path: '/admin/menu', label: 'Menu', icon: '🍜' },
   { path: '/admin/devices', label: 'Devices', icon: '📱' },
   { path: '/admin/orders', label: 'Orders', icon: '🧾' },
   { path: '/admin/qr-sheets', label: 'QR Sheets', icon: '📄' },

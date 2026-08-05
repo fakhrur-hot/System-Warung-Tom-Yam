@@ -176,7 +176,7 @@ export default function CartBar({
 
       {/* Cart bar / sheet */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-40 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] transition-all duration-300 ease-in-out ${
+        className={`fixed bottom-0 left-0 right-0 z-40 bg-white pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] transition-all duration-300 ease-in-out ${
           isExpanded ? 'top-[40%] rounded-t-2xl overflow-hidden' : 'rounded-t-xl'
         }`}
         onTouchStart={handleTouchStart}

@@ -1,0 +1,104 @@
+name: Distribute main to café branches
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: distribute-main-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  distribute:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Distribute main to café branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CAFE_BRANCHES: ${{ vars.CAFE_BRANCHES }}
+        run: |
+          set -e
+
+          if [ -z "$CAFE_BRANCHES" ]; then
+            echo "CAFE_BRANCHES repository variable is not set. Skipping distribution."
+            exit 0
+          fi
+
+          IFS=',' read -ra BRANCHES <<< "$CAFE_BRANCHES"
+
+          for branch in "${BRANCHES[@]}"; do
+            branch=$(echo "$branch" | xargs) # trim whitespace
+            if [ -z "$branch" ]; then
+              continue
+            fi
+
+            echo "--- Processing café branch: $branch ---"
+
+            # Make sure the remote branch exists.
+            if ! git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+              echo "Branch $branch does not exist on origin. Skipping."
+              continue
+            fi
+
+            sync_branch="sync/main-to-${branch}"
+
+            # Clean up any stale local/sync branch.
+            git branch -D "$sync_branch" 2>/dev/null || true
+
+            # Create the sync branch from the café branch.
+            git checkout -b "$sync_branch" "origin/$branch"
+
+            # Try to merge main cleanly.
+            if git merge --no-edit origin/main; then
+              echo "Merge clean for $branch. Pushing sync branch."
+              git push --force-with-lease origin "$sync_branch"
+
+              # Open or update a PR if one does not already exist.
+              existing_pr=$(gh pr list --head "$sync_branch" --base "$branch" --json number --jq '.[0].number' || true)
+              if [ -n "$existing_pr" ]; then
+                echo "PR #$existing_pr already exists for $branch."
+              else
+                gh pr create \
+                  --base "$branch" \
+                  --head "$sync_branch" \
+                  --title "chore(sync): merge main into ${branch}" \
+                  --body "This PR brings the latest product changes from \`main\` into the \`${branch}\` café branch. Review before merging."
+                echo "Created PR for $branch."
+              fi
+            else
+              echo "Merge conflicts detected for $branch. Aborting merge and opening an issue."
+              git merge --abort || true
+
+              issue_title="Merge conflict: main → ${branch}"
+              existing_issue=$(gh issue list --search "$issue_title" --json number --jq '.[0].number' || true)
+              if [ -n "$existing_issue" ]; then
+                echo "Issue #$existing_issue already open for $branch conflict."
+              else
+                gh issue create \
+                  --title "$issue_title" \
+                  --body "The automatic distribution of \`main\` to the \`${branch}\` café branch could not be completed because of merge conflicts. Please resolve manually."
+                echo "Created conflict issue for $branch."
+              fi
+            fi
+
+            # Return to main for the next iteration.
+            git checkout main
+            git branch -D "$sync_branch" 2>/dev/null || true
+          done

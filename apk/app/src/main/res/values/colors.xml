@@ -5,21 +5,21 @@
          resource names (tom_yam_50, etc.) are kept stable so the theme wiring downstream needs no
          changes. These map to the TomYam* ramp names in Color.kt. -->
 
-    <!-- Primary ramp (10 shades from 50-900) -->
-    <color name="tom_yam_50">#EEF2FF</color>  <!-- page background / input tint -->
-    <color name="tom_yam_100">#E0E7FF</color> <!-- containers, chips -->
-    <color name="tom_yam_200">#C7D2FE</color>
-    <color name="tom_yam_300">#A5B4FC</color>
-    <color name="tom_yam_400">#818CF8</color>
-    <color name="tom_yam_500">#6366F1</color>
-    <color name="tom_yam_600">#4F46E5</color> <!-- primary accent — buttons, active states -->
-    <color name="tom_yam_700">#4338CA</color> <!-- hover / pressed -->
-    <color name="tom_yam_800">#3730A3</color>
-    <color name="tom_yam_900">#312E81</color> <!-- headings / primary text -->
+    <!-- Primary ramp (10 shades from 50-900): spicy orange-red Tom Yam broth -->
+    <color name="tom_yam_50">#FFF5F0</color>  <!-- creamy broth page background / input tint -->
+    <color name="tom_yam_100">#FFE6D9</color> <!-- light peach containers, chips -->
+    <color name="tom_yam_200">#FFC4B0</color>
+    <color name="tom_yam_300">#FF9B7A</color>
+    <color name="tom_yam_400">#F36B44</color>
+    <color name="tom_yam_500">#D94824</color>
+    <color name="tom_yam_600">#B52D10</color> <!-- Tom Yam red — primary accent, buttons, active states -->
+    <color name="tom_yam_700">#8F210A</color> <!-- deep chilli hover / pressed -->
+    <color name="tom_yam_800">#691808</color>
+    <color name="tom_yam_900">#430F05</color> <!-- rich red-brown headings / primary text -->
 
     <!-- Neutral muted slate for secondary text. -->
     <color name="tom_yam_muted">#6B7280</color>
-    <color name="tom_yam_outline">#C7D2FE</color>
+    <color name="tom_yam_outline">#FFC4B0</color>
     <!-- The logo's own paper white; the adaptive icon's background layer. -->
     <color name="ic_launcher_background">#FFFFFF</color>
 </resources>
