@@ -21,6 +21,9 @@ café onboarded.
 | Set Edge Function secrets | `/api/provision/secrets` | ✅ Verified live via the Supabase Management API |
 | Create public Storage buckets | `/api/provision/storage` | ✅ Verified live via the Supabase Storage Admin API |
 | Configure Auth URLs | `/api/provision/auth` | ✅ Verified live via the Supabase Management API |
+| **Full orchestrated run (APK installer)** | `/api/provision/run` | ⚠️ Smoke-tested (request parsing + structured error reporting); still needs live verification against a disposable Supabase + Cloudflare setup |
+
+The `/api/provision/run` endpoint is what the APK installer calls. It runs the steps above in one request, plus creating a new Supabase project (if requested) and minting the first owner key. It returns the final tablet config values so the APK can save them automatically.
 
 The UI marks the unverified two with a visible "Unverified" badge. Do not remove that badge until
 the live checks below have actually been run.
@@ -69,6 +72,72 @@ npx tsx scripts/live-verify.mjs
 The `SINGLE_FUNCTION=1` flag makes `functions.ts` deploy only the first Edge Function so you can
 verify one deploy before running the full 33-function loop.
 
+### Full orchestrated run (`/api/provision/run`)
+
+`scripts/live-verify-run.mjs` runs the new orchestrator endpoint against real Supabase + Cloudflare
+credentials. It can exercise a new Supabase project, a new Cloudflare Pages project, or both in
+existing mode:
+
+```bash
+cd provisioning
+export SUPABASE_PAT=<account.supabase.com/account/tokens>
+
+# New Supabase project + new Cloudflare Pages project
+export SUPABASE_ORG_ID=<...>
+export SUPABASE_REGION=ap-southeast-1
+export SUPABASE_PROJECT_NAME=live-verify-run-1
+export CLOUDFLARE_ACCOUNT_ID=<...>
+export CLOUDFLARE_API_TOKEN=<...>
+export CLOUDFLARE_CAFE_SLUG=live-verify-run-1
+export RAZSTUDIO_GITHUB_OWNER=<...>
+export RAZSTUDIO_GITHUB_REPO=<...>
+export CAFE_NAME="Test Café"
+# Optional:
+# export BREVO_API_KEY=...
+# export CLOUDFLARE_ZONE_ID=...
+# export CLOUDFLARE_CUSTOM_DOMAIN=...
+
+npx tsx scripts/live-verify-run.mjs
+```
+
+For existing projects, supply `SUPABASE_PROJECT_REF`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+`CLOUDFLARE_PROJECT_NAME` instead of the new-project fields.
+
+### Smoke test (no real credentials)
+
+`scripts/smoke-test-run.mjs` exercises the orchestrator with fake credentials and verifies that the
+request is parsed correctly and that failures are reported as structured `results` entries. This is a
+safe pre-check before running the live verifier:
+
+```bash
+cd provisioning
+npm run generate
+npx tsx scripts/smoke-test-run.mjs
+```
+
+## APK installer flow
+
+The APK now has an in-app **Provision new café** screen, reached from the role-select screen. It
+collects the same credentials the Wizard would collect, then hands them to a WorkManager worker that
+POSTs to `/api/provision/run` and returns the resolved Supabase URL, anon key, website URL, and
+owner-key URL. The tablet can then save those values directly.
+
+The screen supports four combinations:
+- New Supabase project + new Cloudflare Pages project
+- Existing Supabase project + new Cloudflare Pages project
+- New Supabase project + existing Cloudflare Pages project
+- Existing Supabase project + existing Cloudflare Pages project
+
+High-privilege credentials (PATs, API tokens, service-role keys) are only held in the ViewModel state
+and in the WorkManager input data for the single provisioning request; they are not persisted on
+the tablet.
+
+The build needs the worker URL in `apk/local.properties`:
+
+```
+PROVISIONER_WORKER_URL=https://<your-wizard-domain>/api/provision/run
+```
+
 ## Local development
 
 ```
@@ -84,7 +153,10 @@ they can never drift from the actual migrations/functions in this repo.
 
 ## What the tablet still needs
 
-Nothing about the APK's Setup screen changes because of this tool. The Wizard's final "Done" screen
-displays the Supabase URL, anon key, website URL, and café name for the owner to type into the
-existing three-dots → Setup screen on the tablet — exactly the same low-privilege values that
-screen has always stored.
+The APK's role-select screen now offers a **Provision new café** path that automates the Wizard
+steps from the tablet. Once provisioning succeeds, the resolved Supabase URL, anon key, website URL,
+and café name are saved straight into the existing app config store, and the device can sign in with
+the minted owner key.
+
+For cafés that were set up outside the APK, the existing three-dots → Setup screen still accepts the
+same low-privilege values manually.

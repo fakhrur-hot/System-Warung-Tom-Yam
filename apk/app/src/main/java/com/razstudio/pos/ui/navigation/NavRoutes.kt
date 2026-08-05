@@ -33,8 +33,17 @@ object NavRoutes {
     const val BACKUP = "backup"
     const val KEEP_ALIVE_SETUP = "keep_alive_setup"
     const val CAFE_MANAGEMENT = "cafe_management"
+    const val CAFE_PROFILE = "cafe_profile"
     const val TABLE_MANAGEMENT = "table_management"
     const val SETUP = "setup"
+    const val PROVISIONER = "provisioner"
+
+    /**
+     * Debug-only affiliate catalog editor, reached from the Setup Wizard.
+     *
+     * Not registered in release builds — it holds a GitHub token and commits to `main`.
+     */
+    const val PROMO_CATALOG = "promo_catalog"
     const val HARDWARE_DEVICES = "hardware_devices"
     const val PAYMENT_GATEWAY_SETTINGS = "payment_gateway_settings"
 

@@ -22,6 +22,7 @@ val localProps = Properties().apply {
 val supabaseUrl = localProps.getProperty("SUPABASE_URL") ?: ""
 val supabaseAnonKey = localProps.getProperty("SUPABASE_ANON_KEY") ?: ""
 val websiteUrl = localProps.getProperty("WEBSITE_URL") ?: ""
+val provisionerWorkerUrl = localProps.getProperty("PROVISIONER_WORKER_URL") ?: ""
 val deepLinkHost = localProps.getProperty("DEEP_LINK_HOST") ?: "your-cafe.pages.dev"
 
 // GOOGLE_WEB_CLIENT_ID: the *Web* OAuth client that Credential Manager takes as its server client
@@ -113,6 +114,7 @@ android {
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         buildConfigField("String", "WEBSITE_URL", "\"$websiteUrl\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
+        buildConfigField("String", "PROVISIONER_WORKER_URL", "\"$provisionerWorkerUrl\"")
         // DEEP_LINK_HOST: manifest placeholder for the /join deep link host (Requirement 4.1, 4.2).
         manifestPlaceholders["deepLinkHost"] = deepLinkHost
         // CAFE_NAME: generated string resource for the app launcher name. Overrides the value
@@ -234,6 +236,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)

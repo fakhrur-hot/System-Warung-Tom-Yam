@@ -48,6 +48,7 @@ import com.razstudio.pos.ui.screens.AdminLockScreen
 import com.razstudio.pos.ui.screens.AdminSettingsScreen
 import com.razstudio.pos.ui.screens.BackupScreen
 import com.razstudio.pos.ui.screens.CafeManagementScreen
+import com.razstudio.pos.ui.screens.CafeProfileScreen
 import com.razstudio.pos.ui.screens.DevicesScreen
 import com.razstudio.pos.ui.screens.KeepAliveSetupScreen
 import com.razstudio.pos.ui.screens.ManualDineInScreen
@@ -56,6 +57,7 @@ import com.razstudio.pos.ui.screens.OrderingConnectScreen
 import com.razstudio.pos.ui.screens.OrderingHomeScreen
 import com.razstudio.pos.ui.screens.PaymentGatewaySettingsScreen
 import com.razstudio.pos.ui.screens.PendingApprovalScreen
+import com.razstudio.pos.ui.screens.ProvisionerScreen
 import com.razstudio.pos.ui.screens.PrintersScreen
 import com.razstudio.pos.ui.screens.QrPdfScreen
 import com.razstudio.pos.ui.screens.ReportsScreen
@@ -238,6 +240,7 @@ fun AppNavGraph(
                     }
                 },
                 onSetup = { navController.navigate(NavRoutes.SETUP) },
+                onProvision = { navController.navigate(NavRoutes.PROVISIONER) },
                 // "Reload from Google Drive" is the sign-in screen again: it re-authenticates and
                 // re-lists the account's cafés, which is exactly what that screen already does.
                 // A second code path would be a second place for the chooser to drift.
@@ -254,9 +257,21 @@ fun AppNavGraph(
             LanPairingScreen(onBack = { navController.popBackStack() })
         }
 
+        // Debug builds only: the catalog editor carries a GitHub token and writes to `main`, which
+        // belongs with the owner and not on a café's phone. Absent from release entirely rather than
+        // hidden behind a flag — a route that cannot be navigated to cannot be reached by a deep link.
+        if (com.razstudio.pos.BuildConfig.DEBUG) {
+            composable(NavRoutes.PROMO_CATALOG) {
+                com.razstudio.pos.ui.screens.PromoCatalogScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+        }
+
         composable(NavRoutes.SETUP) {
             SetupScreen(
                 onBack = { navController.popBackStack() },
+                onOpenPromoCatalog = { navController.navigate(NavRoutes.PROMO_CATALOG) },
                 // Setup owns the owner-key flow now; it only needs telling where to land.
                 onOwnerKeyAccepted = {
                     navController.navigate(NavRoutes.ADMIN_HOME) {
@@ -272,11 +287,26 @@ fun AppNavGraph(
             )
         }
 
+        composable(NavRoutes.PROVISIONER) {
+            ProvisionerScreen(
+                onBack = { navController.popBackStack() },
+                onDone = {
+                    navController.navigate(NavRoutes.ADMIN_HOME) {
+                        popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
+                    }
+                },
+            )
+        }
+
         composable(NavRoutes.ADMIN_CONNECT) {
             AdminConnectScreen(
                 onConnected = {
+                    // popUpTo(0), not popUpTo(ROLE_SELECT): role-select is only on the stack when
+                    // the device came through it. Signing in from the lock screen — or from a
+                    // start destination of ADMIN_HOME — leaves it absent, so the old form popped
+                    // nothing and back walked into whatever preceded the login.
                     navController.navigate(NavRoutes.ADMIN_HOME) {
-                        popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
+                        popUpTo(0) { inclusive = true }
                     }
                 },
                 onSecondaryRegistered = {
@@ -325,11 +355,21 @@ fun AppNavGraph(
                     }
                 },
                 onNavigateToLock = {
-                    // Sign-out: pop the ENTIRE logged-in stack back to ROLE_SELECT, so pressing
-                    // back from the lock screen stays at role-select (or closes the app), never
-                    // returning to the pre-logout home/ordering screen.
+                    // Sign-out: clear the ENTIRE back stack, so the lock screen is a dead end.
+                    //
+                    // This used to be popUpTo(ROLE_SELECT), which only pops if role-select is
+                    // actually on the stack — and it usually is not. StartupViewModel sends a
+                    // signed-in admin device straight to ADMIN_HOME as the START destination, so
+                    // role-select was never visited, popUpTo matched nothing, and the lock screen
+                    // was simply pushed on top of the still-live home screen. Pressing back walked
+                    // straight back into the café that had just been signed out of.
+                    //
+                    // popUpTo(0) has no such precondition: it clears everything regardless of how
+                    // the device got here, which is what the original comment intended. Back from
+                    // the lock screen now leaves the app, and relaunching returns to the lock
+                    // screen because StartupViewModel checks sessionPrefs.isLocked().
                     navController.navigate(NavRoutes.ADMIN_LOCK) {
-                        popUpTo(NavRoutes.ROLE_SELECT) { inclusive = false }
+                        popUpTo(0) { inclusive = true }
                     }
                 },
                 onNavigateToReconnect = {
@@ -376,7 +416,15 @@ fun AppNavGraph(
                     navController.navigate(NavRoutes.ADMIN_HOME) {
                         popUpTo(NavRoutes.ADMIN_LOCK) { inclusive = true }
                     }
-                }
+                },
+                onSignInWithOwnerKey = {
+                    // Same owner-key screen a fresh device uses. The lock screen is popped so a
+                    // cancelled scan cannot leave the till sitting behind a login it never
+                    // completed — backing out returns to the lock, which is where it belongs.
+                    navController.navigate(NavRoutes.ADMIN_CONNECT) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
             )
         }
 
@@ -454,7 +502,14 @@ fun AppNavGraph(
         // Admin Settings
         composable(NavRoutes.ADMIN_SETTINGS) {
             AdminSettingsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToPrinters = { navController.navigate(NavRoutes.PRINTERS) },
+                onNavigateToHardwareDevices = {
+                    navController.navigate(NavRoutes.HARDWARE_DEVICES)
+                },
+                onNavigateToKeepAliveSetup = {
+                    navController.navigate(NavRoutes.KEEP_ALIVE_SETUP)
+                },
             )
         }
 
@@ -514,10 +569,18 @@ fun AppNavGraph(
             )
         }
 
+        // Café Profile — the café's own identity (name, logo, location, preset, payment QR)
+        composable(NavRoutes.CAFE_PROFILE) {
+            CafeProfileScreen(onBack = { navController.popBackStack() })
+        }
+
         // Café Management hub
         composable(NavRoutes.CAFE_MANAGEMENT) {
             CafeManagementScreen(
                 onBack = { navController.popBackStack() },
+                onNavigateToCafeProfile = {
+                    navController.navigate(NavRoutes.CAFE_PROFILE)
+                },
                 onNavigateToMenu = {
                     navController.navigate(NavRoutes.MENU_MANAGEMENT)
                 },
@@ -526,12 +589,6 @@ fun AppNavGraph(
                 },
                 onNavigateToQrPdf = {
                     navController.navigate(NavRoutes.QR_PDF)
-                },
-                onNavigateToHardwareDevices = {
-                    navController.navigate(NavRoutes.HARDWARE_DEVICES)
-                },
-                onNavigateToPrinters = {
-                    navController.navigate(NavRoutes.PRINTERS)
                 },
                 onNavigateToPaymentGateway = {
                     navController.navigate(NavRoutes.PAYMENT_GATEWAY_SETTINGS)
