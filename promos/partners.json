@@ -1,38 +1,38 @@
 {
   "_comment": "Central affiliate catalog. Edit THIS file (on main) to change what every cafe shows. See README.md in this folder.",
-  "_todo": "alt/img are placeholders. Shopee serves a JS landing page to non-browser fetches, so product names and images cannot be resolved from a short link -- fill them in from the affiliate portal. alt is the line a customer reads; img upgrades the placement from a text card to a thumbnail row.",
+  "_compliance": "href is the Shopee affiliate shortlink, VERBATIM and unmodified -- it stays the clickable destination so the commission tracks. img is Shopee's own creative for that destination, displayed as-is (not cropped, not rebranded). Never replace a shortlink with a direct product URL.",
   "default": {
     "subId": "menu",
     "products": [
       {
-        "href": "https://s.shopee.com.my/LmAVVh9Vm",
-        "img": "",
-        "alt": "Shopee pick"
+        "href": "https://s.shopee.com.my/BSkJvlbkW",
+        "img": "https://down-my.img.susercontent.com/file/my-11134207-7rasb-m1h3jkm5qdca13",
+        "alt": "Crunchy Garlic Chilli Oil (Halal)"
       },
       {
         "href": "https://s.shopee.com.my/3VjCHrcOH4",
-        "img": "",
-        "alt": "Shopee pick"
+        "img": "https://down-my.img.susercontent.com/file/my-11134207-820l9-mjf35lt8xgxx1c",
+        "alt": "OXYHOME Detergent Powder 1kg"
       },
       {
         "href": "https://s.shopee.com.my/3g2cUBoYEu",
-        "img": "",
-        "alt": "Shopee pick"
-      },
-      {
-        "href": "https://s.shopee.com.my/40fSsvK46E",
-        "img": "",
-        "alt": "Shopee pick"
+        "img": "https://down-my.img.susercontent.com/file/b71a08db1653d53b9c4d2c94e34e7c10",
+        "alt": "Laundry Scent Booster Beads (50pcs)"
       },
       {
         "href": "https://s.shopee.com.my/BSkJtvczO",
-        "img": "",
-        "alt": "Shopee pick"
+        "img": "https://down-my.img.susercontent.com/file/0a6667afa780619305d37f0b23cece9d",
+        "alt": "Health & Beauty on Shopee"
       },
       {
-        "href": "https://s.shopee.com.my/BSkJvlbkW",
-        "img": "",
-        "alt": "Shopee pick"
+        "href": "https://s.shopee.com.my/LmAVVh9Vm",
+        "img": "https://down-my.img.susercontent.com/file/218ca77f9a0e6934ff5fb06b566f6cf1",
+        "alt": "Fashion & Accessories on Shopee"
+      },
+      {
+        "href": "https://s.shopee.com.my/40fSsvK46E",
+        "img": "https://down-my.img.susercontent.com/file/edb9927e39025fbc3601e29d9b842369",
+        "alt": "Men's Bags & Wallets on Shopee"
       }
     ]
   },
