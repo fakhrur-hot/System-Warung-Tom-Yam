@@ -52,7 +52,15 @@ enum class PaymentMethod(
      * Driving the card hardware in-process would put PIN entry and card data inside this app and
      * the deployment inside PCI-DSS scope. (PG-REQ-4d, designs.md H7/D7)
      */
-    CARD("CARD", PaymentCategory.CARD, worksOffline = false);
+    CARD("CARD", PaymentCategory.CARD, worksOffline = false),
+
+    /**
+     * Payment confirmed via a captured notification from a Malaysian eWallet/banking app.
+     * The NotificationListenerService detected an incoming payment matching a pending order.
+     * Works offline because it only requires the notification to arrive on the device —
+     * no live payment gateway callback is needed.
+     */
+    NOTIFICATION("NOTIFICATION", PaymentCategory.QR_PAYNET, worksOffline = true);
 
     companion object {
         /**
@@ -84,6 +92,7 @@ enum class PaymentMethod(
         SHOPEEPAY -> "ShopeePay"
         FPX -> "FPX"
         CARD -> "Card"
+        NOTIFICATION -> "eWallet (Notification)"
     }
 }
 

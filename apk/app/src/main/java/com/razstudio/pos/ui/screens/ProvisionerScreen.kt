@@ -1,5 +1,6 @@
 package com.razstudio.pos.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,8 +13,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.asImageBitmap
+import com.razstudio.pos.ui.util.QrCodeUtil
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,7 +31,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,7 +41,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -47,15 +49,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.data.StepResult
+import com.razstudio.pos.ui.i18n.LanguageViewModel
+import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.viewmodels.CloudflareModeSelection
+import com.razstudio.pos.ui.viewmodels.OwnerKeyLoginViewModel
 import com.razstudio.pos.ui.viewmodels.ProvisionerState
 import com.razstudio.pos.ui.viewmodels.ProvisionerViewModel
 import com.razstudio.pos.ui.viewmodels.SupabaseModeSelection
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 
 /**
  * In-app installer flow that provisions a new café backend from the tablet.
@@ -69,18 +72,28 @@ fun ProvisionerScreen(
     onBack: () -> Unit,
     onDone: () -> Unit,
     viewModel: ProvisionerViewModel = hiltViewModel(),
+    ownerKeyViewModel: OwnerKeyLoginViewModel = hiltViewModel(),
+    languageViewModel: LanguageViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val ownerKeyState by ownerKeyViewModel.state.collectAsState()
+    val language by languageViewModel.language.collectAsState()
+    val strings = uiStrings(language)
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
-    val clipboard = LocalClipboardManager.current
+    var showOwnerQrDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
     }
 
-    LaunchedEffect(state.configurationSaved) {
-        if (state.configurationSaved) onDone()
+    // Once provisioning succeeds, lock the screen on the owner-key QR so the owner must see it.
+    LaunchedEffect(state.success) {
+        if (state.success) showOwnerQrDialog = true
+    }
+
+    // After the owner acknowledges the QR and the owner-key login completes, land in the admin home.
+    LaunchedEffect(ownerKeyState) {
+        if (ownerKeyState is OwnerKeyLoginViewModel.State.Done) onDone()
     }
 
     Scaffold(
@@ -111,6 +124,7 @@ fun ProvisionerScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
+            WizardSection(state, viewModel)
             SupabaseSection(state, viewModel)
             CloudflareSection(state, viewModel)
             CafeSection(state, viewModel)
@@ -119,13 +133,7 @@ fun ProvisionerScreen(
 
             if (state.isRunning) {
                 RunningView(state)
-            } else if (state.success) {
-                SuccessView(
-                    state = state,
-                    onSave = { viewModel.saveConfiguration() },
-                    onCopyOwnerKey = { state.resolvedOwnerKeyUrl?.let { clipboard.setText(AnnotatedString(it)) } },
-                )
-            } else {
+            } else if (!state.success) {
                 ActionView(state, viewModel)
             }
 
@@ -136,6 +144,136 @@ fun ProvisionerScreen(
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
+
+    // ── Owner-key QR: shown immediately after provisioning succeeds, before any sign-in ────────────
+    //
+    // The owner key URL on its own does not carry the Supabase URL/key params, because the backend
+    // cannot know the public values until after the project is created. We append them here so the
+    // QR works on a brand-new device without waiting for the Cloudflare Pages site to finish its
+    // first deployment.
+    if (showOwnerQrDialog) {
+        val ownerKeyUrl = state.resolvedOwnerKeyUrl
+        val augmentedUrl = remember(ownerKeyUrl, state.resolvedSupabaseUrl, state.resolvedSupabaseAnonKey) {
+            val base = ownerKeyUrl ?: ""
+            val api = state.resolvedSupabaseUrl ?: ""
+            val key = state.resolvedSupabaseAnonKey ?: ""
+            if (base.isBlank() || api.isBlank() || key.isBlank()) base
+            else {
+                val sep = if (base.contains('?')) '&' else '?'
+                val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
+                "$base${sep}api=${enc(api)}&key=${enc(key)}"
+            }
+        }
+        OwnerQrDialog(
+            ownerKeyUrl = augmentedUrl,
+            ownerKeyState = ownerKeyState,
+            strings = strings,
+            onContinue = {
+                viewModel.saveConfiguration()
+                ownerKeyViewModel.load(augmentedUrl)
+            },
+        )
+    }
+}
+
+@Composable
+private fun OwnerQrDialog(
+    ownerKeyUrl: String,
+    ownerKeyState: OwnerKeyLoginViewModel.State,
+    strings: com.razstudio.pos.ui.i18n.UiStrings,
+    onContinue: () -> Unit,
+) {
+    val qrBitmap = remember(ownerKeyUrl) { QrCodeUtil.encode(ownerKeyUrl, sizePx = 512) }
+    val isWorking = ownerKeyState is OwnerKeyLoginViewModel.State.Working
+
+    AlertDialog(
+        onDismissRequest = { },
+        title = { Text(strings.provisionOwnerQrTitle) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = strings.provisionOwnerQrWarning,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                qrBitmap?.let { bmp ->
+                    Image(
+                        bitmap = bmp.asImageBitmap(),
+                        contentDescription = strings.provisionOwnerQrTitle,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } ?: Text(
+                    text = "Could not generate QR.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                if (ownerKeyState is OwnerKeyLoginViewModel.State.Working) {
+                    CircularProgressIndicator(modifier = Modifier.width(24.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                if (ownerKeyState is OwnerKeyLoginViewModel.State.Failed) {
+                    Text(
+                        text = when (ownerKeyState.reason) {
+                            OwnerKeyLoginViewModel.Reason.NOT_AN_OWNER_KEY -> strings.ownerQrNotAnOwnerKey
+                            OwnerKeyLoginViewModel.Reason.NO_QR_IN_IMAGE -> strings.ownerQrNoQrInImage
+                            OwnerKeyLoginViewModel.Reason.REJECTED -> strings.ownerQrRejected
+                            OwnerKeyLoginViewModel.Reason.UNREACHABLE -> strings.ownerQrUnreachable
+                            OwnerKeyLoginViewModel.Reason.NO_BACKEND_IN_QR -> strings.ownerQrNoBackend
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onContinue,
+                enabled = !isWorking,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(strings.provisionOwnerQrContinueButton) }
+        },
+    )
+}
+
+/**
+ * Where the credentials below are sent.
+ *
+ * ### Why this is a field and not a build constant
+ *
+ * It was `BuildConfig.PROVISIONER_WORKER_URL`, read from `local.properties`. That put a live
+ * provisioning endpoint into every APK built from this branch — including every café build that will
+ * never provision anything — and it could not be changed without a rebuild, so aiming the installer at
+ * a disposable Wizard to rehearse the two unverified steps meant recompiling. When the property was
+ * unset, which is the template default, the flow failed with "not configured in this build": a dead
+ * end for whoever was holding the tablet.
+ *
+ * It is first on the screen because of what it does. Every token underneath is POSTed here, so this
+ * field decides who receives a Supabase personal access token and a Cloudflare API token. Asking for
+ * the destination before the credentials is the honest order.
+ */
+@Composable
+private fun WizardSection(state: ProvisionerState, viewModel: ProvisionerViewModel) {
+    SectionHeader("Provisioning Wizard")
+    Text(
+        text = "The RAZStudio Wizard endpoint that performs the setup. Everything you enter below is " +
+            "sent to this URL, so check it before filling in any credentials.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Field(
+        label = "Wizard URL (https://…/api/provision/run)",
+        value = state.provisionerWorkerUrl,
+        onChange = { v -> viewModel.update { it.copy(provisionerWorkerUrl = v) } },
+        keyboardType = KeyboardType.Uri,
+    )
 }
 
 @Composable
@@ -191,6 +329,36 @@ private fun SupabaseSection(state: ProvisionerState, viewModel: ProvisionerViewM
             label = "Service role key",
             value = state.supabaseServiceRoleKey,
             onChange = { v -> viewModel.update { it.copy(supabaseServiceRoleKey = v) } },
+        )
+
+        // ── Repair: deploy the Edge Functions only ───────────────────────────────────────────────
+        //
+        // Offered only in EXISTING mode, because it needs a project that already exists. This is the
+        // fix for the one broken state the app cannot talk its way out of: schema applied, functions
+        // missing. The REST API answers, so the project looks alive from outside, but every sign-in
+        // fails — the APK reaches a café only through its Edge Functions.
+        //
+        // Separate from "Start provisioning" because that button also wants a Cloudflare token, a café
+        // name and a Pages project. None of that is needed to upload 26 functions to a project whose
+        // ref is already in the field above, and demanding it is what stopped a half-provisioned café
+        // from being repairable from the device standing in it.
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedButton(
+            onClick = { viewModel.deployFunctionsOnly() },
+            enabled = !state.isRunning &&
+                state.supabasePat.isNotBlank() &&
+                state.supabaseProjectRef.isNotBlank() &&
+                state.provisionerWorkerUrl.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Deploy Edge Functions to this project")
+        }
+        Text(
+            text = "Uploads the café backend's Edge Functions and nothing else. Safe to repeat — each " +
+                "function is replaced in place. Use this if sign-in fails on a project whose database " +
+                "is already set up.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -294,53 +462,6 @@ private fun RunningView(state: ProvisionerState) {
         Text(
             text = "Provisioning… ${if (state.results.isEmpty()) "starting" else "${state.results.count { it.isOk }} done"}",
             style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-}
-
-@Composable
-private fun SuccessView(
-    state: ProvisionerState,
-    onSave: () -> Unit,
-    onCopyOwnerKey: () -> Unit,
-) {
-    Text(
-        text = "Provisioning complete. The tablet can now save the connection details and use the owner key to sign in.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.primary,
-    )
-
-    state.resolvedSupabaseUrl?.let { url ->
-        ReadOnlyRow(label = "Supabase URL", value = url)
-    }
-    state.resolvedWebsiteUrl?.let { url ->
-        ReadOnlyRow(label = "Website URL", value = url)
-    }
-    state.resolvedOwnerKeyUrl?.let { url ->
-        ReadOnlyRow(label = "Owner key URL", value = url)
-        TextButton(
-            onClick = onCopyOwnerKey,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Copy owner key URL") }
-    }
-
-    Button(
-        onClick = onSave,
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text("Save and continue") }
-}
-
-@Composable
-private fun ReadOnlyRow(label: String, value: String) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodySmall,
         )
     }
 }

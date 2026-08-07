@@ -9,11 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.TableRestaurant
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Payment
-import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,16 +23,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.razstudio.pos.data.SecureStorage
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.uiStrings
-import com.razstudio.pos.ui.viewmodels.AdminSessionViewModel
 
 /**
  * Café Management hub screen.
@@ -43,25 +39,17 @@ import com.razstudio.pos.ui.viewmodels.AdminSessionViewModel
 @Composable
 fun CafeManagementScreen(
     onBack: () -> Unit,
+    onNavigateToCafeProfile: () -> Unit = {},
     onNavigateToMenu: () -> Unit,
     onNavigateToTables: () -> Unit,
     onNavigateToQrPdf: () -> Unit = {},
-    onNavigateToPrinters: () -> Unit = {},
-    onNavigateToHardwareDevices: () -> Unit = {},
     onNavigateToPaymentGateway: () -> Unit = {},
     languageViewModel: LanguageViewModel = hiltViewModel(),
-    sessionViewModel: AdminSessionViewModel = hiltViewModel(),
     modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel()
 ) {
     val capabilities by modeViewModel.capabilities.collectAsState()
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
-
-    // A secondary-admin device has no local printer — reconcile the role, then grey the
-    // Printers entry (it prints via the Main Admin) rather than hiding it.
-    LaunchedEffect(Unit) { sessionViewModel.refreshRole() }
-    val currentRole by sessionViewModel.currentRole.collectAsState()
-    val printersEnabled = currentRole != SecureStorage.Role.ADMIN_SECONDARY
 
     Scaffold(
         topBar = {
@@ -83,6 +71,16 @@ fun CafeManagementScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
+
+            // First, above Menu Management: this is the café's identity — the things an
+            // owner sets once and expects back on a replacement device, rather than the
+            // per-terminal preferences that live in Settings.
+            HubCard(
+                icon = Icons.Default.Storefront,
+                title = strings.cafeProfileSection,
+                description = strings.cafeProfileDesc,
+                onClick = onNavigateToCafeProfile
+            )
 
             HubCard(
                 icon = Icons.Default.RestaurantMenu,
@@ -117,27 +115,6 @@ fun CafeManagementScreen(
                     onClick = onNavigateToQrPdf
                 )
             }
-
-            // Printers moved here from the home overflow menu, directly under Generate Table QR.
-            HubCard(
-                icon = Icons.Default.Print,
-                title = strings.printersTitle,
-                description = strings.printersManagementDesc,
-                onClick = onNavigateToPrinters,
-                enabled = printersEnabled
-            )
-
-            // One entry for all peripherals rather than three siblings: hardware is configured
-            // once when the till is set up, whereas Menu Management is opened daily, and equal
-            // visual weight would misrepresent that. Gated exactly like Printers — a secondary
-            // admin has no local hardware and prints through the Main Admin. (HW-REQ-6)
-            HubCard(
-                icon = Icons.Default.Devices,
-                title = strings.devicesAndHardwareTitle,
-                description = strings.devicesAndHardwareDesc,
-                onClick = onNavigateToHardwareDevices,
-                enabled = printersEnabled
-            )
 
             // Gateway payments need a live path to the acquirer and are unavailable off-cloud
             // (ModeCapabilities.gatewayPaymentsEnabled, A1, task 6.4) — hidden here entirely

@@ -34,11 +34,25 @@ serve(async (req) => {
   // role the scanned token belongs to.
   const { data: invite } = await supabase
     .from("invites")
-    .select("token, role")
+    .select("token, role, expires_at")
     .eq("token", inviteToken)
     .maybeSingle();
 
   if (!invite || invite.token !== inviteToken) {
+    return errorResponse(403, "INVALID_INVITE", "Invite token is invalid or expired");
+  }
+
+  // Expiry is enforced here rather than at the QR, because this is the only place that cannot be
+  // skipped: a scanned link goes straight to this endpoint, and anything the app checks first is a
+  // courtesy the app could get wrong or an attacker could bypass entirely.
+  //
+  // A NULL expiry means "never expires" and belongs to rows created before migration 0013 — see
+  // that file for why those keep working rather than being invalidated under a running café.
+  //
+  // The message deliberately does not distinguish expired from invalid. Someone holding a code that
+  // is merely stale learns nothing useful from being told so, and the café's own staff will simply
+  // ask the admin to regenerate either way.
+  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
     return errorResponse(403, "INVALID_INVITE", "Invite token is invalid or expired");
   }
 

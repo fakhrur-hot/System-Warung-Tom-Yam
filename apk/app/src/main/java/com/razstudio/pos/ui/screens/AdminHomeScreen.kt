@@ -20,12 +20,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +57,7 @@ import com.razstudio.pos.ui.components.BlockingLoadingOverlay
 import com.razstudio.pos.ui.components.HoldCountdownOverlay
 import com.razstudio.pos.ui.components.PinEntryDialog
 import com.razstudio.pos.ui.viewmodels.PinLockViewModel
+import com.razstudio.pos.data.customChargeMenuItem
 import com.razstudio.pos.data.NewOrderItem
 import com.razstudio.pos.printing.PrintAlert
 import com.razstudio.pos.realtime.RealtimeService
@@ -98,6 +100,7 @@ fun AdminHomeScreen(
     devicePrefsViewModel: com.razstudio.pos.ui.viewmodels.DevicePrefsViewModel = hiltViewModel(),
     devicesViewModel: com.razstudio.pos.ui.viewmodels.DevicesViewModel = hiltViewModel(),
     modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel(),
+    cashDrawerViewModel: com.razstudio.pos.ui.viewmodels.CashDrawerViewModel = hiltViewModel(),
     /**
      * Avatar -> Mode Logout finished. The caller clears the stack back to the home screen; the
      * Google account is untouched, so the owner's other cafés are still listed when they land.
@@ -111,9 +114,11 @@ fun AdminHomeScreen(
     onNavigateToPrinters: () -> Unit = {},
     onNavigateToQrPdf: () -> Unit = {},
     onNavigateToReports: () -> Unit = {},
+    onNavigateToCashDrawer: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
     onNavigateToKeepAliveSetup: () -> Unit = {},
-    onNavigateToCafeManagement: () -> Unit = {}
+    onNavigateToCafeManagement: () -> Unit = {},
+    onNavigateToPaymentMonitor: () -> Unit = {}
 ) {
     val sessionState by sessionViewModel.uiState.collectAsState()
     val tableStates by tableViewModel.tableStates.collectAsState()
@@ -137,6 +142,7 @@ fun AdminHomeScreen(
     val recentPrints by devicePrefsViewModel.recentPrints.collectAsState()
     var selectedTableLabel by remember { mutableStateOf("") }
     var showOrderSheet by remember { mutableStateOf(false) }
+    var showCalculator by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Poll for pending device requests while on the home screen, so a new ordering-staff device
@@ -243,13 +249,20 @@ fun AdminHomeScreen(
 
     val backupNag = remember { modeViewModel.backupNag() }
 
+    // Pager state hoisted so the TopAppBar title can react to the current page.
+    val homePagerState = androidx.compose.foundation.pager.rememberPagerState(
+        initialPage = 1, // Start on Table Grid
+        pageCount = { 2 },
+    )
+    val isOnDashboard = homePagerState.currentPage == 0
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Column {
                         // Café name sits above the screen title; hidden until branding loads.
-                        if (cafeName.isNotBlank()) {
+                        if (cafeName.isNotBlank() && !isOnDashboard) {
                             Text(
                                 text = cafeName,
                                 style = MaterialTheme.typography.titleSmall,
@@ -257,14 +270,16 @@ fun AdminHomeScreen(
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(strings.tableView)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            // Task 9.4 / Requirement 1.4 — the operator can see the topology without
-                            // opening Setup. It lives beside the screen title rather than in the
-                            // overflow menu because the overflow is behind the PIN gate, and the one
-                            // moment this matters most is when someone is trying to work out why the
-                            // café is behaving unexpectedly.
-                            ModeBadge(mode = activeMode)
+                            Text(if (isOnDashboard) "Dashboard" else strings.tableView)
+                            if (!isOnDashboard) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                // Task 9.4 / Requirement 1.4 — the operator can see the topology without
+                                // opening Setup. It lives beside the screen title rather than in the
+                                // overflow menu because the overflow is behind the PIN gate, and the one
+                                // moment this matters most is when someone is trying to work out why the
+                                // café is behaving unexpectedly.
+                                ModeBadge(mode = activeMode)
+                            }
                         }
                     }
                 },
@@ -341,8 +356,31 @@ fun AdminHomeScreen(
 
                             HorizontalDivider()
 
+                            // --- Payment Monitor ---
+                            DropdownMenuItem(
+                                text = { Text("Payment Monitor") },
+                                onClick = {
+                                    showOverflowMenu = false
+                                    onNavigateToPaymentMonitor()
+                                }
+                            )
+                            HorizontalDivider()
+
                             // --- Setup ---
                             // "Generate Table QR" moved into Café Management (under Tables).
+                            // Cash-drawer ledger: opening float, cash out, audit trail. Above
+                            // Reports because it is touched daily, Reports at close only.
+                            // Greyed (visible, not tappable) while the Enable Cash Drawer toggle
+                            // is off — visible so the feature is discoverable, disabled so nobody
+                            // manages a ledger for a drawer this till says it doesn't use (R7).
+                            DropdownMenuItem(
+                                text = { Text("Drawer") },
+                                enabled = cashDrawerViewModel.isDrawerFeatureEnabled(),
+                                onClick = {
+                                    showOverflowMenu = false
+                                    onNavigateToCashDrawer()
+                                }
+                            )
                             DropdownMenuItem(
                                 text = { Text(strings.reportsTitle) },
                                 onClick = {
@@ -355,13 +393,6 @@ fun AdminHomeScreen(
                                 onClick = {
                                     showOverflowMenu = false
                                     onNavigateToBackup()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(strings.backgroundSetupTitle) },
-                                onClick = {
-                                    showOverflowMenu = false
-                                    onNavigateToKeepAliveSetup()
                                 }
                             )
                             DropdownMenuItem(
@@ -381,10 +412,7 @@ fun AdminHomeScreen(
                                 onClick = {
                                     showOverflowMenu = false
                                     sessionViewModel.signOut()
-                                },
-                                modifier = androidx.compose.ui.Modifier.background(
-                                    Color(0xFFFFE0B2) // light orange
-                                )
+                                }
                             )
                             DropdownMenuItem(
                                 text = { Text(strings.signOutClosingTitle, color = Color.Red) },
@@ -399,12 +427,13 @@ fun AdminHomeScreen(
             )
         },
         floatingActionButton = {
-            // Primary action: start a new dine-in order (Requirement 6.1)
-            ExtendedFloatingActionButton(
-                onClick = onNavigateToDineIn,
-                icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text(strings.newDineInOrder) }
-            )
+            // Primary action: start a new dine-in order (Requirement 6.1).
+            // Icon-only: the label made the FAB span half the row on a phone till. The action is
+            // the label — a lone + at bottom-right of a table grid starts an order in every POS
+            // idiom — and the text survives for TalkBack as the contentDescription.
+            FloatingActionButton(onClick = onNavigateToDineIn) {
+                Icon(Icons.Default.Add, contentDescription = strings.newDineInOrder)
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
@@ -455,25 +484,58 @@ fun AdminHomeScreen(
                     )
                 }
             } else {
-                // Shared table grid — same component as staff screen (Requirement 5.2)
-                TableGrid(
-                    tableStates = tableStates,
-                    strings = strings,
-                    onTableClick = { tableState ->
-                        if (tableState.status == TableUiStatus.FREE) {
-                            // Free table → open the tabbed new-order menu modal
-                            tableViewModel.startOrderEntry(tableState.table.id, tableState.table.label)
-                        } else {
-                            // Occupied table → open the receipt-style order detail
-                            selectedTableLabel = tableState.table.label
-                            tableViewModel.loadOrderForTable(tableState.table.id)
-                            showOrderSheet = true
-                        }
-                    },
+                // HorizontalPager: page 0 = Dashboard, page 1 = Table Grid
+                androidx.compose.foundation.pager.HorizontalPager(
+                    state = homePagerState,
                     modifier = Modifier.fillMaxSize(),
-                )
+                ) { page ->
+                    when (page) {
+                        0 -> DashboardPage()
+                        1 -> TableGrid(
+                            tableStates = tableStates,
+                            strings = strings,
+                            onTableClick = { tableState ->
+                                if (tableState.status == TableUiStatus.FREE) {
+                                    // Free table → open the tabbed new-order menu modal
+                                    tableViewModel.startOrderEntry(tableState.table.id, tableState.table.label)
+                                } else {
+                                    // Occupied table → open the receipt-style order detail
+                                    selectedTableLabel = tableState.table.label
+                                    tableViewModel.loadOrderForTable(tableState.table.id)
+                                    showOrderSheet = true
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
+
+            // Calculator, mirrored opposite New Dine-In Order.
+            //
+            // Bottom-LEFT deliberately: the right-hand FAB starts a sale and is the busy one, and a
+            // second button beside it would be mis-tapped all shift. Left is the reach of the hand
+            // not holding the customer's money.
+            //
+            // It is also how the cash drawer is opened without a sale — see CalculatorViewModel.
+            // Nothing here says so, and nothing should.
+            // Icon-only, matching the new-order FAB opposite; the title lives on for TalkBack.
+            FloatingActionButton(
+                onClick = { showCalculator = true },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp),
+            ) {
+                Icon(Icons.Default.Calculate, contentDescription = strings.calculatorTitle)
             }
         }
+    }
+
+    if (showCalculator) {
+        com.razstudio.pos.ui.calculator.CalculatorDialog(
+            strings = strings,
+            onDismiss = { showCalculator = false },
+        )
     }
 
     // Shared order detail bottom sheet with full admin permissions (Requirement 5.2, 5.3)
@@ -511,6 +573,9 @@ fun AdminHomeScreen(
                 )
             },
             onResumeGatewayCheckout = { pending -> tableViewModel.resumeGatewayCheckout(pending) },
+            onCashTendered = { orderId, totalSen, tenderedSen ->
+                cashDrawerViewModel.recordCashSale(orderId, totalSen, tenderedSen)
+            },
             onCancel = { orderId, reason -> tableViewModel.cancelOrder(orderId, reason) },
             onDismiss = {
                 showOrderSheet = false
@@ -574,6 +639,11 @@ fun AdminHomeScreen(
             strings = strings,
             isSubmitting = orderEntry.isSubmitting,
             onAdd = { item, note, size, price -> tableViewModel.addToCart(item, note, size, price) },
+            // A hand-typed charge enters the cart as a synthetic menu item, so every existing cart
+            // path (dedupe, receipt preview, submit) handles it unchanged.
+            onAddCustom = { name, price ->
+                tableViewModel.addToCart(customChargeMenuItem(name, price), unitPrice = price)
+            },
             onRemove = { index -> tableViewModel.removeFromCart(index) },
             onSubmit = { tableViewModel.submitOrder() },
             onDismiss = { tableViewModel.dismissOrderEntry() },

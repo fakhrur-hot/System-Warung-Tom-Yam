@@ -22,6 +22,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -67,6 +69,7 @@ class AdminSettingsViewModel @Inject constructor(
         val todaysSpecial: String = "",
         val reportEmail: String = "",
         val businessDayStartHour: Int = 15,
+        val businessDayEndHour: Int = 2,
         val defaultLangAdmin: String = "BM",
         val defaultLangOrdering: String = "BM",
         val defaultLangCustomer: String = "BM",
@@ -83,6 +86,14 @@ class AdminSettingsViewModel @Inject constructor(
         // Permanent owner-recovery key (restores Main Admin on a fresh device). Keep secret.
         val recoveryInvite: InviteResponse? = null,
         val recoveryLoading: Boolean = false,
+        // The key is hashed at rest, so once regenerated it can never be *shown* again — GET
+        // answers 409 KEY_NOT_READABLE. True routes the dialog to its "mint a new key" offer
+        // instead of a spinner that can never resolve.
+        val recoveryNotReadable: Boolean = false,
+        // A recovery fetch/regenerate failure, rendered inside the dialog itself. The shared
+        // `error` snackbar fires behind the modal where nobody can see it — which is how "Show
+        // Owner Recovery QR" spun forever on a 409 without anyone learning why.
+        val recoveryError: String? = null,
         // Kitchen-slip menu-text size (device-local): XS/S/M/L/XL/XXL. Applied immediately.
         val kitchenFontSize: String = "S",
 
@@ -125,6 +136,7 @@ class AdminSettingsViewModel @Inject constructor(
         // Business-day start hour (0–23, default 15 = 3 PM) — late-night cafés anchor reports
         // to the opening day rather than the post-midnight calendar date.
         val businessDayStartHour: Int = 15,
+        val businessDayEndHour: Int = 2,
 
         // Café-wide default UI language per surface (BM/EN/ZH/TA/TH). A device/browser applies
         // its surface's default only when it has no locally-saved language choice yet.
@@ -181,6 +193,7 @@ class AdminSettingsViewModel @Inject constructor(
                 todaysSpecial != savedSnapshot.todaysSpecial ||
                 reportEmail != savedSnapshot.reportEmail ||
                 businessDayStartHour != savedSnapshot.businessDayStartHour ||
+                businessDayEndHour != savedSnapshot.businessDayEndHour ||
                 defaultLangAdmin != savedSnapshot.defaultLangAdmin ||
                 defaultLangOrdering != savedSnapshot.defaultLangOrdering ||
                 defaultLangCustomer != savedSnapshot.defaultLangCustomer ||
@@ -313,6 +326,7 @@ class AdminSettingsViewModel @Inject constructor(
                         todaysSpecial = result.data.todaysSpecial,
                         reportEmail = result.data.reportEmail,
                         businessDayStartHour = result.data.businessDayStartHour,
+                        businessDayEndHour = result.data.businessDayEndHour,
                         defaultLangAdmin = result.data.defaultLangAdmin,
                         defaultLangOrdering = result.data.defaultLangOrdering,
                         defaultLangCustomer = result.data.defaultLangCustomer,
@@ -327,6 +341,7 @@ class AdminSettingsViewModel @Inject constructor(
                             todaysSpecial = result.data.todaysSpecial,
                             reportEmail = result.data.reportEmail,
                             businessDayStartHour = result.data.businessDayStartHour,
+                        businessDayEndHour = result.data.businessDayEndHour,
                             defaultLangAdmin = result.data.defaultLangAdmin,
                             defaultLangOrdering = result.data.defaultLangOrdering,
                             defaultLangCustomer = result.data.defaultLangCustomer,
@@ -423,14 +438,48 @@ class AdminSettingsViewModel @Inject constructor(
 
     fun loadRecoveryToken() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(recoveryLoading = true)
+            // recoveryInvite is cleared too: a QR from a previous open would otherwise flash up
+            // (and re-save its PNG) before this fetch resolves.
+            _uiState.value = _uiState.value.copy(
+                recoveryLoading = true, recoveryNotReadable = false, recoveryError = null,
+                recoveryInvite = null
+            )
             when (val result = apiClient.getRecoveryToken()) {
                 is ApiResult.Success ->
                     _uiState.value = _uiState.value.copy(recoveryInvite = result.data, recoveryLoading = false)
                 is ApiResult.Error ->
-                    _uiState.value = _uiState.value.copy(recoveryLoading = false, error = result.message)
+                    // KEY_NOT_READABLE is not a failure: a hashed-at-rest key *cannot* be shown
+                    // again, and the dialog answers it by offering to mint a new one.
+                    if (result.code == "KEY_NOT_READABLE") {
+                        _uiState.value = _uiState.value.copy(recoveryLoading = false, recoveryNotReadable = true)
+                    } else {
+                        _uiState.value = _uiState.value.copy(recoveryLoading = false, recoveryError = result.message)
+                    }
                 is ApiResult.NetworkError ->
-                    _uiState.value = _uiState.value.copy(recoveryLoading = false, error = str().msgNetworkError.format(result.message))
+                    _uiState.value = _uiState.value.copy(
+                        recoveryLoading = false,
+                        recoveryError = str().msgNetworkError.format(result.message)
+                    )
+            }
+        }
+    }
+
+    /** Mint a NEW owner key. The old QR stops working; the dialog warns before calling this. */
+    fun regenerateRecoveryToken() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                recoveryLoading = true, recoveryNotReadable = false, recoveryError = null
+            )
+            when (val result = apiClient.regenerateRecoveryToken()) {
+                is ApiResult.Success ->
+                    _uiState.value = _uiState.value.copy(recoveryInvite = result.data, recoveryLoading = false)
+                is ApiResult.Error ->
+                    _uiState.value = _uiState.value.copy(recoveryLoading = false, recoveryError = result.message)
+                is ApiResult.NetworkError ->
+                    _uiState.value = _uiState.value.copy(
+                        recoveryLoading = false,
+                        recoveryError = str().msgNetworkError.format(result.message)
+                    )
             }
         }
     }
@@ -455,9 +504,45 @@ class AdminSettingsViewModel @Inject constructor(
      * Stage a local change to the "staff can send to kitchen" toggle.
      * Does NOT call the backend — committed via [saveAll].
      */
+    /**
+     * Commit Settings-page changes on their own, shortly after the operator stops making them.
+     *
+     * ## Why the Save button had to go
+     *
+     * It was enabled by an `isDirty` comparison against a snapshot, and it was unreliable in a way
+     * that is worse than a missing feature: an operator flipped a switch, the button stayed grey,
+     * and they could not tell whether the app had ignored the tap or had already saved it. Either
+     * reading is plausible from the outside, so the only safe assumption was "it did not work".
+     *
+     * Auto-save removes the question. There is no state in which a change is made and not on its
+     * way to the backend.
+     *
+     * ## Why it is debounced rather than immediate
+     *
+     * Several of these fields are free text — today's special, the report email — and a push per
+     * keystroke would be a request per character, each one racing the last. Waiting for a pause
+     * means one request carrying the finished value. Toggles feel instant anyway at this delay.
+     *
+     * ## Why Café Profile keeps its Save bar
+     *
+     * The café name, logo and GPS lock are not toggles: renaming the café prompts a restart, and a
+     * half-typed name auto-saved on a pause would fire that prompt mid-word. Those stay staged, and
+     * this is deliberately wired only to the fields the Settings page owns.
+     */
+    private var autoSaveJob: Job? = null
+
+    private fun scheduleAutoSave() {
+        autoSaveJob?.cancel()
+        autoSaveJob = viewModelScope.launch {
+            delay(AUTO_SAVE_DEBOUNCE_MS)
+            saveAll()
+        }
+    }
+
     fun updateStaffCanSendKitchen(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(staffCanSendKitchen = enabled)
         // No pushPermissions() — staged, saved via saveAll()
+        scheduleAutoSave()
     }
 
     /**
@@ -467,6 +552,7 @@ class AdminSettingsViewModel @Inject constructor(
     fun updateStaffCanTakePayment(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(staffCanTakePayment = enabled)
         // No pushPermissions() — staged, saved via saveAll()
+        scheduleAutoSave()
     }
 
     /**
@@ -518,46 +604,61 @@ class AdminSettingsViewModel @Inject constructor(
     /** Stage the customer hold-before-kitchen delay (10/15/30/60s); committed via [saveAll]. */
     fun updateHoldSeconds(seconds: Int) {
         _uiState.value = _uiState.value.copy(holdSeconds = seconds)
+        scheduleAutoSave()
     }
 
     /** Stage the auto-print-to-kitchen toggle; committed via [saveAll]. */
     fun updateAutoPrintToKitchen(enabled: Boolean) {
         _uiState.value = _uiState.value.copy(autoPrintToKitchen = enabled)
+        scheduleAutoSave()
     }
 
     /** Stage the "today's special" text; committed via [saveAll]. */
     fun updateTodaysSpecial(text: String) {
         _uiState.value = _uiState.value.copy(todaysSpecial = text.take(200))
+        scheduleAutoSave()
     }
 
     /** Stage the report-email recipient; committed via [saveAll]. */
     fun updateReportEmail(email: String) {
         _uiState.value = _uiState.value.copy(reportEmail = email.trim())
+        scheduleAutoSave()
     }
 
     /** Stage the business-day start hour (0–23); committed via [saveAll]. */
     fun updateBusinessDayStartHour(hour: Int) {
         _uiState.value = _uiState.value.copy(businessDayStartHour = hour.coerceIn(0, 23))
+        scheduleAutoSave()
+    }
+
+    /** Stage the business-day END hour (0–23). May be earlier than the start; see the entity. */
+    fun updateBusinessDayEndHour(hour: Int) {
+        _uiState.value = _uiState.value.copy(businessDayEndHour = hour.coerceIn(0, 23))
+        scheduleAutoSave()
     }
 
     /** Stage the café default UI language for the admin app (BM/EN/ZH/TA/TH); saved via [saveAll]. */
     fun updateDefaultLangAdmin(code: String) {
         _uiState.value = _uiState.value.copy(defaultLangAdmin = code)
+        scheduleAutoSave()
     }
 
     /** Stage the café default UI language for ordering-staff devices; saved via [saveAll]. */
     fun updateDefaultLangOrdering(code: String) {
         _uiState.value = _uiState.value.copy(defaultLangOrdering = code)
+        scheduleAutoSave()
     }
 
     /** Stage the café default UI language for the customer website; saved via [saveAll]. */
     fun updateDefaultLangCustomer(code: String) {
         _uiState.value = _uiState.value.copy(defaultLangCustomer = code)
+        scheduleAutoSave()
     }
 
     /** Stage the printer language (BM/EN) for slips & receipts; saved via [saveAll]. */
     fun updatePrintLanguage(code: String) {
         _uiState.value = _uiState.value.copy(printLanguage = code)
+        scheduleAutoSave()
     }
 
     fun onLocationCaptured(lat: Double, lng: Double) {
@@ -679,18 +780,34 @@ class AdminSettingsViewModel @Inject constructor(
     fun removePaymentQr() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(paymentQrBusy = true, paymentQrError = null)
-            withContext(Dispatchers.IO) {
-                com.razstudio.pos.ui.util.PaymentQrPipeline.deleteFromInternal(context)
-                appConfigStore.setPaymentQrHash(null)
-                appConfigStore.setPaymentQrUrl(null)
-            }
-            // Clear it on the backend too, so staff devices stop offering Show QR (Requirement 14.5).
+
+            // Backend FIRST, and the local copy only if it succeeds (Requirement 14.5).
+            //
+            // The reverse order leaves a failed call looking like a success: the admin's own device
+            // shows the QR gone while every staff device keeps showing it, and nothing on screen
+            // says so. It also actively resurrects the code — PaymentQrResolver treats "no local
+            // copy, remote hash present" as a device that needs to fetch, which is precisely what a
+            // replacement admin phone looks like, so the deleted QR would come back on its own.
+            //
+            // Refusing to remove locally while the café still serves it is the honest failure: the
+            // admin sees an error and can retry, and no device is left disagreeing with the others.
             val cleared = apiClient.putBranding(
                 cafeName = _uiState.value.cafeName.ifBlank { appConfigStore.cafeName() },
                 removePaymentQr = true,
             )
             if (cleared is ApiResult.Error) {
-                Log.w("AdminSettingsVM", "Payment QR removed locally but not on the server: ${cleared.message}")
+                Log.w("AdminSettingsVM", "Payment QR not removed on the server: ${cleared.message}")
+                _uiState.value = _uiState.value.copy(
+                    paymentQrBusy = false,
+                    paymentQrError = cleared.message,
+                )
+                return@launch
+            }
+
+            withContext(Dispatchers.IO) {
+                com.razstudio.pos.ui.util.PaymentQrPipeline.deleteFromInternal(context)
+                appConfigStore.setPaymentQrHash(null)
+                appConfigStore.setPaymentQrUrl(null)
             }
             _uiState.value = _uiState.value.copy(
                 paymentQrBusy = false,
@@ -910,6 +1027,13 @@ class AdminSettingsViewModel @Inject constructor(
             }
 
             // Business-day start hour — dirty when it differs from the snapshot.
+            if (!anyError && state.businessDayEndHour != state.savedSnapshot.businessDayEndHour) {
+                when (apiClient.putSettings(JSONObject().put("businessDayEndHour", state.businessDayEndHour))) {
+                    is ApiResult.Success -> Unit
+                    else -> anyError = true
+                }
+            }
+
             if (!anyError && state.businessDayStartHour != state.savedSnapshot.businessDayStartHour) {
                 when (apiClient.putSettings(JSONObject().put("businessDayStartHour", state.businessDayStartHour))) {
                     is ApiResult.Success -> { /* persisted */ }
@@ -977,6 +1101,7 @@ class AdminSettingsViewModel @Inject constructor(
                         todaysSpecial = current.todaysSpecial,
                         reportEmail = current.reportEmail,
                         businessDayStartHour = current.businessDayStartHour,
+                        businessDayEndHour = current.businessDayEndHour,
                         defaultLangAdmin = current.defaultLangAdmin,
                         defaultLangOrdering = current.defaultLangOrdering,
                         defaultLangCustomer = current.defaultLangCustomer,
@@ -1007,5 +1132,10 @@ class AdminSettingsViewModel @Inject constructor(
 
     fun clearMessages() {
         _uiState.value = _uiState.value.copy(error = null, successMessage = null)
+    }
+
+    private companion object {
+        /** Long enough to swallow a burst of typing, short enough to feel immediate on a toggle. */
+        const val AUTO_SAVE_DEBOUNCE_MS = 700L
     }
 }

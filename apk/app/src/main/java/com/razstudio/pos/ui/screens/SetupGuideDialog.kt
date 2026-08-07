@@ -61,13 +61,19 @@ fun SetupGuideDialog(
                         "Supabase project and a Cloudflare Pages site — both provisioned by the " +
                         "RAZStudio setup wizard, not by this app."
                 )
-                Step(1, "Run the provisioning wizard for the café. It applies the database schema, " +
-                    "deploys the Edge Functions, creates the Pages site from GitHub main, and points " +
-                    "the domain.")
+                Step(1, "Run the provisioning wizard for the café — the Provision new café tab. It " +
+                    "asks for the Wizard URL first, then applies the database schema, deploys the " +
+                    "Edge Functions, creates the Pages site from GitHub main, and points the domain.")
                 Step(2, "Copy the four values it shows at the end — website URL, Supabase URL, " +
-                    "Supabase anon key, café name — into this screen and tap Save.")
+                    "Supabase publishable key, café name — into this screen and tap Save.")
                 Step(3, "Sign in with the owner key. Every other device joins by scanning a QR: the " +
                     "owner key for an admin, the invite QR for staff. Nothing else is typed twice.")
+                Note(
+                    "Joining a café that is ALREADY running is the Existing café tab, not this one. " +
+                        "It takes the same values the café's Cloudflare Pages project holds — its " +
+                        "site URL, VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY — and can " +
+                        "fetch all of them from the site itself. Use it when the owner QR is lost."
+                )
 
                 Warn(
                     "One-time, by hand, before the first café: install the Cloudflare Pages GitHub " +

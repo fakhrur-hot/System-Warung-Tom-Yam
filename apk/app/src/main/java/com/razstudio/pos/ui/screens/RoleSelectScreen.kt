@@ -54,6 +54,10 @@ import com.razstudio.pos.ui.viewmodels.SetupViewModel
  *   onSetup           → SETUP
  *   onTryDemo         → Demo Mode (bottom row, alongside Setup Wizard)
  */
+// FlowRow (the footer) is still experimental in this Compose version. Opted in the same way
+// AddMenuItemScreen's ItemFormContent does — the API has been stable in practice across the
+// versions this app has shipped on, and the alternative is a footer that cannot wrap.
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun RoleSelectScreen(
     onAdminConnect: () -> Unit,
@@ -64,7 +68,6 @@ fun RoleSelectScreen(
     onKiosk: () -> Unit = {},
     onTryDemo: () -> Unit = {},
     onSetup: () -> Unit = {},
-    onProvision: () -> Unit = {},
     /** Avatar → re-authenticate and re-list the account's cafés. */
     onReloadDrive: () -> Unit = {},
     /** Avatar → either logout finished; the caller resets the stack. */
@@ -287,36 +290,45 @@ fun RoleSelectScreen(
                 Spacer(modifier = Modifier.weight(1f))
 
                 // ── Bottom row: subordinate actions ─────────────────────────────────
-                // Setup Wizard is the existing manual-config path. Try Demo shares this tier rather
-                // than being dropped: the hierarchy is about which actions are PROMINENT, and Demo
-                // Mode is a working feature reachable only from here. Provision new café is the
-                // installer path for staff who set up a backend on behalf of a new owner. All three
-                // are TextButtons, so the mode buttons above remain the only visually primary choices.
-                Row(
+                // Setup Wizard is the existing config path. Try Demo shares this tier rather than
+                // being dropped: the hierarchy is about which actions are PROMINENT, and Demo Mode is
+                // a working feature reachable only from here. Both are TextButtons, so the mode buttons
+                // above remain the only visually primary choices.
+                //
+                // ### Why FlowRow and not Row
+                //
+                // These two labels do not reliably fit one line, and a `Row` does not know that. It
+                // hands out width in order, so the first can take too much and the second is left with a
+                // column barely wider than one glyph — Malay's "Cuba Demo (Mod Luar Talian)" rendered as
+                // fifteen stacked lines, one character each, and pushed the row far taller than the
+                // 24.dp bottom padding it was supposed to sit inside.
+                //
+                // Constraining or ellipsising each label would only hide the problem: these are the only
+                // routes to the wizard and Demo Mode, so a truncated one is unusable. FlowRow wraps
+                // whole BUTTONS onto a second line instead of wrapping characters inside one, which is
+                // the only behaviour that holds for every locale — and the labels here are translated,
+                // so the widest one is not knowable at build time.
+                androidx.compose.foundation.layout.FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    horizontalArrangement = Arrangement.Center,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     TextButton(onClick = onSetup) {
                         Text(
                             text = strings.setupWizard,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    TextButton(onClick = onProvision) {
-                        Text(
-                            text = "Provision new café",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
                         )
                     }
                     TextButton(onClick = onTryDemo) {
                         Text(
                             text = strings.tryDemo,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
                         )
                     }
                 }

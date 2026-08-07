@@ -6,6 +6,7 @@ import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.NewOrderItem
+import com.razstudio.pos.data.toNewOrderItem
 import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.OrderDto
 import com.razstudio.pos.data.json.toEntity
@@ -75,6 +76,7 @@ class TableViewViewModel @Inject constructor(
     private val paymentQrResolver: com.razstudio.pos.data.PaymentQrResolver,
     private val customerDisplayManager: CustomerDisplayManager,
     private val paymentTransactionDao: PaymentTransactionDao,
+    private val tableSync: com.razstudio.pos.data.local.TableSync,
     modeRepository: com.razstudio.pos.data.ModeRepository,
 ) : ViewModel() {
 
@@ -325,14 +327,10 @@ class TableViewViewModel @Inject constructor(
         if (entry.cart.isEmpty()) return
         if (orderHoldJob?.isActive == true) return
 
+        // toNewOrderItem, not a raw NewOrderItem: a hand-typed "+ Customized" line lives in the cart
+        // as a synthetic menu item, and only that helper carries its typed name onto the wire.
         val items = entry.cart.map {
-            NewOrderItem(
-                menuItemId = it.menuItem.id,
-                quantity = it.quantity,
-                note = it.note,
-                unitPrice = it.unitPrice,
-                size = it.size,
-            )
+            it.menuItem.toNewOrderItem(it.quantity, it.note, it.size, it.unitPrice)
         }
 
         orderHoldJob = viewModelScope.launch {
@@ -392,7 +390,12 @@ class TableViewViewModel @Inject constructor(
             // device last closed. The latest attempt only, and only surfaced if still PENDING —
             // a settled one is exactly what completePayment/settleLocalTransaction already turned
             // it into, and has nothing left to resume.
-            val pendingGateway = order?.let { paymentTransactionDao.getLatestForOrder(it.id) }
+            // Suppressed while gateway payments are switched off product-wide: the banner's only
+            // action is Resume, which would restart a checkout that can no longer be started. A
+            // stale PENDING row from an older build must not offer a café a dead button.
+            val pendingGateway = order
+                ?.takeIf { activeMode.value.toCapabilities().gatewayPaymentsEnabled }
+                ?.let { paymentTransactionDao.getLatestForOrder(it.id) }
                 ?.takeIf { it.status == PaymentTransactionStatus.PENDING }
             _orderDetail.value = OrderDetailState(
                 order = order,
@@ -805,8 +808,15 @@ class TableViewViewModel @Inject constructor(
                 // shrank would keep its old quantity beside the new one.
                 orderDao.deleteItemsForOrder(orderId)
                 reconcileOrderFromDto(shrunk.data)
-                tableId?.let { loadOrderForTable(it) }
-                _orderDetail.value = _orderDetail.value.copy(
+
+                // Refresh inline rather than calling loadOrderForTable (which launches a
+                // separate coroutine that races with the successMessage assignment below,
+                // overwriting it with null before the UI can display it).
+                val refreshedOrder = orderDao.getOrderById(orderId)
+                val refreshedItems = if (refreshedOrder != null) orderDao.getItemsForOrder(orderId) else emptyList()
+                _orderDetail.value = OrderDetailState(
+                    order = refreshedOrder,
+                    items = refreshedItems,
                     isLoading = false,
                     successMessage = str().splitSharePaid.format(method),
                 )
@@ -1170,30 +1180,9 @@ class TableViewViewModel @Inject constructor(
      * has *something* to be authoritative over).
      */
     fun rehydrateTablesIfEmpty() {
-        viewModelScope.launch {
-            if (tableDao.getCount() > 0) return@launch
-            when (val result = apiClient.getTables()) {
-                is ApiResult.Success -> {
-                    result.data.forEachIndexed { index, (id, label) ->
-                        tableDao.insert(Table(id = id, label = label, sortOrder = index))
-                    }
-
-                    // A fresh install's SystemSettings.nextTableNumber restarts at 1 —
-                    // bump it past the highest rehydrated "T####" suffix so addTable()
-                    // doesn't immediately collide with a table just pulled from the server.
-                    val highestExisting = result.data
-                        .mapNotNull { (id, _) -> Regex("""^T(\d+)$""").find(id)?.groupValues?.get(1)?.toIntOrNull() }
-                        .maxOrNull() ?: 0
-                    if (highestExisting > 0) {
-                        val settings = settingsDao.get() ?: SystemSettings()
-                        if (settings.nextTableNumber <= highestExisting) {
-                            settingsDao.upsert(settings.copy(nextTableNumber = highestExisting + 1))
-                        }
-                    }
-                }
-                else -> { /* best-effort — admin can still add tables manually */ }
-            }
-        }
+        // Delegates to TableSync, which knows the difference between "this device has tables" and
+        // "this device has THIS café's tables" — the distinction three stray Demo rows exposed.
+        viewModelScope.launch { tableSync.syncIfNeeded() }
     }
 
     fun showTableManagement() {

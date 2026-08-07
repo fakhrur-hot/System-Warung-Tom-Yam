@@ -312,6 +312,7 @@ open class CafeBundleStore @Inject constructor(
         accessToken: String,
         payload: CafeConfigPayload,
         photos: List<java.io.File> = emptyList(),
+        paymentQr: java.io.File? = null,
     ): String? = withContext(Dispatchers.IO) {
         try {
             val wantedName = folderNameFor(payload.mode, payload.cafeName)
@@ -326,7 +327,17 @@ open class CafeBundleStore @Inject constructor(
                 if (id != null) photoIds[file.name] = id
             }
 
-            val json = payload.copy(photoFileIds = photoIds).toJson()
+            // Uploaded with the photos and before the manifest, for the same reason: an id in
+            // the JSON pointing at a file that was never uploaded restores a broken QR, which
+            // is worse than none because it still looks configured.
+            val qrId = paymentQr?.takeIf { it.exists() }?.let { file ->
+                uploadBinary(accessToken, folderId, file, findChild(accessToken, folderId, file.name))
+            }
+
+            val json = payload.copy(
+                photoFileIds = photoIds,
+                paymentQrFileId = qrId ?: "",
+            ).toJson()
             val existingJson = findChild(accessToken, folderId, BUNDLE_FILE)
             val ok = if (existingJson != null) {
                 val request = Request.Builder()

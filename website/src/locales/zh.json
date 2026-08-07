@@ -60,5 +60,6 @@
   "closeScanner": "关闭",
   "cafeClosedTitle": "尚未营业",
   "cafeClosedBody": "餐厅尚未营业，请稍后再来！",
-  "searchMenu": "搜索"
+  "searchMenu": "搜索",
+  "tableNotFound": "找不到桌子"
 }

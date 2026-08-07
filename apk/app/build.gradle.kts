@@ -22,8 +22,34 @@ val localProps = Properties().apply {
 val supabaseUrl = localProps.getProperty("SUPABASE_URL") ?: ""
 val supabaseAnonKey = localProps.getProperty("SUPABASE_ANON_KEY") ?: ""
 val websiteUrl = localProps.getProperty("WEBSITE_URL") ?: ""
-val provisionerWorkerUrl = localProps.getProperty("PROVISIONER_WORKER_URL") ?: ""
 val deepLinkHost = localProps.getProperty("DEEP_LINK_HOST") ?: "your-cafe.pages.dev"
+
+// ── The RAZStudio template repo — baked, because it is not a backend ──────────────────────────
+//
+// Read from template-repo.properties at the monorepo root: committed, tracked, and shared with the
+// provisioning Wizard so the APK and the Wizard can never name different repositories. See that
+// file's header for why it is not in local.properties.
+//
+// PROVISIONER_WORKER_URL used to sit alongside these and does not any more. The distinction is what
+// the value IS, not how convenient it is to bake: this owner/repo is public and identical for every
+// café, while the Wizard URL is a live endpoint holding provisioning privileges. A baked live URL
+// ships in every APK and cannot be changed without a rebuild, so it is typed into the Provision
+// screen instead (see ProvisionerScreen's Wizard section).
+val templateRepoProps = Properties().apply {
+    val f = rootProject.file("../template-repo.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val razstudioGithubOwner = templateRepoProps.getProperty("RAZSTUDIO_GITHUB_OWNER") ?: ""
+val razstudioGithubRepo = templateRepoProps.getProperty("RAZSTUDIO_GITHUB_REPO") ?: ""
+// Failing loudly beats shipping a build whose preset and affiliate-catalog URLs are silently
+// malformed — those would 404 at runtime with nothing pointing back at a missing build input.
+if (razstudioGithubOwner.isBlank() || razstudioGithubRepo.isBlank()) {
+    throw GradleException(
+        "template-repo.properties at the monorepo root must define RAZSTUDIO_GITHUB_OWNER and " +
+            "RAZSTUDIO_GITHUB_REPO. It is committed on main — if it is missing, this is not a full " +
+            "checkout of the repository."
+    )
+}
 
 // GOOGLE_WEB_CLIENT_ID: the *Web* OAuth client that Credential Manager takes as its server client
 // ID (the ID token's audience). It is not a secret — it ships in every APK by definition — but it
@@ -114,7 +140,8 @@ android {
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         buildConfigField("String", "WEBSITE_URL", "\"$websiteUrl\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
-        buildConfigField("String", "PROVISIONER_WORKER_URL", "\"$provisionerWorkerUrl\"")
+        buildConfigField("String", "RAZSTUDIO_GITHUB_OWNER", "\"$razstudioGithubOwner\"")
+        buildConfigField("String", "RAZSTUDIO_GITHUB_REPO", "\"$razstudioGithubRepo\"")
         // DEEP_LINK_HOST: manifest placeholder for the /join deep link host (Requirement 4.1, 4.2).
         manifestPlaceholders["deepLinkHost"] = deepLinkHost
         // CAFE_NAME: generated string resource for the app launcher name. Overrides the value
@@ -258,6 +285,9 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+
+    // DataStore Preferences: reactive device-local settings (Payment Notification Listener)
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // ESC/POS Bluetooth thermal printer
     implementation("com.github.DantSu:ESCPOS-ThermalPrinter-Android:3.3.0")

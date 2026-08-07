@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RemoveCircle
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -520,7 +521,10 @@ fun DevicesScreen(
         OwnerRecoveryQrDialog(
             url = settingsState.recoveryInvite?.url,
             loading = settingsState.recoveryLoading,
+            notReadable = settingsState.recoveryNotReadable,
+            errorText = settingsState.recoveryError,
             strings = strings,
+            onRegenerate = { settingsViewModel.regenerateRecoveryToken() },
             onDismiss = { showRecovery = false }
         )
     }
@@ -567,7 +571,10 @@ fun DevicesScreen(
 private fun OwnerRecoveryQrDialog(
     url: String?,
     loading: Boolean,
+    notReadable: Boolean,
+    errorText: String?,
     strings: UiStrings,
+    onRegenerate: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -610,8 +617,27 @@ private fun OwnerRecoveryQrDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 when {
-                    loading || (url == null) -> {
+                    // Also spins for the one frame between the button tap and the ViewModel's
+                    // first state emission, when nothing else is known yet.
+                    loading || (qr == null && !notReadable && errorText == null) -> {
                         CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    }
+                    // The key is hashed at rest, so it can never be shown again — the only way to
+                    // get a QR is minting a new key. Explicit offer, with the consequence stated,
+                    // instead of the spinner this state used to fall into (url stayed null, and
+                    // `loading || url == null` spun until the owner gave up).
+                    notReadable && qr == null -> {
+                        Text(
+                            text = "This café's owner key is stored securely and cannot be shown " +
+                                "again. Generate a new key to get a fresh QR — the old QR stops " +
+                                "working the moment you do.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(onClick = onRegenerate) { Text("Generate new owner key") }
+                    }
+                    errorText != null && qr == null -> {
+                        Text(text = errorText, color = MaterialTheme.colorScheme.error)
                     }
                     qr != null -> {
                         Image(

@@ -112,6 +112,22 @@ serve(async (req) => {
       return errorResponse(422, "VALIDATION", "Each item must have menuItemId and quantity >= 1");
     }
 
+    // ── Custom charge: a cashier-typed name + price, no menu item behind it ──────
+    // Staff/admin only. A customer amending their own order over x-browser-id must never be able
+    // to name its own price, so for them a CUSTOM: line is simply not a valid menu item.
+    if (isCustomChargeId(item.menuItemId)) {
+      if (!admin && !staff) {
+        return errorResponse(403, "FORBIDDEN", "Only staff can add a custom charge");
+      }
+      const custom = customChargeLine(item, nextSession, autoPrint);
+      if (!custom) {
+        return errorResponse(422, "VALIDATION", "A custom charge needs a name and a price above 0");
+      }
+      newItems.push(custom);
+      additionalTotal += Number(custom.unitPriceSnapshot) * item.quantity;
+      continue;
+    }
+
     const menuItem = menuItems.get(item.menuItemId);
     if (!menuItem) {
       return errorResponse(422, "ITEM_UNAVAILABLE", `Menu item '${item.menuItemId}' not found or unavailable`);
@@ -191,6 +207,46 @@ function extractOrderIdFromPath(pathname: string): string | null {
     }
   }
   return null;
+}
+
+// ── Custom charges ─────────────────────────────────────────────────────────
+// A bill line the cashier typed by hand — corkage, a replacement plate, a special order — with no
+// menu item behind it. The client marks it by prefixing its menuItemId with `CUSTOM:` (plus a UUID,
+// so two different manual charges stay two lines) and sends `customName` + `unitPrice` alongside.
+// Both are trusted only for admin/staff callers; the caps below match the APK's own.
+const CUSTOM_CHARGE_ID_PREFIX = "CUSTOM:";
+const CUSTOM_CHARGE_NAME_MAX = 60;
+const CUSTOM_CHARGE_PRICE_MAX = 99_999.99;
+
+function isCustomChargeId(menuItemId: unknown): boolean {
+  return typeof menuItemId === "string" && menuItemId.startsWith(CUSTOM_CHARGE_ID_PREFIX);
+}
+
+/**
+ * Build a custom-charge line, or null when the name or price is unusable — which is the 422 above
+ * rather than a silently free line on the customer's bill.
+ */
+// deno-lint-ignore no-explicit-any
+function customChargeLine(item: any, sessionNumber: number, autoPrint: boolean) {
+  const name = typeof item.customName === "string"
+    ? item.customName.trim().slice(0, CUSTOM_CHARGE_NAME_MAX)
+    : "";
+  const price = Number(item.unitPrice);
+  if (!name) return null;
+  if (!Number.isFinite(price) || price <= 0 || price > CUSTOM_CHARGE_PRICE_MAX) return null;
+  return {
+    id: crypto.randomUUID(),
+    menuItemId: item.menuItemId,
+    nameSnapshot: name,
+    unitPriceSnapshot: Math.round(price * 100) / 100,
+    categorySnapshot: "",
+    codeSnapshot: "",
+    marketPriceSnapshot: false,
+    quantity: item.quantity,
+    note: item.note || null,
+    sentToKitchen: autoPrint,
+    sessionNumber,
+  };
 }
 
 interface MenuItemInfo {

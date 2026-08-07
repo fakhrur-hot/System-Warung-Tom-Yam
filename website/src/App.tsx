@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { applyCafeDefault, serverCodeToLang } from './i18n'
 import { getSupabase } from './lib/supabase'
 import { getBrowserId } from './lib/browserId'
+import { useOrderPolling } from './hooks/useOrderPolling'
 import Header from './components/Header'
 import SplashScreen from './components/SplashScreen'
 import PlaceholderView from './components/PlaceholderView'
@@ -145,10 +146,27 @@ export default function App() {
   // Whether the in-page camera QR scanner overlay is open.
   const [scanning, setScanning] = useState(false)
   const pendingOrderRef = useRef<Array<{ menuItemId: string; quantity: number; note: string; size?: string; unitPrice?: number }>>([])
-  const channelRef = useRef<ReturnType<ReturnType<typeof getSupabase>['channel']> | null>(null)
 
   const tableId = getTableFromUrl()
   const browserId = getBrowserId()
+
+  const pollingInitialStatus: OrderStatus =
+    view.type === 'status' ? view.order.status : 'COMPLETED'
+
+  const handleTableNotFound = useCallback(() => {}, [])
+
+  const { status: polledStatus, pollingError } = useOrderPolling(
+    tableId ?? '',
+    browserId,
+    pollingInitialStatus,
+    handleTableNotFound,
+  )
+
+  useEffect(() => {
+    if (pollingError) {
+      setView({ type: 'error', message: pollingError })
+    }
+  }, [pollingError])
 
   // Load page-level ad scripts — only from this component, which the router renders solely for
   // customer-facing paths (/order and the unmatched-path fallback), never any /admin/* route.
@@ -163,43 +181,6 @@ export default function App() {
   useEffect(() => {
     loadRuntimeConfig().then((cfg) => loadRollerAds(cfg.rolleradsTagSrc))
     loadAdSense()
-  }, [])
-
-  // Clean up realtime subscription on unmount
-  useEffect(() => {
-    return () => {
-      if (channelRef.current) {
-        const supabase = getSupabase()
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-      }
-    }
-  }, [])
-
-  // Subscribe to order realtime updates
-  const subscribeToOrder = useCallback((orderId: string) => {
-    const supabase = getSupabase()
-    // Clean previous channel
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current)
-    }
-
-    const channel = supabase
-      .channel(`order:${orderId}`)
-      .on('broadcast', { event: 'STATUS_UPDATE' }, (payload) => {
-        const newStatus = payload.payload?.status as OrderStatus | undefined
-        if (newStatus) {
-          setView((prev) => {
-            if (prev.type === 'status') {
-              return { type: 'status', order: { ...prev.order, status: newStatus } }
-            }
-            return prev
-          })
-        }
-      })
-      .subscribe()
-
-    channelRef.current = channel
   }, [])
 
   // Fetch branding
@@ -293,7 +274,6 @@ export default function App() {
           if (sessionData.order) {
             const order: Order = sessionData.order
             setView({ type: 'status', order })
-            subscribeToOrder(order.id)
           } else {
             // Another browser owns this table
             setView({ type: 'occupied' })
@@ -306,7 +286,7 @@ export default function App() {
     }
 
     checkSession()
-  }, [tableId, browserId, subscribeToOrder, t])
+  }, [tableId, browserId, t])
 
   // Submit order - show confirmation first
   const handleSubmitOrder = (
@@ -397,7 +377,6 @@ export default function App() {
 
       if (sessionData?.order) {
         setView({ type: 'status', order: sessionData.order })
-        subscribeToOrder(sessionData.order.id)
       } else {
         setView({ type: 'error', message: t('error') })
       }
@@ -442,7 +421,6 @@ export default function App() {
       })
       if (sessionData?.order) {
         setView({ type: 'status', order: sessionData.order })
-        subscribeToOrder(sessionData.order.id)
       }
     } catch {
       window.location.reload()
@@ -597,10 +575,12 @@ export default function App() {
         )
       }
 
-      case 'status':
+      case 'status': {
+        const order =
+          polledStatus !== null ? { ...view.order, status: polledStatus } : view.order
         return (
           <StatusView
-            order={view.order}
+            order={order}
             onCancel={handleCancelOrder}
             isCancelling={isCancelling}
             onDone={handleDone}
@@ -608,6 +588,7 @@ export default function App() {
             isAddingMore={isAddingMore}
           />
         )
+      }
     }
   }
 

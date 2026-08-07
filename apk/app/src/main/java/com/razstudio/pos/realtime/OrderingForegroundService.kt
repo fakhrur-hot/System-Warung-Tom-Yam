@@ -29,6 +29,7 @@ import com.razstudio.pos.data.local.SystemSettings
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -55,6 +56,10 @@ import javax.inject.Inject
 class OrderingForegroundService : Service() {
 
     companion object {
+        /** Push reconnect backoff. Starts quick, tops out at a minute — the poll covers the gap. */
+        private const val CLOUD_PUSH_INITIAL_BACKOFF_MS = 2_000L
+        private const val CLOUD_PUSH_MAX_BACKOFF_MS = 60_000L
+
         private const val TAG = "OrderingFgService"
         private const val CHANNEL_ID = "ordering_staff_channel"
         private const val NOTIFICATION_ID = 2001
@@ -88,6 +93,10 @@ class OrderingForegroundService : Service() {
     private val serviceJob = SupervisorJob()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
 
+    /** Cloud-mode push socket to the admin device; null whenever it is down (the poll covers). */
+    private var cloudPushSocket: WebSocket? = null
+    private var cloudPushBackoffMs = CLOUD_PUSH_INITIAL_BACKOFF_MS
+
     @Inject lateinit var apiClient: ApiClient
     @Inject lateinit var secureStorage: SecureStorage
     @Inject lateinit var orderDao: OrderDao
@@ -95,6 +104,8 @@ class OrderingForegroundService : Service() {
     @Inject lateinit var appConfig: com.razstudio.pos.data.AppConfigStore
     @Inject lateinit var modeRepository: com.razstudio.pos.data.ModeRepository
     @Inject lateinit var noInternetGuard: com.razstudio.pos.data.net.NoInternetGuard
+    @Inject lateinit var lanServerLocator: com.razstudio.pos.data.lan.LanServerLocator
+    @Inject lateinit var staffOrderSync: com.razstudio.pos.data.local.StaffOrderSync
 
     // Task 18.1. `by lazy` because @Inject fields are not populated until onCreate, and a property
     // initialiser would read the guard before Hilt has set it.
@@ -118,7 +129,94 @@ class OrderingForegroundService : Service() {
         startForegroundWithNotification()
         requestBatteryOptimizationExemption()
         connectToRealtime()
+        connectCloudPushSocket()
         return START_STICKY
+    }
+
+    /**
+     * Subscribe to the admin device's push socket in Cloud mode (the café's local fast path).
+     *
+     * ### Why a staff device listens to the admin at all in Cloud mode
+     *
+     * The cloud is authoritative and stays authoritative — every write still goes to Supabase. What
+     * it is not is prompt: this device learns about a change on its own poll tick. The admin already
+     * knows the instant it makes the change, and it is on the same Wi-Fi, so it says so directly.
+     *
+     * ### A frame is a TRIGGER, not a payload
+     *
+     * The frame is not applied. It calls [StaffOrderSync.syncNow] — the same function the poll calls,
+     * with the same watermark and the same reconcile. That is deliberate and load-bearing: a second
+     * path that mutated state straight from frames would de-duplicate against different data than the
+     * poll, and the way that disagreement surfaces is a kitchen slip printing twice mid-service.
+     *
+     * ### Every failure is survivable
+     *
+     * No admin on the network, socket refused, revoked credential, frame dropped, app backgrounded —
+     * all of it costs latency and nothing else, because the poll still runs. That is why this never
+     * reports an error to the user: there is nothing for them to do about it.
+     */
+    private fun connectCloudPushSocket() {
+        if (modeRepository.currentMode() != com.razstudio.pos.data.OperatingMode.CLOUD) return
+        val credential = secureStorage.getApiKey() ?: return
+
+        serviceScope.launch {
+            // The admin's address is not configured anywhere in a Cloud café, so it is discovered:
+            // last-known, then the DHCP gateway (the admin when it hosts the hotspot), then mDNS.
+            val found = lanServerLocator.locate()
+            val base = (found as? com.razstudio.pos.data.lan.LanServerLocator.Result.Reachable)?.url
+            if (base == null) {
+                Log.i(TAG, "No café push server found — poll continues to cover")
+                return@launch
+            }
+
+            val url = base.trimEnd('/')
+                .replaceFirst("http://", "ws://")
+                .replaceFirst("https://", "wss://") + "/functions/v1/realtime"
+
+            cloudPushSocket?.close(1001, "Reconnecting")
+            cloudPushSocket = client.newWebSocket(
+                Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", "Bearer $credential")
+                    .build(),
+                object : WebSocketListener() {
+                    override fun onOpen(webSocket: WebSocket, response: Response) {
+                        Log.i(TAG, "Cloud push connected to $url")
+                        cloudPushBackoffMs = CLOUD_PUSH_INITIAL_BACKOFF_MS
+                    }
+
+                    override fun onMessage(webSocket: WebSocket, text: String) {
+                        val envelope = com.razstudio.pos.data.lan.LanPushEnvelope.decode(text) ?: return
+                        if (envelope.type != com.razstudio.pos.data.lan.LanPushEnvelope.Type.STATUS_UPDATE) return
+                        // ACK before syncing: the server's view of delivery must not depend on how
+                        // long our follow-up fetch takes.
+                        runCatching {
+                            webSocket.send(
+                                com.razstudio.pos.data.lan.LanPushEnvelope(
+                                    type = com.razstudio.pos.data.lan.LanPushEnvelope.Type.ACK,
+                                    sessionId = envelope.sessionId,
+                                    messageId = envelope.messageId,
+                                    timestamp = envelope.timestamp,
+                                    ackFor = envelope.messageId,
+                                ).encode()
+                            )
+                        }
+                        serviceScope.launch { staffOrderSync.syncNow() }
+                    }
+
+                    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                        Log.w(TAG, "Cloud push disconnected (${t.message}) — poll continues to cover")
+                        cloudPushSocket = null
+                        serviceScope.launch {
+                            delay(cloudPushBackoffMs)
+                            cloudPushBackoffMs =
+                                (cloudPushBackoffMs * 2).coerceAtMost(CLOUD_PUSH_MAX_BACKOFF_MS)
+                            connectCloudPushSocket()
+                        }
+                    }
+                },
+            )
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -127,6 +225,8 @@ class OrderingForegroundService : Service() {
         Log.i(TAG, "Ordering foreground service destroyed")
         webSocket?.close(1000, "Service destroyed")
         webSocket = null
+        cloudPushSocket?.close(1000, "Service destroyed")
+        cloudPushSocket = null
         serviceJob.cancel()
         super.onDestroy()
     }

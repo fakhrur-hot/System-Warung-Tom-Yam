@@ -45,7 +45,8 @@ class AdminSessionViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val languageManager: LanguageManager,
     private val secureStorage: com.razstudio.pos.data.SecureStorage,
-    private val printerConnectionManager: com.razstudio.pos.printing.PrinterConnectionManager
+    private val printerConnectionManager: com.razstudio.pos.printing.PrinterConnectionManager,
+    private val closingReportSaver: com.razstudio.pos.data.local.ClosingReportSaver,
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
@@ -66,7 +67,9 @@ class AdminSessionViewModel @Inject constructor(
      */
     fun refreshRole() {
         viewModelScope.launch {
-            val deviceId = secureStorage.getDeviceId()
+            // `devices-status` looks up `devices.id` — the SERVER id learned at register/recovery,
+            // never the local UUID (see SecureStorage.getServerDeviceId). The local id 404s here.
+            val deviceId = secureStorage.getServerDeviceId()
             if (deviceId.isBlank()) return@launch
             when (val result = apiClient.pollDeviceStatus(deviceId)) {
                 is ApiResult.Success -> {
@@ -288,6 +291,26 @@ class AdminSessionViewModel @Inject constructor(
                 // into the next service day.
                 runCatching {
                     apiClient.putSettings(org.json.JSONObject().put("todaysSpecial", ""))
+                }
+            }
+
+            // Step 3b: Generate the closing report and save it into the device's Downloads folder.
+            //
+            // This is the first time anything in the app has asked for a closing report at all: the
+            // `reports-closing` endpoint existed and emailed via Brevo, but no client ever called
+            // it, so a report was produced only if somebody hit the URL by hand. Closing the till is
+            // the moment the report is *about*, so it is the moment to produce it.
+            //
+            // Deliberately after the CLOSE has been posted, and deliberately non-blocking on
+            // failure: the café is already closed by this point, and an owner locking up must never
+            // be held at a spinner — or left unsure whether the till actually closed — because a
+            // download failed. A missing file is recoverable in the morning; a session that did not
+            // close is not.
+            withContext(Dispatchers.IO) {
+                when (val ref = apiClient.getClosingReport()) {
+                    is ApiResult.Success ->
+                        closingReportSaver.saveToDownloads(ref.data.url, bizZone.id)
+                    else -> Unit // 409 = no takings today, which is a quiet non-event.
                 }
             }
 

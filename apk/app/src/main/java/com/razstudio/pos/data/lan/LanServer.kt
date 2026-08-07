@@ -69,6 +69,7 @@ class LanServer @Inject constructor(
     private val pairedDeviceDao: PairedDeviceDao,
     private val lanAddress: LanAddress,
     private val pushBus: LanPushBus,
+    private val cloudKeyVerifier: CloudOrderingKeyVerifier,
     @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) {
 
@@ -76,6 +77,9 @@ class LanServer @Inject constructor(
 
     @Volatile
     private var engine: io.ktor.server.engine.ApplicationEngine? = null
+
+    /** Cloud mode: only the push socket is registered. See [start]. */
+    private var pushOnly: Boolean = false
 
     /**
      * Why the last [start] failed, for the pairing screen to show (task 14.2). Null when the server
@@ -104,8 +108,9 @@ class LanServer @Inject constructor(
      * deliberate: a server listening on an unreachable interface is indistinguishable, from the
      * admin's side, from one that is working.
      */
-    fun start(): Boolean {
+    fun start(pushOnly: Boolean = false): Boolean {
         if (engine != null) return true
+        this.pushOnly = pushOnly
 
         val address = lanAddress.resolve()
         if (address !is LanAddress.Result.Found) {
@@ -129,7 +134,12 @@ class LanServer @Inject constructor(
                     pingPeriodMillis = 20_000
                     timeoutMillis = 30_000
                 }
-                routes()
+                // Cloud cafés get the push socket and NOTHING else. The REST routes below are the
+                // HTTP face of LocalBackend, which in Cloud mode is a mirror rather than the
+                // authority — serving them would have staff reading and writing the wrong database
+                // while the cloud silently disagreed. Push carries no data (it is a trigger), so it
+                // is safe to expose where the REST surface is not.
+                if (pushOnly) pushRouteOnly() else routes()
             }.also { it.start(wait = false) }
             boundHost = address.ip
             advertiseOverMdns()
@@ -246,46 +256,7 @@ class LanServer @Inject constructor(
         // the WebSocket equivalent of the 401 contract, so revoking a device ejects it from the
         // socket exactly as it ejects it from a request — a revoked phone must not keep receiving
         // the café's order stream just because it connected before the revocation.
-        webSocket("$PREFIX/realtime") {
-            if (!call.authorizedDeviceOrNull()) {
-                close(
-                    CloseReason(
-                        CloseReason.Codes.VIOLATED_POLICY,
-                        "UNAUTHORIZED",
-                    )
-                )
-                return@webSocket
-            }
-
-            // Fan out every published change to this Client for as long as the socket lives.
-            val job = launch {
-                pushBus.events.collect { envelope ->
-                    runCatching { send(Frame.Text(envelope.encode())) }
-                        .onFailure { Log.d(TAG, "Push send failed; socket closing") }
-                }
-            }
-
-            try {
-                // Inbound: ACKs and catch-up requests. Read rather than ignored, because a socket
-                // whose incoming frames are never consumed stops honouring pings and is torn down.
-                for (frame in incoming) {
-                    val text = (frame as? Frame.Text)?.readText() ?: continue
-                    val envelope = LanPushEnvelope.decode(text) ?: continue
-                    when (envelope.type) {
-                        LanPushEnvelope.Type.ACK ->
-                            Log.d(TAG, "ACK for ${envelope.ackFor}")
-                        LanPushEnvelope.Type.STATUS_REQUEST ->
-                            // Nothing replayed here on purpose: the Client's own catch-up poll is
-                            // the authoritative reconciliation path (Requirement 6.6), and a second
-                            // replay mechanism would be a second thing that can disagree with it.
-                            Log.d(TAG, "Catch-up requested from ${envelope.lastSeenId} — poll will serve it")
-                        else -> Unit
-                    }
-                }
-            } finally {
-                job.cancel()
-            }
-        }
+        realtimeSocket()
 
         // ── The Payment QR image (task 15.3, Requirement 14.8) ───────────────────────────────────
         // Authenticated like everything else: the payee code identifies where the café's money goes,
@@ -395,6 +366,7 @@ class LanServer @Inject constructor(
                     .put("todaysSpecial", s.todaysSpecial)
                     .put("reportEmail", s.reportEmail)
                     .put("businessDayStartHour", s.businessDayStartHour)
+                    .put("businessDayEndHour", s.businessDayEndHour)
                     .put("defaultLangAdmin", s.defaultLangAdmin)
                     .put("defaultLangOrdering", s.defaultLangOrdering)
                     .put("defaultLangCustomer", s.defaultLangCustomer)
@@ -419,12 +391,73 @@ class LanServer @Inject constructor(
      * and emit `SessionExpired`. A 403 would leave a revoked device retrying forever with a
      * credential that will never work again.
      */
+
+    /**
+     * The push socket, registered by both the full LAN route set and the Cloud push-only server.
+     *
+     * Extracted rather than duplicated: this is the one route Cloud mode exposes, and a second copy
+     * would be a second place for the auth check or the ACK handling to drift.
+     */
+    private fun io.ktor.server.routing.Route.realtimeSocket() {
+        webSocket("$PREFIX/realtime") {
+            if (!call.authorizedDeviceOrNull()) {
+                close(
+                    CloseReason(
+                        CloseReason.Codes.VIOLATED_POLICY,
+                        "UNAUTHORIZED",
+                    )
+                )
+                return@webSocket
+            }
+
+            // Fan out every published change to this Client for as long as the socket lives.
+            val job = launch {
+                pushBus.events.collect { envelope ->
+                    runCatching { send(Frame.Text(envelope.encode())) }
+                        .onFailure { Log.d(TAG, "Push send failed; socket closing") }
+                }
+            }
+
+            try {
+                // Inbound: ACKs and catch-up requests. Read rather than ignored, because a socket
+                // whose incoming frames are never consumed stops honouring pings and is torn down.
+                for (frame in incoming) {
+                    val text = (frame as? Frame.Text)?.readText() ?: continue
+                    val envelope = LanPushEnvelope.decode(text) ?: continue
+                    when (envelope.type) {
+                        LanPushEnvelope.Type.ACK ->
+                            Log.d(TAG, "ACK for ${envelope.ackFor}")
+                        LanPushEnvelope.Type.STATUS_REQUEST ->
+                            // Nothing replayed here on purpose: the Client's own catch-up poll is
+                            // the authoritative reconciliation path (Requirement 6.6), and a second
+                            // replay mechanism would be a second thing that can disagree with it.
+                            Log.d(TAG, "Catch-up requested from ${envelope.lastSeenId} — poll will serve it")
+                        else -> Unit
+                    }
+                }
+            } finally {
+                job.cancel()
+            }
+        }
+    }
+
+    /**
+     * Cloud mode's entire surface: the push socket and nothing else. See [start].
+     */
+    private fun io.ktor.server.application.Application.pushRouteOnly() = routing {
+        realtimeSocket()
+    }
+
     private suspend fun io.ktor.server.application.ApplicationCall.authorizedDeviceOrNull(): Boolean {
         val bearer = request.headers["Authorization"]
             ?.removePrefix("Bearer ")
             ?.trim()
             .orEmpty()
         if (bearer.isEmpty()) return false
+
+        // Cloud mode: the admin never issued this credential and cannot hash it into a match — the
+        // ordering key is the backend's secret. Ask the backend instead. See CloudOrderingKeyVerifier.
+        if (pushOnly) return cloudKeyVerifier.isValid(bearer)
 
         val hash = LocalBackend.hashCredentialForLan(bearer)
         val device = pairedDeviceDao.getAllOnce().firstOrNull { it.credentialHash == hash }
@@ -506,6 +539,9 @@ class LanServer @Inject constructor(
                 note = o.optString("note", "").ifBlank { null },
                 unitPrice = if (o.has("unitPrice")) o.optDouble("unitPrice") else null,
                 size = o.optString("size", "").ifBlank { null },
+                // A staff device may relay a cashier-typed custom charge; the name has to survive
+                // the hop or the line arrives priced-but-nameless on the admin device.
+                customName = o.optString("customName", "").ifBlank { null },
             )
         }
     }

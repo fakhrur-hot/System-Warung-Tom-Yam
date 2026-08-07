@@ -72,6 +72,16 @@ data class CafeConfigPayload(
      * what `MenuItem.imagePath` already points at.
      */
     val photoFileIds: Map<String, String> = emptyMap(),
+    /**
+     * Drive file id of the café's payment QR image, or blank if it has none.
+     *
+     * Carried separately from [photoFileIds] rather than as one more entry, because the two
+     * restore to different places — menu photos into `LocalImageStore`, this into `filesDir`
+     * where `PaymentQrPipeline` looks — and because losing this one has a different
+     * consequence: a missing menu photo is a grey box, a missing payment QR is a till that
+     * cannot take payment at all.
+     */
+    val paymentQrFileId: String = "",
     /** Set when written; used to tell two bundles apart in the conflict dialog (task 23.8). */
     val savedAtMs: Long = 0L,
     /** The device that saved it, for the same reason. Never used for authorisation. */
@@ -90,6 +100,7 @@ data class CafeConfigPayload(
         put(KEY_CLOUDFLARE_PROJECT, cloudflareProject)
         put(KEY_SETUP_DATA, setupData)
         put(KEY_PHOTOS, JSONObject(photoFileIds as Map<*, *>))
+        put(KEY_PAYMENT_QR, paymentQrFileId)
         put(KEY_SAVED_AT, savedAtMs)
         put(KEY_SAVED_BY, savedByDevice)
     }.toString()
@@ -109,6 +120,7 @@ data class CafeConfigPayload(
         private const val KEY_CLOUDFLARE_PROJECT = "cloudflare_project"
         private const val KEY_SETUP_DATA = "setup_data"
         private const val KEY_PHOTOS = "photo_file_ids"
+        private const val KEY_PAYMENT_QR = "payment_qr_file_id"
         private const val KEY_SAVED_AT = "saved_at_ms"
         private const val KEY_SAVED_BY = "saved_by_device"
 
@@ -157,6 +169,7 @@ data class CafeConfigPayload(
                     obj.keys().asSequence().associateWith { k -> obj.optString(k) }
                         .filterValues { it.isNotBlank() }
                 } ?: emptyMap(),
+                paymentQrFileId = o.optString(KEY_PAYMENT_QR).trim(),
                 savedAtMs = o.optLong(KEY_SAVED_AT, 0L),
                 savedByDevice = o.optString(KEY_SAVED_BY).trim(),
             )

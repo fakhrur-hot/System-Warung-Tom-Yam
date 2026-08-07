@@ -49,10 +49,21 @@ class ModeCapabilitiesTest {
         )
     }
 
+    /**
+     * CLOUD is the mode with no *technical* limits, so every capability it does not enable has to be
+     * a deliberate product decision — listed here by name so switching one off silently is not
+     * possible. [gatewayPaymentsEnabled] is off product-wide because every acquirer evaluated for it
+     * charges a standing subscription, which is incompatible with a zero-commitment POS; the
+     * implementation stays wired so the flag alone can bring it back.
+     */
     @Test
-    fun cloudEnablesEveryCapability() {
+    fun cloudEnablesEveryCapabilityExceptThoseDisabledOnPurpose() {
+        val deliberatelyOff = setOf("gatewayPaymentsEnabled")
         val off = flagsOf(OperatingMode.CLOUD.toCapabilities()).filterValues { !it }.keys
-        assertTrue("CLOUD must enable everything — these were false: $off", off.isEmpty())
+        assertEquals(
+            "CLOUD disables exactly the capabilities retired on purpose",
+            deliberatelyOff, off,
+        )
     }
 
     @Test

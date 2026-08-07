@@ -1,5 +1,7 @@
 package com.razstudio.pos.data.demo
 
+import com.razstudio.pos.data.CUSTOM_CHARGE_ID_PREFIX
+import com.razstudio.pos.data.CUSTOM_CHARGE_NAME_MAX
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.BrandingResponse
 import com.razstudio.pos.data.CreateOrderResponse
@@ -412,12 +414,15 @@ class DemoBackend @Inject constructor(
     /** Resolve a new order line from menu seed data (name / price / category snapshots). */
     private fun NewOrderItem.toEntity(orderId: String, sessionNumber: Int): OrderItem {
         val seed = DemoSeedData.menuItems.firstOrNull { it.id == menuItemId }
+        // Same custom-charge rule the real backends apply: a typed name+price, no menu lookup.
+        val custom = customName?.takeIf { menuItemId.startsWith(CUSTOM_CHARGE_ID_PREFIX) }?.trim()
+            ?.take(CUSTOM_CHARGE_NAME_MAX)?.ifBlank { null }
         return OrderItem(
             id = "demo-oi-${UUID.randomUUID()}",
             orderId = orderId,
             menuItemId = menuItemId,
             // Backend bakes the English base name as the snapshot; clients re-resolve per surface.
-            nameSnapshot = seed?.nameEn ?: menuItemId,
+            nameSnapshot = custom ?: seed?.nameEn ?: menuItemId,
             unitPriceSnapshot = unitPrice ?: seed?.price ?: 0.0,
             categorySnapshot = seed?.category ?: "",
             quantity = quantity,

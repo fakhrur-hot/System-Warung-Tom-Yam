@@ -56,7 +56,10 @@ class PrintersViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         PrintersUiState(
             keepAliveMode = connectionManager.getMode(),
-            kitchenFontSize = printSettingsStore.getKitchenFontSize()
+            kitchenFontSize = printSettingsStore.getKitchenFontSize(),
+            receiptLogo = printSettingsStore.getReceiptLogo(),
+            escAsteriskMode = printSettingsStore.getEscAsteriskImageMode(),
+            receiptAutoCut = printSettingsStore.getReceiptAutoCut(),
         )
     )
     val uiState: StateFlow<PrintersUiState> = _uiState.asStateFlow()
@@ -72,6 +75,28 @@ class PrintersViewModel @Inject constructor(
         printSettingsStore.setKitchenFontSize(size)
         _uiState.value = _uiState.value.copy(kitchenFontSize = size)
     }
+
+    /** Logo on receipt toggle (device-local). */
+    fun updateReceiptLogo(enabled: Boolean) {
+        printSettingsStore.setReceiptLogo(enabled)
+        _uiState.value = _uiState.value.copy(receiptLogo = enabled)
+    }
+
+    /** ESC * image mode compatibility toggle (device-local). */
+    fun updateEscAsteriskMode(enabled: Boolean) {
+        printSettingsStore.setEscAsteriskImageMode(enabled)
+        _uiState.value = _uiState.value.copy(escAsteriskMode = enabled)
+    }
+
+    /** Receipt paper auto-cut toggle (device-local). */
+    fun setReceiptAutoCut(enabled: Boolean) {
+        printSettingsStore.setReceiptAutoCut(enabled)
+        _uiState.value = _uiState.value.copy(receiptAutoCut = enabled)
+    }
+
+    // ── Printer transport (shared with HardwareDevicesViewModel) ─────────────────────────
+    // The transport section on PrintersScreen uses HardwareDevicesViewModel directly via
+    // hiltViewModel() in the composable rather than duplicating availability probes here.
 
     // ── Two-bucket kitchen print router (FOOD / BEVERAGE) ────────────────────
     // Each bucket routes to one printer, stored in that printer's categoryFilter (the same
@@ -373,6 +398,11 @@ data class PrintersUiState(
     val keepAliveMode: String = PrinterConnectionManager.MODE_FAST,
     // Kitchen-slip menu-text size: "S"/"M"/"L" (see KitchenFontSize).
     val kitchenFontSize: String = "M",
+    // Receipt-image settings (moved here from AdminSettingsScreen, Printing & Hardware)
+    val receiptLogo: Boolean = false,
+    val escAsteriskMode: Boolean = true,
+    // Receipt paper auto-cut (moved from Devices & Hardware)
+    val receiptAutoCut: Boolean = true,
     val error: String? = null,
     val successMessage: String? = null
 )

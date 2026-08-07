@@ -1,13 +1,19 @@
 package com.razstudio.pos.ui.tableview
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -20,22 +26,33 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.local.OrderItem
 import com.razstudio.pos.data.local.PaymentMethod
 import com.razstudio.pos.ui.i18n.UiStrings
+import com.razstudio.pos.ui.util.PaymentQrPipeline
 import com.razstudio.pos.ui.viewmodels.SplitPaymentPlanner
 
 /**
@@ -50,6 +67,23 @@ import com.razstudio.pos.ui.viewmodels.SplitPaymentPlanner
  *
  * The remainder is shown next to the amount throughout, because the question a cashier is actually
  * being asked across the counter is "how much is left?" — not "how much have we taken so far".
+ *
+ * ## Why the payment QR is on screen the whole time
+ *
+ * A split table is where the QR is needed most and where the old flow served it worst: each person
+ * pays separately, so the code had to be produced once *per customer*, and it lived behind a button
+ * on the sheet underneath this dialog. The cashier had to close the split, show the QR, dismiss it,
+ * and reopen the split with their selection lost.
+ *
+ * So the code sits beside the tally — 40% of the dialog, on the left in landscape and on top in
+ * portrait, where a customer standing across the counter can reach it with their phone while the
+ * cashier keeps working on the right.
+ *
+ * ## Why this is a raw Dialog and not an AlertDialog
+ *
+ * `AlertDialog` sizes itself to its content under a platform width cap, which cannot express "70% of
+ * the screen, split 40:60". `usePlatformDefaultWidth = false` hands back the geometry, and the
+ * Surface below is the alert container rebuilt at the size this layout needs.
  *
  * ## Fix items only goes down
  *
@@ -79,8 +113,13 @@ fun SplitPaymentDialog(
 ) {
     // Per-line counters. Keyed by order-item id so a reload that reorders the list cannot shift a
     // customer's selection onto somebody else's food.
-    val taken = remember { mutableStateMapOf<String, Int>() }
-    var fixMode by remember { mutableStateOf(false) }
+    //
+    // Saved across configuration changes, because on a phone with auto-rotate this map IS the
+    // customer's share. Losing it to a turn of the wrist means re-tapping every line with somebody
+    // waiting to pay, and the cashier has no way to tell a reset selection from one they had not
+    // finished making — both look like a partial tally.
+    val taken = rememberSaveable(saver = TakenSaver) { mutableStateMapOf<String, Int>() }
+    var fixMode by rememberSaveable { mutableStateOf(false) }
 
     // Reducing a line is a void: the café stops charging for food it already cooked, and there is
     // no undo. A single tap is too cheap for that, so the item waits here until it is confirmed.
@@ -95,91 +134,68 @@ fun SplitPaymentDialog(
     val remainder = SplitPaymentPlanner.remainderAfter(items, taken)
     val canPay = plan !is SplitPaymentPlanner.Plan.NothingSelected && !isLoading
 
-    AlertDialog(
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    // Landscape takes 70% of both axes. Portrait takes 70% of the height only and keeps the width
+    // an alert already had — a phone dialog is nearly full-width regardless, so narrowing it to a
+    // percentage would only cramp the item rows for no gain.
+    val dialogWidth: Dp = if (isLandscape) {
+        (configuration.screenWidthDp * 0.7f).dp
+    } else {
+        minOf(configuration.screenWidthDp - 48, 560).dp
+    }
+    val dialogHeight: Dp = (configuration.screenHeightDp * 0.7f).dp
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text(strings.splitDialogTitle) },
-        text = {
-            Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                FilterChip(
-                    selected = fixMode,
-                    onClick = { fixMode = !fixMode },
-                    label = { Text(strings.splitEditItems) },
-                )
-                if (fixMode) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = strings.splitEditItemsHint,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-
-                items.forEach { item ->
-                    val take = (taken[item.id] ?: 0).coerceIn(0, item.quantity)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(item.nameSnapshot, style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                text = "RM %.2f × %d".format(item.unitPriceSnapshot, item.quantity),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-
-                        if (fixMode) {
-                            // Decrement only. See the class note on why there is no counterpart.
-                            IconButton(
-                                onClick = { pendingReduce = item },
-                                enabled = !isLoading,
-                            ) { Icon(Icons.Default.Remove, contentDescription = null) }
-                            Text("${item.quantity}", fontWeight = FontWeight.Bold)
-                        } else {
-                            IconButton(
-                                onClick = { taken[item.id] = (take - 1).coerceAtLeast(0) },
-                                enabled = take > 0 && !isLoading,
-                            ) { Icon(Icons.Default.Remove, contentDescription = null) }
-                            Text(
-                                text = "$take",
-                                fontWeight = if (take > 0) FontWeight.Bold else FontWeight.Normal,
-                            )
-                            IconButton(
-                                onClick = { taken[item.id] = (take + 1).coerceAtMost(item.quantity) },
-                                enabled = take < item.quantity && !isLoading,
-                            ) { Icon(Icons.Default.Add, contentDescription = null) }
-                        }
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier
+                .width(dialogWidth)
+                .height(dialogHeight),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+        ) {
+            if (isLandscape) {
+                Row(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+                    Box(modifier = Modifier.weight(0.4f).fillMaxHeight()) {
+                        SplitQrPane(strings = strings)
                     }
-                    HorizontalDivider()
+                    VerticalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    Column(modifier = Modifier.weight(0.6f).fillMaxHeight()) {
+                        SplitTally(
+                            items = items, strings = strings, isLoading = isLoading,
+                            gatewayMethods = gatewayMethods, taken = taken,
+                            fixMode = fixMode, onFixModeChange = { fixMode = it },
+                            amount = amount, remainder = remainder, canPay = canPay,
+                            plan = plan, onPay = onPay, onDismiss = onDismiss,
+                            onRequestReduce = { pendingReduce = it },
+                        )
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                AmountRow(strings.splitThisCustomerPays, amount, emphasised = true)
-                AmountRow(strings.splitRemaining, remainder, emphasised = false)
-
-                if (gatewayMethods.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    GatewayMethodRow(
-                        methods = gatewayMethods,
-                        strings = strings,
-                        enabled = canPay,
-                        onSelect = { method -> onPay(plan, method.code) },
-                    )
+            } else {
+                Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+                    Box(modifier = Modifier.weight(0.4f).fillMaxWidth()) {
+                        SplitQrPane(strings = strings)
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+                    Column(modifier = Modifier.weight(0.6f).fillMaxWidth()) {
+                        SplitTally(
+                            items = items, strings = strings, isLoading = isLoading,
+                            gatewayMethods = gatewayMethods, taken = taken,
+                            fixMode = fixMode, onFixModeChange = { fixMode = it },
+                            amount = amount, remainder = remainder, canPay = canPay,
+                            plan = plan, onPay = onPay, onDismiss = onDismiss,
+                            onRequestReduce = { pendingReduce = it },
+                        )
+                    }
                 }
             }
-        },
-        confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onPay(plan, "CASH") }, enabled = canPay) { Text(strings.payCash) }
-                Button(onClick = { onPay(plan, "QR") }, enabled = canPay) { Text(strings.payQR) }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading) { Text(strings.commonCancel) }
-        },
-    )
+        }
+    }
 
     pendingReduce?.let { item ->
         val clearsLine = item.quantity <= 1
@@ -211,6 +227,175 @@ fun SplitPaymentDialog(
     }
 }
 
+/**
+ * The café's payment QR, sized to whatever share of the dialog it was given.
+ *
+ * The code is squared off against the *smaller* of the pane's two dimensions, minus the room the
+ * brand label and its picker need. Sizing on width alone — which is what a plain `fillMaxWidth`
+ * image does — overflows the moment the pane is wider than it is tall, which is exactly the portrait
+ * case: a full-width strip only 40% of the dialog's height.
+ */
+@Composable
+private fun SplitQrPane(strings: UiStrings) {
+    val context = LocalContext.current
+    val prefs = remember(context) {
+        context.getSharedPreferences("app_local_prefs", android.content.Context.MODE_PRIVATE)
+    }
+    var brand by remember {
+        mutableStateOf(PaymentQrBrand.fromName(prefs.getString("payment_qr_brand", null)))
+    }
+    // Gated on the stored image alone, matching the order sheet's panel — see the note there on why
+    // the config hash is deliberately not consulted.
+    val qr = remember { PaymentQrPipeline.loadFromInternal(context) }
+
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (qr == null) {
+            // The pane keeps its share of the dialog rather than collapsing: a layout that changes
+            // shape depending on whether a café has uploaded a QR is harder to learn than one that
+            // always looks the same and occasionally says it is empty.
+            Text(
+                text = strings.paymentQrNone,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        } else {
+            val side = minOf(maxWidth, maxHeight - BRAND_CHROME_HEIGHT).coerceAtLeast(96.dp)
+            PaymentQrPanel(
+                qr = qr,
+                brand = brand,
+                onBrandChange = { chosen ->
+                    brand = chosen
+                    prefs.edit().putString("payment_qr_brand", chosen.name).apply()
+                },
+                modifier = Modifier.width(side),
+            )
+        }
+    }
+}
+
+/** Height taken by the brand label above the code and the rail picker below it. */
+private val BRAND_CHROME_HEIGHT = 76.dp
+
+/** The right-hand (landscape) / lower (portrait) half: what is being paid for, and the pay buttons. */
+@Composable
+private fun ColumnScope.SplitTally(
+    items: List<OrderItem>,
+    strings: UiStrings,
+    isLoading: Boolean,
+    gatewayMethods: List<PaymentMethod>,
+    taken: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Int>,
+    fixMode: Boolean,
+    onFixModeChange: (Boolean) -> Unit,
+    amount: Double,
+    remainder: Double,
+    canPay: Boolean,
+    plan: SplitPaymentPlanner.Plan,
+    onPay: (SplitPaymentPlanner.Plan, String) -> Unit,
+    onDismiss: () -> Unit,
+    onRequestReduce: (OrderItem) -> Unit,
+) {
+    Text(
+        text = strings.splitDialogTitle,
+        style = MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.Bold,
+    )
+    Spacer(modifier = Modifier.height(12.dp))
+
+    FilterChip(
+        selected = fixMode,
+        onClick = { onFixModeChange(!fixMode) },
+        label = { Text(strings.splitEditItems) },
+    )
+    if (fixMode) {
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = strings.splitEditItemsHint,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    Spacer(modifier = Modifier.height(12.dp))
+
+    // The list takes the slack so the totals and the pay buttons stay pinned to the bottom of the
+    // pane. A cashier reaching for Pay Cash should find it in the same place on every table,
+    // regardless of how many lines the group ordered.
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .verticalScroll(rememberScrollState())
+    ) {
+        items.forEach { item ->
+            val take = (taken[item.id] ?: 0).coerceIn(0, item.quantity)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(item.nameSnapshot, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = "RM %.2f × %d".format(item.unitPriceSnapshot, item.quantity),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (fixMode) {
+                    // Decrement only. See the class note on why there is no counterpart.
+                    IconButton(
+                        onClick = { onRequestReduce(item) },
+                        enabled = !isLoading,
+                    ) { Icon(Icons.Default.Remove, contentDescription = null) }
+                    Text("${item.quantity}", fontWeight = FontWeight.Bold)
+                } else {
+                    IconButton(
+                        onClick = { taken[item.id] = (take - 1).coerceAtLeast(0) },
+                        enabled = take > 0 && !isLoading,
+                    ) { Icon(Icons.Default.Remove, contentDescription = null) }
+                    Text(
+                        text = "$take",
+                        fontWeight = if (take > 0) FontWeight.Bold else FontWeight.Normal,
+                    )
+                    IconButton(
+                        onClick = { taken[item.id] = (take + 1).coerceAtMost(item.quantity) },
+                        enabled = take < item.quantity && !isLoading,
+                    ) { Icon(Icons.Default.Add, contentDescription = null) }
+                }
+            }
+            HorizontalDivider()
+        }
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+    AmountRow(strings.splitThisCustomerPays, amount, emphasised = true)
+    AmountRow(strings.splitRemaining, remainder, emphasised = false)
+
+    if (gatewayMethods.isNotEmpty()) {
+        Spacer(modifier = Modifier.height(8.dp))
+        GatewayMethodRow(
+            methods = gatewayMethods,
+            strings = strings,
+            enabled = canPay,
+            onSelect = { method -> onPay(plan, method.code) },
+        )
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(onClick = onDismiss, enabled = !isLoading) { Text(strings.commonCancel) }
+        Spacer(modifier = Modifier.weight(1f))
+        Button(onClick = { onPay(plan, "CASH") }, enabled = canPay) { Text(strings.payCash) }
+        Button(onClick = { onPay(plan, "QR") }, enabled = canPay) { Text(strings.payQR) }
+    }
+}
+
 @Composable
 private fun AmountRow(label: String, amount: Double, emphasised: Boolean) {
     Row(
@@ -231,3 +416,26 @@ private fun AmountRow(label: String, amount: Double, emphasised: Boolean) {
         )
     }
 }
+
+/**
+ * Persists the per-line share selection across configuration changes.
+ *
+ * Flattened to an alternating id/count list rather than saved as a Map, because the Bundle-backed
+ * saver only guarantees the primitive and parcelable types, and a list of Strings and Ints is the
+ * simplest shape that is certainly one of them.
+ */
+private val TakenSaver: Saver<androidx.compose.runtime.snapshots.SnapshotStateMap<String, Int>, Any> =
+    Saver(
+        save = { map -> ArrayList<Any>(map.flatMap { listOf(it.key, it.value) }) },
+        restore = { saved ->
+            @Suppress("UNCHECKED_CAST")
+            val flat = saved as List<Any>
+            mutableStateMapOf<String, Int>().apply {
+                flat.chunked(2).forEach { pair ->
+                    val key = pair.getOrNull(0) as? String
+                    val value = pair.getOrNull(1) as? Int
+                    if (key != null && value != null) put(key, value)
+                }
+            }
+        },
+    )

@@ -46,61 +46,61 @@ class TemplatePaletteTest {
 
     @Test
     fun tomYam50ResolvesToTemplateValue() {
-        // colors.xml: #EEF2FF — page background / input tint
+        // colors.xml: #FFF5F0 — creamy broth page background / input tint
         assertEquals(resolveColor(R.color.tom_yam_50), TomYamColors.TomYam50)
     }
 
     @Test
     fun tomYam100ResolvesToTemplateValue() {
-        // colors.xml: #E0E7FF — containers, chips
+        // colors.xml: #FFE6D9 — light peach containers, chips
         assertEquals(resolveColor(R.color.tom_yam_100), TomYamColors.TomYam100)
     }
 
     @Test
     fun tomYam200ResolvesToTemplateValue() {
-        // colors.xml: #C7D2FE
+        // colors.xml: #FFC4B0
         assertEquals(resolveColor(R.color.tom_yam_200), TomYamColors.TomYam200)
     }
 
     @Test
     fun tomYam300ResolvesToTemplateValue() {
-        // colors.xml: #A5B4FC
+        // colors.xml: #FF9B7A
         assertEquals(resolveColor(R.color.tom_yam_300), TomYamColors.TomYam300)
     }
 
     @Test
     fun tomYam400ResolvesToTemplateValue() {
-        // colors.xml: #818CF8
+        // colors.xml: #F36B44
         assertEquals(resolveColor(R.color.tom_yam_400), TomYamColors.TomYam400)
     }
 
     @Test
     fun tomYam500ResolvesToTemplateValue() {
-        // colors.xml: #6366F1
+        // colors.xml: #D94824
         assertEquals(resolveColor(R.color.tom_yam_500), TomYamColors.TomYam500)
     }
 
     @Test
     fun tomYam600ResolvesToTemplateValue() {
-        // colors.xml: #4F46E5 — primary accent (buttons, active states)
+        // colors.xml: #B52D10 — Tom Yam red, primary accent (buttons, active states)
         assertEquals(resolveColor(R.color.tom_yam_600), TomYamColors.TomYam600)
     }
 
     @Test
     fun tomYam700ResolvesToTemplateValue() {
-        // colors.xml: #4338CA — hover / pressed
+        // colors.xml: #8F210A — deep chilli hover / pressed
         assertEquals(resolveColor(R.color.tom_yam_700), TomYamColors.TomYam700)
     }
 
     @Test
     fun tomYam800ResolvesToTemplateValue() {
-        // colors.xml: #3730A3
+        // colors.xml: #691808
         assertEquals(resolveColor(R.color.tom_yam_800), TomYamColors.TomYam800)
     }
 
     @Test
     fun tomYam900ResolvesToTemplateValue() {
-        // colors.xml: #312E81 — headings / primary text
+        // colors.xml: #430F05 — rich red-brown headings / primary text
         assertEquals(resolveColor(R.color.tom_yam_900), TomYamColors.TomYam900)
     }
 
@@ -114,7 +114,7 @@ class TemplatePaletteTest {
 
     @Test
     fun tomYamOutlineResolvesToTemplateValue() {
-        // colors.xml: #C7D2FE — same hue as 200, used for borders
+        // colors.xml: #FFC4B0 — same hue as 200, used for borders
         assertEquals(resolveColor(R.color.tom_yam_outline), TomYamColors.TomYamOutline)
     }
 
@@ -128,18 +128,18 @@ class TemplatePaletteTest {
     fun templateValuesMatchColorsXmlExactly() {
         // Each expected value is the literal hex from colors.xml, converted to ARGB with full alpha.
         val expectedRamp = mapOf(
-            "TomYam50"      to 0xFFEEF2FF.toInt(),  // #EEF2FF
-            "TomYam100"     to 0xFFE0E7FF.toInt(),  // #E0E7FF
-            "TomYam200"     to 0xFFC7D2FE.toInt(),  // #C7D2FE
-            "TomYam300"     to 0xFFA5B4FC.toInt(),  // #A5B4FC
-            "TomYam400"     to 0xFF818CF8.toInt(),  // #818CF8
-            "TomYam500"     to 0xFF6366F1.toInt(),  // #6366F1
-            "TomYam600"     to 0xFF4F46E5.toInt(),  // #4F46E5
-            "TomYam700"     to 0xFF4338CA.toInt(),  // #4338CA
-            "TomYam800"     to 0xFF3730A3.toInt(),  // #3730A3
-            "TomYam900"     to 0xFF312E81.toInt(),  // #312E81
+            "TomYam50"      to 0xFFFFF5F0.toInt(),  // #FFF5F0
+            "TomYam100"     to 0xFFFFE6D9.toInt(),  // #FFE6D9
+            "TomYam200"     to 0xFFFFC4B0.toInt(),  // #FFC4B0
+            "TomYam300"     to 0xFFFF9B7A.toInt(),  // #FF9B7A
+            "TomYam400"     to 0xFFF36B44.toInt(),  // #F36B44
+            "TomYam500"     to 0xFFD94824.toInt(),  // #D94824
+            "TomYam600"     to 0xFFB52D10.toInt(),  // #B52D10
+            "TomYam700"     to 0xFF8F210A.toInt(),  // #8F210A
+            "TomYam800"     to 0xFF691808.toInt(),  // #691808
+            "TomYam900"     to 0xFF430F05.toInt(),  // #430F05
             "TomYamMuted"   to 0xFF6B7280.toInt(),  // #6B7280
-            "TomYamOutline" to 0xFFC7D2FE.toInt(),  // #C7D2FE
+            "TomYamOutline" to 0xFFFFC4B0.toInt(),  // #FFC4B0
         )
 
         val actualColors = mapOf(

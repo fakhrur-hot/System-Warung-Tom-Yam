@@ -17,6 +17,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.razstudio.pos.ui.i18n.UiStrings
 
@@ -31,6 +33,12 @@ fun TableCell(
     strings: UiStrings,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * Cell footprint. Defaults to the square a phone's adaptive grid asks for; a landscape tablet
+     * passes the size that makes its 6x6 floor plan fill the screen, which is wider than it is tall.
+     */
+    cellWidth: Dp = 100.dp,
+    cellHeight: Dp = 100.dp,
 ) {
     val backgroundColor = tableState.order?.status.tableColor()
     val statusLabel = when (tableState.status) {
@@ -43,7 +51,7 @@ fun TableCell(
 
     Box(
         modifier = modifier
-            .size(100.dp)
+            .size(width = cellWidth, height = cellHeight)
             .clip(RoundedCornerShape(12.dp))
             .background(backgroundColor)
             .clickable(onClick = onClick)
@@ -59,7 +67,9 @@ fun TableCell(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = statusLabel,

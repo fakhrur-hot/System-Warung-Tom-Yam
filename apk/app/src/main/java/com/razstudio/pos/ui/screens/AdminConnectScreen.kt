@@ -67,6 +67,7 @@ class AdminConnectViewModel @Inject constructor(
     private val apiClient: ApiClient,
     private val secureStorage: SecureStorage,
     private val appConfig: com.razstudio.pos.data.AppConfigStore,
+    private val appConfigFetcher: com.razstudio.pos.data.AppConfigFetcher,
 ) : ViewModel() {
 
     var isLoading by mutableStateOf(false)
@@ -238,7 +239,35 @@ class AdminConnectViewModel @Inject constructor(
         }
         errorMessage = null
         errorKey = null
-        if (!apiClient.isBackendConfigured()) {
+
+        // ── Let the invite configure the device, the way the owner key already does ──────
+        //
+        // This reported "this app isn't connected to any café yet" and stopped, which is a dead end
+        // for the one device that most needs to get in: a manager's phone that has never been set up.
+        // The invite link is `https://<café-website>/join?invite=<token>`, and that origin publishes
+        // the café's Supabase URL and anon key at `/app-config.json` — the same self-configuration
+        // the owner-recovery QR relies on (see OwnerKeyLoginViewModel). The backend was in the QR all
+        // along; nothing was reading it.
+        //
+        // Only attempted when the device has no backend, so a configured device is never repointed at
+        // another café by scanning its invite.
+        if (appConfig.supabaseUrl().isBlank()) {
+            inviteOrigin(raw)?.let { origin ->
+                isLoading = true
+                val fetched = appConfigFetcher.fetch(origin, interactiveSetup = true)
+                isLoading = false
+                if (fetched is com.razstudio.pos.data.AppConfigFetcher.FetchResult.Success) {
+                    appConfig.adoptBackendFromRecoveryQr(
+                        fetched.supabaseUrl, fetched.supabaseAnonKey, websiteUrl = origin,
+                    )
+                }
+            }
+        }
+
+        // The RUNTIME value, not `apiClient.isBackendConfigured()` — that helper falls back to
+        // BuildConfig, so on a café-branded build it would report "configured" and send this invite
+        // to whichever café was baked in at compile time. Same reasoning as the owner-key path.
+        if (appConfig.supabaseUrl().isBlank()) {
             errorKey = "NO_BACKEND"
             return false
         }
@@ -357,7 +386,11 @@ internal fun queryParam(input: String, name: String): String? {
 internal fun extractRecoverToken(input: String): String? {
     val t = input.trim()
     Regex("[?&]recover=([a-fA-F0-9]+)").find(t)?.let { return it.groupValues[1] }
-    if (Regex("^[a-fA-F0-9]{32}$").matches(t)) return t
+    // Real owner keys are 64 hex chars (generateToken(32) = 32 random bytes, hex-encoded). This
+    // used to demand EXACTLY 32, so pasting a genuine bare key silently fell through to the
+    // invite path and failed — only full ...?recover=<token> links ever worked. Accept 32-128 so
+    // both the historic short tokens and current 64-char keys match.
+    if (Regex("^[a-fA-F0-9]{32,128}$").matches(t)) return t
     return null
 }
 
@@ -372,6 +405,17 @@ private fun extractInviteToken(input: String): String? {
 
 /** True when [input] carries an explicit "invite=" param — the reliable signal that a scanned QR
  *  is a Secondary-Admin invite rather than the owner key. */
+/**
+ * The scheme+host of an invite link, or null when the input is a bare code rather than a URL.
+ *
+ * A bare code carries no café, so it genuinely cannot configure a blank device — that case keeps
+ * reporting NO_BACKEND, which is honest rather than a silent failure.
+ */
+private fun inviteOrigin(raw: String): String? = runCatching {
+    val url = java.net.URL(raw.trim())
+    "${url.protocol}://${url.authority}"
+}.getOrNull()
+
 private fun looksLikeInvite(input: String): Boolean =
     Regex("[?&]invite=").containsMatchIn(input.trim())
 

@@ -2,8 +2,20 @@
 
 package com.razstudio.pos.ui.tableview
 
+import android.content.res.Configuration
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.material3.SheetValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +25,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -31,7 +44,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,14 +55,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.razstudio.pos.data.CUSTOM_CHARGE_NAME_MAX
+import com.razstudio.pos.data.parseCustomChargePrice
 import com.razstudio.pos.data.local.MenuCategory
 import com.razstudio.pos.data.local.MenuItem
 import com.razstudio.pos.ui.i18n.AppLanguage
 import com.razstudio.pos.ui.i18n.UiStrings
+import com.razstudio.pos.ui.theme.scrollPanel
 
 /** One line in the order-entry cart, already resolved to a display name in the active language. */
 data class CartLine(
@@ -74,14 +97,68 @@ fun OrderEntrySheet(
     strings: UiStrings,
     isSubmitting: Boolean,
     onAdd: (item: MenuItem, note: String?, size: String?, unitPrice: Double?) -> Unit,
+    /**
+     * A hand-typed charge with no menu item behind it — see [CustomChargeButton]. The caller turns
+     * the name+price into a cart line with [com.razstudio.pos.data.customChargeMenuItem].
+     */
+    onAddCustom: (name: String, price: Double) -> Unit,
     onRemove: (Int) -> Unit,
     onSubmit: () -> Unit,
     onDismiss: () -> Unit,
     categoryOrder: List<String> = emptyList(),
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // ── Dismissing this sheet takes a deliberate act ─────────────────────────────────
+    // Same guard as OrderDetailSheet, and it matters at least as much here: this sheet holds a cart
+    // that exists NOWHERE else until Submit is pressed. A careless downward flick while scrolling
+    // the menu threw away everything the cashier had rung up, with a customer waiting.
+    //
+    // The armed flag is set only by a drag on the handle. Material3 1.3.1 does not consult
+    // `confirmValueChange` for swipe-to-dismiss (measured on device), so the real decision is made
+    // in `onDismissRequest` below — this is the first of the two gates, not the only one.
+    var handleDismissArmed by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { target -> target != SheetValue.Hidden || handleDismissArmed },
+    )
+    val sheetScope = rememberCoroutineScope()
+    // Whether the hand-typed charge fields are open. Local scratch state, like the note fields in
+    // the menu rows — it has no business surviving the sheet.
+    var showCustomCharge by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // Same 640.dp Material default that squeezed OrderDetailSheet into half of the D3 Mini's
+    // 1280x800 landscape — see the fuller note there. Widened to match, so the two table-view
+    // sheets do not jump between different widths as a cashier moves from taking an order to
+    // settling it. Portrait keeps Material's own default.
+    val configuration = LocalConfiguration.current
+    val sheetMaxWidth = if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+        (configuration.screenWidthDp * 0.9f).dp
+    } else {
+        Dp.Unspecified
+    }
+
+    ModalBottomSheet(
+        // Decided by cause, exactly as in OrderDetailSheet: a drag that was not armed by the handle
+        // springs the sheet back instead of discarding the cart. The X button, the scrim tap and back
+        // press all still close it — those are unambiguous, and trapping a cashier is not the goal.
+        onDismissRequest = {
+            val draggedAway = sheetState.targetValue == SheetValue.Hidden
+            if (handleDismissArmed || !draggedAway) {
+                onDismiss()
+            } else {
+                sheetScope.launch { sheetState.show() }
+            }
+        },
+        sheetState = sheetState,
+        sheetMaxWidth = sheetMaxWidth,
+        dragHandle = {
+            SheetGrabHandle(
+                onDragDownToDismiss = {
+                    handleDismissArmed = true
+                    sheetScope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                },
+            )
+        },
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -98,10 +175,23 @@ fun OrderEntrySheet(
                     text = "${strings.newOrder} — $tableLabel",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    // Weighted so a long café-specific table label ellipsizes instead of pushing
+                    // the "+ Customized" and close buttons off the row.
+                    modifier = Modifier.weight(1f, fill = false),
                 )
+                // Same row as the title/close, mirroring where it sits on the Items row in
+                // OrderDetailSheet; the fields open full-width below.
+                CustomChargeButton(strings = strings) { showCustomCharge = !showCustomCharge }
+                Spacer(modifier = Modifier.width(8.dp))
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.Default.Close, contentDescription = strings.commonClose)
                 }
+            }
+
+            AnimatedVisibility(visible = showCustomCharge) {
+                CustomChargeForm(strings = strings, onAdd = onAddCustom)
             }
 
             CategoryMenuPicker(
@@ -176,7 +266,8 @@ fun OrderEntrySheet(
                 Spacer(modifier = Modifier.height(4.dp))
                 HorizontalDivider()
                 val grand = cart.sumOf { it.unitPrice * it.quantity }
-                ReceiptTotalRow(strings.subtotal, grand, bold = false)
+                // Grand total only — see OrderDetailSheet: menu prices, no tax, no service charge,
+                // so a subtotal is the same number printed twice.
                 ReceiptTotalRow(strings.grandTotal, grand, bold = true)
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -307,10 +398,19 @@ fun CategoryMenuPicker(
                 emptyList()
             }
             val rows = results.flatMap { sizedRows(it, language.menuName(it), strings.marketPriceMode) }
+            // Lighter ground than the sheet around it — the menu list is the scroll area, and it
+            // reads as a bounded inset panel rather than melting into the dialog. See the
+            // surfaceContainer mapping in ThemePreset.
+            Surface(
+                color = MaterialTheme.colorScheme.scrollPanel,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 120.dp, max = 320.dp),
+                    .heightIn(min = 120.dp, max = 320.dp)
+                    .padding(horizontal = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(rows, key = { "${it.item.id}_${it.size ?: ""}" }) { row ->
@@ -322,14 +422,24 @@ fun CategoryMenuPicker(
                         onAdd = { note -> onAdd(row.item, note, row.size, row.unitPrice) },
                     )
                 }
+            }
             }
         } else {
             val itemsInCategory = menuItems.filter { selectedCategory in it.allCategories() }
             val rows = itemsInCategory.flatMap { sizedRows(it, language.menuName(it), strings.marketPriceMode) }
+            // Lighter ground than the sheet around it — the menu list is the scroll area, and it
+            // reads as a bounded inset panel rather than melting into the dialog. See the
+            // surfaceContainer mapping in ThemePreset.
+            Surface(
+                color = MaterialTheme.colorScheme.scrollPanel,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 120.dp, max = 320.dp),
+                    .heightIn(min = 120.dp, max = 320.dp)
+                    .padding(horizontal = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(rows, key = { "${it.item.id}_${it.size ?: ""}" }) { row ->
@@ -342,6 +452,180 @@ fun CategoryMenuPicker(
                     )
                 }
             }
+            }
+        }
+    }
+}
+
+/**
+ * The sheet's grab handle — and the only gesture that can drag this sheet closed.
+ *
+ * ### Why it owns the gesture
+ *
+ * The sheet refuses to go Hidden on its own (see `confirmValueChange` in [OrderDetailSheet]), so a
+ * flick anywhere on the bill springs back instead of closing. This handle is what re-enables the
+ * intent: `draggable` here consumes the vertical gesture, accumulates it, and on release past
+ * [DISMISS_DRAG_THRESHOLD] asks the caller to dismiss. Anything shorter is treated as a fumble and
+ * the accumulator resets.
+ *
+ * The trade-off, stated plainly: the sheet does not follow the finger during the drag the way a
+ * native swipe does — it dismisses on release. Making it track the finger means driving the sheet's
+ * anchors directly, which Material3 1.3.1 does not expose.
+ *
+ * ### Why it looks like this
+ *
+ * Material's default handle is a 32x4dp bar at `onSurfaceVariant` — nearly invisible, and on a sheet
+ * you now MUST use it to close, an invisible control is a trap. So: 56x7dp, in `primary` rather than
+ * a grey, and wrapped in a 48dp-tall touch target so the finger does not have to find 7dp of bar.
+ */
+@Composable
+fun SheetGrabHandle(onDragDownToDismiss: () -> Unit) {
+    var dragged by remember { mutableStateOf(0f) }
+    val thresholdPx = with(LocalDensity.current) { DISMISS_DRAG_THRESHOLD.toPx() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(28.dp)
+            .draggable(
+                orientation = Orientation.Vertical,
+                state = rememberDraggableState { delta -> dragged += delta },
+                onDragStopped = {
+                    if (dragged > thresholdPx) onDragDownToDismiss()
+                    dragged = 0f
+                },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = 56.dp, height = 7.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.primary),
+        )
+    }
+}
+
+/** How far down the handle must travel before the sheet closes. Short enough to feel like a swipe,
+ *  long enough that brushing the handle does not dismiss a bill. */
+val DISMISS_DRAG_THRESHOLD = 48.dp
+
+/**
+ * ── The "+ Customized" charge ──────────────────────────────────────────────────────────────────
+ *
+ * A charge the menu does not carry: corkage, a replacement plate, a catering surcharge, a special
+ * order priced at the counter. The cashier types a description and a price and it becomes an
+ * ordinary bill line.
+ *
+ * This comes in two pieces on purpose. The button belongs ON the same row as the "+" menu button
+ * (it is the same kind of act — put another line on this bill — just sourced from the cashier's head
+ * instead of the menu), but that row is a tight header with no room for two text fields. So the
+ * caller places [CustomChargeButton] on the row, holds the expanded flag, and renders
+ * [CustomChargeForm] below at full width.
+ */
+@Composable
+fun CustomChargeButton(strings: UiStrings, onClick: () -> Unit) {
+    SheetActionChip(label = strings.customChargeButton, onClick = onClick)
+}
+
+/**
+ * The squircle chip used by the small actions on a sheet's header row.
+ *
+ * Deliberately built from the same parts as AddItemCircleButton — primaryContainer fill,
+ * onPrimaryContainer content, 36.dp tall — so a row of them reads as one control strip rather than
+ * a button beside a link. A squircle (18.dp corners on a 36.dp box) instead of a full circle only
+ * because a label needs the horizontal room.
+ *
+ * Shared rather than copied so "QR" and "Customized" cannot drift apart: they sit next to each other
+ * and any difference in height, radius or fill between them is immediately visible.
+ */
+@Composable
+fun SheetActionChip(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * The description + price fields behind [CustomChargeButton]. Wrap in your own `AnimatedVisibility`.
+ *
+ * The Add action stays disabled until BOTH a description and a parseable positive price are present
+ * — a nameless line is unreadable on a receipt, and a zero-priced one is a free lunch. The price
+ * field accepts "12", "12.50" and "12,50" (see [parseCustomChargePrice]) and bills at 2dp.
+ *
+ * [onAdd] receives the typed name and the parsed price; the caller turns that into a cart line with
+ * [com.razstudio.pos.data.customChargeMenuItem], which is why this composable knows nothing about
+ * carts. The fields clear themselves after a successful add so a second charge can be typed
+ * straight away.
+ */
+@Composable
+fun CustomChargeForm(
+    strings: UiStrings,
+    onAdd: (name: String, price: Double) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var name by remember { mutableStateOf("") }
+    var priceText by remember { mutableStateOf("") }
+
+    val canAdd = name.isNotBlank() && parseCustomChargePrice(priceText) != null
+
+    fun addNow() {
+        val price = parseCustomChargePrice(priceText) ?: return
+        if (name.isBlank()) return
+        onAdd(name.trim().take(CUSTOM_CHARGE_NAME_MAX), price)
+        name = ""
+        priceText = ""
+    }
+
+    Column(modifier = modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { if (it.length <= CUSTOM_CHARGE_NAME_MAX) name = it },
+                label = { Text(strings.customChargeNameLabel) },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            OutlinedTextField(
+                value = priceText,
+                // Digits and one separator only: a decimal keyboard still offers "-" on some IMEs,
+                // and a cashier never enters a negative charge here.
+                onValueChange = { input ->
+                    if (input.all { it.isDigit() || it == '.' || it == ',' }) priceText = input
+                },
+                label = { Text(strings.customChargePriceLabel) },
+                prefix = { Text("RM ") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.width(160.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Button(
+            onClick = ::addNow,
+            enabled = canAdd,
+            modifier = Modifier.align(Alignment.End),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(strings.customChargeAddButton)
         }
     }
 }

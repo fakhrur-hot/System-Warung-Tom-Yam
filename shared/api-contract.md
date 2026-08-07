@@ -281,6 +281,20 @@ req → { "tableId":"T3", "browserId":"<uuid>?",
 422 → { "error":"UNKNOWN_TABLE" | "ITEM_UNAVAILABLE" }
 429 → { "error":"RATE_LIMITED" }
 ```
+**Custom charges.** A line whose `menuItemId` starts with `CUSTOM:` (followed by a UUID) is a
+charge the cashier typed by hand — corkage, a replacement plate, a special order priced at the
+counter — with no menu item behind it. It carries `customName` and `unitPrice` instead, and the
+server snapshots those verbatim rather than pricing from the menu (`categorySnapshot:""`, so it
+routes to the food slip). The UUID keeps two different manual charges from merging into one line.
+
+Accepted **only from admin/staff callers** (a `STAFF`-source order here, an admin or ordering-key
+token on `/items`) — a QR customer sending one gets `403 FORBIDDEN`, since otherwise it could name
+its own price. A missing name, or a price ≤ 0 or > 99999.99, is `422 VALIDATION`.
+```
+req → { "items": [ { "menuItemId":"CUSTOM:<uuid>", "quantity":1,
+                     "customName":"Corkage fee", "unitPrice":5.00 } ] }
+```
+
 Each stored line snapshots `name/unitPrice/category`. Side effect: broadcasts `NEW_ORDER`
 on `admin-orders` — the admin device's own Realtime listener is what actually triggers the
 kitchen print (see §7), since that's the only device with a printer attached.
@@ -292,7 +306,7 @@ next `sessionNumber` up from whatever's already on the order (the table's 1st or
 session 1, this is session 2, 3, …). **Capped at 10 sessions per order** — an 11th round
 is rejected until the table is paid out and freed.
 ```
-req → { "items": [ { "menuItemId","quantity","note" } ] }
+req → { "items": [ { "menuItemId","quantity","note" } ] }   # or a CUSTOM: line, see POST /api/orders
 200 → { ...order, "linesToPrint":[ OrderItem, ... ] }   # this round's new lines
 409 → { "error":"SESSION_LIMIT" }   # already at 10 rounds on this order
 ```

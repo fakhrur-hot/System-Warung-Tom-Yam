@@ -1,5 +1,7 @@
 package com.razstudio.pos.data.local
 
+import com.razstudio.pos.data.CUSTOM_CHARGE_ID_PREFIX
+import com.razstudio.pos.data.CUSTOM_CHARGE_NAME_MAX
 import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ModeRepository
 import com.razstudio.pos.data.ApiResult
@@ -251,6 +253,9 @@ class LocalBackend @Inject constructor(
 
     override suspend fun getRecoveryToken(): ApiResult<InviteResponse> =
         unsupportedInThisMode("getRecoveryToken")
+
+    override suspend fun regenerateRecoveryToken(): ApiResult<InviteResponse> =
+        unsupportedInThisMode("regenerateRecoveryToken")
 
     /**
      * The current pairing code, minting one if none is live (task 5.2, Requirement 5.4).
@@ -923,6 +928,7 @@ class LocalBackend @Inject constructor(
                 todaysSpecial = s.todaysSpecial,
                 reportEmail = s.reportEmail,
                 businessDayStartHour = s.businessDayStartHour,
+                businessDayEndHour = s.businessDayEndHour,
                 defaultLangAdmin = s.defaultLangAdmin,
                 defaultLangOrdering = s.defaultLangOrdering,
                 // The customer surface does not exist off-cloud, but the stored preference is still
@@ -958,6 +964,7 @@ class LocalBackend @Inject constructor(
                 customerOrderAutoPrint = body.optBoolean("customerOrderAutoPrint", cur.customerOrderAutoPrint),
                 todaysSpecial = body.optString("todaysSpecial", cur.todaysSpecial),
                 reportEmail = body.optString("reportEmail", cur.reportEmail),
+                businessDayEndHour = body.optInt("businessDayEndHour", cur.businessDayEndHour),
                 businessDayStartHour = body.optInt("businessDayStartHour", cur.businessDayStartHour)
                     .coerceIn(0, 23),
                 defaultLangAdmin = body.optString("defaultLangAdmin", cur.defaultLangAdmin),
@@ -1261,13 +1268,17 @@ class LocalBackend @Inject constructor(
         sessionNumber: Int,
     ): OrderItem {
         val menu = menuIndex[menuItemId]
+        // A custom charge has no menu row to price from — the cashier typed both the name and the
+        // price, and they are all this line will ever have.
+        val custom = customName?.takeIf { menuItemId.startsWith(CUSTOM_CHARGE_ID_PREFIX) }?.trim()
+            ?.take(CUSTOM_CHARGE_NAME_MAX)?.ifBlank { null }
         return OrderItem(
             id = UUID.randomUUID().toString(),
             orderId = orderId,
             menuItemId = menuItemId,
             // Backend bakes the English name as the line-item snapshot; clients re-resolve per locale
             // at display/print time from the live menu (PrintService.localizeItemNames).
-            nameSnapshot = menu?.nameEn ?: menuItemId,
+            nameSnapshot = custom ?: menu?.nameEn ?: menuItemId,
             unitPriceSnapshot = unitPrice ?: menu?.price ?: 0.0,
             categorySnapshot = menu?.category ?: "",
             quantity = quantity,

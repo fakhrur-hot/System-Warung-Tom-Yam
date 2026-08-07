@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -37,8 +39,22 @@ import kotlinx.coroutines.delay
 @Composable
 fun AdminLockScreen(
     onReopen: () -> Unit,
+    onSignInWithOwnerKey: () -> Unit = {},
     languageViewModel: LanguageViewModel = hiltViewModel()
 ) {
+    // Back does nothing here, deliberately.
+    //
+    // Clearing the back stack (see AppNavGraph's onNavigateToLock) already means there is nothing
+    // behind this screen, so back would fall through and close the app. That is survivable but it
+    // is not what a locked till should do: a cashier tapping back during service would black the
+    // screen out and have to find the launcher again.
+    //
+    // Swallowing it makes the lock a true dead end — the only way forward is the reopen button, and
+    // the only way out is the Home key. The two together are what "locked" is supposed to mean, and
+    // neither depends on the back stack having been cleared correctly, so this holds even if some
+    // future navigation path forgets to.
+    BackHandler(enabled = true) { /* intentionally inert */ }
+
     var unlockReady by remember { mutableStateOf(false) }
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
@@ -85,6 +101,31 @@ fun AdminLockScreen(
                 ) {
                     Text(if (unlockReady) strings.reopenCafeButton else "…")
                 }
+
+                // ── Sign in as the owner instead ─────────────────────────────────────
+                //
+                // Reopen above reuses the session already stored on this device, which is right
+                // for the ordinary case: the same owner locking up and coming back in the morning.
+                // It is the wrong tool when the stored session is the problem — expired, revoked
+                // from another device, or simply belonging to someone who has left — because there
+                // was no way back in from this screen at all, and the only escape was clearing the
+                // app's data and re-provisioning the till.
+                //
+                // Scanning the owner key mints a fresh Main Admin session, so it recovers from all
+                // of those without touching anything else on the device.
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(
+                    onClick = onSignInWithOwnerKey,
+                    enabled = unlockReady,
+                ) {
+                    Text(strings.lockSignInWithOwnerKey)
+                }
+                Text(
+                    text = strings.lockSignInWithOwnerKeyDesc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
             }
 
             AdBannerFooter()

@@ -44,6 +44,7 @@ interface BackendGateway {
     suspend fun pollDeviceStatus(deviceId: String): ApiResult<DeviceStatusResponse>
     suspend fun recoverAdmin(recoveryToken: String, deviceId: String, deviceModel: String): ApiResult<String>
     suspend fun getRecoveryToken(): ApiResult<InviteResponse>
+    suspend fun regenerateRecoveryToken(): ApiResult<InviteResponse>
     suspend fun getInvite(role: String? = null): ApiResult<InviteResponse>
     suspend fun regenerateInvite(role: String? = null): ApiResult<InviteResponse>
     suspend fun getDevices(): ApiResult<List<DeviceDto>>
@@ -52,6 +53,17 @@ interface BackendGateway {
     // ── Session lifecycle and reporting ───────────────────────────────────────────
     suspend fun postSession(event: String, reason: String? = null, closing: Boolean = false): ApiResult<SessionResponse>
     suspend fun postAggregates(date: String, body: JSONObject): ApiResult<Unit>
+
+    /**
+     * Build the closing report for the current business day and return a signed URL to it.
+     *
+     * The URL is short-lived (the backend mints it for an hour), so it is meant to be fetched
+     * immediately rather than stored. Returns the URL and the business-day date the report
+     * covers — the caller needs the date to name the file it saves.
+     */
+    suspend fun getClosingReport(): ApiResult<ClosingReportRef> = ApiResult.Error(
+        "UNSUPPORTED", "Closing report is only available on a cloud backend",
+    )
 
     // ── Menu ──────────────────────────────────────────────────────────────────────
     suspend fun getMenu(): ApiResult<MenuResponse>

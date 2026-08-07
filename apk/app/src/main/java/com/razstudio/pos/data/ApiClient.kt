@@ -35,6 +35,7 @@ class ApiClient @Inject constructor(
     private val appConfig: AppConfigStore,
     private val noInternetGuard: com.razstudio.pos.data.net.NoInternetGuard,
     private val modeRepository: ModeRepository,
+    private val lanPushBus: com.razstudio.pos.data.lan.LanPushBus,
 ) : BackendGateway {
 
     companion object {
@@ -180,6 +181,34 @@ class ApiClient @Inject constructor(
         val lan = appConfig.lanServerUrl()
         if (modeRepository.currentMode() == OperatingMode.LAN && lan.isNotBlank()) return true
         return supabaseUrl().isNotBlank()
+    }
+
+    /**
+     * Tell staff devices on the café LAN that something changed, so they can pull it now instead of
+     * waiting for their next poll tick.
+     *
+     * ### A trigger, never a payload
+     *
+     * The frame carries an order id and nothing else that matters. Receivers re-fetch through their
+     * own catch-up sync — the same function their poll runs, with the same de-duplication. That rule
+     * is what keeps exactly one code path into kitchen printing; applying deltas straight from a
+     * frame would create a second one that de-duplicates against different data, and the way that
+     * surfaces is a slip printing twice mid-service.
+     *
+     * ### Why here and not in the ViewModels
+     *
+     * This is the choke point every cloud mutation already passes through, so a new order path
+     * cannot forget to announce itself. It mirrors what LocalBackend does off-cloud.
+     *
+     * Fire-and-forget by construction: [LanPushBus.publish] never suspends and never throws, so a
+     * dead socket cannot fail a payment.
+     */
+    private fun announceOrderChange(orderId: String?, what: String) {
+        if (modeRepository.currentMode() != OperatingMode.CLOUD) return
+        lanPushBus.publish(
+            JSONObject().put("kind", what).apply { if (orderId != null) put("orderId", orderId) },
+            java.time.Instant.now().toString(),
+        )
     }
 
     private fun anonKey(): String =
@@ -336,12 +365,6 @@ class ApiClient @Inject constructor(
     /** Consume and discard a response body so OkHttp can reuse the connection. */
     private fun Response.consumeBody(): String = use { body?.string() ?: "" }
 
-    /**
-     * Admin handshake: first-claim admin registration with rotating key.
-     * @return [ApiResult] with sessionToken on success, or error code.
-     */
-    suspend fun adminHandshake(deviceId: String, rotatingKey: String): ApiResult<String> =
-        adminHandshakeRequest(deviceId) { put("rotatingKey", rotatingKey) }
 
     /**
      * Debug-only admin handshake: claims the admin slot using the café's plaintext
@@ -579,6 +602,55 @@ class ApiClient @Inject constructor(
         }
 
     /**
+     * GET /reports/closing — build today's closing report and return a signed URL to it.
+     *
+     * 409 means the day has no aggregate row yet, which is not an error worth surfacing as one:
+     * it is what a café that closed without taking an order looks like. Reported as a distinct
+     * code so the caller can stay silent rather than telling an owner something failed.
+     */
+    override suspend fun getClosingReport(): ApiResult<ClosingReportRef> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) {
+                return@withContext ApiResult.Error("UNSUPPORTED", "Not available in demo mode")
+            }
+            try {
+                val token = adminBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+
+                val request = Request.Builder()
+                    .url("${baseUrl()}/reports-closing")
+                    .addHeader("apikey", anonKey())
+                    .addHeader("Authorization", "Bearer $token")
+                    .get()
+                    .build()
+
+                val response = client.newCall(request).execute()
+                val body = response.body?.string() ?: ""
+
+                when (response.code) {
+                    200 -> {
+                        val json = JSONObject(body)
+                        val url = json.optString("reportUrl", "")
+                        if (url.isBlank()) {
+                            ApiResult.Error("NO_REPORT", "Report was generated without a URL")
+                        } else {
+                            ApiResult.Success(
+                                ClosingReportRef(url = url, date = json.optString("date", "")),
+                            )
+                        }
+                    }
+                    401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
+                    409 -> ApiResult.Error("NO_AGGREGATE", "No takings recorded for this day")
+                    else -> unexpectedStatus(response.code)
+                }
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
+    /**
      * Push full menu snapshot (availability updates, daily popup changes).
      */
     override suspend fun putMenu(menuItems: JSONArray, categories: JSONArray): ApiResult<Unit> =
@@ -709,6 +781,8 @@ class ApiClient @Inject constructor(
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
         }
+            // Nudge staff devices to pull now instead of waiting for their poll tick.
+            .also { r -> if (r is ApiResult.Success) announceOrderChange(orderId, "kitchen") }
 
     /**
      * Add items to an existing order (amendment).
@@ -728,6 +802,7 @@ class ApiClient @Inject constructor(
                         if (item.note != null) put("note", item.note)
                         if (item.unitPrice != null) put("unitPrice", item.unitPrice)
                         if (item.size != null) put("size", item.size)
+                        if (item.customName != null) put("customName", item.customName)
                     })
                 }
                 val body = JSONObject().apply {
@@ -761,6 +836,8 @@ class ApiClient @Inject constructor(
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
         }
+            // Nudge staff devices to pull now instead of waiting for their poll tick.
+            .also { r -> if (r is ApiResult.Success) announceOrderChange(orderId, "items") }
 
 
     /**
@@ -783,6 +860,8 @@ class ApiClient @Inject constructor(
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
         }
+            // Nudge staff devices to pull now instead of waiting for their poll tick.
+            .also { r -> if (r is ApiResult.Success) announceOrderChange(orderId, "void") }
 
     /**
      * Void lines on an active order using the ordering API key (staff).
@@ -897,6 +976,8 @@ class ApiClient @Inject constructor(
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
         }
+            // Nudge staff devices to pull now instead of waiting for their poll tick.
+            .also { r -> if (r is ApiResult.Success) announceOrderChange(orderId, "status") }
 
     /**
      * Process payment (Cash/QR). Only valid after SENT_TO_KITCHEN.
@@ -938,6 +1019,8 @@ class ApiClient @Inject constructor(
                 ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
             }
         }
+            // Nudge staff devices to pull now instead of waiting for their poll tick.
+            .also { r -> if (r is ApiResult.Success) announceOrderChange(orderId, "payment") }
 
     /**
      * Cancel an order with reason and who cancelled it.
@@ -1227,6 +1310,50 @@ class ApiClient @Inject constructor(
                     )
                 }
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
+                // The key is stored hashed and can never be read back — not by the owner, not by
+                // this endpoint. The only way forward is minting a new one; the caller offers that.
+                409 -> ApiResult.Error(
+                    "KEY_NOT_READABLE",
+                    "This café's owner key is stored securely and cannot be shown again."
+                )
+                else -> unexpectedStatus(response.code)
+            }
+        } catch (e: IOException) {
+            networkError(e)
+        } catch (e: Exception) {
+            ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+        }
+    }
+
+    /**
+     * Mint a NEW owner key (admin only). The old key stops working the moment this returns; the
+     * plaintext in the response is the only copy that will ever exist, so the caller must put it
+     * in front of the owner (QR + saved PNG) immediately.
+     */
+    override suspend fun regenerateRecoveryToken(): ApiResult<InviteResponse> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext demoBackend.getInvite()
+        try {
+            val token = adminBearerToken()
+                ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+            val request = Request.Builder()
+                .url("${baseUrl()}/admin-recovery/regenerate")
+                .addHeader("apikey", anonKey())
+                .addHeader("Authorization", "Bearer $token")
+                .post("{}".toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+            val response = client.newCall(request).execute()
+            val responseBody = response.body?.string() ?: ""
+            when (response.code) {
+                200 -> {
+                    val json = JSONObject(responseBody)
+                    ApiResult.Success(
+                        InviteResponse(
+                            token = json.getString("token"),
+                            url = withBackendDetails(json.getString("url")),
+                        )
+                    )
+                }
+                401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
@@ -1258,7 +1385,16 @@ class ApiClient @Inject constructor(
                 val response = connectClient.newCall(request).execute()
                 val responseBody = response.body?.string() ?: ""
                 when (response.code) {
-                    200 -> ApiResult.Success(JSONObject(responseBody).getString("sessionToken"))
+                    200 -> {
+                        val json = JSONObject(responseBody)
+                        // `admin-recovery` matches by `device_identifier`, but every later
+                        // device-scoped call (`devices-status`, `devices`, `attendance`) looks up
+                        // `devices.id` — see SecureStorage.getServerDeviceId. Stored here, at the
+                        // one point both sign-in screens share, or the very next status poll 404s
+                        // and the fresh session is torn down.
+                        json.optStringOrNull("deviceId")?.let { secureStorage.setServerDeviceId(it) }
+                        ApiResult.Success(json.getString("sessionToken"))
+                    }
                     403 -> ApiResult.Error("INVALID_RECOVERY", "Invalid recovery key")
                     else -> unexpectedStatus(response.code)
                 }
@@ -1290,6 +1426,7 @@ class ApiClient @Inject constructor(
                     if (item.note != null) put("note", item.note)
                     if (item.unitPrice != null) put("unitPrice", item.unitPrice)
                     if (item.size != null) put("size", item.size)
+                    if (item.customName != null) put("customName", item.customName)
                 })
             }
             val body = JSONObject().apply {
@@ -1499,6 +1636,7 @@ class ApiClient @Inject constructor(
                         if (item.note != null) put("note", item.note)
                         if (item.unitPrice != null) put("unitPrice", item.unitPrice)
                         if (item.size != null) put("size", item.size)
+                        if (item.customName != null) put("customName", item.customName)
                     })
                 }
                 val body = JSONObject().apply {
@@ -1616,6 +1754,7 @@ class ApiClient @Inject constructor(
                             todaysSpecial = json.optString("todaysSpecial", ""),
                             reportEmail = json.optString("reportEmail", ""),
                             businessDayStartHour = json.optInt("businessDayStartHour", 15),
+                            businessDayEndHour = json.optInt("businessDayEndHour", 2),
                             defaultLangAdmin = json.optString("defaultLangAdmin", "BM"),
                             defaultLangOrdering = json.optString("defaultLangOrdering", "BM"),
                             defaultLangCustomer = json.optString("defaultLangCustomer", "BM")
@@ -2068,6 +2207,7 @@ class ApiClient @Inject constructor(
                     if (item.note != null) put("note", item.note)
                     if (item.unitPrice != null) put("unitPrice", item.unitPrice)
                     if (item.size != null) put("size", item.size)
+                    if (item.customName != null) put("customName", item.customName)
                 })
             }
             val body = JSONObject().apply {
@@ -2116,6 +2256,8 @@ class ApiClient @Inject constructor(
             ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
         }
     }
+            // Nudge staff devices to pull now instead of waiting for their poll tick.
+            .also { r -> if (r is ApiResult.Success) announceOrderChange(null, "created") }
 
     // --- Menu item images ---
 
@@ -2923,7 +3065,14 @@ data class NewOrderItem(
     /** Chosen Small/Medium/Large price for a variable-price item (null = use the item's base). */
     val unitPrice: Double? = null,
     /** Size label baked into the name server-side, e.g. "S"/"M"/"L". */
-    val size: String? = null
+    val size: String? = null,
+    /**
+     * Cashier-typed name for a **custom charge** — a bill line with no menu item behind it (see
+     * [CUSTOM_CHARGE_ID_PREFIX]). Non-null only when [menuItemId] carries that prefix, in which case
+     * [unitPrice] is the typed price and the server snapshots both instead of pricing from the menu.
+     * Honored for admin/staff callers only.
+     */
+    val customName: String? = null
 )
 
 // --- Device management data classes ---
@@ -2979,6 +3128,7 @@ data class SettingsResponse(
     val todaysSpecial: String = "",
     val reportEmail: String = "",
     val businessDayStartHour: Int = 15,
+    val businessDayEndHour: Int = 2,
     // Café-wide default UI language per surface (BM/EN/ZH/TA/TH). Applied by a device only
     // when it has no locally-saved language choice yet — see LanguageManager.applyDefaultIfUnset.
     val defaultLangAdmin: String = "BM",

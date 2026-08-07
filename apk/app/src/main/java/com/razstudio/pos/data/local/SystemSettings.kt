@@ -34,6 +34,12 @@ data class SystemSettings(
     val reportEmail: String = "",
     /** Hour (0–23) a trading day starts; sales after midnight count toward the opening day. */
     val businessDayStartHour: Int = 15,
+    /**
+     * Hour the trading day ends (0–23). May be EARLIER than [businessDayStartHour] — a stall
+     * open 15:00–02:00 is the case this pair exists for, so the window is read as wrapping
+     * midnight rather than as invalid.
+     */
+    val businessDayEndHour: Int = 2,
     /** Café-wide default UI language per surface; a device applies it only if it has no own choice. */
     val defaultLangAdmin: String = "BM",
     val defaultLangOrdering: String = "BM",

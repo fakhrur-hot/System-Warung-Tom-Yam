@@ -39,17 +39,28 @@ function versionedLogoUrl(logoUrl: string | null, updatedAt: string | null): str
 async function handleGetBranding(): Promise<Response> {
   const supabase = getSupabaseClient();
 
+  // maybeSingle, not single: `single()` treats "no rows" as an ERROR, so a café whose branding
+  // singleton was never seeded answered 500 here. That is the wrong answer to give a device that is
+  // trying to set the café up — an unconfigured café is a normal state with a defined reply, and this
+  // endpoint already has one (`configured: false`). A 500 instead reads as a broken backend and
+  // stalls the setup flow at exactly the moment the row is expected to be missing.
+  //
+  // The row IS seeded by migration 0001, so a missing one means the schema is partly applied. Saying
+  // "not configured yet" lets the app continue and lets the operator re-run the schema step; saying
+  // "server error" tells them nothing they can act on.
   const { data, error } = await supabase
     .from("branding")
     .select("cafe_name, logo_url, updated_at, payment_qr_url, payment_qr_hash")
     .eq("id", 1)
-    .single();
+    .maybeSingle();
 
-  if (error || !data) {
+  // A genuine query failure (table absent, permission denied) is still a 500 — that is not the same
+  // thing as an empty table, and pretending it is would hide a broken deployment behind a skeleton.
+  if (error) {
     return errorResponse(500, "SERVER_ERROR", "Failed to read branding");
   }
 
-  if (!data.cafe_name) {
+  if (!data || !data.cafe_name) {
     return jsonResponse({ configured: false });
   }
 

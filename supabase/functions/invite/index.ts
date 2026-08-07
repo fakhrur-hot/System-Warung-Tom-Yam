@@ -9,6 +9,21 @@ import { verifyAdminToken, generateToken } from "../_shared/auth.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
 import { errorResponse, jsonResponse } from "../_shared/errors.ts";
 
+/**
+ * How long a freshly-minted invite stays valid.
+ *
+ * An invite is scanned within a minute of being shown in practice — the admin holds one phone up and
+ * the joining device photographs it. Fifteen minutes is generous for that and short enough that a
+ * code found later (a photo, a printed slip in a drawer, a screenshot in a group chat) is already
+ * dead. See migration 0013 for why the column is nullable.
+ */
+const INVITE_TTL_MINUTES = 15;
+
+/** Expiry stamp for a token minted now. */
+function inviteExpiry(): string {
+  return new Date(Date.now() + INVITE_TTL_MINUTES * 60_000).toISOString();
+}
+
 serve(async (req) => {
   const corsResp = handleCors(req);
   if (corsResp) return corsResp;
@@ -51,11 +66,18 @@ serve(async (req) => {
   if (isRegenerate) {
     // Generate a new invite token and replace the target role's row
     const newToken = generateToken(16);
+    const expiresAt = inviteExpiry();
 
     const { error } = await supabase
       .from("invites")
       .upsert(
-        { id: inviteId, token: newToken, role: inviteRole, rotated_at: new Date().toISOString() },
+        {
+          id: inviteId,
+          token: newToken,
+          role: inviteRole,
+          rotated_at: new Date().toISOString(),
+          expires_at: expiresAt,
+        },
         { onConflict: "id" }
       );
 
@@ -68,33 +90,45 @@ serve(async (req) => {
     // WEBSITE_ORIGIN secret (same one CORS uses).
     const inviteUrl = `${base}/join?invite=${newToken}`;
 
-    return jsonResponse({ token: newToken, url: inviteUrl, role: inviteRole });
+    return jsonResponse({ token: newToken, url: inviteUrl, role: inviteRole, expiresAt });
   }
 
   // GET — return current invite token for the target role (seed one if none exists)
   let { data: invite, error } = await supabase
     .from("invites")
-    .select("token")
+    .select("token, expires_at")
     .eq("id", inviteId)
     .single();
 
   if (!invite || error) {
     // Seed an initial invite token
     const initialToken = generateToken(16);
+    const seededExpiry = inviteExpiry();
     const { error: insertError } = await supabase
       .from("invites")
       .upsert(
-        { id: inviteId, token: initialToken, role: inviteRole, rotated_at: new Date().toISOString() },
+        {
+          id: inviteId,
+          token: initialToken,
+          role: inviteRole,
+          rotated_at: new Date().toISOString(),
+          expires_at: seededExpiry,
+        },
         { onConflict: "id" }
       );
 
     if (insertError) {
       return errorResponse(500, "SERVER_ERROR", insertError.message);
     }
-    invite = { token: initialToken };
+    invite = { token: initialToken, expires_at: seededExpiry };
   }
 
   const inviteUrl = `${base}/join?invite=${invite.token}`;
 
-  return jsonResponse({ token: invite.token, url: inviteUrl, role: inviteRole });
+  return jsonResponse({
+    token: invite.token,
+    url: inviteUrl,
+    role: inviteRole,
+    expiresAt: invite.expires_at ?? null,
+  });
 });

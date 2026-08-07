@@ -51,6 +51,7 @@ Thumbs.db
 # pushed history and are still retrievable. Verified at the time of removal that
 # none of these files ever contained real credentials.
 .kiro/specs/
+.kiro/c--*/
 docs/
 DEPLOYMENT.md
 *_planner.md

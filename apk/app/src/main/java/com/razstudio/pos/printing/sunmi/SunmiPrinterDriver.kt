@@ -55,7 +55,8 @@ import kotlin.coroutines.resumeWithException
  */
 @Singleton
 class SunmiPrinterDriver @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val printSettingsStore: com.razstudio.pos.data.local.PrintSettingsStore,
 ) : PrinterDriver {
 
     companion object {
@@ -130,17 +131,43 @@ class SunmiPrinterDriver @Inject constructor(
             service.enterPrinterBuffer(clean = 1)
             try {
                 service.printBitmap(bitmap, dotWidth)
-                // Feed clear of the head before cutting, or the cutter slices through the last
-                // couple of lines — the tear bar sits below the print head, not level with it.
-                service.lineWrap(3)
-                service.commitPrinterBuffer()
-                // Cut *after* the commit: inside the buffer it would be queued behind the bitmap
-                // and, on models that ignore buffered cuts, dropped entirely.
-                service.cutPaper()
-                Log.d(TAG, "Print completed (${dotWidth}px, ${charWidth}ch/line)")
+
+                // The feed belongs to the cut, so both are skipped together. On a terminal with a
+                // tear bar and no cutter these three lines are pure waste — fed to clear a blade
+                // that is not there, on every receipt — and clearing the head is the only reason
+                // they exist. Feeding without cutting would be worse than not feeding at all.
+                val autoCut = printSettingsStore.getReceiptAutoCut()
+                if (autoCut) {
+                    // Feed clear of the head before cutting, or the cutter slices through the last
+                    // couple of lines — the blade sits below the print head, not level with it.
+                    service.lineWrap(3)
+                    service.cutPaper()
+                }
+
+                // exitPrinterBuffer(commit = true), NOT commitPrinterBuffer().
+                //
+                // Both print what is buffered; only this one leaves transaction mode. The previous
+                // code committed and then cut, on the reasoning that a cut inside the buffer might
+                // be dropped — but committing does not end the transaction, so that cut was issued
+                // *inside* the buffer anyway, cached with nothing left to flush it, and silently
+                // discarded. The receipt printed, the call returned cleanly, nothing was logged,
+                // and the paper never cut. Worse, the service was left in transaction mode for the
+                // life of the binding.
+                //
+                // Everything now goes in the buffer and one call prints it and exits, which is the
+                // sequence the AIDL documents.
+                service.exitPrinterBuffer(commit = true)
+                // The hardware cut counter is the only way to tell "the blade fired" from
+                // "there is no blade" — cutPaper() returns cleanly in both cases.
+                Log.d(
+                    TAG,
+                    "Print completed (${dotWidth}px, ${charWidth}ch/line, " +
+                        "autoCut=$autoCut, cutCount=${service.getCutPaperTimes()})",
+                )
             } catch (e: Exception) {
-                // Try to exit buffer mode on error so subsequent prints aren't stuck in buffer
-                runCatching { service.commitPrinterBuffer() }
+                // Leave transaction mode on the way out, or every later print is buffered into a
+                // transaction nothing will ever commit.
+                runCatching { service.exitPrinterBuffer(commit = true) }
                 throw e
             }
         }

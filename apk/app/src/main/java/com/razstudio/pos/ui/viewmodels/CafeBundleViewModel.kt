@@ -48,6 +48,7 @@ class CafeBundleViewModel @Inject constructor(
     private val backupManager: com.razstudio.pos.data.local.DatabaseBackupManager,
     private val imageStore: com.razstudio.pos.data.local.LocalImageStore,
     private val session: com.razstudio.pos.data.google.GoogleAccountSession,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
 ) : ViewModel() {
 
     data class State(
@@ -111,7 +112,15 @@ class CafeBundleViewModel @Inject constructor(
             // The café's menu photos travel with it. They live in app-private storage and are
             // deleted with the app, so a replacement phone would otherwise restore a picture menu
             // with no pictures.
-            val failure = bundleStore.save(token, payload, imageStore.allFiles())
+            // The payment QR travels the same way and for a sharper reason: it lives only in
+            // app-private storage and on the backend, so a café that loses its Supabase access
+            // has no other copy of the code its customers pay into.
+            val failure = bundleStore.save(
+                token,
+                payload,
+                imageStore.allFiles(),
+                com.razstudio.pos.ui.util.PaymentQrPipeline.storedFileOrNull(context),
+            )
             _state.value = State(
                 outcome = if (failure == null) Outcome.SAVED else Outcome.UPLOAD_REJECTED
             )

@@ -272,6 +272,49 @@ val MIGRATION_15_16 = object : Migration(15, 16) {
  * INTEGER sen. The unique index on `idempotencyKey` is what makes a double-charge a database error
  * rather than a silent second payment — the constraint belongs here, not only in the client. (A6)
  */
+/**
+ * Adds the business-day END hour beside the existing start hour.
+ *
+ * Defaulted to 2 (2 AM) to stay consistent with the start default of 15 (3 PM): a café that has
+ * never opened the setting still describes a coherent late-night trading window rather than a
+ * zero-length day that would make "is the café open?" answer false forever.
+ */
+/**
+ * Adds the cash-drawer ledger (version 19). Append-only rows; money as INTEGER sen, the same
+ * storage the payment_transactions table already established.
+ */
+val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS cash_drawer_events (
+                id              INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                type            TEXT    NOT NULL,
+                amountSen       INTEGER NOT NULL,
+                balanceAfterSen INTEGER NOT NULL,
+                orderId         TEXT,
+                tenderedSen     INTEGER,
+                changeSen       INTEGER,
+                usedDefaultPin  INTEGER NOT NULL DEFAULT 0,
+                timestamp       TEXT    NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_cash_drawer_events_timestamp " +
+                "ON cash_drawer_events (timestamp)"
+        )
+    }
+}
+
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE system_settings ADD COLUMN businessDayEndHour INTEGER NOT NULL DEFAULT 2"
+        )
+    }
+}
+
 val MIGRATION_16_17 = object : Migration(16, 17) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(
@@ -298,6 +341,48 @@ val MIGRATION_16_17 = object : Migration(16, 17) {
         db.execSQL(
             "CREATE UNIQUE INDEX IF NOT EXISTS index_payment_transactions_idempotencyKey " +
                 "ON payment_transactions (idempotencyKey)"
+        )
+    }
+}
+
+/**
+ * v19 → v20: add `captured_payments` table for the Payment Notification Listener feature.
+ *
+ * Purely additive — one new table with three indices. Stores payment notifications captured
+ * from eWallet/bank apps so the service can auto-match them to pending orders by amount.
+ * Money is INTEGER sen, same convention as payment_transactions and cash_drawer_events.
+ */
+val MIGRATION_19_20 = object : Migration(19, 20) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS captured_payments (
+                id TEXT NOT NULL PRIMARY KEY,
+                amountSen INTEGER NOT NULL,
+                walletApp TEXT NOT NULL,
+                packageName TEXT NOT NULL,
+                sender TEXT,
+                reference TEXT,
+                rawTitle TEXT NOT NULL,
+                rawText TEXT NOT NULL,
+                matchStatus TEXT NOT NULL,
+                matchedOrderId TEXT,
+                capturedAt TEXT NOT NULL,
+                matchedAt TEXT
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_captured_payments_capturedAt " +
+                "ON captured_payments (capturedAt)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_captured_payments_matchStatus " +
+                "ON captured_payments (matchStatus)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_captured_payments_matchedOrderId " +
+                "ON captured_payments (matchedOrderId)"
         )
     }
 }

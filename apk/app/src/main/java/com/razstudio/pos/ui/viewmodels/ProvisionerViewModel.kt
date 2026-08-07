@@ -47,6 +47,13 @@ class ProvisionerViewModel @Inject constructor(
     private val workManager = WorkManager.getInstance(application)
 
     init {
+        // Prefill the Wizard URL from whatever this device was last pointed at. It is not baked into
+        // the build any more, so without this an installer re-types it on every attempt — and
+        // provisioning is retried more often than it succeeds first time.
+        secureStorage.getProvisionerWorkerUrl()?.takeIf { it.isNotBlank() }?.let { saved ->
+            _state.value = _state.value.copy(provisionerWorkerUrl = saved)
+        }
+
         workManager.getWorkInfosForUniqueWorkLiveData(ProvisionWorker.WORK_NAME)
             .asFlow()
             .map { infos -> infos.firstOrNull() }
@@ -63,6 +70,20 @@ class ProvisionerViewModel @Inject constructor(
 
     fun blockingReason(): String? {
         val s = _state.value
+
+        // Checked first, and checked properly. Every credential on this form is posted to this URL, so
+        // a typo does not merely fail — it hands a Supabase personal access token and a Cloudflare API
+        // token to whatever host was actually typed. Requiring https is the part that matters: over
+        // plaintext http those same credentials cross the network readable.
+        val wizardUrl = s.provisionerWorkerUrl.trim()
+        if (wizardUrl.isBlank()) return "Enter the provisioning Wizard URL."
+        if (!wizardUrl.startsWith("https://")) {
+            return "The Wizard URL must start with https:// — credentials are posted to it."
+        }
+        if (android.net.Uri.parse(wizardUrl).host.isNullOrBlank()) {
+            return "The Wizard URL is not a valid URL."
+        }
+
         if (s.supabaseMode == SupabaseModeSelection.NEW) {
             if (s.supabasePat.isBlank()) return "Enter the Supabase personal access token."
             if (s.supabaseOrgId.isBlank()) return "Enter the Supabase organization ID."
@@ -129,7 +150,13 @@ class ProvisionerViewModel @Inject constructor(
             )
         }
 
+        val wizardUrl = s.provisionerWorkerUrl.trim()
+        // Remembered only once the form is otherwise valid and provisioning is actually being started,
+        // so a half-typed URL never becomes the prefill for the next attempt.
+        secureStorage.saveProvisionerWorkerUrl(wizardUrl)
+
         val request = ProvisionRequest(
+            provisionerWorkerUrl = wizardUrl,
             supabaseMode = supabaseMode,
             cloudflareMode = cloudflareMode,
             cafeName = s.cafeName,
@@ -147,6 +174,61 @@ class ProvisionerViewModel @Inject constructor(
             resolvedOwnerKeyUrl = null,
         )
         ProvisionWorker.start(getApplication(), request)
+    }
+
+    /**
+     * Deploy the Edge Functions to an existing Supabase project, without provisioning anything else.
+     *
+     * Runs on the ViewModel scope rather than through [ProvisionWorker]: this is one request that
+     * finishes in tens of seconds, not the multi-minute project-creation run WorkManager exists to
+     * survive. Routing it through the worker would also fight the full run for the same unique work
+     * name, so a repair could cancel a provisioning in progress.
+     *
+     * Deliberately requires only the PAT and the project ref — the two things a café's owner already
+     * has for a project that exists. Demanding a Cloudflare token and a café name to redeploy 26
+     * functions is what made the full run useless as a repair tool.
+     */
+    fun deployFunctionsOnly() {
+        val s = _state.value
+        val wizardUrl = s.provisionerWorkerUrl.trim()
+        if (wizardUrl.isBlank() || !wizardUrl.startsWith("https://")) {
+            _state.value = s.copy(errorMessage = "Enter the provisioning Wizard URL (https://…).")
+            return
+        }
+        if (s.supabasePat.isBlank()) {
+            _state.value = s.copy(errorMessage = "Enter the Supabase personal access token.")
+            return
+        }
+        // The project ref is only asked for in EXISTING mode; in NEW mode there is no project yet, so
+        // there is nothing to deploy to and the button is not offered.
+        val projectRef = s.supabaseProjectRef.trim()
+        if (projectRef.isBlank()) {
+            _state.value = s.copy(errorMessage = "Enter the Supabase project reference.")
+            return
+        }
+
+        secureStorage.saveProvisionerWorkerUrl(wizardUrl)
+        _state.value = s.copy(isRunning = true, errorMessage = null, results = emptyList(), success = false)
+
+        viewModelScope.launch {
+            try {
+                val result = provisionerClient.deployFunctions(wizardUrl, s.supabasePat, projectRef)
+                _state.value = _state.value.copy(
+                    isRunning = false,
+                    results = result.results,
+                    // Only the deploy succeeded — NOT a provisioned café. `success` drives the owner-key
+                    // QR dialog, and there is no owner key here, so it stays false on purpose.
+                    success = false,
+                    errorMessage = result.results.firstOrNull { it.isError }
+                        ?.let { "${it.step}: ${it.detail ?: "failed"}" },
+                )
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    isRunning = false,
+                    errorMessage = e.message ?: "Deploying the Edge Functions failed.",
+                )
+            }
+        }
     }
 
     fun saveConfiguration() {
@@ -215,6 +297,9 @@ enum class SupabaseModeSelection { NEW, EXISTING }
 enum class CloudflareModeSelection { NEW, EXISTING }
 
 data class ProvisionerState(
+    /** The Wizard's `/api/provision/run` endpoint. Typed on the screen; never a build constant. */
+    val provisionerWorkerUrl: String = "",
+
     val supabaseMode: SupabaseModeSelection = SupabaseModeSelection.NEW,
     val supabasePat: String = "",
     val supabaseOrgId: String = "",

@@ -383,6 +383,118 @@ fun PrintersScreen(
                     )
                 }
             }
+
+            // ── Receipt printer transport (moved from Devices & Hardware) ────────────────
+            item {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Text(
+                    text = strings.hardwarePrintersSection,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Choose how this device connects to its receipt printer.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                val hwViewModel: com.razstudio.pos.ui.viewmodels.HardwareDevicesViewModel = hiltViewModel()
+                val hwState by hwViewModel.uiState.collectAsState()
+                if (hwState.printerDrivers.isEmpty()) {
+                    Text(
+                        text = strings.hardwareNoDriversAvailable,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                hwState.printerDrivers.forEach { row ->
+                    val available = row.availability == com.razstudio.pos.ui.viewmodels.HardwareAvailabilityReason.AVAILABLE
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.RadioButton(
+                            selected = hwState.selectedPrinterTransport == row.kind,
+                            onClick = { hwViewModel.selectPrinterTransport(row.kind) },
+                            enabled = available,
+                        )
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            val label = when (row.kind) {
+                                com.razstudio.pos.ui.viewmodels.PrinterDriverKind.BLUETOOTH -> strings.hardwareDriverBluetooth
+                                com.razstudio.pos.ui.viewmodels.PrinterDriverKind.SUNMI_AIDL -> strings.hardwareDriverSunmi
+                                com.razstudio.pos.ui.viewmodels.PrinterDriverKind.USB -> strings.hardwareDriverUsb
+                                com.razstudio.pos.ui.viewmodels.PrinterDriverKind.NETWORK -> strings.hardwareDriverNetwork
+                            }
+                            Text(label)
+                            if (!available) {
+                                Text(
+                                    text = row.availability.name,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Receipt paper auto-cut (moved from Devices & Hardware) ───────────────────
+            item {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(strings.hardwareAutoCutLabel, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = strings.hardwareAutoCutDesc,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = uiState.receiptAutoCut,
+                        onCheckedChange = { viewModel.setReceiptAutoCut(it) },
+                    )
+                }
+            }
+
+            // ── Logo on receipt + ESC * image mode (moved from Settings) ─────────────────
+            item {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(strings.receiptLogoLabel)
+                    Switch(
+                        checked = uiState.receiptLogo,
+                        onCheckedChange = { viewModel.updateReceiptLogo(it) },
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(strings.escAsteriskLabel)
+                    Switch(
+                        checked = uiState.escAsteriskMode,
+                        onCheckedChange = { viewModel.updateEscAsteriskMode(it) },
+                    )
+                }
+                Text(
+                    text = strings.escAsteriskDesc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
         }
     }
 

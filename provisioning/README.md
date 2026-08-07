@@ -46,11 +46,37 @@ the live checks below have actually been run.
    npx wrangler pages deploy dist --project-name=cafe-setup-wizard
    ```
    (Or wire it into a GitHub Actions workflow, mirroring `.github/workflows/deploy-website.yml`.)
-4. **Set two environment variables** on the Wizard's own Cloudflare Pages project (Settings →
-   Environment variables — NOT in `wrangler.toml`, since these are operational details, not
-   secrets):
-   - `RAZSTUDIO_GITHUB_OWNER` — e.g. `razstudio-org`
-   - `RAZSTUDIO_GITHUB_REPO` — e.g. `cafe-website-template`
+
+   > ### ⚠ It must be Pages, not Workers
+   >
+   > `wrangler pages deploy` serves **two** things from one project: the Vite UI out of `dist/`, and
+   > the eight provisioning endpoints out of `functions/`, which Cloudflare mounts automatically by
+   > file path (`functions/api/provision/run.ts` → `/api/provision/run`). There is no router to write;
+   > that file tree *is* the routing.
+   >
+   > Deploying with plain `wrangler deploy` publishes a **Worker** on `*.workers.dev` that serves
+   > `dist/` alone. Workers do not run a Pages `functions/` directory, so the UI loads perfectly and
+   > every `/api/provision/*` route returns 404 — and the Wizard is then unable to provision anything,
+   > including a fix for itself. Nothing in the UI hints at the cause; it looks like a healthy site.
+   >
+   > Symptom to check for: `curl -s -o /dev/null -w '%{http_code}' <wizard>/api/provision/run` should
+   > be 405 (GET not allowed), never 404. Local equivalent is `wrangler pages dev dist`, which mounts
+   > `functions/`; plain `wrangler dev` does not.
+
+   If the Wizard is unreachable and a café needs its Edge Functions deployed *now*, there is a
+   laptop-side escape hatch that performs the identical operation:
+   ```
+   npm run generate
+   SUPA_PAT=sbp_... SUPA_REF=<project-ref> node scripts/deploy-edge-functions.mjs
+   ```
+4. **Nothing to configure for the template repo.** `RAZSTUDIO_GITHUB_OWNER` /
+   `RAZSTUDIO_GITHUB_REPO` used to be required environment variables on the Wizard's own Pages
+   project. They are now baked at build time from `template-repo.properties` at the monorepo root —
+   the same file the APK compiles into `BuildConfig`, so the repo a café's website deploys from and
+   the repo its menu presets come from cannot disagree.
+
+   Setting the two environment variables still works and still wins, for a fork or a white-label
+   Wizard that deploys cafés from a different repository. Leave them unset otherwise.
 
 ## Verifying the provisioner steps
 
@@ -89,8 +115,7 @@ export SUPABASE_PROJECT_NAME=live-verify-run-1
 export CLOUDFLARE_ACCOUNT_ID=<...>
 export CLOUDFLARE_API_TOKEN=<...>
 export CLOUDFLARE_CAFE_SLUG=live-verify-run-1
-export RAZSTUDIO_GITHUB_OWNER=<...>
-export RAZSTUDIO_GITHUB_REPO=<...>
+# RAZSTUDIO_GITHUB_OWNER / _REPO are optional — they default to template-repo.properties.
 export CAFE_NAME="Test Café"
 # Optional:
 # export BREVO_API_KEY=...
@@ -132,11 +157,18 @@ High-privilege credentials (PATs, API tokens, service-role keys) are only held i
 and in the WorkManager input data for the single provisioning request; they are not persisted on
 the tablet.
 
-The build needs the worker URL in `apk/local.properties`:
+The Wizard URL is **not** a build input. It is typed on the Provision screen (and, optionally, on
+Setup → Existing café, which stores it for later):
 
 ```
-PROVISIONER_WORKER_URL=https://<your-wizard-domain>/api/provision/run
+https://<your-wizard-domain>/api/provision/run
 ```
+
+It used to be `PROVISIONER_WORKER_URL` in `apk/local.properties`, compiled into `BuildConfig`. That
+put a live provisioning endpoint into every APK built from this branch — including café builds that
+will never provision anything — and could not be repointed at a disposable Wizard without a rebuild,
+which is exactly what rehearsing the unverified steps requires. The app remembers what was typed, on
+that device only.
 
 ## Local development
 

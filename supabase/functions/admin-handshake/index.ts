@@ -172,18 +172,19 @@ serve(async (req) => {
     return jsonResponse({ sessionToken: result.sessionToken });
   }
 
-  // Validate rotating key against ±1 window
-  const secret = Deno.env.get("ROTATING_KEY_SECRET");
-  if (!secret) {
-    return errorResponse(500, "SERVER_ERROR", "Rotating key secret not configured");
-  }
-
-  const valid = await validateRotatingKey(secret, rotatingKey);
-  if (!valid) {
-    return errorResponse(401, "INVALID_KEY", "Rotating key is invalid or expired");
-  }
-
-  const result = await claimAdminDevice(deviceId);
-  if ("error" in result) return result.error;
-  return jsonResponse({ sessionToken: result.sessionToken });
+  // ── No rotating key any more ──────────────────────────────────────────────────
+  //
+  // This branch validated a time-windowed key against ROTATING_KEY_SECRET. It had no callers left in
+  // the app — `ApiClient.adminHandshake(deviceId, rotatingKey)` is never invoked — so it was a secret
+  // every café had to provision, a clock-skew failure mode, and a second way to become admin, all for
+  // a path nobody used. The café's one secret is the owner key (`admin-recovery`), delivered as a QR
+  // and stored only as a hash.
+  //
+  // Reached only when a caller sends `rotatingKey`, which nothing does; answered honestly rather than
+  // silently minting a session.
+  return errorResponse(
+    410,
+    "ROTATING_KEY_REMOVED",
+    "Rotating-key sign-in has been removed. Use the owner key QR (admin-recovery).",
+  );
 });

@@ -21,6 +21,7 @@ import { onRequestPost as storageHandler } from './storage'
 import { onRequestPost as authHandler } from './auth'
 import { onRequestPost as dnsHandler } from './dns'
 import { onRequestPost as ownerKeyHandler } from './owner-key'
+import { TEMPLATE_GITHUB_OWNER, TEMPLATE_GITHUB_REPO } from '../../_generated/template-repo'
 
 interface SupabaseNew {
   mode: 'new'
@@ -142,8 +143,12 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
           projectName: cfg.cafeSlug,
           supabaseUrl: supabase!.url,
           supabaseAnonKey: supabase!.anonKey,
-          githubOwner: context.env.RAZSTUDIO_GITHUB_OWNER,
-          githubRepo: context.env.RAZSTUDIO_GITHUB_REPO,
+          // Baked from template-repo.properties, with the env var kept as an override for a fork or
+          // a white-label deployment. It used to be env-only, which meant a Wizard that was otherwise
+          // configured correctly still failed at this step until someone remembered to set two
+          // variables that are the same for every café.
+          githubOwner: context.env.RAZSTUDIO_GITHUB_OWNER || TEMPLATE_GITHUB_OWNER,
+          githubRepo: context.env.RAZSTUDIO_GITHUB_REPO || TEMPLATE_GITHUB_REPO,
         }),
       )
       cloudflare = {
@@ -190,12 +195,22 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
     )
 
     // ── Edge Functions ─────────────────────────────────────────────────────────────────────────
-    await runStep(results, 'deploy-functions', () =>
-      callHandler(functionsHandler, {
-        personalAccessToken: supabase!.personalAccessToken,
-        projectRef: supabase!.ref,
-      }),
-    )
+    //
+    // Not via callHandler, deliberately. That wrapper throws if ANY inner result is an error and
+    // keeps only a concatenated message, which is the wrong shape for this step: 26 functions deploy
+    // one at a time, and the useful answer is *which* ones landed. Collapsing 26 outcomes into one
+    // thrown string loses exactly the information an operator needs to retry, and aborting the run on
+    // the first failure leaves the café with an unknown subset deployed.
+    //
+    // So the per-function results are merged into the checklist verbatim, and the run continues. A
+    // café missing one function is a café to re-run this step against — which the APK can now do on
+    // its own (see ProvisionerViewModel.deployFunctionsOnly) — not a reason to abandon provisioning
+    // with the owner key unminted.
+    const fnResults = await deployEdgeFunctions({
+      personalAccessToken: supabase!.personalAccessToken,
+      projectRef: supabase!.ref,
+    })
+    results.push(...fnResults.map((r) => ({ ...r, step: `deploy-functions:${r.step}` })))
 
     // ── Secrets ────────────────────────────────────────────────────────────────────────────────
     await runStep(results, 'set-secrets', () =>
@@ -271,6 +286,29 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
       cafeName: body.cafe.cafeName,
     } satisfies ProvisionRunResponse, 500)
   }
+}
+
+/**
+ * Runs the Edge Functions deploy and returns its per-function results instead of throwing.
+ *
+ * Shares one code path with `POST /api/provision/functions`, so a full provisioning run and a
+ * functions-only re-run from the APK deploy byte-identical bundles. If these ever diverged, "re-run
+ * the functions step" would stop being a reliable repair for a café provisioned by the other path.
+ */
+async function deployEdgeFunctions(body: {
+  personalAccessToken: string
+  projectRef: string
+}): Promise<StepResult[]> {
+  const response = await functionsHandler({
+    request: new Request('http://localhost/api/provision/functions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+    env: {},
+  })
+  const data = (await response.json()) as ProvisionResponse
+  return data.results ?? [{ step: 'deploy-functions', status: 'error', detail: `HTTP ${response.status}` }]
 }
 
 async function runStep<T>(
@@ -395,10 +433,12 @@ async function createPagesProject(params: {
   githubOwner?: string
   githubRepo?: string
 }): Promise<{ detail: string }> {
+  // Unreachable while template-repo.properties is present (the generator fails the build otherwise),
+  // kept because this function is also callable with explicit params.
   if (!params.githubOwner || !params.githubRepo) {
     throw new Error(
-      'RAZSTUDIO_GITHUB_OWNER / RAZSTUDIO_GITHUB_REPO are not configured on the Wizard deployment — ' +
-        'set them in the Wizard\'s own Cloudflare Pages project settings.',
+      'No template repository configured — template-repo.properties is missing from the build, or ' +
+        'RAZSTUDIO_GITHUB_OWNER / RAZSTUDIO_GITHUB_REPO were set to empty strings on this deployment.',
     )
   }
 
@@ -419,7 +459,10 @@ async function createPagesProject(params: {
     build_config: {
       build_command: 'npm run build',
       destination_dir: 'dist',
-      root_dir: '/',
+      // The café site lives in the monorepo's website/ folder; the repo root has no package.json,
+      // so root_dir '/' makes every build fail with "npm run build: no such script" and the
+      // project sits at zero deployments serving a 522.
+      root_dir: 'website',
     },
     deployment_configs: {
       production: {

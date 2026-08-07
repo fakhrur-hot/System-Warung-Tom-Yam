@@ -15,7 +15,6 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.razstudio.pos.BuildConfig
 import com.razstudio.pos.MainActivity
-import com.razstudio.pos.R
 import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.OrderDto
@@ -70,7 +69,6 @@ class RealtimeService : Service() {
         // to a silent channel REQUIRES a new id — the old one is deleted in createNotificationChannel.
         private const val NEW_ORDER_CHANNEL_ID = "new_orders_channel_v2"
         private const val LEGACY_NEW_ORDER_CHANNEL_ID = "new_orders_channel"
-        private const val NOTIFICATION_ID = 1001
         private const val NEW_ORDER_NOTIF_BASE = 2000
         private const val SYNC_PREFS_NAME = "realtime_sync_prefs"
         private const val KEY_LAST_SEEN = "last_seen_timestamp"
@@ -182,6 +180,7 @@ class RealtimeService : Service() {
     @Inject lateinit var lanServer: com.razstudio.pos.data.lan.LanServer
     @Inject lateinit var secureStorage: com.razstudio.pos.data.SecureStorage
     @Inject lateinit var newOrderSound: NewOrderSoundPlayer
+    @Inject lateinit var posNotificationStatus: PosNotificationStatus
 
     private fun s() = uiStrings(languageManager.language.value)
 
@@ -407,19 +406,20 @@ class RealtimeService : Service() {
     // --- WebSocket Connection ---
 
     private fun startForegroundWithNotification() {
-        val notification = buildNotification(s().notifListening)
+        posNotificationStatus.updateRealtimeStatus(s().notifListening)
+        val notification = posNotificationStatus.buildForegroundNotification()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             // Must match the manifest exactly or startForeground throws. See the manifest comment
             // for why this is remoteMessaging: dataSync is capped at ~6h/day on Android 15 and was
             // taking the till down mid-service.
             startForeground(
-                NOTIFICATION_ID,
+                PosNotificationStatus.NOTIFICATION_ID,
                 notification,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
             )
         } else {
-            startForeground(NOTIFICATION_ID, notification)
+            startForeground(PosNotificationStatus.NOTIFICATION_ID, notification)
         }
     }
 
@@ -461,6 +461,20 @@ class RealtimeService : Service() {
      * Device starting its own server would answer its peers with an empty database.
      */
     private fun startLanServerIfServer() {
+        // Cloud cafés run the server too, but PUSH-ONLY (task: cloud fast path). The REST routes are
+        // the HTTP face of LocalBackend, which is a mirror here rather than the authority — staff must
+        // keep reading and writing the cloud. What they gain is latency: a frame arrives in
+        // milliseconds and triggers the same catch-up sync their poll runs, so the floor stops waiting
+        // on a poll tick and the poll interval can be relaxed.
+        if (modeRepository.currentMode() == com.razstudio.pos.data.OperatingMode.CLOUD) {
+            if (lanServer.start(pushOnly = true)) {
+                Log.i(TAG, "Cloud push server on ${lanServer.boundHost} (push-only)")
+            } else {
+                Log.w(TAG, "Cloud push server did not start — staff fall back to their poll")
+            }
+            return
+        }
+
         // Was gated on the stored role, which is written when the owner taps "Host this café" —
         // often after this service has already started and decided not to serve. The café then had
         // no LAN server at all and no indication why. `isLanHost` reads pairing configuration
@@ -618,7 +632,7 @@ class RealtimeService : Service() {
                 """.trimIndent()
                 webSocket.send(joinPayload)
 
-                updateNotification(s().notifConnected)
+                posNotificationStatus.updateRealtimeStatus(s().notifConnected)
 
                 // Perform catch-up sync on every (re)connect
                 performCatchUpSync()
@@ -649,7 +663,7 @@ class RealtimeService : Service() {
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 Log.e(TAG, "WebSocket failure: ${t.message}", t)
                 isConnected = false
-                updateNotification(s().notifDisconnected)
+                posNotificationStatus.updateRealtimeStatus(s().notifDisconnected)
                 scheduleReconnect()
             }
         })
@@ -881,27 +895,5 @@ class RealtimeService : Service() {
         return if (label.isNullOrBlank()) tableId else label
     }
 
-    private fun buildNotification(contentText: String): Notification {
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.app_name))
-            .setContentText(contentText)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .setSilent(true)
-            .build()
-    }
-
-    private fun updateNotification(contentText: String) {
-        val notification = buildNotification(contentText)
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, notification)
-    }
 }
 

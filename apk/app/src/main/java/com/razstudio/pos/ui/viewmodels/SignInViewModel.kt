@@ -281,10 +281,40 @@ class SignInViewModel @Inject constructor(
      * failed image must not fail the restore.
      */
     private suspend fun restorePhotos(token: String, payload: CafeConfigPayload) {
-        if (payload.photoFileIds.isEmpty()) return
         payload.photoFileIds.forEach { (fileName, fileId) ->
             bundleStore.downloadPhoto(token, fileId, imageStore.fileFor(fileName))
         }
+        restorePaymentQr(token, payload)
+    }
+
+    /**
+     * Bring the café's payment QR back beside its menu.
+     *
+     * The hash is recorded only after the bytes land and only if they still decode as a QR — the
+     * same rule `PaymentQrResolver` applies to a download, and for the same reason. The hash is what
+     * every other device compares against, so recording one for an image that is truncated or
+     * missing would tell the whole café it is up to date with a code nobody can scan.
+     *
+     * Best-effort, like the photos: a café whose menu and tables came back is open for business, and
+     * the admin can re-upload a QR from Café Profile in seconds.
+     */
+    private suspend fun restorePaymentQr(token: String, payload: CafeConfigPayload) {
+        if (payload.paymentQrFileId.isBlank()) return
+        val target = java.io.File(context.filesDir, "payment_qr.png")
+        if (!bundleStore.downloadPhoto(token, payload.paymentQrFileId, target)) return
+
+        val bytes = try {
+            target.readBytes()
+        } catch (e: Exception) {
+            return
+        }
+        if (com.razstudio.pos.ui.util.PaymentQrPipeline.decodeQrPayloadFromBytes(bytes) == null) {
+            target.delete()
+            return
+        }
+        appConfigStore.setPaymentQrHash(
+            com.razstudio.pos.ui.util.PaymentQrPipeline.computeSha256Hex(target)
+        )
     }
 
     /** Task 23.8 — the owner kept the device's café. Nothing is written, nothing is overwritten. */

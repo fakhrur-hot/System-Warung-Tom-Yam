@@ -1,6 +1,5 @@
 package com.razstudio.pos.data
 
-import com.razstudio.pos.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -42,15 +41,64 @@ class ProvisionerClient @Inject constructor() {
 
     suspend fun provision(request: ProvisionRequest): ProvisionResult = withContext(Dispatchers.IO) {
         val body = request.toJson().toString().toRequestBody(JSON_MEDIA_TYPE)
-        val url = BuildConfig.PROVISIONER_WORKER_URL
+        // The endpoint comes from the request, i.e. from what the installer typed on the Provision
+        // screen — never from BuildConfig. It used to be baked in, which meant every APK carried a
+        // live URL that accepts Supabase and Cloudflare credentials, unchangeable without a rebuild,
+        // and a build with the property unset failed here with "not configured in this build" — a
+        // dead end no operator could act on from the device in their hands.
+        val url = request.provisionerWorkerUrl.trim()
         if (url.isBlank()) {
-            throw IllegalStateException("Provisioner worker URL is not configured in this build.")
+            throw IllegalStateException("Enter the provisioning Wizard URL on the Provision screen.")
         }
         val httpRequest = Request.Builder()
             .url(url)
             .post(body)
             .build()
 
+        try {
+            client.newCall(httpRequest).execute().use { response ->
+                val responseBody = response.body?.string() ?: ""
+                if (!response.isSuccessful) {
+                    throw IOException("Provisioner worker returned HTTP ${response.code}: $responseBody")
+                }
+                parseResponse(JSONObject(responseBody))
+            }
+        } catch (e: IOException) {
+            throw e
+        } catch (e: Exception) {
+            throw IOException("Failed to call provisioner worker: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Deploy the café's Edge Functions and nothing else.
+     *
+     * ### Why this exists separately from [provision]
+     *
+     * The functions are the only part of a café the APK cannot work without — it talks to a backend
+     * exclusively through them, so a project with the schema applied but no functions deployed answers
+     * every REST query and refuses every sign-in. That state is reachable in ordinary use: a café
+     * provisioned before this Wizard existed, a run that failed partway, or a project set up by hand.
+     * Until now the only remedy was a full provisioning run, which would try to create a Supabase
+     * project and a Pages site the café already has.
+     *
+     * Idempotent by construction — the Management API's deploy endpoint updates a slug in place — so
+     * running it against a healthy café is a no-op that costs 26 uploads, not a hazard.
+     */
+    suspend fun deployFunctions(
+        wizardUrl: String,
+        personalAccessToken: String,
+        projectRef: String,
+    ): ProvisionResult = withContext(Dispatchers.IO) {
+        val url = functionsEndpoint(wizardUrl)
+            ?: throw IllegalStateException("Enter the provisioning Wizard URL first.")
+
+        val body = JSONObject().apply {
+            put("personalAccessToken", personalAccessToken)
+            put("projectRef", projectRef)
+        }.toString().toRequestBody(JSON_MEDIA_TYPE)
+
+        val httpRequest = Request.Builder().url(url).post(body).build()
         try {
             client.newCall(httpRequest).execute().use { response ->
                 val responseBody = response.body?.string() ?: ""
@@ -93,6 +141,29 @@ class ProvisionerClient @Inject constructor() {
     }
 }
 
+/**
+ * Turn the Wizard's `/run` URL into its `/functions` sibling.
+ *
+ * The operator types one endpoint, not a base and a set of paths — asking for both would be asking
+ * them to know the Wizard's routing table. The two endpoints are siblings on the same deployment, so
+ * the second is derivable from the first, and a URL already pointing at `/functions` is left alone so
+ * pasting either one works.
+ *
+ * Returns null for anything unusable, so the caller reports "enter the Wizard URL" rather than
+ * silently POSTing credentials at a guessed address.
+ */
+internal fun functionsEndpoint(wizardUrl: String): String? {
+    val trimmed = wizardUrl.trim().trimEnd('/')
+    if (trimmed.isBlank() || !trimmed.startsWith("https://")) return null
+    return when {
+        trimmed.endsWith("/functions") -> trimmed
+        trimmed.endsWith("/run") -> trimmed.removeSuffix("/run") + "/functions"
+        // A bare origin: assume the Wizard's standard route rather than failing, since that is the
+        // one layout every deployment of this Wizard has.
+        else -> "$trimmed/api/provision/functions"
+    }
+}
+
 data class StepResult(
     val step: String,
     val status: String,
@@ -116,6 +187,14 @@ data class ProvisionResult(
 
 /** Form data for the installer screen. High-privilege credentials are only kept in ViewModel state. */
 data class ProvisionRequest(
+    /**
+     * The provisioning Wizard's `/api/provision/run` endpoint, typed on the Provision screen.
+     *
+     * Part of the request rather than a build constant so that one APK can point at a staging Wizard,
+     * a disposable one, or a self-hosted deployment without being rebuilt — which is also the only way
+     * the two unverified provisioning steps can be rehearsed against a throwaway project.
+     */
+    val provisionerWorkerUrl: String,
     val supabaseMode: SupabaseMode,
     val cloudflareMode: CloudflareMode,
     val cafeName: String,

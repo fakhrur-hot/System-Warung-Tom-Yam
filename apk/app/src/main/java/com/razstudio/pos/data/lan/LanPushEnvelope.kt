@@ -43,6 +43,9 @@ data class LanPushEnvelope(
         /** Client → Server: I have [lastSeenId]; send me anything after it. */
         STATUS_REQUEST,
 
+        /** Server → Client: a payment notification was captured on the SecondaryAdmin device. */
+        PAYMENT_RECEIVED,
+
         /** Anything unrecognised. Carried rather than thrown — see [decode]. */
         UNKNOWN,
         ;

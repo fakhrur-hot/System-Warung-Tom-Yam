@@ -11,6 +11,7 @@
 // time. That authorization is account/org-level, so it never needs repeating per café.
 
 import type { PagesContext, ProvisionResponse, StepResult } from '../../_shared-ts/types'
+import { TEMPLATE_GITHUB_OWNER, TEMPLATE_GITHUB_REPO } from '../../_generated/template-repo'
 
 interface ProvisionPagesRequest {
   cloudflareAccountId: string
@@ -24,8 +25,11 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
   const body = (await context.request.json()) as ProvisionPagesRequest
   const { cloudflareAccountId, cloudflareApiToken, cafeSlug, supabaseUrl, supabaseAnonKey } = body
 
-  const githubOwner = context.env.RAZSTUDIO_GITHUB_OWNER
-  const githubRepo = context.env.RAZSTUDIO_GITHUB_REPO
+  // Baked from template-repo.properties at build time; the env vars remain an override for a fork or
+  // white-label Wizard. Every café is created from the same repo, so requiring an env var per
+  // deployment only created a step that could be forgotten.
+  const githubOwner = context.env.RAZSTUDIO_GITHUB_OWNER || TEMPLATE_GITHUB_OWNER
+  const githubRepo = context.env.RAZSTUDIO_GITHUB_REPO || TEMPLATE_GITHUB_REPO
   if (!githubOwner || !githubRepo) {
     return json({
       results: [
@@ -33,8 +37,8 @@ export async function onRequestPost(context: PagesContext): Promise<Response> {
           step: 'create-pages-project',
           status: 'error',
           detail:
-            'RAZSTUDIO_GITHUB_OWNER / RAZSTUDIO_GITHUB_REPO are not configured on this Wizard ' +
-            'deployment — set them in the Wizard\'s own Cloudflare Pages project settings.',
+            'No template repository configured — template-repo.properties is missing from the build, ' +
+            'or RAZSTUDIO_GITHUB_OWNER / RAZSTUDIO_GITHUB_REPO were set to empty strings here.',
         },
       ],
     })
@@ -84,7 +88,10 @@ async function createPagesProject(params: {
     build_config: {
       build_command: 'npm run build',
       destination_dir: 'dist',
-      root_dir: '/',
+      // The café site lives in the monorepo's website/ folder; the repo root has no package.json,
+      // so root_dir '/' makes every build fail with "npm run build: no such script" and the
+      // project sits at zero deployments serving a 522.
+      root_dir: 'website',
     },
     deployment_configs: {
       production: {

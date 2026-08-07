@@ -177,14 +177,11 @@ class OrderingViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // 1. Get GPS fix
-                val location = GpsHelper.getLastLocation(getApplication())
-                if (location == null) {
-                    _errorMessage.value = "Unable to get GPS location. Please ensure location is enabled."
-                    _isCheckingIn.value = false
-                    return@launch
-                }
+                // The fix has to be judged against the radius it will be tested with, so the cafe
+                // location is fetched BEFORE locating rather than after. Previously the order was
+                // reversed and any fix at all was accepted.
 
-                // 2. Fetch café location if not cached
+                // 1. Fetch café location if not cached
                 if (cafeLocation == null) {
                     when (val locResult = client.getCafeLocation()) {
                         is ApiResult.Success -> cafeLocation = locResult.data
@@ -202,6 +199,42 @@ class OrderingViewModel @Inject constructor(
                 }
 
                 val cafe = cafeLocation!!
+
+                // 2. Get a fix good enough to decide the question, and say so when it is not.
+                //
+                // Each refusal names the actual obstacle. "8616m away" sent staff hunting for a bug
+                // in the app; "your phone's position is 3 hours old" sends them to a window, which
+                // is the thing that actually fixes it.
+                val location = when (val fix = GpsHelper.locate(getApplication(), cafe.radiusMeters)) {
+                    is GpsHelper.Fix.Usable -> fix.location
+                    is GpsHelper.Fix.Stale -> {
+                        _errorMessage.value =
+                            "Your phone's last position is ${fix.ageMs / 60_000} minutes old, so it " +
+                                "cannot be checked against the cafe. Step outside or near a window " +
+                                "for a moment, then try again."
+                        _isCheckingIn.value = false
+                        return@launch
+                    }
+                    is GpsHelper.Fix.TooImprecise -> {
+                        _errorMessage.value =
+                            "Your phone can only place itself to within ${fix.accuracyMeters.toInt()}m, " +
+                                "which is wider than the cafe's ${cafe.radiusMeters}m area. Step " +
+                                "outside for a better GPS signal, then try again."
+                        _isCheckingIn.value = false
+                        return@launch
+                    }
+                    GpsHelper.Fix.NoPermission -> {
+                        _errorMessage.value = "Location permission is required to check in."
+                        _isCheckingIn.value = false
+                        return@launch
+                    }
+                    GpsHelper.Fix.Unavailable -> {
+                        _errorMessage.value =
+                            "Unable to get GPS location. Please ensure location is enabled."
+                        _isCheckingIn.value = false
+                        return@launch
+                    }
+                }
 
                 // 3. Validate distance
                 val withinRadius = GpsHelper.isWithinRadius(

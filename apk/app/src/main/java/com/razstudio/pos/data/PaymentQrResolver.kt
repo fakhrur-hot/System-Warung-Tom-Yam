@@ -58,12 +58,20 @@ class PaymentQrResolver @Inject constructor(
      * Safe to call on every branding fetch: when the hashes already agree it does no I/O.
      */
     suspend fun reconcile(remoteHash: String?, remoteUrl: String?): Outcome = withContext(Dispatchers.IO) {
+        val localHash = appConfigStore.paymentQrHash()
+
         // The admin device is the origin of its own upload — never clobber it from the server.
-        if (secureStorage.getRole() == SecureStorage.Role.ADMIN) {
+        //
+        // But only while it HAS one. A replacement admin phone — fresh install, owner QR scanned —
+        // holds nothing, so there is no upload to protect and the server is the only copy in
+        // existence. Short-circuiting on role alone left that device permanently without the café's
+        // payment QR: the backend had both hash and URL, and the one device authorised to fix it was
+        // the one device that never looked. Which is exactly the case this whole mechanism is for,
+        // since admin phones are replaced like any other.
+        val adminHasOwnCopy = localHash != null || PaymentQrPipeline.storedFileOrNull(context) != null
+        if (secureStorage.getRole() == SecureStorage.Role.ADMIN && adminHasOwnCopy) {
             return@withContext Outcome.ADMIN_IS_AUTHORITATIVE
         }
-
-        val localHash = appConfigStore.paymentQrHash()
 
         // Admin removed it: drop the local copy so Show QR disappears here too (Requirement 14.5).
         if (remoteHash.isNullOrBlank()) {

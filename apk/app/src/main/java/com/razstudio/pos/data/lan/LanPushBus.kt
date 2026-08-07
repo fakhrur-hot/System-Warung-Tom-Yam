@@ -67,4 +67,19 @@ class LanPushBus @Inject constructor() {
         )
         _events.tryEmit(envelope)
     }
+
+    /**
+     * Publish a payment alert. Uses [LanPushEnvelope.Type.PAYMENT_RECEIVED] so that receiving
+     * Clients can distinguish payment alerts from order status updates without inspecting the delta.
+     */
+    fun publishPayment(delta: JSONObject, nowIso: String) {
+        val envelope = LanPushEnvelope(
+            type = LanPushEnvelope.Type.PAYMENT_RECEIVED,
+            sessionId = sessionId,
+            messageId = nextMessageId(),
+            timestamp = nowIso,
+            delta = delta,
+        )
+        _events.tryEmit(envelope)
+    }
 }

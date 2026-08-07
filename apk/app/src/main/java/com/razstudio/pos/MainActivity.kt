@@ -21,17 +21,35 @@ import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.ads.MobileAds
+import com.razstudio.pos.data.local.LocalPrefs
 import com.razstudio.pos.ui.navigation.AppNavGraph
+import com.razstudio.pos.ui.screens.PermissionGate
 import com.razstudio.pos.ui.navigation.DeepLinkInvite
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.theme.WarungTomYamTheme
 import com.razstudio.pos.ui.viewmodels.StartupViewModel
+import com.razstudio.pos.ui.util.FullscreenMode
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val startupViewModel: StartupViewModel by viewModels()
+
+    @Inject lateinit var localPrefs: LocalPrefs
+
+    /**
+     * Re-assert immersive mode every time the window regains focus.
+     *
+     * Android shows the system bars again on its own after dialogs, keyboards, permission
+     * prompts and edge swipes. Setting it once in onCreate produces a till that is fullscreen
+     * until the first time anything happens, which is worse than not offering the option.
+     */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) FullscreenMode.apply(this, localPrefs.fullscreenMode)
+    }
 
     // POST_NOTIFICATIONS runtime prompt (Android 13+). Without it, the persistent
     // foreground notification and live new-order alerts are silently suppressed.
@@ -50,6 +68,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        FullscreenMode.apply(this, localPrefs.fullscreenMode)
 
         // Initialize Google Mobile Ads SDK (one-time, safe to call multiple times)
         MobileAds.initialize(this)
@@ -91,10 +110,17 @@ class MainActivity : ComponentActivity() {
                             val languageViewModel: LanguageViewModel = hiltViewModel()
                             LaunchedEffect(Unit) { languageViewModel.bootstrapCafeDefault() }
                             val navController = rememberNavController()
-                            AppNavGraph(
-                                navController = navController,
-                                startDestination = s.startDestination
-                            )
+                            // Mandatory permission gate on first launch: location, nearby devices
+                            // and notifications, on a screen carrying the app's own logo. It wraps
+                            // the graph rather than being a route in it, so no destination -- deep
+                            // link included -- can slip past it, and it disappears for good once
+                            // everything is granted. See PermissionGate.
+                            PermissionGate {
+                                AppNavGraph(
+                                    navController = navController,
+                                    startDestination = s.startDestination
+                                )
+                            }
                         }
                     }
                 }

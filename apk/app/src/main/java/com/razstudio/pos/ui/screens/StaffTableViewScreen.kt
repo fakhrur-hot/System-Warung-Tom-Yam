@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExitToApp
@@ -59,6 +60,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.razstudio.pos.data.customChargeMenuItem
 import com.razstudio.pos.data.NewOrderItem
 import com.razstudio.pos.data.local.MenuItem
 import com.razstudio.pos.data.local.PaymentMethod
@@ -93,6 +95,7 @@ import com.razstudio.pos.ui.viewmodels.StaffOrderViewModel
 fun StaffTableViewScreen(
     viewModel: StaffOrderViewModel = hiltViewModel(),
     languageViewModel: LanguageViewModel = hiltViewModel(),
+    cashDrawerViewModel: com.razstudio.pos.ui.viewmodels.CashDrawerViewModel = hiltViewModel(),
     /**
      * Avatar -> Mode Logout finished. The caller clears the stack back to the home screen; the
      * Google account is untouched, so the owner's other cafés are still listed when they land.
@@ -100,6 +103,10 @@ fun StaffTableViewScreen(
     onAccountSignedOut: () -> Unit = {},
     onCheckOut: () -> Unit,
 ) {
+    // Pull the floor plan if this device does not already hold this café's. Staff previously had
+    // no path to this at all, so a freshly-joined phone showed an empty grid indefinitely.
+    LaunchedEffect(Unit) { viewModel.syncTablesIfNeeded() }
+
     val tableStates by viewModel.tableStates.collectAsState()
     val orderDetail by viewModel.orderDetail.collectAsState()
     val orderEntry by viewModel.orderEntry.collectAsState()
@@ -112,6 +119,7 @@ fun StaffTableViewScreen(
     val strings = uiStrings(language)
 
     var showOrderSheet by remember { mutableStateOf(false) }
+    var showCalculator by remember { mutableStateOf(false) }
     var selectedTableLabel by remember { mutableStateOf("") }
     var showTableSelectForOrder by remember { mutableStateOf(false) }
 
@@ -254,6 +262,19 @@ fun StaffTableViewScreen(
                 )
             }
 
+            // Calculator, opposite the new-order button. Same reasoning as the admin home: the
+            // busy FAB keeps the right, this takes the left. Staff need the till open to give
+            // change as often as an admin does.
+            // Icon-only, matching the new-order FAB opposite; the title lives on for TalkBack.
+            FloatingActionButton(
+                onClick = { showCalculator = true },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp),
+            ) {
+                Icon(Icons.Default.Calculate, contentDescription = strings.calculatorTitle)
+            }
+
             // Offline banner at bottom (unchanged)
             if (pendingCount > 0) {
                 Box(
@@ -272,6 +293,13 @@ fun StaffTableViewScreen(
                 }
             }
         }
+    }
+
+    if (showCalculator) {
+        com.razstudio.pos.ui.calculator.CalculatorDialog(
+            strings = strings,
+            onDismiss = { showCalculator = false },
+        )
     }
 
     // Shared order detail bottom sheet with RBAC-gated permissions (Requirement 5.2, 5.3)
@@ -311,6 +339,9 @@ fun StaffTableViewScreen(
                 )
             },
             onResumeGatewayCheckout = { pending -> viewModel.resumeGatewayCheckout(pending) },
+            onCashTendered = { orderId, totalSen, tenderedSen ->
+                cashDrawerViewModel.recordCashSale(orderId, totalSen, tenderedSen)
+            },
             onCancel = { orderId, reason -> viewModel.cancelOrder(orderId, reason) },
             onDismiss = {
                 showOrderSheet = false
@@ -386,6 +417,11 @@ fun StaffTableViewScreen(
             strings = strings,
             isSubmitting = orderEntry.isSubmitting,
             onAdd = { item, note, size, price -> viewModel.addToCart(item, 1, note, size, price) },
+            // A hand-typed charge enters the cart as a synthetic menu item, so every existing cart
+            // path (dedupe, receipt preview, submit) handles it unchanged.
+            onAddCustom = { name, price ->
+                viewModel.addToCart(customChargeMenuItem(name, price), 1, unitPrice = price)
+            },
             onRemove = { index -> viewModel.removeFromCartAt(index) },
             onSubmit = { viewModel.submitOrder() },
             onDismiss = { viewModel.dismissOrderEntry() },

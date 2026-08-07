@@ -723,9 +723,13 @@ data class UiStringsGroup8(
     val chooseCafeBody: String,
     val chooseCafeCannotUndo: String,
     val setupTabOwnerQr: String,
-    val setupTabManual: String,
+    val setupTabProvision: String,
     val setupOwnerQrHelp: String,
     val setupLoadOwnerQrButton: String,
+    val setupTabExistingCafe: String,
+    val setupExistingCafeHelp: String,
+    val setupExistingWizardUrl: String,
+    val setupExistingWizardHint: String,
     val ownerQrChoiceBody: String,
     val ownerQrScanWithCamera: String,
     val ownerQrChooseSavedImage: String,
@@ -918,6 +922,13 @@ data class UiStringsGroup10(
     val setupSwitchIntro: String,
     val setupSwitchToFormat: String,
     val setupCancel: String,
+
+    // ── Provision new café ──
+    val provisionTabHelp: String,
+    val provisionStartButton: String,
+    val provisionOwnerQrTitle: String,
+    val provisionOwnerQrWarning: String,
+    val provisionOwnerQrContinueButton: String,
 )
 
 class UiStrings(
@@ -1561,9 +1572,13 @@ class UiStrings(
     val chooseCafeBody: String get() = g8.chooseCafeBody
     val chooseCafeCannotUndo: String get() = g8.chooseCafeCannotUndo
     val setupTabOwnerQr: String get() = g8.setupTabOwnerQr
-    val setupTabManual: String get() = g8.setupTabManual
+    val setupTabProvision: String get() = g8.setupTabProvision
     val setupOwnerQrHelp: String get() = g8.setupOwnerQrHelp
     val setupLoadOwnerQrButton: String get() = g8.setupLoadOwnerQrButton
+    val setupTabExistingCafe: String get() = g8.setupTabExistingCafe
+    val setupExistingCafeHelp: String get() = g8.setupExistingCafeHelp
+    val setupExistingWizardUrl: String get() = g8.setupExistingWizardUrl
+    val setupExistingWizardHint: String get() = g8.setupExistingWizardHint
     val ownerQrChoiceBody: String get() = g8.ownerQrChoiceBody
     val ownerQrScanWithCamera: String get() = g8.ownerQrScanWithCamera
     val ownerQrChooseSavedImage: String get() = g8.ownerQrChooseSavedImage
@@ -1742,6 +1757,11 @@ class UiStrings(
     val setupSwitchIntro: String get() = g10.setupSwitchIntro
     val setupSwitchToFormat: String get() = g10.setupSwitchToFormat
     val setupCancel: String get() = g10.setupCancel
+    val provisionTabHelp: String get() = g10.provisionTabHelp
+    val provisionStartButton: String get() = g10.provisionStartButton
+    val provisionOwnerQrTitle: String get() = g10.provisionOwnerQrTitle
+    val provisionOwnerQrWarning: String get() = g10.provisionOwnerQrWarning
+    val provisionOwnerQrContinueButton: String get() = g10.provisionOwnerQrContinueButton
 }
 
 fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
@@ -2395,9 +2415,13 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             chooseCafeBody = "Akaun Google ini menyimpan lebih daripada satu kafe. Pilih yang patut dijalankan oleh peranti ini.",
             chooseCafeCannotUndo = "Pilihan ini menggantikan apa sahaja yang telah disediakan pada peranti ini. Untuk bertukar kemudian, guna “Tinggalkan kafe ini”.",
             setupTabOwnerQr = "QR Pemilik",
-            setupTabManual = "Masukkan butiran",
+            setupTabProvision = "Sediakan kafe baharu",
             setupOwnerQrHelp = "Imbas kunci pemilik kafe. Ia sudah membawa bahagian belakang, laman web dan nama kafe — tiada apa-apa di sini perlu ditaip.",
             setupLoadOwnerQrButton = "Muat QR Pemilik",
+            setupTabExistingCafe = "Kafe sedia ada",
+            setupExistingCafeHelp = "Sambungkan peranti ini ke kafe yang sudah berjalan. Muatkan tetapannya dari laman web kafe, atau masukkan nilainya sendiri.",
+            setupExistingWizardUrl = "URL Wizard Persediaan (pilihan)",
+            setupExistingWizardHint = "Hanya perlu jika langkah persediaan kafe ini akan dijalankan semula kelak. Disimpan pada peranti ini sahaja.",
             ownerQrChoiceBody = "Halakan kamera ke kunci itu, atau pilih gambarnya yang anda sudah simpan.",
             ownerQrScanWithCamera = "Imbas QR pemilik",
             ownerQrChooseSavedImage = "Pilih imej QR tersimpan",
@@ -2552,8 +2576,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupManualHint = "Masukkan butiran daripada papan pemuka projek Supabase anda. Guna ini jika laman web belum dilancarkan.",
             setupSupabaseUrl = "URL Supabase",
             setupSupabaseUrlPlaceholder = "https://projek-anda.supabase.co",
-            setupSupabaseAnonKey = "Kunci awam Supabase",
-            setupSupabaseAnonKeyPlaceholder = "eyJhbGci…",
+            setupSupabaseAnonKey = "Kunci publishable Supabase (anon)",
+            setupSupabaseAnonKeyPlaceholder = "sb_publishable_… / eyJhbGci…",
             setupCafeName = "Nama kafe",
             setupCafeNamePlaceholder = "Kafe Anda",
             setupSave = "Simpan",
@@ -2578,6 +2602,11 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupSwitchIntro = "Ini menukar cara keseluruhan kafe beroperasi. Sebelum anda teruskan:",
             setupSwitchToFormat = "Tukar ke %1\$s",
             setupCancel = "Batal",
+            provisionTabHelp = "Cipta backend Supabase + Cloudflare baharu untuk kafe ini.",
+            provisionStartButton = "Mula sediakan",
+            provisionOwnerQrTitle = "Kunci pemilik anda",
+            provisionOwnerQrWarning = "Simpan QR ini dengan selamat. Ia adalah satu-satunya cara untuk log masuk semula sebagai pemilik jika apl ini dipasang semula atau peranti ini diganti.",
+            provisionOwnerQrContinueButton = "Saya sudah simpan — teruskan",
         ),
     )
     AppLanguage.EN -> UiStrings(
@@ -3230,9 +3259,13 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             chooseCafeBody = "This Google account holds more than one café. Pick the one this device should run.",
             chooseCafeCannotUndo = "Choosing replaces whatever is set up on this device. To switch later, use “Leave this café”.",
             setupTabOwnerQr = "Owner QR",
-            setupTabManual = "Enter details",
+            setupTabProvision = "Provision new café",
             setupOwnerQrHelp = "Scan the café owner key. It already carries the backend, the website and the café name — nothing here needs typing.",
             setupLoadOwnerQrButton = "Load Owner QR",
+            setupTabExistingCafe = "Existing cafe",
+            setupExistingCafeHelp = "Point this device at a cafe that is already running. Load its settings from the cafe website, or enter them by hand.",
+            setupExistingWizardUrl = "Provisioning Wizard URL (optional)",
+            setupExistingWizardHint = "Only needed if setup steps will be re-run on this cafe later. Kept on this device only.",
             ownerQrChoiceBody = "Point the camera at the key, or pick a photo of it you already saved.",
             ownerQrScanWithCamera = "Scan owner QR",
             ownerQrChooseSavedImage = "Choose saved QR image",
@@ -3387,8 +3420,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupManualHint = "Enter the details from your Supabase project dashboard. Use this if your website isn't deployed yet.",
             setupSupabaseUrl = "Supabase URL",
             setupSupabaseUrlPlaceholder = "https://your-project.supabase.co",
-            setupSupabaseAnonKey = "Supabase anon key",
-            setupSupabaseAnonKeyPlaceholder = "eyJhbGci…",
+            setupSupabaseAnonKey = "Supabase publishable key (anon)",
+            setupSupabaseAnonKeyPlaceholder = "sb_publishable_… / eyJhbGci…",
             setupCafeName = "Café name",
             setupCafeNamePlaceholder = "Your Café",
             setupSave = "Save",
@@ -3413,6 +3446,11 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupSwitchIntro = "This changes how the whole café runs. Before you continue:",
             setupSwitchToFormat = "Switch to %1\$s",
             setupCancel = "Cancel",
+            provisionTabHelp = "Create a new Supabase + Cloudflare backend for this café.",
+            provisionStartButton = "Start provisioning",
+            provisionOwnerQrTitle = "Your owner key",
+            provisionOwnerQrWarning = "Keep this QR safe. It is the only way to sign back in as owner if this app is reinstalled or this device is replaced.",
+            provisionOwnerQrContinueButton = "I have saved it — continue",
         ),
     )
     AppLanguage.ZH -> UiStrings(
@@ -4063,9 +4101,13 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             chooseCafeBody = "此 Google 账户保存了多间餐厅。请选择本设备要运行的那一间。",
             chooseCafeCannotUndo = "选择后将替换本设备上现有的设置。若要稍后更换，请使用“离开此餐厅”。",
             setupTabOwnerQr = "店主二维码",
-            setupTabManual = "手动填写",
+            setupTabProvision = "开设新餐厅",
             setupOwnerQrHelp = "扫描店主密钥。它已包含后端、网站和餐厅名称 — 此处无需输入任何内容。",
             setupLoadOwnerQrButton = "加载店主二维码",
+            setupTabExistingCafe = "现有咖啡馆",
+            setupExistingCafeHelp = "将此设备连接到已在运营的咖啡馆。可从咖啡馆网站加载设置，或手动输入。",
+            setupExistingWizardUrl = "配置向导网址（可选）",
+            setupExistingWizardHint = "仅在日后需要重新运行此咖啡馆的设置步骤时才需要。只保存在本设备上。",
             ownerQrChoiceBody = "将摄像头对准密钥，或选择您已保存的照片。",
             ownerQrScanWithCamera = "扫描店主二维码",
             ownerQrChooseSavedImage = "选择已保存的二维码图片",
@@ -4220,8 +4262,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupManualHint = "从 Supabase 项目面板输入详情。若网站尚未部署，请使用此项。",
             setupSupabaseUrl = "Supabase 网址",
             setupSupabaseUrlPlaceholder = "https://your-project.supabase.co",
-            setupSupabaseAnonKey = "Supabase 匿名密钥",
-            setupSupabaseAnonKeyPlaceholder = "eyJhbGci…",
+            setupSupabaseAnonKey = "Supabase 可发布密钥（匿名）",
+            setupSupabaseAnonKeyPlaceholder = "sb_publishable_… / eyJhbGci…",
             setupCafeName = "咖啡馆名称",
             setupCafeNamePlaceholder = "您的咖啡馆",
             setupSave = "保存",
@@ -4246,6 +4288,11 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupSwitchIntro = "这将改变整个咖啡馆的运行方式。继续之前：",
             setupSwitchToFormat = "切换到 %1\$s",
             setupCancel = "取消",
+            provisionTabHelp = "为此餐厅创建新的 Supabase + Cloudflare 后端。",
+            provisionStartButton = "开始开设",
+            provisionOwnerQrTitle = "您的店主密钥",
+            provisionOwnerQrWarning = "请妥善保存此二维码。如果重新安装应用或更换设备，它是以店主身份重新登录的唯一方式。",
+            provisionOwnerQrContinueButton = "我已保存 — 继续",
         ),
     )
     AppLanguage.TA -> UiStrings(
@@ -4898,9 +4945,13 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             chooseCafeBody = "இந்த Google கணக்கில் ஒன்றுக்கு மேற்பட்ட கஃபேக்கள் உள்ளன. இந்தச் சாதனம் இயக்க வேண்டியதைத் தேர்ந்தெடுக்கவும்.",
             chooseCafeCannotUndo = "தேர்வு இந்தச் சாதனத்தில் அமைக்கப்பட்டதை மாற்றும். பிறகு மாற்ற “இந்தக் கஃபேயை விடு” ஐப் பயன்படுத்தவும்.",
             setupTabOwnerQr = "உரிமையாளர் QR",
-            setupTabManual = "விவரங்களை உள்ளிடவும்",
+            setupTabProvision = "புதிய கஃபேயை உருவாக்கு",
             setupOwnerQrHelp = "கஃபே உரிமையாளர் சாவியை ஸ்கேன் செய்யவும். அதில் சர்வர், இணயதளம் மற்றும் கஃபேயின் பெயர் ஏற்கெனவே உள்ளன — இங்கே எதுவும் தட்டச்சு செய்யத் தேவையில்லை.",
             setupLoadOwnerQrButton = "உரிமையாளர் QR ඐ ஏற்று",
+            setupTabExistingCafe = "ஏற்கனவே உள்ள கஃபே",
+            setupExistingCafeHelp = "ஏற்கனவே இயங்கும் கஃபேவுடன் இந்த சாதனத்தை இணைக்கவும். அதன் அமைப்புகளை கஃபே இணையதளத்திலிருந்து ஏற்றவும், அல்லது கைமுறையாக உள்ளிடவும்.",
+            setupExistingWizardUrl = "வழங்கல் வழிகாட்டி URL (விரும்பினால்)",
+            setupExistingWizardHint = "இந்த கஃபேவின் அமைப்பு படிகளை பின்னர் மீண்டும் இயக்க வேண்டியிருந்தால் மட்டுமே தேவை. இந்த சாதனத்தில் மட்டும் சேமிக்கப்படும்.",
             ownerQrChoiceBody = "கேமராவை சாவியின் மீது நேராக வைக்கவும், அல்லது ஏற்கெனவே சேமித்த படத்தைத் தேர்ந்தெடுக்கவும்.",
             ownerQrScanWithCamera = "உரிமையாளர் QR ஸ்கேன் செய்",
             ownerQrChooseSavedImage = "சேமித்த QR படத்தைத் தேர்ந்தெடு",
@@ -5055,8 +5106,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupManualHint = "உங்கள் Supabase திட்ட முகப்பிலிருந்து விவரங்களை உள்ளிடவும். உங்கள் இணையதளம் இன்னும் வெளியிடப்படவில்லை எனில் இதைப் பயன்படுத்தவும்.",
             setupSupabaseUrl = "Supabase URL",
             setupSupabaseUrlPlaceholder = "https://your-project.supabase.co",
-            setupSupabaseAnonKey = "Supabase anon விசை",
-            setupSupabaseAnonKeyPlaceholder = "eyJhbGci…",
+            setupSupabaseAnonKey = "Supabase publishable விசை (anon)",
+            setupSupabaseAnonKeyPlaceholder = "sb_publishable_… / eyJhbGci…",
             setupCafeName = "கஃபே பெயர்",
             setupCafeNamePlaceholder = "உங்கள் கஃபே",
             setupSave = "சேமி",
@@ -5081,6 +5132,11 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupSwitchIntro = "இது முழு கஃபேவின் செயல்பாட்டையும் மாற்றுகிறது. தொடர்வதற்கு முன்:",
             setupSwitchToFormat = "%1\$s க்கு மாறு",
             setupCancel = "ரத்து செய்",
+            provisionTabHelp = "இந்த கஃபேவிற்கு புதிய Supabase + Cloudflare பின்தளத்தை உருவாக்கவும்.",
+            provisionStartButton = "உருவாக்கத்தை தொடங்கு",
+            provisionOwnerQrTitle = "உங்கள் உரிமையாளர் சாவி",
+            provisionOwnerQrWarning = "இந்த QR-ஐ பாதுகாப்பாக வைத்திருங்கள். இந்த செயலி மீண்டும் நிறுவப்பட்டாலோ அல்லது இந்த சாதனம் மாற்றப்பட்டாலோ உரிமையாளராக மீண்டும் உள்நுழைவதற்கு இது ஒரே வழி.",
+            provisionOwnerQrContinueButton = "நான் சேமித்துவிட்டேன் — தொடரவும்",
         ),
     )
     AppLanguage.TH -> UiStrings(
@@ -5733,9 +5789,13 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             chooseCafeBody = "บัญชี Google นี้เก็บร้านไว้มากกว่าหนึ่งร้าน เลือกร้านที่อุปกรณ์นี้ควรใช้งาน",
             chooseCafeCannotUndo = "การเลือกจะแทนที่การตั้งค่าที่มีอยู่บนอุปกรณ์นี้ หากต้องการเปลี่ยนภายหลัง ให้ใช้ “ออกจากร้านนี้”",
             setupTabOwnerQr = "QR เจ้าของ",
-            setupTabManual = "กรอกรายละเอียด",
+            setupTabProvision = "สร้างร้านใหม่",
             setupOwnerQrHelp = "สแกนกุญแจเจ้าของร้าน กุญแจนี้มีทั้งเซิร์ฟเวอร์ เว็บไซต์ และชื่อร้านอยู่แล้ว — ไม่ต้องพิมพ์อะไรที่นี่",
             setupLoadOwnerQrButton = "โหลด QR เจ้าของ",
+            setupTabExistingCafe = "ร้านที่เปิดใช้งานอยู่",
+            setupExistingCafeHelp = "เชื่อมต่ออุปกรณ์นี้กับร้านที่เปิดใช้งานอยู่แล้ว โหลดการตั้งค่าจากเว็บไซต์ของร้าน หรือกรอกเอง",
+            setupExistingWizardUrl = "URL ตัวช่วยติดตั้ง (ไม่บังคับ)",
+            setupExistingWizardHint = "จำเป็นเฉพาะเมื่อจะรันขั้นตอนติดตั้งของร้านนี้อีกครั้งในภายหลัง เก็บไว้บนอุปกรณ์นี้เท่านั้น",
             ownerQrChoiceBody = "หันกล้องไปที่กุญแจ หรือเลือกรูปที่คุณบันทึกไว้แล้ว",
             ownerQrScanWithCamera = "สแกน QR เจ้าของ",
             ownerQrChooseSavedImage = "เลือกรูป QR ที่บันทึกไว้",
@@ -5890,8 +5950,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupManualHint = "ป้อนข้อมูลจากแดชบอร์ดโครงการ Supabase ของคุณ ใช้ตัวเลือกนี้หากเว็บไซต์ของคุณยังไม่ได้เผยแพร่",
             setupSupabaseUrl = "URL Supabase",
             setupSupabaseUrlPlaceholder = "https://your-project.supabase.co",
-            setupSupabaseAnonKey = "กุญแจสาธารณะ Supabase",
-            setupSupabaseAnonKeyPlaceholder = "eyJhbGci…",
+            setupSupabaseAnonKey = "กุญแจ publishable ของ Supabase (anon)",
+            setupSupabaseAnonKeyPlaceholder = "sb_publishable_… / eyJhbGci…",
             setupCafeName = "ชื่อคาเฟ่",
             setupCafeNamePlaceholder = "คาเฟ่ของคุณ",
             setupSave = "บันทึก",
@@ -5916,6 +5976,11 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             setupSwitchIntro = "สิ่งนี้จะเปลี่ยนวิธีที่คาเฟ่ทั้งหมดทำงาน ก่อนที่คุณจะดำเนินการต่อ:",
             setupSwitchToFormat = "เปลี่ยนเป็น %1\$s",
             setupCancel = "ยกเลิก",
+            provisionTabHelp = "สร้างแบ็กเอนด์ Supabase + Cloudflare ใหม่สำหรับคาเฟ่นี้",
+            provisionStartButton = "เริ่มสร้าง",
+            provisionOwnerQrTitle = "กุญแจเจ้าของของคุณ",
+            provisionOwnerQrWarning = "เก็บ QR นี้ให้ปลอดภัย หากต้องติดตั้งแอปใหม่หรือเปลี่ยนอุปกรณ์ นี่คือวิธีเดียวที่จะลงชื่อเข้าใช้ใหม่ในฐานะเจ้าของ",
+            provisionOwnerQrContinueButton = "ฉันบันทึกไว้แล้ว — ดำเนินการต่อ",
         ),
     )
 }

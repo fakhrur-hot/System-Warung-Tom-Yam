@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.ApiResult
+import com.razstudio.pos.data.AppConfigFetcher
 import com.razstudio.pos.data.AppConfigStore
 import com.razstudio.pos.data.ModeRepository
 import com.razstudio.pos.data.OperatingMode
@@ -42,6 +43,7 @@ import javax.inject.Inject
 class OwnerKeyLoginViewModel @Inject constructor(
     private val apiClient: ApiClient,
     private val appConfig: AppConfigStore,
+    private val appConfigFetcher: AppConfigFetcher,
     private val secureStorage: SecureStorage,
     private val modeRepository: ModeRepository,
 ) : ViewModel() {
@@ -54,7 +56,7 @@ class OwnerKeyLoginViewModel @Inject constructor(
     }
 
     /** The screen owns the wording; this app ships in five languages. */
-    enum class Reason { NOT_AN_OWNER_KEY, NO_QR_IN_IMAGE, REJECTED, UNREACHABLE }
+    enum class Reason { NOT_AN_OWNER_KEY, NO_QR_IN_IMAGE, REJECTED, UNREACHABLE, NO_BACKEND_IN_QR }
 
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state.asStateFlow()
@@ -76,13 +78,41 @@ class OwnerKeyLoginViewModel @Inject constructor(
         viewModelScope.launch {
             // Backend first. Without it the recovery call has nowhere to go, and the failure would
             // read as a bad key when the key is fine.
+            val origin = originOf(scanned)
             val api = queryParam(scanned, ApiClient.QR_PARAM_API)
             val key = queryParam(scanned, ApiClient.QR_PARAM_KEY)
             if (api != null && key != null) {
-                appConfig.adoptBackendFromRecoveryQr(api, key, websiteUrl = originOf(scanned))
+                appConfig.adoptBackendFromRecoveryQr(api, key, websiteUrl = origin)
+            } else if (origin.isNotBlank()) {
+                // ── The first device of a brand-new café ────────────────────────────────────
+                //
+                // `api`/`key` are NOT minted by the backend — `admin-recovery` returns only
+                // `${'$'}{origin}/join?recover=<token>`, and `ApiClient.withBackendDetails` bolts the
+                // two params on when an ALREADY-CONFIGURED device renders the QR. A new café has no
+                // such device yet, so its very first owner key arrives bare and this path was the
+                // one that could never succeed — the chicken-and-egg at the exact moment a café is
+                // being born.
+                //
+                // The origin is right there in the link, and the café's own website publishes the
+                // pair at `/app-config.json`. Fetching it makes any recovery link work, including
+                // one copied straight out of Supabase.
+                val fetched = appConfigFetcher.fetch(origin, interactiveSetup = true)
+                if (fetched is AppConfigFetcher.FetchResult.Success) {
+                    appConfig.adoptBackendFromRecoveryQr(
+                        fetched.supabaseUrl, fetched.supabaseAnonKey, websiteUrl = origin,
+                    )
+                }
             }
-            if (!apiClient.isBackendConfigured()) {
-                _state.value = State.Failed(Reason.NOT_AN_OWNER_KEY)
+
+            // The RUNTIME value, deliberately — not `apiClient.isBackendConfigured()`.
+            //
+            // That helper falls back to `BuildConfig.SUPABASE_URL`, so on a café-branded build it
+            // reports "configured" using whatever café was baked in at compile time. The recovery
+            // token would then be sent to a DIFFERENT café's Supabase, be rejected there, and the
+            // screen would blame the key. Refusing here means a bare QR fails honestly instead of
+            // authenticating against a café it never named.
+            if (appConfig.supabaseUrl().isBlank()) {
+                _state.value = State.Failed(Reason.NO_BACKEND_IN_QR)
                 return@launch
             }
 

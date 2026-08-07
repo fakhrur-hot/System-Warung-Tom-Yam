@@ -21,12 +21,47 @@ const KEY_MAP: Record<string, string> = {
   customer_order_hold_seconds: "customerOrderHoldSeconds",
   todays_special: "todaysSpecial",
   business_day_start_hour: "businessDayStartHour",
+  business_day_end_hour: "businessDayEndHour",
   // Café-wide default UI language per surface (BM/EN/ZH/TA/TH). Each client applies the
   // relevant one ONLY when it has no locally-saved language choice yet — see the apps'
   // language bootstrap. Default seed is BM.
   default_lang_admin: "defaultLangAdmin",
   default_lang_ordering: "defaultLangOrdering",
   default_lang_customer: "defaultLangCustomer",
+};
+
+/**
+ * Baseline values for a café that has not been configured yet — DB keys, matching the seeds in
+ * `migrations/0001_initial_schema.sql`, `0006_default_languages.sql` and `0014_business_day_end_hour.sql`.
+ *
+ * ### Why a function-side copy of the seeds
+ *
+ * The seeds are the source of truth and normally win: these are merged UNDER whatever the table
+ * holds, so a café that has configured anything sees exactly its own values and this map is inert.
+ *
+ * It matters when the table is empty. A partly-applied schema leaves `settings` with no rows, and
+ * this endpoint then returned `{}` — every client falling back to whatever its own code happened to
+ * default to, independently, with no way to tell "the café chose this" from "the café said nothing".
+ * Returning the documented baseline instead means a half-provisioned café still answers with a usable
+ * configuration, which is the difference between a setup flow that continues and one that stalls.
+ *
+ * Deliberately NOT a place to introduce new defaults: anything added here must be added to a
+ * migration too, or a configured café and an unconfigured one would disagree about what "default"
+ * means. `owner_recovery_token` is excluded on purpose — it is a secret, minted per café, and has no
+ * meaningful default.
+ */
+const DEFAULT_SETTINGS: Record<string, string> = {
+  print_language: "EN",
+  timezone: "Asia/Kuala_Lumpur",
+  top_n_items: "5",
+  report_email: "",
+  closing_report_auto: "true",
+  staff_can_send_kitchen: "false",
+  staff_can_take_payment: "false",
+  default_lang_admin: "BM",
+  default_lang_ordering: "BM",
+  default_lang_customer: "BM",
+  business_day_end_hour: "2",
 };
 
 // Allowed default-language codes (shared by the three defaultLang* settings).
@@ -87,7 +122,16 @@ async function handleGetSettings(req: Request): Promise<Response> {
     return errorResponse(500, "SERVER_ERROR", "Failed to read settings");
   }
 
-  const result = buildSettingsObject(data, isAuthorized);
+  // Stored rows layered OVER the baseline, so a café that configured a key always sees its own value
+  // and an empty table still answers with the documented defaults instead of `{}`.
+  const merged = [
+    ...Object.entries(DEFAULT_SETTINGS)
+      .filter(([key]) => !data.some((row) => row.key === key))
+      .map(([key, value]) => ({ key, value })),
+    ...data,
+  ];
+
+  const result = buildSettingsObject(merged, isAuthorized);
   return jsonResponse(result);
 }
 
@@ -183,6 +227,7 @@ function coerceValue(apiKey: string, value: string): unknown {
     case "customerOrderHoldSeconds":
       return parseInt(value, 10);
     case "businessDayStartHour":
+    case "businessDayEndHour":
       return parseInt(value, 10);
     case "staffCanSendKitchen":
     case "staffCanTakePayment":
@@ -220,6 +265,17 @@ function validateSetting(apiKey: string, value: unknown): string | null {
       const n = Number(value);
       if (!Number.isInteger(n) || n < 0 || n > 23) {
         return "businessDayStartHour must be an integer 0–23";
+      }
+      break;
+    }
+    // Deliberately NOT validated against the start hour. A café that opens at 15:00 and closes at
+    // 02:00 has an end BEFORE its start, and that is the normal case for the late-night stalls this
+    // setting exists for — rejecting end < start would reject exactly the cafés it was built to
+    // serve. The pair is interpreted as a window that may wrap midnight; neither ordering is wrong.
+    case "businessDayEndHour": {
+      const n = Number(value);
+      if (!Number.isInteger(n) || n < 0 || n > 23) {
+        return "businessDayEndHour must be an integer 0–23";
       }
       break;
     }

@@ -55,10 +55,25 @@ serve(async (req) => {
 
 // ── GET /api/orders?since=<iso> ────────────────────────────────────────────
 async function handleGetOrders(req: Request, url: URL): Promise<Response> {
-  // Admin-only
+  // Admin OR an ordering-key device.
+  //
+  // This was admin-only, and that single line was the reason a staff phone's table grid never
+  // updated: the catch-up sync every ordering device runs sends its ordering key here, got 401 on
+  // every tick, and so had NEVER read a single order — its `orders` table was empty, not stale.
+  // The 401 also reached the client's interceptor, which turns one into a session expiry, so the
+  // staff device was additionally being logged out on a timer. One rejection, both symptoms.
+  //
+  // Staff already create orders, add rounds, send to the kitchen and take payment through this same
+  // endpoint family, each of which accepts an ordering key. Being unable to READ the floor they are
+  // working was the anomaly, not the safeguard.
+  //
+  // The response shape is deliberately identical for both callers rather than a trimmed staff
+  // variant: terminal orders after `since` are what let a settled table drop out of the active set
+  // and go green on the floor, and a second contract would be a second thing to keep in step.
   const admin = await verifyAdminToken(req);
-  if (!admin) {
-    return errorResponse(401, "UNAUTHORIZED", "Admin token required");
+  const ordering = !admin ? await verifyOrderingKey(req) : null;
+  if (!admin && !ordering) {
+    return errorResponse(401, "UNAUTHORIZED", "Admin token or ordering key required");
   }
 
   const since = url.searchParams.get("since");
@@ -204,6 +219,21 @@ async function handleCreateOrder(req: Request, _url: URL): Promise<Response> {
       return errorResponse(422, "VALIDATION", "Each item must have menuItemId and quantity >= 1");
     }
 
+    // ── Custom charge: a cashier-typed name + price, no menu item behind it ──────
+    // Staff/admin only — a QR customer naming its own price would be a free lunch.
+    if (isCustomChargeId(item.menuItemId)) {
+      if (source !== "STAFF") {
+        return errorResponse(403, "FORBIDDEN", "Only staff can add a custom charge");
+      }
+      const custom = customChargeLine(item, autoPrint);
+      if (!custom) {
+        return errorResponse(422, "VALIDATION", "A custom charge needs a name and a price above 0");
+      }
+      orderItems.push(custom);
+      total += custom.unitPriceSnapshot * item.quantity;
+      continue;
+    }
+
     const menuItem = menuItems.get(item.menuItemId);
     if (!menuItem) {
       return errorResponse(422, "ITEM_UNAVAILABLE", `Menu item '${item.menuItemId}' not found or unavailable`);
@@ -292,6 +322,46 @@ interface OrderItemLine {
   note: string | null;
   sentToKitchen: boolean;
   sessionNumber: number;
+}
+
+// ── Custom charges ─────────────────────────────────────────────────────────
+// A bill line the cashier typed by hand — corkage, a replacement plate, a special order — with no
+// menu item behind it. The client marks it by prefixing its menuItemId with `CUSTOM:` (plus a UUID,
+// so two different manual charges stay two lines) and sends `customName` + `unitPrice` alongside.
+// Both are trusted only for STAFF-source orders; the caps below match the APK's own.
+const CUSTOM_CHARGE_ID_PREFIX = "CUSTOM:";
+const CUSTOM_CHARGE_NAME_MAX = 60;
+const CUSTOM_CHARGE_PRICE_MAX = 99_999.99;
+
+function isCustomChargeId(menuItemId: unknown): boolean {
+  return typeof menuItemId === "string" && menuItemId.startsWith(CUSTOM_CHARGE_ID_PREFIX);
+}
+
+/**
+ * Build a custom-charge line, or null when the name or price is unusable — which is the 422 at the
+ * call site rather than a silently free line on the customer's bill.
+ */
+// deno-lint-ignore no-explicit-any
+function customChargeLine(item: any, autoPrint: boolean): OrderItemLine | null {
+  const name = typeof item.customName === "string"
+    ? item.customName.trim().slice(0, CUSTOM_CHARGE_NAME_MAX)
+    : "";
+  const price = Number(item.unitPrice);
+  if (!name) return null;
+  if (!Number.isFinite(price) || price <= 0 || price > CUSTOM_CHARGE_PRICE_MAX) return null;
+  return {
+    id: crypto.randomUUID(),
+    menuItemId: item.menuItemId,
+    nameSnapshot: name,
+    unitPriceSnapshot: Math.round(price * 100) / 100,
+    categorySnapshot: "",
+    codeSnapshot: "",
+    marketPriceSnapshot: false,
+    quantity: item.quantity,
+    note: item.note || null,
+    sentToKitchen: autoPrint,
+    sessionNumber: 1,
+  };
 }
 
 interface MenuItemInfo {

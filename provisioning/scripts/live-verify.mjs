@@ -36,7 +36,12 @@ const ref = requireEnv('SUPABASE_PROJECT_REF')
 const pat = requireEnv('SUPABASE_PAT')
 const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 const brevoApiKey = process.env.BREVO_API_KEY || 'test-key'
-const websiteUrl = process.env.WEBSITE_URL || `https://test-${ref}.pages.dev`
+// No placeholder default. This value becomes the project's WEBSITE_ORIGIN secret, which is both
+// the origin CORS allows and the origin minted into every owner-key/invite QR. Running this
+// harness against a REAL café with the old `https://test-${ref}.pages.dev` fallback silently
+// pointed all of that at a site that does not exist (it happened — Sri Pantai Timur, Aug 2026),
+// blocking the real site's browser calls and minting dead QR links.
+const websiteUrl = requireEnv('WEBSITE_URL')
 
 function requireEnv(name) {
   const value = process.env[name]

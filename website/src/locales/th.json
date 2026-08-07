@@ -60,5 +60,6 @@
   "closeScanner": "ปิด",
   "cafeClosedTitle": "ยังไม่เปิด",
   "cafeClosedBody": "ร้านอาหารยังไม่เปิด กรุณากลับมาใหม่อีกครั้ง!",
-  "searchMenu": "ค้นหา"
+  "searchMenu": "ค้นหา",
+  "tableNotFound": "ไม่พบโต๊ะ"
 }

@@ -54,7 +54,12 @@ async function deployFunction(params: {
   // Redeploying an existing slug updates it in place, so this call is safe to repeat
   // (Requirement R3.3) — no separate "does it already exist" check needed.
   const form = new FormData()
-  form.append('metadata', JSON.stringify({ entrypoint_path: 'index.ts', name }))
+  // verify_jwt MUST be false: every function does its own auth (admin session token / owner key /
+  // ordering api_key), and none of those are Supabase JWTs. Left at the platform default (true),
+  // the gateway 401s every call made with the publishable key — sign-in appears to work and the
+  // session is immediately torn down. This is the exact failure that required redeploying every
+  // function with `--no-verify-jwt` on the first two cafés.
+  form.append('metadata', JSON.stringify({ entrypoint_path: 'index.ts', name, verify_jwt: false }))
   form.append('file', new Blob([content], { type: 'application/typescript' }), 'index.ts')
 
   try {

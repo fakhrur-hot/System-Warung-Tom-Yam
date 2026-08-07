@@ -3,6 +3,13 @@
 package com.razstudio.pos.ui.tableview
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.material3.SheetValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import android.content.res.Configuration
@@ -10,6 +17,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,17 +26,21 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -53,6 +65,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -75,15 +89,20 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.razstudio.pos.data.NewOrderItem
+import com.razstudio.pos.data.customChargeMenuItem
+import com.razstudio.pos.data.isCustomCharge
+import com.razstudio.pos.data.toNewOrderItem
 import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.local.MenuItem
 import com.razstudio.pos.data.local.OrderActions
 import com.razstudio.pos.data.local.OrderItem
+import com.razstudio.pos.data.local.OrderStatus
 import com.razstudio.pos.data.local.PaymentCategory
 import com.razstudio.pos.data.local.PaymentMethod
 import com.razstudio.pos.data.local.PaymentTransaction
 import com.razstudio.pos.ui.i18n.AppLanguage
 import com.razstudio.pos.ui.i18n.UiStrings
+import com.razstudio.pos.ui.theme.scrollPanel
 import com.razstudio.pos.ui.viewmodels.SplitPaymentPlanner
 import kotlinx.coroutines.delay
 
@@ -189,24 +208,51 @@ fun OrderDetailSheet(
      * everywhere else in this sheet.
      */
     onResumeGatewayCheckout: (PaymentTransaction) -> Unit = {},
+    /**
+     * A cash payment was confirmed on the tender pad: the customer handed over [tenderedSen] for
+     * a bill of [totalSen]. Fired so the caller can append the movement to the cash-drawer ledger
+     * (and kick the drawer open for the change) — this sheet stays ViewModel-free, so the ledger
+     * write is the caller's job, wired the same way every other side effect here is. No-op by
+     * default: callers without a drawer (customer-facing surfaces) simply don't record.
+     */
+    onCashTendered: (orderId: String, totalSen: Long, tenderedSen: Long) -> Unit = { _, _, _ -> },
     onCancel: (String, String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // ── Dismissing this sheet takes a deliberate act ─────────────────────────────────
+    //
+    // A swipe anywhere on the sheet used to close it. On a bill that is 85% of the screen and full
+    // of scrollable lists and steppers, that is one careless downward flick away from losing a
+    // half-built round mid-service — and the cashier then has to find the table and start again.
+    //
+    // So `confirmValueChange` refuses Hidden unless [handleDismissArmed] was set, and the ONLY thing
+    // that sets it is a downward drag on the handle. Material3 1.3.1 has no `sheetGesturesEnabled`
+    // to switch this off wholesale (it arrives in 1.5), and gating the state change is better than
+    // that flag would be anyway: the scrim tap keeps working, since it calls `onDismissRequest`
+    // directly rather than driving the sheet through Hidden.
+    var handleDismissArmed by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { target -> target != SheetValue.Hidden || handleDismissArmed },
+    )
+    val sheetScope = rememberCoroutineScope()
     var showCancelDialog by remember { mutableStateOf(false) }
     var showAddItemPicker by remember(state.order?.id) { mutableStateOf(false) }
+    // The hand-typed "+ Customized" charge fields. Keyed on the order like the picker so a
+    // half-typed charge cannot follow the cashier onto a different table's bill.
+    var showCustomCharge by remember(state.order?.id) { mutableStateOf(false) }
     var stagedCart by remember(state.order?.id) { mutableStateOf(listOf<StagedCartLine>()) }
     var pendingPaymentMethod by remember { mutableStateOf<String?>(null) }
     var pendingGatewayMethod by remember { mutableStateOf<PaymentMethod?>(null) }
+    // Pay Cash now routes through the tender pad first; this reveals it.
+    var showCashTender by remember { mutableStateOf(false) }
     // Split state lives here rather than in the ViewModel: it is a cashier's working scratchpad for
     // one customer standing at the counter, and it must not survive the sheet closing.
     var splitMode by remember { mutableStateOf(false) }
-    var showSplitDialog by remember { mutableStateOf(false) }
-    // A SliceOff (not the final share) waiting on the same print-confirm choice every other
-    // payment method gets, before it is handed to onSplitShare/onGatewaySplitCheckout/
-    // onRequestMerchantScanSplit. SplitPaymentDialog hides while this is set so the two dialogs
-    // never stack.
-    var pendingSplitAction by remember { mutableStateOf<PendingSplitAction?>(null) }
+    // rememberSaveable, not remember: with auto-rotate on, turning the phone while a customer's
+    // share is being tallied recreates the activity, and a plain remember drops the cashier back
+    // to the sheet mid-transaction with the person still standing there.
+    var showSplitDialog by rememberSaveable { mutableStateOf(false) }
 
     // ── Voiding unserved lines at payment time ─────────────────────────────────────
     // The café's actual counter situation: the customer is leaving, says a dish never came, and wants
@@ -226,9 +272,56 @@ fun OrderDetailSheet(
         .filter { keptQty(it) != it.quantity }
         .map { VoidLine(itemId = it.id, keepQuantity = keptQty(it)) }
 
+    // ── How wide the sheet is allowed to get ──────────────────────────────────────
+    //
+    // Material3 caps a ModalBottomSheet at 640.dp by default. On the D3 Mini's 1280x800 landscape
+    // that is almost exactly HALF the screen: the receipt and the actions were squeezed into the
+    // middle while a quarter of the display sat empty on either side. The two-pane landscape
+    // layout below only pays off if it is given the room.
+    //
+    // 90% rather than the whole width so the scrim still reads as a modal — an edge-to-edge sheet
+    // looks like a screen you navigated to, and the cashier loses the "tap outside to dismiss"
+    // affordance that the visible strip advertises.
+    //
+    // Portrait is untouched: `Dp.Unspecified` restores Material's own default, which already fills
+    // a phone's width and does not want a percentage applied to it.
+    val configuration = LocalConfiguration.current
+    val isLandscapeLayout = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val sheetMaxWidth = if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+        (configuration.screenWidthDp * 0.9f).dp
+    } else {
+        androidx.compose.ui.unit.Dp.Unspecified
+    }
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        // `confirmValueChange` above is not enough on its own: Material3 1.3.1 does not consult it
+        // for swipe-to-dismiss, so a drag on the body settled the sheet to Hidden and fired this
+        // callback anyway (measured on device — the body swipe closed the bill).
+        //
+        // So the decision is made here, by cause:
+        //  - dragged away (target is Hidden) and NOT armed by the handle → refuse, and re-show so
+        //    the sheet springs back instead of vanishing.
+        //  - anything else — scrim tap, back press, the handle's own armed hide → dismiss normally.
+        //    Those keep working; the point is to stop an accidental flick, not to trap the cashier.
+        onDismissRequest = {
+            val draggedAway = sheetState.targetValue == SheetValue.Hidden
+            if (handleDismissArmed || !draggedAway) {
+                onDismiss()
+            } else {
+                sheetScope.launch { sheetState.show() }
+            }
+        },
         sheetState = sheetState,
+        sheetMaxWidth = sheetMaxWidth,
+        dragHandle = {
+            SheetGrabHandle(
+                onDragDownToDismiss = {
+                    // Arm first, then hide: the gate above refuses Hidden until this is set.
+                    handleDismissArmed = true
+                    sheetScope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                },
+            )
+        },
     ) {
         // ── No active order — nothing to arrange in two panes ────────────────────────
         val order = state.order
@@ -261,22 +354,75 @@ fun OrderDetailSheet(
         // pendingPaymentMethod / showCancelDialog setters). Threading those through parameter
         // lists is precisely where a behaviour change sneaks into a layout refactor, so the
         // bodies below are left byte-for-byte alone — only their arrangement changes.
-        val receiptPane: @Composable ColumnScope.() -> Unit = {
-            Text(
-                text = "${strings.tableWord}: $tableLabel",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+        // ── How tall the sheet is, and how much of it the bill gets ──────────────────
+        //
+        // The sheet is pinned to [SHEET_HEIGHT_FRACTION] of the screen rather than being left to
+        // hug its content. Two reasons: a bill that grows a session no longer makes the whole sheet
+        // jump to a new height under the cashier's hand, and the bill panel gets a predictable share
+        // of a known total instead of a fixed 260.dp that was generous on a phone and tiny on the
+        // D3 Mini's 800dp-tall landscape.
+        //
+        // The bill panel takes the slack via a proportional cap, NOT `weight(1f)`. Both layout
+        // branches wrap their content in `verticalScroll`, which measures children with unbounded
+        // height — so a weight there resolves to zero and the list would vanish. Splitting the
+        // receipt pane into above-list / list / below-list to get a true fill is a bigger change
+        // than this one, and the proportion below lands within a few dp of the same result.
+        val screenHeightDp = configuration.screenHeightDp
+        val sheetHeight = (screenHeightDp * SHEET_HEIGHT_FRACTION).dp
 
-            // ── Order info ────────────────────────────────────────────────────────
-            // The internal order UUID is intentionally not shown — it's a database id with
-            // no meaning to staff and only clutters the header. Status alone is enough.
-            Text(
-                text = "${strings.status}: ${order.status.name}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
+        // ── Payment QR, resolved once for the whole sheet ────────────────────────────
+        //
+        // Hoisted out of the payment section because the button moved to the Items row — but the
+        // rule for whether it may be shown is unchanged, and still routed through OrderActions so
+        // what runs here is the same rule OrderActionsPaymentQrTest pins rather than a copy of it.
+        //
+        // Keyed on the order id so the hash is re-read each time the sheet opens for a different
+        // order. An unkeyed remember would pin whatever existed at first composition — on a staff
+        // device that is null, and the QR chip would stay hidden even after the image downloaded.
+        val qrContext = LocalContext.current
+        val paymentQrHash = remember(order.id) { AppConfigStore(qrContext).paymentQrHash() }
+        val paymentQrBitmap = remember(paymentQrHash) {
+            if (paymentQrHash == null) null else PaymentQrPipeline.loadFromInternal(qrContext)
+        }
+        var showPaymentQr by remember { mutableStateOf(false) }
+        // Absent rather than shown-and-disabled: a control that dies in front of a waiting customer
+        // is worse than no control.
+        val canShowPaymentQr = paymentQrBitmap != null &&
+            OrderActions.canShowPaymentQr(
+                hasPaymentPermission = permissions.canTakePayment,
+                status = order.status,
+                paymentQrHash = paymentQrHash,
+                hasStoredImage = true,
             )
+        if (showPaymentQr && paymentQrBitmap != null) {
+            PaymentQrDialog(qr = paymentQrBitmap, onDismiss = { showPaymentQr = false })
+        }
+
+        val receiptPane: @Composable ColumnScope.() -> Unit = {
+            // ── Header: table and status on ONE line ──────────────────────────────
+            // The status used to sit on its own line below, which cost a whole row of a sheet that
+            // is short on vertical space on a phone. It is two words; it belongs beside the table.
+            //
+            // The internal order UUID is deliberately absent — a database id means nothing to staff
+            // and only clutters the header.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "${strings.tableWord}: $tableLabel",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = order.status.readableLabel(strings),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(8.dp))
@@ -293,15 +439,49 @@ fun OrderDetailSheet(
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
-                if (canAddItems) {
-                    AddItemCircleButton(
-                        contentDescription = strings.addItemCd,
-                        onClick = {
-                            showAddItemPicker = !showAddItemPicker
-                            if (!showAddItemPicker) stagedCart = emptyList()
-                        },
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // QR lives here rather than under the payment buttons: presenting the code is
+                    // something a cashier does WHILE reading the bill, not after choosing how to
+                    // settle, and buried under Pay Cash / Pay QR it was three scrolls away. Same chip
+                    // as Customized so the row reads as one strip.
+                    if (canShowPaymentQr) {
+                        SheetActionChip(label = strings.showQrButton) { showPaymentQr = true }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    if (canAddItems) {
+                        CustomChargeButton(strings = strings) {
+                            showCustomCharge = !showCustomCharge
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        AddItemCircleButton(
+                            contentDescription = strings.addItemCd,
+                            // Collapsing no longer discards the staged round: the staged list now
+                            // renders below regardless of this toggle (a typed charge needs it), so
+                            // clearing here would throw away lines still on screen. Individual
+                            // lines have their own delete button.
+                            onClick = { showAddItemPicker = !showAddItemPicker },
+                        )
+                    }
                 }
+            }
+            // Breathing room so the chips do not sit flush against the white scroll panel below —
+            // touching, they read as one control attached to the list.
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // A hand-typed charge stages into the SAME stagedCart as picker items, so a round of
+            // "one more Teh Tarik plus a RM 5.00 corkage" is one order round, one kitchen print,
+            // and one confirm button — see the staged-cart block below.
+            AnimatedVisibility(visible = showCustomCharge && canAddItems) {
+                CustomChargeForm(
+                    strings = strings,
+                    onAdd = { name, price ->
+                        stagedCart = stagedCart + StagedCartLine(
+                            menuItem = customChargeMenuItem(name, price),
+                            quantity = 1,
+                            unitPrice = price,
+                        )
+                    },
+                )
             }
 
             // Inline, expandable tabbed menu picker. Picks are staged locally (not sent
@@ -328,57 +508,75 @@ fun OrderDetailSheet(
                             }
                         },
                     )
+                }
+            }
 
-                    if (stagedCart.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        stagedCart.forEachIndexed { index, line ->
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
+            // The staged round, OUTSIDE the picker's visibility: a custom charge can be typed with
+            // the menu picker shut, and a staged line the cashier cannot see or send is a line that
+            // silently vanishes when they walk away. Shown whenever anything is staged, from either
+            // source, and confirmed by one button.
+            if (stagedCart.isNotEmpty() && canAddItems) {
+                Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    stagedCart.forEachIndexed { index, line ->
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "${line.quantity}× ${language.menuName(line.menuItem)}${line.size?.let { " ($it)" } ?: ""}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                // A hand-typed charge shows its price here — it is the only place
+                                // the cashier can check what they typed before sending it.
+                                if (line.menuItem.isCustomCharge) {
                                     Text(
-                                        text = "${line.quantity}× ${language.menuName(line.menuItem)}${line.size?.let { " ($it)" } ?: ""}",
+                                        text = "RM %.2f".format((line.unitPrice ?: line.menuItem.price) * line.quantity),
                                         style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.weight(1f),
+                                        fontFamily = FontFamily.Monospace,
                                     )
-                                    IconButton(
-                                        onClick = {
-                                            stagedCart = stagedCart.toMutableList().also { it.removeAt(index) }
-                                        },
-                                        modifier = Modifier.size(28.dp),
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = strings.commonDelete,
-                                            tint = MaterialTheme.colorScheme.error,
-                                        )
-                                    }
                                 }
-                                if (!line.note.isNullOrBlank()) {
-                                    Text(
-                                        text = "   + ${line.note}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
+                                IconButton(
+                                    onClick = {
+                                        stagedCart = stagedCart.toMutableList().also { it.removeAt(index) }
+                                    },
+                                    modifier = Modifier.size(28.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = strings.commonDelete,
+                                        tint = MaterialTheme.colorScheme.error,
                                     )
                                 }
                             }
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Button(
-                            onClick = {
-                                onAddItems(
-                                    order.id,
-                                    stagedCart.map { NewOrderItem(menuItemId = it.menuItem.id, quantity = it.quantity, note = it.note, unitPrice = it.unitPrice, size = it.size) },
+                            if (!line.note.isNullOrBlank()) {
+                                Text(
+                                    text = "   + ${line.note}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
-                                stagedCart = emptyList()
-                                showAddItemPicker = false
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("${strings.addItemsToOrderButton} (${stagedCart.sumOf { it.quantity }})")
+                            }
                         }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Button(
+                        onClick = {
+                            onAddItems(
+                                order.id,
+                                stagedCart.map {
+                                    it.menuItem.toNewOrderItem(it.quantity, it.note, it.size, it.unitPrice)
+                                },
+                            )
+                            stagedCart = emptyList()
+                            showAddItemPicker = false
+                            showCustomCharge = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("${strings.addItemsToOrderButton} (${stagedCart.sumOf { it.quantity }})")
                     }
                 }
             }
@@ -386,10 +584,39 @@ fun OrderDetailSheet(
             // ── Items grouped by session (order-placement round), then by category ──
             val sessionGroups = state.items.groupBy { it.sessionNumber }.toSortedMap()
 
-            LazyColumn(
+            // This list is a 260.dp scroll box, so a newly-added round lands BELOW the fold with the
+            // divider and "Subtotal" sitting right under it — which reads as "the item I just added
+            // isn't there", when it is, one scroll down. Jumping to the end whenever the line count
+            // grows puts the round the cashier just created where they are already looking.
+            val itemsListState = rememberLazyListState()
+            LaunchedEffect(state.items.size) {
+                val last = itemsListState.layoutInfo.totalItemsCount - 1
+                if (last > 0) itemsListState.animateScrollToItem(last)
+            }
+
+            // The scroll area keeps the LIGHT ground while the sheet around it is a step darker
+            // (see ThemePreset's surfaceContainer mapping). This is the receipt — the one region a
+            // cashier reads line by line with a customer waiting — so it gets the highest contrast
+            // on the sheet, and its edges make the scrollable region visibly bounded instead of
+            // blending into the actions below it.
+            Surface(
+                color = MaterialTheme.colorScheme.scrollPanel,
+                shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 260.dp),
+                    // Takes ALL the leftover height in the sheet. With a fixed 85% sheet and a
+                    // one-item bill, a capped panel left a band of dead space under Cancel Order and
+                    // pushed every action up into the middle of the screen. Weighted, the panel grows
+                    // to fill whatever the fixed content does not use, so the totals and the payment
+                    // buttons always sit at the bottom of the sheet no matter how short the order is —
+                    // and the cashier's thumb finds them in the same place every time.
+                    .weight(1f),
+            ) {
+            LazyColumn(
+                state = itemsListState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp),
             ) {
                 sessionGroups.forEach { (sessionNumber, sessionItems) ->
                     // Partition into confirmed (sentToKitchen=true) and pending (sentToKitchen=false)
@@ -398,13 +625,43 @@ fun OrderDetailSheet(
                     // ── Confirmed items — render as before ──────────────────────────────
                     if (confirmedItems.isNotEmpty()) {
                         item {
-                            Text(
-                                text = "${strings.orderSessionLabel} $sessionNumber",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
-                            )
+                            // Session number and its reprint action on ONE row. The button used to be
+                            // a full-width bar under the round's items, which cost a whole row per
+                            // session inside a 260dp scroll box — with four sessions, half the
+                            // scrollable height was buttons. Sitting beside the heading it also no
+                            // longer needs to name the session: the row it is on says which.
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp, bottom = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "${strings.orderSessionLabel} $sessionNumber",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                if (permissions.canSendToKitchen) {
+                                    TextButton(
+                                        onClick = { onReprintSession(order.id, sessionNumber) },
+                                        enabled = !state.isLoading,
+                                        contentPadding = PaddingValues(horizontal = 8.dp),
+                                    ) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.Send,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = strings.reprintToKitchenButton,
+                                            style = MaterialTheme.typography.labelMedium,
+                                        )
+                                    }
+                                }
+                            }
                         }
                         val byCategory = confirmedItems.groupBy { it.categorySnapshot }
                         byCategory.forEach { (category, categoryItems) ->
@@ -432,27 +689,6 @@ fun OrderDetailSheet(
                             }
                         }
 
-                        // Per-session reprint — reprints ONLY this round's slip (marked
-                        // "Session #N") so the kitchen can tell it apart from other rounds.
-                        if (permissions.canSendToKitchen) {
-                            item {
-                                OutlinedButton(
-                                    onClick = { onReprintSession(order.id, sessionNumber) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 4.dp, bottom = 4.dp),
-                                    enabled = !state.isLoading,
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.Send,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("${strings.reprintToKitchenButton} (${strings.orderSessionLabel} $sessionNumber)")
-                                }
-                            }
-                        }
                     }
 
                     // ── Pending items — own labeled block with scoped Print button ──────
@@ -502,14 +738,17 @@ fun OrderDetailSheet(
                     }
                 }
             }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider()
             Spacer(modifier = Modifier.height(4.dp))
 
-            // ── Subtotal + Grand Total (receipt-style) ─────────────────────────────
-            val subtotal = state.items.sumOf { it.unitPriceSnapshot * it.quantity }
-            ReceiptTotal(label = strings.subtotal, amount = subtotal, bold = false)
+            // ── Grand Total only ──────────────────────────────────────────────────
+            // No subtotal line. This stall sells food and drink at the price on the menu — there is
+            // no service charge, no tax, nothing between the lines and the total. A subtotal that
+            // always equals the grand total is a row of noise that makes a cashier check whether
+            // they differ, every single time.
             ReceiptTotal(label = strings.grandTotal, amount = order.total, bold = true)
 
             // While marking unserved lines, show what the customer would actually pay. The server
@@ -651,6 +890,46 @@ fun OrderDetailSheet(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
+                // ── The café's payment QR, shown rather than hidden behind a button ──────────
+                //
+                // Landscape leaves a large dead area above the pay controls, and a code the
+                // CUSTOMER has to scan is a poor fit for a dialog the cashier must open first.
+                // Portrait keeps the "Show QR" button below, where there is no room for this.
+                if (isLandscapeLayout) {
+                    val panelContext = LocalContext.current
+                    val panelPrefs = remember(panelContext) {
+                        panelContext.getSharedPreferences("app_local_prefs", android.content.Context.MODE_PRIVATE)
+                    }
+                    var qrBrand by remember {
+                        mutableStateOf(PaymentQrBrand.fromName(panelPrefs.getString("payment_qr_brand", null)))
+                    }
+                    // Gated on the stored image alone, deliberately — unlike the "Show QR" button,
+                    // which also checks the config hash. The two can disagree (see OrderActions),
+                    // and for a panel that only draws what it has, a hash mismatch hiding a
+                    // perfectly good code is a worse failure than showing a stale one.
+                    val panelQr = remember(order.id) { PaymentQrPipeline.loadFromInternal(panelContext) }
+                    panelQr?.let { bitmap ->
+                        // Capped against the screen's HEIGHT, not the pane's width. A landscape
+                        // phone is only ~400dp tall, and a code sized to fill half its width would
+                        // be taller than the sheet — pushing Pay Cash, Pay QR and the split radio
+                        // below the fold, so the pane meant to speed the cashier up hid the only
+                        // controls they need. The D3's landscape canvas is twice as tall and is
+                        // unaffected by the cap.
+                        PaymentQrPanel(
+                            qr = bitmap,
+                            brand = qrBrand,
+                            onBrandChange = { chosen ->
+                                qrBrand = chosen
+                                panelPrefs.edit().putString("payment_qr_brand", chosen.name).apply()
+                            },
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .widthIn(max = (configuration.screenHeightDp * 0.45f).dp),
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
+
                 // ── Two ways to settle, chosen before the money moves ────────────────────────
                 //
                 // Whole-bill stays first and stays the default: most tables pay once, and a cashier
@@ -661,19 +940,48 @@ fun OrderDetailSheet(
                 // told the till something untrue about who paid how.
                 // A radio group of one is not a choice. With split unavailable the screen stays
                 // exactly as it was before this feature existed.
+                // Both choices on ONE row. They are two halves of a single question — "one bill or
+                // several?" — and stacking them put the payment buttons between the options, so the
+                // second choice was below the actions belonging to the first.
                 if (allowSplitPayment) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = !splitMode,
-                                onClick = { splitMode = false },
-                                role = Role.RadioButton,
-                            ),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        RadioButton(selected = !splitMode, onClick = { splitMode = false })
-                        Text(strings.payWholeBillOption, style = MaterialTheme.typography.bodyMedium)
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .selectable(
+                                    selected = !splitMode,
+                                    onClick = { splitMode = false },
+                                    role = Role.RadioButton,
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = !splitMode, onClick = { splitMode = false })
+                            Text(
+                                text = strings.payWholeBillOption,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2,
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .selectable(
+                                    selected = splitMode,
+                                    onClick = { splitMode = true },
+                                    role = Role.RadioButton,
+                                ),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = splitMode, onClick = { splitMode = true })
+                            Text(
+                                text = strings.splitPaymentOption,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2,
+                            )
+                        }
                     }
                 }
 
@@ -683,7 +991,10 @@ fun OrderDetailSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Button(
-                            onClick = { pendingPaymentMethod = "CASH" },
+                            // Through the tender pad, not straight to payment: the pad computes
+                            // the change and feeds the cash-drawer ledger before the existing
+                            // receipt-confirm flow continues unchanged.
+                            onClick = { showCashTender = true },
                             modifier = Modifier.weight(1f),
                             enabled = !state.isLoading,
                         ) {
@@ -697,7 +1008,6 @@ fun OrderDetailSheet(
                             Text(strings.payQR)
                         }
                     }
-
                     if (gatewayMethods.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         GatewayMethodRow(
@@ -709,22 +1019,6 @@ fun OrderDetailSheet(
                     }
                 }
 
-                if (allowSplitPayment) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = splitMode,
-                                onClick = { splitMode = true },
-                                role = Role.RadioButton,
-                            ),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = splitMode, onClick = { splitMode = true })
-                        Text(strings.splitPaymentOption, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-
                 if (splitMode && allowSplitPayment) {
                     Button(
                         onClick = { showSplitDialog = true },
@@ -732,58 +1026,6 @@ fun OrderDetailSheet(
                         enabled = !state.isLoading && state.items.isNotEmpty(),
                     ) {
                         Text(strings.splitPaymentButton)
-                    }
-                }
-
-                // ── Show QR (task 17.3, Requirements 13.1-13.3) ──────────────────────────────
-                // Small outlined button directly under the two payment buttons, deliberately
-                // subordinate to them. Shown under exactly the same condition as those buttons, so
-                // any device permitted to take payment can present the code — admin or staff alike.
-                //
-                // Visibility is `hash != null`, never mode-dependent: the Payment QR exists in all
-                // three operating modes (Requirement 14.7). When nothing is configured the button is
-                // ABSENT rather than shown-and-disabled or shown-then-failing (Requirement 13.3) —
-                // a control that dies in front of a waiting customer is worse than no control.
-                val qrContext = LocalContext.current
-                // Keyed on the order id so the hash is re-read each time the sheet is opened for a
-                // different order, rather than being captured once for the lifetime of the composition.
-                // That is what makes task 16.3's ordering hold: PaymentQrResolver runs when Table View
-                // loads its branding, which is strictly before any sheet can be opened from it, so by
-                // the time this reads the hash the cache is already reconciled. An unkeyed remember
-                // would have pinned whatever value existed at first composition — on a staff device
-                // that is null, and the Show QR button would stay hidden even after the download.
-                val paymentQrHash = remember(order.id) { AppConfigStore(qrContext).paymentQrHash() }
-                val paymentQrBitmap = remember(paymentQrHash) {
-                    if (paymentQrHash == null) null else PaymentQrPipeline.loadFromInternal(qrContext)
-                }
-                var showPaymentQr by remember { mutableStateOf(false) }
-
-                // Routed through OrderActions so the rule that runs here is the same one
-                // OrderActionsPaymentQrTest pins, rather than a duplicate of it that can drift.
-                // Bound to a local first: the rule already requires a non-null image, but a function
-                // call cannot smart-cast, and this keeps the dialog's argument provably non-null
-                // instead of reaching for !!.
-                val qrToShow = paymentQrBitmap
-                if (qrToShow != null &&
-                    OrderActions.canShowPaymentQr(
-                        hasPaymentPermission = permissions.canTakePayment,
-                        status = order.status,
-                        paymentQrHash = paymentQrHash,
-                        hasStoredImage = true,
-                    )
-                ) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedButton(
-                        onClick = { showPaymentQr = true },
-                        enabled = !state.isLoading,
-                    ) {
-                        Text(strings.showQrButton)
-                    }
-                    if (showPaymentQr) {
-                        PaymentQrDialog(
-                            qr = qrToShow,
-                            onDismiss = { showPaymentQr = false },
-                        )
                     }
                 }
 
@@ -841,14 +1083,15 @@ fun OrderDetailSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight()
+                    .height(sheetHeight)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
+                // Bounded, not scrolling, for the same reason as portrait — the bill panel inside
+                // needs a real height to weight against. The ACTIONS column keeps its own scroll.
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .verticalScroll(rememberScrollState())
                         .padding(end = 16.dp),
                 ) { receiptPane() }
 
@@ -863,7 +1106,12 @@ fun OrderDetailSheet(
                 // and content taller than it fills the pane and scrolls as before.
                 Box(
                     modifier = Modifier
-                        .width(ACTIONS_PANE_WIDTH)
+                        // Even 50:50 rather than a fixed 300.dp column. The receipt only needs as
+                        // much width as its longest item line, and on a 1280px landscape screen the
+                        // old split gave it ~836px against the actions' 300 — the pane the cashier
+                        // actually touches was the cramped one, and the payment QR below had
+                        // nowhere to go.
+                        .weight(1f)
                         .fillMaxHeight()
                         .padding(start = 16.dp),
                     contentAlignment = Alignment.BottomCenter,
@@ -872,12 +1120,16 @@ fun OrderDetailSheet(
                 }
             }
         } else {
+            // No verticalScroll here any more, deliberately: a scrolling column is measured with
+            // unbounded height, which makes the bill panel's `weight(1f)` resolve to zero. The sheet
+            // is a known 85% instead, the panel absorbs the slack, and the panel's own LazyColumn is
+            // what scrolls when an order outgrows the space.
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .height(sheetHeight)
                     .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .padding(bottom = 32.dp),
+                    .padding(bottom = 16.dp),
             ) {
                 receiptPane()
                 actionsPane()
@@ -903,10 +1155,10 @@ fun OrderDetailSheet(
     // planner returns SettleWholeOrder, and this hands it to `pendingPaymentMethod` — the ordinary
     // path, which shows the 10-second receipt prompt, ends the table session and returns to the
     // table grid. Closing a table in two different places would give two behaviours to keep in step.
-    // Hidden rather than dismissed while a split-off share is waiting on the print-confirm
-    // dialog below — the two must never stack, and the split dialog reappears (still open, still
-    // showing the shrunk list) the moment the choice resolves, for the next customer in the group.
-    if (showSplitDialog && pendingSplitAction == null) {
+    // No hide-and-reappear any more: with the per-share prompt gone there is no second dialog to
+    // avoid stacking with, so this stays open across shares and simply shows the shrunk list for the
+    // next customer. It closes the instant the bill is cleared (see the SettleWholeOrder branch).
+    if (showSplitDialog) {
         SplitPaymentDialog(
             items = state.items,
             strings = strings,
@@ -914,9 +1166,7 @@ fun OrderDetailSheet(
             gatewayMethods = gatewayMethods,
             onPay = { plan, method ->
                 // A gateway method code routes to the async checkout+poll flow instead of
-                // completing immediately — same generic (Plan, String) callback either way, so
-                // this dialog itself needs no gateway-specific branching (task 7.3: "nothing
-                // special beyond appearing there").
+                // completing immediately — same generic (Plan, String) callback either way.
                 when (plan) {
                     is SplitPaymentPlanner.Plan.SettleWholeOrder -> {
                         showSplitDialog = false
@@ -926,12 +1176,31 @@ fun OrderDetailSheet(
                         else pendingPaymentMethod = method
                     }
                     is SplitPaymentPlanner.Plan.SliceOff -> {
-                        // Every split-off share gets the same print-confirm choice as a whole-bill
-                        // payment, not just whoever settles the last one — resolved below, which
-                        // is what actually dispatches to onSplitShare/onGatewaySplitCheckout/
-                        // onRequestMerchantScanSplit.
+                        // Charged immediately: no prompt, no receipt for an individual share.
+                        //
+                        // This used to raise a print-confirm per share, so a group of four answered
+                        // four dialogs. The receipt question is now asked ONCE, when the bill is
+                        // finally cleared — the last payer always resolves to SettleWholeOrder (see
+                        // SplitPaymentPlanner: `takesEverything`), which routes into the ordinary
+                        // whole-bill path and its single 10s prompt.
+                        //
+                        // The cost, stated because it is a real loss: an individual payer can no
+                        // longer walk away with a receipt for their own share. Anyone who needs one
+                        // for expenses has to be handled another way.
                         state.order?.let { order ->
-                            pendingSplitAction = PendingSplitAction(order.id, order.tableId, plan, method)
+                            val gateway = PaymentMethod.fromCode(method)?.takeIf { !it.worksOffline }
+                            when {
+                                gateway?.category == PaymentCategory.E_WALLET ->
+                                    onRequestMerchantScanSplit(
+                                        order.id, order.tableId, plan, gateway, false,
+                                    )
+                                gateway != null ->
+                                    onGatewaySplitCheckout(
+                                        order.id, order.tableId, plan, gateway, false,
+                                    )
+                                else ->
+                                    onSplitShare(order.id, order.tableId, plan, method, false)
+                            }
                         }
                     }
                     SplitPaymentPlanner.Plan.NothingSelected -> Unit
@@ -944,6 +1213,26 @@ fun OrderDetailSheet(
         )
     }
 
+    // ── Cash tender pad ───────────────────────────────────────────────────────────
+    // Sits BEFORE the receipt-print confirm in the flow: tender → (ledger records, drawer opens
+    // for the change) → the same ReceiptPrintConfirmDialog and onPayment path as ever.
+    if (showCashTender && state.order != null) {
+        CashTenderDialog(
+            totalRinggit = state.order.total,
+            strings = strings,
+            onConfirm = { tenderedSen ->
+                onCashTendered(
+                    state.order.id,
+                    PaymentTransaction.fromRinggit(state.order.total),
+                    tenderedSen,
+                )
+                showCashTender = false
+                pendingPaymentMethod = "CASH"
+            },
+            onDismiss = { showCashTender = false },
+        )
+    }
+
     // ── Payment receipt-print confirm dialog ──────────────────────────────────────
     val paymentMethod = pendingPaymentMethod
     if (paymentMethod != null && state.order != null) {
@@ -952,32 +1241,6 @@ fun OrderDetailSheet(
             onResolve = { shouldPrint ->
                 onPayment(state.order.id, paymentMethod, shouldPrint)
                 pendingPaymentMethod = null
-            },
-        )
-    }
-
-    // ── Split-share receipt-print confirm dialog ──────────────────────────────────
-    val splitAction = pendingSplitAction
-    if (splitAction != null) {
-        ReceiptPrintConfirmDialog(
-            strings = strings,
-            onResolve = { shouldPrint ->
-                val gatewayMethod = PaymentMethod.fromCode(splitAction.method)?.takeIf { !it.worksOffline }
-                when {
-                    gatewayMethod?.category == PaymentCategory.E_WALLET ->
-                        onRequestMerchantScanSplit(
-                            splitAction.orderId, splitAction.tableId, splitAction.plan, gatewayMethod, shouldPrint,
-                        )
-                    gatewayMethod != null ->
-                        onGatewaySplitCheckout(
-                            splitAction.orderId, splitAction.tableId, splitAction.plan, gatewayMethod, shouldPrint,
-                        )
-                    else ->
-                        onSplitShare(
-                            splitAction.orderId, splitAction.tableId, splitAction.plan, splitAction.method, shouldPrint,
-                        )
-                }
-                pendingSplitAction = null
             },
         )
     }
@@ -1034,6 +1297,16 @@ fun OrderDetailSheet(
 
 // ── Private helpers ───────────────────────────────────────────────────────────────
 
+/**
+ * How much of the screen height the order sheet occupies.
+ *
+ * Fixed rather than content-hugging so the sheet does not resize as sessions are added, and so the
+ * bill panel can be given a share of a known total. 85% leaves the scrim visible at the top, which
+ * is what still advertises "tap outside to dismiss" — an edge-to-edge sheet reads as a screen you
+ * navigated to, and the cashier loses that affordance.
+ */
+private const val SHEET_HEIGHT_FRACTION = 0.85f
+
 private data class StagedCartLine(
     val menuItem: MenuItem,
     val quantity: Int,
@@ -1042,28 +1315,47 @@ private data class StagedCartLine(
     val unitPrice: Double? = null,
 )
 
-/** A split-off share (not the final one) waiting on the print-confirm dialog before it is handed
- *  to whichever of onSplitShare/onGatewaySplitCheckout/onRequestMerchantScanSplit fits [method]. */
-private data class PendingSplitAction(
-    val orderId: String,
-    val tableId: String?,
-    val plan: SplitPaymentPlanner.Plan.SliceOff,
-    val method: String,
-)
 
-private fun categoryLabel(category: String, strings: UiStrings): String = when (category.uppercase()) {
-    "FOOD" -> strings.catFood
-    "BEVERAGES" -> strings.catBeverages
-    "SIDE_DISHES", "SIDE DISHES" -> strings.catSideDishes
-    else -> strings.catOthers
+/**
+ * The category caption above a group of receipt lines, from the line's frozen `categorySnapshot`.
+ *
+ * Two things this gets right that the previous version did not.
+ *
+ * A hand-typed charge has NO menu category — its snapshot is empty — and lumping it under "Others"
+ * claimed it belonged to a menu bucket it was never in. Blank now reads as "Customized", matching
+ * the button that created it.
+ *
+ * And a café's own preset categories ("SAYUR", "MINUMAN (AIS)") are shown verbatim rather than
+ * collapsed into "Others". The old `else` branch swallowed every custom category the menu defines,
+ * so a stall with its own categories saw its whole receipt filed under one meaningless heading.
+ */
+private fun categoryLabel(category: String, strings: UiStrings): String = when {
+    category.isBlank() -> strings.customChargeButton
+    else -> when (category.uppercase()) {
+        "FOOD" -> strings.catFood
+        "BEVERAGES" -> strings.catBeverages
+        "SIDE_DISHES", "SIDE DISHES" -> strings.catSideDishes
+        "OTHERS" -> strings.catOthers
+        else -> category
+    }
 }
 
 /**
- * Width of the landscape actions column. Wide enough that Pay Cash and Pay QR sit side by
- * side without their labels wrapping in any of the five supported languages, and narrow
- * enough to leave the receipt the majority of a 2720px-wide screen.
+ * Status as words a person reads, not an enum name.
+ *
+ * `SENT_TO_KITCHEN` was being printed raw in the header — screaming caps with underscores, which is
+ * a database value leaking into a cashier's face. The four live states reuse the same short labels
+ * the table grid already uses, so one order speaks the same vocabulary everywhere; the terminal and
+ * unknown states fall back to a de-underscored, sentence-cased name rather than needing strings that
+ * would almost never be seen.
  */
-private val ACTIONS_PANE_WIDTH = 300.dp
+private fun OrderStatus.readableLabel(strings: UiStrings): String = when (this) {
+    OrderStatus.RECEIVED -> strings.statusNew
+    OrderStatus.SENT_TO_KITCHEN -> strings.statusKitchen
+    OrderStatus.PREPARING -> strings.statusPreparing
+    OrderStatus.READY -> strings.statusReady
+    else -> name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
+}
 
 /**
  * One receipt line.

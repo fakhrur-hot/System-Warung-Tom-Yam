@@ -4,9 +4,6 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +23,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -36,8 +32,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -98,6 +94,8 @@ fun SetupScreen(
      * the route in release, so the button below stays hidden there.
      */
     onOpenPromoCatalog: (() -> Unit)? = null,
+    /** Open the in-app provisioner to create a new café backend from this tablet. */
+    onProvision: () -> Unit = {},
     viewModel: SetupViewModel = hiltViewModel(),
     // NOTE: the rest of this screen is still hardcoded English — a pre-existing gap, not one this
     // change introduces. The new controls below are translated; the older labels around them are
@@ -207,18 +205,33 @@ fun SetupScreen(
                 // was about to overwrite — which is the whole reason these tabs exist.
                 //
                 // Manual stays, because a café whose site is not deployed yet has no QR to scan.
-                TabRow(
-                    selectedTabIndex = if (state.connectionTab == ConnectionTab.OWNER_QR) 0 else 1,
+                // Three tabs, so ScrollableTabRow: the labels are translated and "Sediakan kafe
+                // baharu" alone is wide, which a fixed TabRow would have to squeeze into a third of
+                // the screen. Scrollable keeps every label whole in every language.
+                ScrollableTabRow(
+                    selectedTabIndex = when (state.connectionTab) {
+                        ConnectionTab.OWNER_QR -> 0
+                        ConnectionTab.EXISTING_CAFE -> 1
+                        ConnectionTab.PROVISION_NEW_CAFE -> 2
+                    },
+                    edgePadding = 0.dp,
                 ) {
                     Tab(
                         selected = state.connectionTab == ConnectionTab.OWNER_QR,
                         onClick = { viewModel.selectConnectionTab(ConnectionTab.OWNER_QR) },
                         text = { Text(strings.setupTabOwnerQr) },
                     )
+                    // Middle, matching how often each is used: almost every device joins by QR, a few
+                    // join a running café by hand, and provisioning a new one happens once per café.
                     Tab(
-                        selected = state.connectionTab == ConnectionTab.MANUAL,
-                        onClick = { viewModel.selectConnectionTab(ConnectionTab.MANUAL) },
-                        text = { Text(strings.setupTabManual) },
+                        selected = state.connectionTab == ConnectionTab.EXISTING_CAFE,
+                        onClick = { viewModel.selectConnectionTab(ConnectionTab.EXISTING_CAFE) },
+                        text = { Text(strings.setupTabExistingCafe) },
+                    )
+                    Tab(
+                        selected = state.connectionTab == ConnectionTab.PROVISION_NEW_CAFE,
+                        onClick = { viewModel.selectConnectionTab(ConnectionTab.PROVISION_NEW_CAFE) },
+                        text = { Text(strings.setupTabProvision) },
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -252,94 +265,159 @@ fun SetupScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
+            // ── Existing, already-running café ───────────────────────────────────────────────────
+            //
+            // The values asked for here are the same four a café's own Cloudflare Pages project holds
+            // as VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY plus its site URL, so an owner can
+            // copy them straight out of the dashboard they already have open. The website field is
+            // offered first because /app-config.json serves all of them: one field beats three, and
+            // typing a publishable key by hand on a tablet is where mistakes happen.
+            //
+            // The manual fields stay reachable underneath, because the case this tab exists for
+            // includes a café whose site is up but whose app-config is not being served correctly —
+            // if the fetch is the only way in, that café is stuck.
             if (state.operatingMode == OperatingMode.CLOUD &&
-                state.connectionTab == ConnectionTab.MANUAL
+                state.connectionTab == ConnectionTab.EXISTING_CAFE
             ) {
-                // ── Task 4.2: single website URL field as the primary input ──────────────────────
-                HelpText(strings.setupCafeWebsiteUrlHint)
+                HelpText(strings.setupExistingCafeHelp)
 
                 Field(
-                    label = strings.setupCafeWebsiteUrl,
-                    placeholder = strings.setupCafeWebsitePlaceholder,
-                    value = state.websiteUrl,
-                    keyboardType = KeyboardType.Uri,
-                    onChange = { v -> viewModel.update { it.copy(websiteUrl = v) } },
-                )
+                    strings.setupCafeWebsiteUrl,
+                    strings.setupCafeWebsitePlaceholder,
+                    state.websiteUrl,
+                    KeyboardType.Uri,
+                ) { v -> viewModel.update { it.copy(websiteUrl = v) } }
+                HelpText(strings.setupCafeWebsiteUrlHint)
 
-                // Fetch button and in-progress indicator
-                Row(
+                Button(
+                    onClick = { viewModel.fetchFromWebsite() },
+                    enabled = !state.isFetching && state.websiteUrl.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Button(
-                        onClick = { viewModel.fetchFromWebsite() },
-                        enabled = !state.isFetching,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(if (state.isFetching) strings.setupConnecting else strings.setupConnect)
-                    }
-                    if (state.isFetching) {
-                        CircularProgressIndicator(modifier = Modifier.width(24.dp))
-                    }
+                    Text(if (state.isFetching) strings.setupConnecting else strings.setupConnect)
                 }
-
-                // Fetch error message (non-null after a failed attempt)
-                state.fetchError?.let { errorMsg ->
+                state.fetchError?.let { err ->
                     Text(
-                        text = errorMsg,
+                        text = err,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                // No "✓ Connected" line here, deliberately. The obvious version of it — show it when
+                // both Supabase fields are non-blank — is a lie on this tab: it fires the moment the
+                // values are TYPED, claiming a connection nobody made, and it also says "tap Save to
+                // apply" while Save is still disabled pending the check below. Populated fields are
+                // their own evidence that the fetch worked; the only success worth announcing is the
+                // one the Check button earns.
 
-                // Success banner — shown only when fetch succeeded and manual fields are hidden
-                if (state.fetchError == null && !state.isFetching && !state.showManualFields
-                    && state.supabaseUrl.isNotBlank()
-                ) {
-                    Text(
-                        text = strings.setupConnected,
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-
-                // ── Task 4.2: "Enter manually" toggle ─────────────────────────────────────────
-                TextButton(
-                    onClick = { viewModel.toggleManualFields() },
-                    modifier = Modifier.padding(top = 4.dp),
-                ) {
+                TextButton(onClick = { viewModel.toggleManualFields() }) {
                     Text(
                         if (state.showManualFields) strings.setupHideManualFields
                         else strings.setupEnterManually
                     )
                 }
 
-                // Three manual fields, hidden by default, animated into view
-                AnimatedVisibility(
-                    visible = state.showManualFields,
-                    enter = expandVertically(),
-                    exit = shrinkVertically(),
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        HelpText(strings.setupManualHint)
-                        Field(
-                            label = strings.setupSupabaseUrl,
-                            placeholder = strings.setupSupabaseUrlPlaceholder,
-                            value = state.supabaseUrl,
-                            keyboardType = KeyboardType.Uri,
-                            onChange = { v -> viewModel.update { it.copy(supabaseUrl = v) } },
-                        )
-                        Field(
-                            label = strings.setupSupabaseAnonKey,
-                            placeholder = strings.setupSupabaseAnonKeyPlaceholder,
-                            value = state.supabaseAnonKey,
-                            keyboardType = KeyboardType.Text,
-                            secret = true,
-                            onChange = { v -> viewModel.update { it.copy(supabaseAnonKey = v) } },
-                        )
-                    }
+                if (state.showManualFields) {
+                    HelpText(strings.setupManualHint)
+                    Field(
+                        strings.setupSupabaseUrl,
+                        strings.setupSupabaseUrlPlaceholder,
+                        state.supabaseUrl,
+                        KeyboardType.Uri,
+                    ) { v -> viewModel.update { it.copy(supabaseUrl = v) } }
+                    Field(
+                        strings.setupSupabaseAnonKey,
+                        strings.setupSupabaseAnonKeyPlaceholder,
+                        state.supabaseAnonKey,
+                        KeyboardType.Text,
+                    ) { v -> viewModel.update { it.copy(supabaseAnonKey = v) } }
                 }
+
+                // Optional, and placed ABOVE the check deliberately. `update()` clears `verified` on
+                // every keystroke — correct, since editing a field invalidates a check of the old
+                // value — but that makes any field below the check button a trap: check, get a green
+                // result, type one more thing, and Save silently disables again while the message
+                // still says to check the connection. Nothing on this tab needs the Wizard URL, so it
+                // goes before the gate rather than earning an exemption from it.
+                Field(
+                    strings.setupExistingWizardUrl,
+                    "https://…/api/provision/run",
+                    state.provisionerWorkerUrl,
+                    KeyboardType.Uri,
+                ) { v -> viewModel.update { it.copy(provisionerWorkerUrl = v) } }
+                HelpText(strings.setupExistingWizardHint)
+
+                // Rendered here rather than by the shared block below, for the same reason as the
+                // Wizard URL: everything editable has to sit above the check, or verifying and then
+                // naming the café silently undoes the verification.
+                Field(strings.setupCafeName, strings.setupCafeNamePlaceholder, state.cafeName,
+                    KeyboardType.Text) { v -> viewModel.update { it.copy(cafeName = v) } }
+
+                // ── Check the connection ─────────────────────────────────────────────────────────
+                //
+                // Not optional polish: `blockingReason()` refuses to save an unverified Cloud pair, so
+                // without this control the tab is a dead end — every field filled, Save permanently
+                // disabled, and the message underneath asking for a check the screen never offered.
+                // (That is exactly what this tab did on its first run on a device.)
+                //
+                // It is also the only thing that separates a URL and key that are well-formed from
+                // ones that are correct. Saving unverified values lights up the café's mode button on
+                // the home screen, and the failure then surfaces somewhere far less explicable.
+                Button(
+                    onClick = { viewModel.verifyConnection() },
+                    enabled = !state.isVerifying &&
+                        state.supabaseUrl.isNotBlank() && state.supabaseAnonKey.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (state.isVerifying) strings.setupChecking else strings.setupCheckConnection)
+                }
+                state.verifyError?.let { err ->
+                    Text(
+                        text = err,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                if (state.verified) HelpText(strings.setupConnectionOk)
+
+                // ── Whole-café preflight ─────────────────────────────────────────────────────────
+                //
+                // Check connection above answers "can this device reach this backend" and gates Save.
+                // This answers the broader question the operator cannot see from here: is the café
+                // fully stood up? The parts it covers fail silently — a Wizard that serves its UI and
+                // no API, a website deployed without its Supabase variables — and both look fine in a
+                // browser, which is exactly why they get missed.
+                //
+                // Read-only, so it sits outside the Save gate and can be run at any point.
+                OutlinedButton(
+                    onClick = { viewModel.runPreflight() },
+                    enabled = !state.isPreflighting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (state.isPreflighting) "Checking…" else "Check café setup")
+                }
+                state.preflight.forEach { item ->
+                    Text(
+                        text = (if (item.ok) "✓ " else "✗ ") + item.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (item.ok) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error,
+                    )
+                    if (item.detail.isNotBlank()) HelpText(item.detail)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (state.operatingMode == OperatingMode.CLOUD &&
+                state.connectionTab == ConnectionTab.PROVISION_NEW_CAFE
+            ) {
+                HelpText(strings.provisionTabHelp)
+                Button(
+                    onClick = onProvision,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(strings.provisionStartButton) }
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             // Explicitly !CLOUD, not "else". Once the Cloud branch above gained a tab condition, an
@@ -348,11 +426,16 @@ fun SetupScreen(
             if (state.operatingMode != OperatingMode.CLOUD) {
                 HelpText(strings.setupOffCloudHint)
             }
-            // Hidden on the owner-QR tab. The name arrives from `branding` the moment the key is
-            // accepted, so a field here would be overwritten seconds after it was filled in — and a
-            // field whose value silently changes teaches an owner not to trust the screen.
+            // Hidden on the owner-QR and provision-new-café tabs. The name arrives from `branding`
+            // the moment the key is accepted, so a field here would be overwritten seconds after it
+            // was filled in — and a field whose value silently changes teaches an owner not to trust
+            // the screen.
+            // Also excluded for EXISTING_CAFE, which draws its own copy above its Check button — see
+            // there for why every editable field on that tab has to sit above the check.
             if (!(state.operatingMode == OperatingMode.CLOUD &&
-                    state.connectionTab == ConnectionTab.OWNER_QR)
+                    (state.connectionTab == ConnectionTab.OWNER_QR ||
+                        state.connectionTab == ConnectionTab.PROVISION_NEW_CAFE ||
+                        state.connectionTab == ConnectionTab.EXISTING_CAFE))
             ) {
                 Field(strings.setupCafeName, strings.setupCafeNamePlaceholder, state.cafeName,
                     KeyboardType.Text) { v -> viewModel.update { it.copy(cafeName = v) } }
@@ -375,66 +458,39 @@ fun SetupScreen(
                 )
             }
 
-            // ── Step 2: prove it works, then save (tasks 6.3, 6.6) ───────────────────────────
-            //
-            // Save alone used to be the whole flow, and it proved only that text reached disk. An
-            // operator who mistyped a key learned nothing until a later screen failed for a reason
-            // that never mentioned the key.
-            if (state.operatingMode == OperatingMode.CLOUD &&
-                state.connectionTab == ConnectionTab.MANUAL
+            // The provision-new-café tab launches a separate wizard that saves and signs in on its
+            // own, so the wizard's own Save button is not shown there.
+            if (!(state.operatingMode == OperatingMode.CLOUD &&
+                    state.connectionTab == ConnectionTab.PROVISION_NEW_CAFE)
             ) {
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { viewModel.verifyConnection() },
-                    enabled = !state.isVerifying &&
-                        state.supabaseUrl.isNotBlank() && state.supabaseAnonKey.isNotBlank(),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
+                // Why Save is refused, named rather than left to guesswork. The home screen enables
+                // exactly one mode button — the one whose setup was completed — so a blocked Save is
+                // the difference between a café that can start and one that cannot.
+                viewModel.blockingReason()?.let { reason ->
                     Text(
-                        when {
-                            state.isVerifying -> strings.setupChecking
-                            state.verified -> strings.setupConnectionOk
-                            else -> strings.setupCheckConnection
-                        }
-                    )
-                }
-                state.verifyError?.let { err ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = err,
+                        text = reason,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-            }
 
-            // Why Save is refused, named rather than left to guesswork. The home screen enables
-            // exactly one mode button — the one whose setup was completed — so a blocked Save is
-            // the difference between a café that can start and one that cannot.
-            viewModel.blockingReason()?.let { reason ->
-                Text(
-                    text = reason,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-
-            Button(
-                onClick = {
-                    // Task 10.1: a mode switch is destructive and irreversible in the ways that
-                    // matter, so it is confirmed. A save that changes nothing about the topology is
-                    // not — making an operator confirm a café-name edit would train them to dismiss
-                    // the dialog that actually matters.
-                    if (state.operatingMode != savedMode) showModeChangeConfirm = true else viewModel.save()
-                },
-                // Every field this mode shows must be filled, and Cloud must have answered.
-                enabled = viewModel.canSave(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 24.dp),
-            ) {
-                Text(if (state.saved) strings.setupSaved else strings.setupSave)
+                Button(
+                    onClick = {
+                        // Task 10.1: a mode switch is destructive and irreversible in the ways that
+                        // matter, so it is confirmed. A save that changes nothing about the topology is
+                        // not — making an operator confirm a café-name edit would train them to dismiss
+                        // the dialog that actually matters.
+                        if (state.operatingMode != savedMode) showModeChangeConfirm = true else viewModel.save()
+                    },
+                    // Every field this mode shows must be filled, and Cloud must have answered.
+                    enabled = viewModel.canSave(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 24.dp),
+                ) {
+                    Text(if (state.saved) strings.setupSaved else strings.setupSave)
+                }
             }
 
             // ── Affiliate catalog (debug builds only) ────────────────────────────────────

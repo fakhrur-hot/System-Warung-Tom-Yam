@@ -42,7 +42,19 @@ class SecureStorage @Inject constructor(
         private const val KEY_SERVER_DEVICE_ID = "server_device_id"
         private const val KEY_ROLE = "role"
         private const val KEY_ADMIN_PIN = "admin_pin"
+        private const val KEY_PROMO_TOKEN = "promo_catalog_token"
+        private const val KEY_PROVISIONER_WORKER_URL = "provisioner_worker_url"
         private const val KEY_PIN_LOCK_ENABLED = "pin_lock_enabled"
+        private const val KEY_DRAWER_PIN = "cash_drawer_pin"
+
+        /**
+         * The drawer PIN a till ships with, until the café sets its own.
+         *
+         * Six identical digits deliberately: it is fast to type one-handed at a counter, and
+         * it is obviously a placeholder rather than something that could be mistaken for a
+         * chosen number, which is what makes it read as "change me" in the settings text.
+         */
+        const val DEFAULT_DRAWER_PIN = "666666"
     }
 
     // ADMIN = main admin (printer host). ADMIN_SECONDARY = full admin management but no
@@ -278,6 +290,37 @@ class SecureStorage @Inject constructor(
 
     fun setRole(role: Role): Boolean = safeWrite(KEY_ROLE, role.name)
 
+    // --- Affiliate-catalog publish token (debug tooling only) ---
+
+    /**
+     * GitHub token used by the debug-only affiliate catalog editor to commit `promos/partners.json`.
+     *
+     * Stored here rather than compiled in: a PAT baked into an APK leaks the moment that APK is
+     * shared, and debug builds get shared freely. Encrypted at rest like every other credential, and
+     * scoped to the one device whose owner typed it.
+     */
+    fun savePromoToken(token: String): Boolean = safeWrite(KEY_PROMO_TOKEN, token)
+
+    fun getPromoToken(): String? = safeRead(KEY_PROMO_TOKEN)
+
+    // --- Provisioning Wizard endpoint (installer tooling only) ---
+
+    /**
+     * The Wizard's `/api/provision/run` URL, remembered after the installer types it once.
+     *
+     * Deliberately stored on the device rather than compiled into the build. Baking it put a live
+     * provisioning endpoint into every APK — including café builds that will never provision anything
+     * — and made it impossible to aim a build at a disposable Wizard without recompiling. Remembering
+     * what one installer typed on one device has neither problem, and saves re-typing a long URL on a
+     * tablet keyboard between provisioning attempts, which is when it is needed most.
+     *
+     * Not a secret, but it is kept with the other credentials because it is only ever read by the same
+     * installer flow, and a wrong value here is where high-privilege tokens would be sent.
+     */
+    fun saveProvisionerWorkerUrl(url: String): Boolean = safeWrite(KEY_PROVISIONER_WORKER_URL, url)
+
+    fun getProvisionerWorkerUrl(): String? = safeRead(KEY_PROVISIONER_WORKER_URL)
+
     // --- Admin settings PIN lock (device-local, AES-256-GCM like all other credentials) ---
 
     /** Store the 4-digit admin PIN (encrypted). */
@@ -292,6 +335,28 @@ class SecureStorage @Inject constructor(
     }
 
     /** Whether the admin has turned on the PIN gate for Settings. */
+    /**
+     * The cash-drawer PIN — typed into the calculator to pop the till without opening a sale.
+     *
+     * Encrypted like the admin PIN, and for a stronger reason: this one is deliberately
+     * *invisible*. It is never shown on a screen, never printed, and the whole point is that a
+     * bystander watching the counter cannot tell the cashier is doing anything but arithmetic.
+     * A PIN that unlocks a cash drawer sitting in plain SharedPreferences would undo that on
+     * any rooted or ADB-enabled terminal, which describes most cheap POS hardware.
+     *
+     * Falls back to [DEFAULT_DRAWER_PIN] rather than to "disabled", so the drawer can be opened on
+     * a brand-new till before anyone has been through Settings — a café that unboxes a terminal
+     * mid-service should not have to go hunting for a setting to break a note. The default is
+     * documented on screen precisely *because* it is a default: a shared secret that every install
+     * knows is not a secret, and an owner who has read that sentence knows to change it.
+     */
+    fun saveDrawerPin(pin: String): Boolean = safeWrite(KEY_DRAWER_PIN, pin)
+
+    fun getDrawerPin(): String = safeRead(KEY_DRAWER_PIN)?.takeIf { it.isNotBlank() } ?: DEFAULT_DRAWER_PIN
+
+    /** True once the café has replaced the shipped default with its own PIN. */
+    fun hasCustomDrawerPin(): Boolean = safeRead(KEY_DRAWER_PIN)?.isNotBlank() == true
+
     fun isPinLockEnabled(): Boolean = safeRead(KEY_PIN_LOCK_ENABLED) == "true"
 
     fun setPinLockEnabled(enabled: Boolean): Boolean =
@@ -364,6 +429,18 @@ class SecureStorage @Inject constructor(
      * mode — regenerating it would make the Server Device look like a brand-new peer to its own
      * paired clients — and the role is what it will still be after the switch.
      */
+    /**
+     * Forget which role this device holds, for the unlink path only.
+     *
+     * Deliberately separate from [clearCloudCredentials], which keeps the role because a mode
+     * switch stays within one café. Unlinking leaves no café to hold a role in, and a device
+     * still claiming ADMIN after forgetting its backend would route straight past Setup into a
+     * home screen it cannot load.
+     */
+    fun clearRoleForUnlink() {
+        safeWrite(KEY_ROLE, null)
+    }
+
     fun clearCloudCredentials() {
         safeWrite(KEY_SESSION_TOKEN, null)
         safeWrite(KEY_API_KEY, null)

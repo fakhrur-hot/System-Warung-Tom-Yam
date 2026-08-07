@@ -23,6 +23,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -49,8 +50,12 @@ import com.razstudio.pos.ui.viewmodels.HardwareDevicesViewModel
 import com.razstudio.pos.ui.viewmodels.PrinterDriverKind
 
 /**
- * Devices & Hardware — pick the printer transport, cash drawer and customer display this device
- * uses. (HW-REQ-6)
+ * Devices & Hardware — the customer display this device drives. (HW-REQ-6)
+ *
+ * This screen used to also hold the printer transport, drawer assignment, and receipt auto-cut;
+ * those moved to [CashDrawerSettingsScreen] (cash-drawer-settings spec, Requirement 3), which
+ * renders them through the same shared composables and the same [HardwareDevicesViewModel] — this
+ * screen kept the ViewModel because the display probe lives on it.
  *
  * Two rules shape the whole screen:
  *
@@ -58,7 +63,7 @@ import com.razstudio.pos.ui.viewmodels.PrinterDriverKind
  *   as a bug; "No USB device" tells the owner what to plug in, and a café that might buy the
  *   hardware tomorrow learns it exists.
  * - **Selections are device-local.** One café runs a Sunmi till plus several staff phones off one
- *   backend; a café-wide setting would push "Sunmi built-in printer" onto phones that have no such
+ *   backend; a café-wide setting would push a hardware choice onto phones that have no such
  *   hardware. The ViewModel writes to `LocalPrefs`, never to the shared database. (HW-REQ-8)
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -111,49 +116,8 @@ fun HardwareDevicesScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            SectionCard(title = s.hardwarePrintersSection) {
-                if (state.printerDrivers.isEmpty()) {
-                    Text(
-                        text = s.hardwareNoDriversAvailable,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                state.printerDrivers.forEach { row ->
-                    val available = row.availability == HardwareAvailabilityReason.AVAILABLE
-                    DriverRow(
-                        label = printerDriverLabel(row.kind, s),
-                        selected = state.selectedPrinterTransport == row.kind,
-                        enabled = available,
-                        // A paired-device count is the useful thing to say about an available
-                        // Bluetooth adapter; for everything else the reason is what matters.
-                        detail = if (available) {
-                            row.pairedCount?.let { s.hardwarePairedCount.format(it) }
-                        } else {
-                            reasonLabel(row.availability, s)
-                        },
-                        onSelect = { viewModel.selectPrinterTransport(row.kind) }
-                    )
-                }
-            }
-
-            SectionCard(title = s.hardwareCashDrawerSection) {
-                state.drawerOptions.forEach { option ->
-                    DriverRow(
-                        label = when {
-                            option.printerId == null -> s.hardwareDrawerNone
-                            option.printerId == HardwareDevicesViewModel.SUNMI_DRAWER_SYNTHETIC_ID ->
-                                s.hardwareDrawerSunmi
-                            else -> s.hardwareDrawerViaPrinter.format(option.printerName.orEmpty())
-                        },
-                        selected = state.selectedDrawerPrinterId == option.printerId,
-                        enabled = option.available,
-                        detail = null,
-                        onSelect = { viewModel.selectDrawer(option.printerId) }
-                    )
-                }
-            }
-
+            // Printer transport, drawer assignment and auto-cut moved to Cash Drawer Settings
+            // (Settings → Cash Drawer). Only the customer display remains.
             SectionCard(title = s.hardwareCustomerDisplaySection) {
                 state.displayDrivers.forEach { row ->
                     val available = row.availability == HardwareAvailabilityReason.AVAILABLE
@@ -176,8 +140,11 @@ fun HardwareDevicesScreen(
     }
 }
 
+// Internal, not private: CashDrawerSettingsScreen (same package) inherited three of this
+// screen's sections and must render them identically — sharing the composables is what keeps
+// the two screens from drifting apart visually.
 @Composable
-private fun SectionCard(title: String, content: @Composable () -> Unit) {
+internal fun SectionCard(title: String, content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -198,7 +165,7 @@ private fun SectionCard(title: String, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun DriverRow(
+internal fun DriverRow(
     label: String,
     selected: Boolean,
     enabled: Boolean,
@@ -239,7 +206,7 @@ private fun DriverRow(
 
 // ── Enum → localized text. Kept at the UI edge so no ViewModel holds English. ────────────────
 
-private fun printerDriverLabel(kind: PrinterDriverKind, s: UiStrings): String = when (kind) {
+internal fun printerDriverLabel(kind: PrinterDriverKind, s: UiStrings): String = when (kind) {
     PrinterDriverKind.BLUETOOTH -> s.hardwareDriverBluetooth
     PrinterDriverKind.SUNMI_AIDL -> s.hardwareDriverSunmi
     PrinterDriverKind.USB -> s.hardwareDriverUsb
@@ -252,7 +219,7 @@ private fun displayDriverLabel(kind: DisplayDriverKind, s: UiStrings): String = 
     DisplayDriverKind.VFD_SERIAL -> s.hardwareDisplayVfd
 }
 
-private fun reasonLabel(reason: HardwareAvailabilityReason, s: UiStrings): String? = when (reason) {
+internal fun reasonLabel(reason: HardwareAvailabilityReason, s: UiStrings): String? = when (reason) {
     HardwareAvailabilityReason.AVAILABLE -> null
     HardwareAvailabilityReason.BLUETOOTH_OFF -> s.hardwareReasonBluetoothOff
     HardwareAvailabilityReason.BLUETOOTH_UNAVAILABLE -> s.hardwareDriverUnavailable

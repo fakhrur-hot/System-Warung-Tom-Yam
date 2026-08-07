@@ -144,7 +144,15 @@ class PrinterConnectionManager @Inject constructor(
             } else {
                 body
             }
-            escPosPrinter.printFormattedTextAndCut(logoMarkup + bodyMarkup)
+            // ...AndCut vs ...Text is the whole toggle on this transport: DantSu appends the
+            // GS V cut itself, so there is no way to suppress it other than calling the other
+            // method. Both feed the paper clear of the head first; only one severs it.
+            val ticket = logoMarkup + bodyMarkup
+            if (printSettingsStore.getReceiptAutoCut()) {
+                escPosPrinter.printFormattedTextAndCut(ticket)
+            } else {
+                escPosPrinter.printFormattedText(ticket)
+            }
 
             when (getMode()) {
                 MODE_FAST -> {

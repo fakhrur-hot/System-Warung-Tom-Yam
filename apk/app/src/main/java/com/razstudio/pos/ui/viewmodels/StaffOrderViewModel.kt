@@ -8,6 +8,7 @@ import com.razstudio.pos.data.ApiResult
 import com.razstudio.pos.data.GatewayConfigDto
 import com.razstudio.pos.data.GatewayPaymentResult
 import com.razstudio.pos.data.NewOrderItem
+import com.razstudio.pos.data.toNewOrderItem
 import com.razstudio.pos.data.PosCheckoutPayload
 import com.razstudio.pos.data.VoidLine
 import com.razstudio.pos.data.OrderDto
@@ -88,6 +89,8 @@ class StaffOrderViewModel @Inject constructor(
     private val customerDisplayManager: CustomerDisplayManager,
     private val paymentTransactionDao: PaymentTransactionDao,
     private val modeRepository: com.razstudio.pos.data.ModeRepository,
+    private val tableSync: com.razstudio.pos.data.local.TableSync,
+    private val staffOrderSync: com.razstudio.pos.data.local.StaffOrderSync,
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
@@ -177,6 +180,22 @@ class StaffOrderViewModel @Inject constructor(
 
         // Fixed pre-send hold for staff orders (mis-tap guard).
         const val STAFF_ORDER_HOLD_SECONDS = 3
+
+        /**
+         * How often the staff device re-reads the floor when no push arrives.
+         *
+         * 30s, not 10s, because the LAN push socket now carries the latency: the admin announces a
+         * change the moment it makes one and this device pulls immediately, so the poll went from
+         * being the mechanism to being the safety net.
+         *
+         * The number is a quota decision as much as a UX one. At 10s a single device makes roughly
+         * 260k Edge Function calls a month and Supabase's free tier is 500k in total — admin plus one
+         * staff phone already exceeded it. 30s brings a two-device café to about 175k and leaves room
+         * for a third. The cost of the change is the worst case when the push path is down: a table
+         * can be stale for 30s instead of 10s, which is the tradeoff worth making because the push
+         * path being down is the exception and the quota ceiling is not.
+         */
+        const val STAFF_ORDER_POLL_INTERVAL_MS = 30_000L
     }
 
     private val _permissions = MutableStateFlow(StaffPermissions(
@@ -193,6 +212,7 @@ class StaffOrderViewModel @Inject constructor(
     init {
         loadPermissions()
         performCatchUpSync()
+        startOrderPolling()
         refreshGatewayConfig()
     }
 
@@ -210,6 +230,17 @@ class StaffOrderViewModel @Inject constructor(
     }
 
     /** Refresh permissions (e.g., after settings broadcast). */
+    /**
+     * Pull the café's floor plan if this device does not already hold it.
+     *
+     * Staff had no such path at all: rehydrate lived on the admin ViewModel with a single caller in
+     * AdminHomeScreen, so a freshly-joined staff phone showed an empty table grid indefinitely
+     * while its menu synced perfectly through an unrelated code path.
+     */
+    fun syncTablesIfNeeded() {
+        viewModelScope.launch { tableSync.syncIfNeeded() }
+    }
+
     fun refreshPermissions() {
         loadPermissions()
     }
@@ -223,7 +254,12 @@ class StaffOrderViewModel @Inject constructor(
             val order = orderDao.getActiveOrderForTable(tableId)
             val items = if (order != null) orderDao.getItemsForOrder(order.id) else emptyList()
             // Crash/resume recovery (task 8.5) — see TableViewViewModel.loadOrderForTable.
-            val pendingGateway = order?.let { paymentTransactionDao.getLatestForOrder(it.id) }
+            // Suppressed while gateway payments are switched off product-wide: the banner's only
+            // action is Resume, which would restart a checkout that can no longer be started. A
+            // stale PENDING row from an older build must not offer a café a dead button.
+            val pendingGateway = order
+                ?.takeIf { modeRepository.activeMode.value.toCapabilities().gatewayPaymentsEnabled }
+                ?.let { paymentTransactionDao.getLatestForOrder(it.id) }
                 ?.takeIf { it.status == PaymentTransactionStatus.PENDING }
             _orderDetail.value = OrderDetailState(
                 order = order,
@@ -483,8 +519,15 @@ class StaffOrderViewModel @Inject constructor(
                 // its old quantity alongside the new one.
                 orderDao.deleteItemsForOrder(orderId)
                 reconcileOrderFromDto(shrunk.data)
-                tableId?.let { loadOrderForTable(it) }
-                _orderDetail.value = _orderDetail.value.copy(
+
+                // Refresh inline rather than calling loadOrderForTable (which launches a
+                // separate coroutine that races with the successMessage assignment below,
+                // overwriting it with null before the UI can display it).
+                val refreshedOrder = orderDao.getOrderById(orderId)
+                val refreshedItems = if (refreshedOrder != null) orderDao.getItemsForOrder(orderId) else emptyList()
+                _orderDetail.value = OrderDetailState(
+                    order = refreshedOrder,
+                    items = refreshedItems,
                     isLoading = false,
                     successMessage = str().splitSharePaid.format(method),
                 )
@@ -954,13 +997,14 @@ class StaffOrderViewModel @Inject constructor(
         if (cart.isEmpty()) return
         if (orderHoldJob?.isActive == true) return
 
+        // toNewOrderItem, not a raw NewOrderItem: a hand-typed "+ Customized" line lives in the cart
+        // as a synthetic menu item, and only that helper carries its typed name onto the wire.
         val items = cart.map { cartItem ->
-            NewOrderItem(
-                menuItemId = cartItem.menuItem.id,
+            cartItem.menuItem.toNewOrderItem(
                 quantity = cartItem.quantity,
                 note = cartItem.note,
+                size = cartItem.size,
                 unitPrice = cartItem.unitPrice,
-                size = cartItem.size
             )
         }
 
@@ -976,6 +1020,22 @@ class StaffOrderViewModel @Inject constructor(
                     _orderEntry.value = OrderEntryState(
                         successMessage = str().orderCreatedTotal.format(result.data.total)
                     )
+                    // The table tile is driven by Room (`orderDao.getActiveOrdersFlow`), and until
+                    // now NOTHING on this device wrote the order there: the slip printed, the admin's
+                    // grid went occupied, and the staff phone that took the order kept showing the
+                    // table as Free. Write the row immediately so the tile flips under the cashier's
+                    // hand, then reconcile from the server for the authoritative items/session.
+                    orderDao.insertOrder(
+                        Order(
+                            id = result.data.orderId,
+                            tableId = tableId,
+                            source = "STAFF",
+                            status = OrderStatus.fromWire(result.data.status),
+                            total = result.data.total,
+                            createdAt = Instant.now().toString(),
+                        )
+                    )
+                    syncOrders()
                     // Retry any pending orders now that we have connectivity
                     retryPendingOrders()
                 }
@@ -1015,6 +1075,8 @@ class StaffOrderViewModel @Inject constructor(
                     if (item.note != null) put("note", item.note)
                     if (item.unitPrice != null) put("unitPrice", item.unitPrice)
                     if (item.size != null) put("size", item.size)
+                    // Without this an offline-queued custom charge would replay as a nameless line.
+                    if (item.customName != null) put("customName", item.customName)
                 })
             }
         }.toString()
@@ -1064,7 +1126,8 @@ class StaffOrderViewModel @Inject constructor(
                         quantity = obj.getInt("quantity"),
                         note = obj.optStringOrNull("note"),
                         unitPrice = if (obj.has("unitPrice")) obj.getDouble("unitPrice") else null,
-                        size = obj.optStringOrNull("size")
+                        size = obj.optStringOrNull("size"),
+                        customName = obj.optStringOrNull("customName")
                     )
                 )
             }
@@ -1076,17 +1139,7 @@ class StaffOrderViewModel @Inject constructor(
 
     private fun performCatchUpSync() {
         viewModelScope.launch {
-            when (val result = apiClient.getOrdersSinceAsStaff(
-                Instant.now().minusSeconds(86400).toString()
-            )) {
-                is ApiResult.Success -> {
-                    for (dto in result.data.orders) {
-                        reconcileOrderFromDto(dto)
-                    }
-                }
-                is ApiResult.Error -> { /* silently fail on startup sync */ }
-                is ApiResult.NetworkError -> { /* offline — will sync later */ }
-            }
+            syncOrders()
 
             // Also fetch latest settings
             when (val result = apiClient.getSettings()) {
@@ -1156,6 +1209,38 @@ class StaffOrderViewModel @Inject constructor(
         val order = orderDao.getOrderById(orderId)
         val items = if (order != null) orderDao.getItemsForOrder(orderId) else emptyList()
         _orderDetail.value = _orderDetail.value.copy(order = order, items = items)
+    }
+
+    /**
+     * Pull orders and reconcile, via the shared [StaffOrderSync].
+     *
+     * Shared rather than local because the push socket triggers the SAME function — one watermark,
+     * one reconcile, no second de-duplication path that can disagree with this one.
+     */
+    private suspend fun syncOrders() {
+        staffOrderSync.syncNow()
+    }
+
+    /**
+     * The staff device's catch-up poll.
+     *
+     * It had none: `performCatchUpSync` ran once in `init` and never again, so this screen only ever
+     * showed the floor as it looked the moment the ViewModel was created. Everything after that --
+     * its own orders, another phone's orders, a bill the admin settled -- was invisible. The admin
+     * side has Realtime plus its own reconcile; staff had neither, which is why the table status
+     * never moved here.
+     *
+     * Polling rather than Realtime deliberately: on this backend the WebSocket delivers no broadcast
+     * frames to these devices (the same reason kitchen auto-print rides the poll), so a socket here
+     * would be a dependency that looks live and is not.
+     */
+    private fun startOrderPolling() {
+        viewModelScope.launch {
+            while (true) {
+                delay(STAFF_ORDER_POLL_INTERVAL_MS)
+                syncOrders()
+            }
+        }
     }
 
     private suspend fun reconcileOrderFromDto(dto: OrderDto) {

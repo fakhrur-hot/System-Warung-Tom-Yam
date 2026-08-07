@@ -29,6 +29,7 @@ object NavRoutes {
     const val ADMIN_SETTINGS = "admin_settings"
     const val QR_PDF = "qr_pdf"
     const val REPORTS = "reports"
+    const val CASH_DRAWER = "cash_drawer"
     const val BILL_HISTORY = "bill_history"
     const val BACKUP = "backup"
     const val KEEP_ALIVE_SETUP = "keep_alive_setup"
@@ -45,7 +46,9 @@ object NavRoutes {
      */
     const val PROMO_CATALOG = "promo_catalog"
     const val HARDWARE_DEVICES = "hardware_devices"
+    const val CASH_DRAWER_SETTINGS = "cash_drawer_settings"
     const val PAYMENT_GATEWAY_SETTINGS = "payment_gateway_settings"
+    const val PAYMENT_MONITOR = "payment_monitor"
 
     // Category names can contain "/", spaces or "()" (e.g. "UDANG/SOTONG", "MINUMAN (AIS)"),
     // so URL-encode the path segment; AppNavGraph decodes it when reading the argument.

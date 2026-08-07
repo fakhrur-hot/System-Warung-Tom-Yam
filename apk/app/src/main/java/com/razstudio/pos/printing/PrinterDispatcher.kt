@@ -40,7 +40,8 @@ class PrinterDispatcher @Inject constructor(
     private val printerConfigDao: PrinterConfigDao,
     private val printJobDao: PrintJobDao,
     private val drivers: Set<@JvmSuppressWildcards PrinterDriver>,   // runtime-selected driver set
-    private val languageManager: LanguageManager
+    private val languageManager: LanguageManager,
+    private val printSettingsStore: com.razstudio.pos.data.local.PrintSettingsStore,
 ) {
 
     /**
@@ -259,6 +260,11 @@ class PrinterDispatcher @Inject constructor(
      * here would fail the sale, which is far worse.
      */
     suspend fun kickCashDrawer() {
+        // The one master gate for the solenoid pulse (cash-drawer-settings Requirement 1.2):
+        // every kick path — cash sale, cash out, receipt print, the calculator's PIN — funnels
+        // through this method, so the toggle lives here and nowhere else. Cash LEDGER writes
+        // deliberately do not consult it; money is tracked whether or not hardware moves.
+        if (!printSettingsStore.isCashDrawerEnabled()) return
         try {
             val owner = printerConfigDao.getAll().firstOrNull {
                 it.isActive && it.drawerKick != DrawerKick.NONE

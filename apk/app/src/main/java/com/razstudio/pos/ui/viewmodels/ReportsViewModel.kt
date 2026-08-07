@@ -59,7 +59,8 @@ class ReportsViewModel @Inject constructor(
     private val printerConfigDao: PrinterConfigDao,
     private val sunmiDriver: SunmiPrinterDriver,
     private val apiClient: BackendGateway,
-    private val languageManager: LanguageManager
+    private val languageManager: LanguageManager,
+    private val menuDao: com.razstudio.pos.data.local.MenuDao,
 ) : ViewModel() {
 
     private fun str() = uiStrings(languageManager.language.value)
@@ -166,10 +167,30 @@ class ReportsViewModel @Inject constructor(
                 // Top-N per category
                 val topN = settings?.topN ?: 5
                 val popularItems = orderDao.getPopularItems(startIso, endIso)
+
+                // Menu names are stored on the order line as an English SNAPSHOT, captured when the
+                // order was taken so a later rename cannot rewrite history. That is right for the
+                // record and wrong for the reader: a Malay café got a Malay report with English
+                // dish names down the middle of it.
+                //
+                // AppLanguage.localizedSnapshotName swaps the English base for the current
+                // language's name while keeping any size suffix, and falls back to the raw snapshot
+                // when the item has since been deleted or renamed past recognition — so a discontinued
+                // dish still appears in last month's report rather than vanishing from it.
+                val lang = languageManager.language.value
+                val menuById = menuDao.getAll().associateBy { it.id }
+                fun localizedName(menuItemId: String?, snapshot: String): String =
+                    lang.localizedSnapshotName(snapshot, menuById[menuItemId])
                 val topNPerCategory = popularItems
                     .groupBy { it.categorySnapshot }
                     .mapValues { (_, items) ->
-                        items.take(topN).map { TopItem(it.nameSnapshot, it.totalQuantity, it.totalRevenue) }
+                        items.take(topN).map {
+                            TopItem(
+                                localizedName(it.menuItemId, it.nameSnapshot),
+                                it.totalQuantity,
+                                it.totalRevenue,
+                            )
+                        }
                     }
 
                 // Best sellers across the whole menu. getPopularItems() is already ordered by
@@ -178,7 +199,13 @@ class ReportsViewModel @Inject constructor(
                 // the other drinks; this says what the café actually sells.
                 val topOverall = popularItems
                     .take(topN)
-                    .map { TopItem(it.nameSnapshot, it.totalQuantity, it.totalRevenue) }
+                    .map {
+                        TopItem(
+                            localizedName(it.menuItemId, it.nameSnapshot),
+                            it.totalQuantity,
+                            it.totalRevenue,
+                        )
+                    }
 
                 // Payment split. The query returns EVERY method present in the period, so gateway
                 // codes (DUITNOW_QR, GRABPAY, …) arrive here too. Previously only the CASH and QR
@@ -265,12 +292,18 @@ class ReportsViewModel @Inject constructor(
             val report = _uiState.value.reportData ?: return@launch
             try {
                 val document = PdfDocument()
-                val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4
-                val page = document.startPage(pageInfo)
-                val canvas = page.canvas
-
-                drawReportPdf(canvas, report, _uiState.value.cafeName)
-                document.finishPage(page)
+                // The renderer owns pagination now — it starts and finishes pages itself, because
+                // the per-table breakdown can run past one page and used to be silently truncated.
+                com.razstudio.pos.ui.util.ReportPdfRenderer.render(
+                    document = document,
+                    report = report,
+                    cafeName = _uiState.value.cafeName,
+                    logo = com.razstudio.pos.ui.util.LogoPipeline.loadJpegFromInternal(context),
+                    // The report speaks the Admin App's language, which itself defaults from the
+                    // café-wide `defaultLangAdmin` — Bahasa Malaysia unless an owner changed it.
+                    // It used to be hardcoded English regardless.
+                    strings = str(),
+                )
 
                 val fileName = "report-${report.startDate}-to-${report.endDate}.pdf"
                 val (_, uri) = savePdf(context, document, fileName)
@@ -340,97 +373,6 @@ class ReportsViewModel @Inject constructor(
                 (customStart ?: dateOnlyFormat.format(cal.time)) to
                     (customEnd ?: dateOnlyFormat.format(cal.time))
             }
-        }
-    }
-
-    private fun drawReportPdf(canvas: Canvas, report: ReportData, cafeName: String) {
-        val cafePaint = Paint().apply {
-            color = Color.BLACK; textSize = 22f; typeface = Typeface.DEFAULT_BOLD
-        }
-        val titlePaint = Paint().apply {
-            color = Color.BLACK; textSize = 18f; typeface = Typeface.DEFAULT_BOLD
-        }
-        val headerPaint = Paint().apply {
-            color = Color.DKGRAY; textSize = 14f; typeface = Typeface.DEFAULT_BOLD
-        }
-        val bodyPaint = Paint().apply {
-            color = Color.BLACK; textSize = 11f; typeface = Typeface.DEFAULT
-        }
-        val linePaint = Paint().apply {
-            color = Color.LTGRAY; strokeWidth = 0.5f
-        }
-
-        var y = 40f
-        val margin = 40f
-
-        // Café name header (from backend branding); skip the line if unavailable.
-        if (cafeName.isNotBlank()) {
-            canvas.drawText(cafeName, margin, y, cafePaint)
-            y += 26f
-        }
-        canvas.drawText("Sales Report", margin, y, titlePaint)
-        y += 20f
-        canvas.drawText("${report.startDate}  to  ${report.endDate}", margin, y, bodyPaint)
-        y += 25f
-
-        canvas.drawLine(margin, y, 555f, y, linePaint); y += 15f
-
-        // Summary
-        canvas.drawText("Summary", margin, y, headerPaint); y += 18f
-        canvas.drawText("Total Orders: ${report.totalOrders}", margin, y, bodyPaint); y += 15f
-        canvas.drawText("Total Revenue: RM %.2f".format(report.totalRevenue), margin, y, bodyPaint); y += 15f
-        canvas.drawText("Avg Order Value: RM %.2f".format(report.avgOrderValue), margin, y, bodyPaint); y += 20f
-
-        // Payment split
-        canvas.drawText("Payment Split", margin, y, headerPaint); y += 18f
-        canvas.drawText("Cash: ${report.paymentSplit.cashCount} orders (RM %.2f)".format(report.paymentSplit.cashTotal), margin, y, bodyPaint); y += 15f
-        canvas.drawText("QR: ${report.paymentSplit.qrCount} orders (RM %.2f)".format(report.paymentSplit.qrTotal), margin, y, bodyPaint); y += 15f
-        // Gateway channels, once live. Cash/QR already have their own lines above. Raw method
-        // codes here rather than localized labels — the PDF is a fixed-English document, and an
-        // unrecognised code must still appear so the lines add up to total revenue. (task 9.2)
-        for (row in report.paymentSplit.byMethod) {
-            if (row.method.equals("CASH", ignoreCase = true) || row.method.equals("QR", ignoreCase = true)) continue
-            canvas.drawText("${row.method}: ${row.orderCount} orders (RM %.2f)".format(row.revenue), margin, y, bodyPaint)
-            y += 15f
-            if (y > 790f) break
-        }
-        y += 5f
-
-        // Per-table
-        if (report.perTableBreakdown.isNotEmpty()) {
-            canvas.drawText("Per-Table Breakdown", margin, y, headerPaint); y += 18f
-            for (tb in report.perTableBreakdown) {
-                canvas.drawText("${tb.tableLabel}: ${tb.orderCount} orders, RM %.2f".format(tb.revenue), margin + 10f, y, bodyPaint)
-                y += 14f
-                if (y > 790f) break // page overflow guard
-            }
-            y += 10f
-        }
-
-        // Top items per category
-        for ((category, items) in report.topNPerCategory) {
-            if (y > 750f) break
-            canvas.drawText("Top Items — $category", margin, y, headerPaint); y += 18f
-            for (item in items) {
-                canvas.drawText("  ${item.name}: ${item.quantity} sold (RM %.2f)".format(item.revenue), margin, y, bodyPaint)
-                y += 14f
-                if (y > 790f) break
-            }
-            y += 8f
-        }
-
-        // Cancelled
-        if (y < 750f) {
-            canvas.drawText("Cancelled Orders", margin, y, headerPaint); y += 18f
-            canvas.drawText("Total: ${report.cancelledSummary.totalCount} (RM %.2f)".format(report.cancelledSummary.totalValue), margin, y, bodyPaint); y += 15f
-            canvas.drawText("By Admin: ${report.cancelledSummary.byAdmin}  |  By Customer: ${report.cancelledSummary.byCustomer}  |  By Staff: ${report.cancelledSummary.byStaff}", margin, y, bodyPaint)
-            y += 20f
-        }
-
-        // Drawer-opening count (only shown when a Sunmi printer with drawer is configured)
-        if (y < 750f && report.drawerOpeningCount != null) {
-            canvas.drawText("Cash Drawer", margin, y, headerPaint); y += 18f
-            canvas.drawText("Drawer openings today: ${report.drawerOpeningCount}", margin, y, bodyPaint)
         }
     }
 

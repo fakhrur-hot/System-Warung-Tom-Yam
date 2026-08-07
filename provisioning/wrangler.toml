@@ -11,8 +11,15 @@ compatibility_date = "2026-07-30"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "dist"
 
-# The RAZStudio-owned repo Cloudflare git-integration deploys each café's website FROM.
-# Set as Pages env vars (Settings -> Environment variables) on the Wizard's OWN project,
-# not baked in here, since these are operational details, not per-deploy secrets:
-#   RAZSTUDIO_GITHUB_OWNER   e.g. "razstudio-org"
-#   RAZSTUDIO_GITHUB_REPO    e.g. "cafe-website-template"
+# The RAZStudio-owned repo Cloudflare git-integration deploys each café's website FROM is no longer
+# configured here or as an env var. It is baked at build time from template-repo.properties at the
+# monorepo root — the same file the APK compiles in — so the Wizard and the app cannot name different
+# repositories. RAZSTUDIO_GITHUB_OWNER / RAZSTUDIO_GITHUB_REPO still override, for a fork.
+#
+# ⚠ DEPLOY THIS AS PAGES, NOT AS A WORKER.
+#
+# `pages_build_output_dir` above is what makes `npx wrangler pages deploy dist` correct. Deploying it
+# with plain `wrangler deploy` puts the UI on *.workers.dev and serves dist/ only — Workers do not run
+# a Pages `functions/` directory, so every /api/provision/* route 404s while the site itself looks
+# perfectly healthy. A Wizard in that state cannot deploy Edge Functions, apply a schema or mint an
+# owner key, and the failure gives no hint that the deployment target was the problem.

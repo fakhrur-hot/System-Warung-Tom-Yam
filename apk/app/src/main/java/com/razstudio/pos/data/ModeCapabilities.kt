@@ -44,13 +44,23 @@ data class ModeCapabilities(
      */
     val realtimeWebSocket: Boolean,
     /**
-     * Whether gateway payment methods (DuitNow QR, e-wallets, FPX, Card) are available at checkout.
+     * Whether acquirer-backed payment methods (e-wallets, FPX, Card) are available at checkout.
      *
-     * False in LAN and Kiosk: every gateway flow requires a live internet path to the acquirer, and
-     * `NoInternetGuard` blocks all non-local hosts in those modes by design. Showing gateway tiles
-     * that can never succeed is worse than hiding them — a greyed tile that the owner has no way to
-     * un-grey tells them their configuration is broken when it is working exactly as designed. Cash
-     * and the static merchant QR remain available in all three modes. (A1, PG-REQ-3, task 6.4)
+     * **Currently false in every mode — the feature is switched off product-wide, not per mode.**
+     * Every acquirer evaluated for it charges a monthly subscription on top of per-transaction fees,
+     * which is incompatible with what this app is for: a POS a café can run at zero commitment. A
+     * café that will never sign such a contract should not be shown settings, checkout tiles or a
+     * management card for one, and should not have to work out whether the empty screens matter.
+     *
+     * The implementation is left wired rather than deleted. It works, it is covered by tests, and
+     * the decision that retired it is commercial rather than technical — if an acquirer without a
+     * standing fee becomes available, this flag is the whole switch. Nothing downstream reads any
+     * other signal, so nothing else has to change to bring it back.
+     *
+     * **This has nothing to do with the café's own Payment QR** — the static merchant code uploaded
+     * in Café Profile and shown at checkout. That is a picture of the café's own bank QR, involves
+     * no acquirer, no contract and no fee, and is deliberately available in all three modes with no
+     * capability gate at all. The two are unrelated and must stay that way. (Requirement 14.7)
      */
     val gatewayPaymentsEnabled: Boolean,
 )
@@ -73,9 +83,9 @@ fun OperatingMode.toCapabilities(): ModeCapabilities = when (this) {
         websiteInvites = true,
         cloudImageHosting = true,
         realtimeWebSocket = true,
-        // Gateway payments require a live internet path to the acquirer — available in Cloud only.
-        // (A1, PG-REQ-3, task 6.4)
-        gatewayPaymentsEnabled = true,
+        // Off product-wide: subscription-based acquirers do not fit a zero-commitment POS. Cloud
+        // is the only mode that *could* support it, which is why the note lives here.
+        gatewayPaymentsEnabled = false,
     )
 
     OperatingMode.LAN -> ModeCapabilities(

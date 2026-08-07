@@ -57,6 +57,9 @@ class ProvisionWorker(
 
         val cafeName = obj.optString("cafeName", "")
         val brevoApiKey = obj.optString("brevoApiKey", null)
+        // Absent means an old queued job from before the URL moved out of BuildConfig; the client
+        // rejects a blank URL with a message naming the screen, which is the right outcome.
+        val provisionerWorkerUrl = obj.optString("provisionerWorkerUrl", "")
 
         val supabaseObj = obj.getJSONObject("supabase")
         val supabaseMode = when (supabaseObj.optString("mode", "")) {
@@ -95,6 +98,7 @@ class ProvisionWorker(
         }
 
         return ProvisionRequest(
+            provisionerWorkerUrl = provisionerWorkerUrl,
             supabaseMode = supabaseMode,
             cloudflareMode = cloudflareMode,
             cafeName = cafeName,
@@ -177,6 +181,7 @@ class ProvisionWorker(
             val json = JSONObject().apply {
                 put("cafeName", request.cafeName)
                 putOpt("brevoApiKey", request.brevoApiKey)
+                put("provisionerWorkerUrl", request.provisionerWorkerUrl)
             }
 
             val supabaseJson = when (request.supabaseMode) {

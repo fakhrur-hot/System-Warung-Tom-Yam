@@ -68,6 +68,22 @@ class IWoyouServiceStub(binder: IBinder) {
         guard("commitPrinterBuffer") { it.commitPrinterBuffer() }
     }
 
+    /**
+     * Leave transaction mode, optionally printing what was buffered.
+     *
+     * **Not the same as [commitPrinterBuffer], and the difference is why receipts never cut.**
+     * The AIDL is explicit: `enterPrinterBuffer` puts the service in transaction mode where *all*
+     * print calls are cached, and commit flushes the cache **without leaving that mode**. A driver
+     * that only ever commits therefore stays inside the transaction forever, and every command
+     * issued after the commit — the paper cut — is quietly cached behind it and never printed. The
+     * call succeeds, nothing is logged, and the paper does not cut.
+     *
+     * @param commit true to print the buffered content on the way out.
+     */
+    fun exitPrinterBuffer(commit: Boolean) {
+        guard("exitPrinterBuffer") { it.exitPrinterBuffer(commit) }
+    }
+
     // ── Printing ─────────────────────────────────────────────────────────────
 
     /**
@@ -97,6 +113,14 @@ class IWoyouServiceStub(binder: IBinder) {
     fun cutPaper() {
         guardValue("cutPaper", Unit) { it.cutPaper(null) }
     }
+
+    /**
+     * Hardware counter of paper cuts. -1 if the service does not implement it.
+     *
+     * The only honest way to tell a cut that did not happen from a cutter that is not fitted: the
+     * AIDL accepts [cutPaper] and returns cleanly either way.
+     */
+    fun getCutPaperTimes(): Int = guardValue("getCutPaperTimes", -1) { it.cutPaperTimes }
 
     // ── Cash drawer ──────────────────────────────────────────────────────────
 

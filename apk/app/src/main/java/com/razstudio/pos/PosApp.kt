@@ -34,6 +34,15 @@ class PosApp : Application(), coil.ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         BackupReminderWorker.schedule(this)
+
+        // Keeps a free-tier Supabase project from being paused for inactivity. Read from the
+        // stored mode rather than injected state, because this runs before any screen has
+        // composed — and re-evaluated on every launch so a mode change or an unlink takes
+        // effect the next time the app opens. See the worker for what it cannot cover.
+        com.razstudio.pos.data.local.KeepAliveHeartbeatWorker.scheduleForMode(
+            this,
+            com.razstudio.pos.data.AppConfigStore(this).operatingMode(),
+        )
         cleanupLegacyNullStringsOnce()
     }
 

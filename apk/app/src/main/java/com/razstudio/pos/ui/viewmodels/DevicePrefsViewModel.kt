@@ -26,6 +26,10 @@ class DevicePrefsViewModel @Inject constructor(
     fun showPrintStatus(): Boolean = localPrefs.showPrintStatus
     fun setShowPrintStatus(enabled: Boolean) { localPrefs.showPrintStatus = enabled }
 
+    /** Hide the Android system bars. Applied to the window by the caller — see FullscreenMode. */
+    fun fullscreenMode(): Boolean = localPrefs.fullscreenMode
+    fun setFullscreenMode(enabled: Boolean) { localPrefs.fullscreenMode = enabled }
+
     fun lowStockAlerts(): Boolean = localPrefs.lowStockAlerts
     fun setLowStockAlerts(enabled: Boolean) { localPrefs.lowStockAlerts = enabled }
 

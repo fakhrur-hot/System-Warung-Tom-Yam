@@ -286,6 +286,16 @@ enum class ThemePreset(
                 surfaceVariant       = shade800,
                 onSurfaceVariant     = muted,
 
+                // ── Dialog / sheet grounds ──────────────────────────────────────────────
+                // See the light-scheme note below: unset, these fall back to Material's stock
+                // baseline palette and every dialog in the app ignores the active preset.
+                surfaceContainerLowest = shade900,
+                surfaceContainerLow    = shade800,
+                surfaceContainer       = shade800,
+                surfaceContainerHigh   = shade700,
+                surfaceContainerHighest = shade700,
+                surfaceTint            = shade200,
+
                 outline              = outline,
                 outlineVariant       = shade700,
 
@@ -318,6 +328,28 @@ enum class ThemePreset(
                 onSurface            = shade900,
                 surfaceVariant       = shade100,
                 onSurfaceVariant     = muted,
+
+                // ── Dialog / sheet grounds ──────────────────────────────────────────────
+                //
+                // Material3 draws a ModalBottomSheet on `surfaceContainerLow` and an AlertDialog on
+                // `surfaceContainerHigh`. Leaving those unset does NOT fall back to `surface` — it
+                // falls back to Material's own baseline palette, which is a lavender-tinted white.
+                // So until now every dialog and sheet in the app was drawn in stock Material lavender
+                // no matter which preset was active: the Tom Yam red build had lavender sheets, and so
+                // did every other one. The preset only ever reached the content inside them.
+                //
+                // Mapping them onto the preset's own ramp fixes that and gives dialogs the intended
+                // reading order: a dialog sits one step DARKER than the white content panels it
+                // contains, so a scroll area inside it (which stays `surface` = white) reads as a
+                // lighter inset rather than melting into the dialog around it.
+                surfaceContainerLowest = Color.White,
+                surfaceContainerLow    = shade50,
+                surfaceContainer       = shade50,
+                surfaceContainerHigh   = shade100,
+                surfaceContainerHighest = shade100,
+                // The elevation-overlay tint, so a raised surface warms toward the preset rather
+                // than toward Material's default purple.
+                surfaceTint            = shade600,
 
                 outline              = outline,
                 outlineVariant       = shade200,

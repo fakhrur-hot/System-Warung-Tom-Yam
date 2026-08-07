@@ -60,5 +60,6 @@
   "closeScanner": "Close",
   "cafeClosedTitle": "Not open yet",
   "cafeClosedBody": "The restaurant isn't open right now. Please check back soon!",
-  "searchMenu": "Search"
+  "searchMenu": "Search",
+  "tableNotFound": "Table not found"
 }

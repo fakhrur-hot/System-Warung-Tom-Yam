@@ -215,4 +215,56 @@ interface OrderDao {
     /** Line items for several bills at once, so the list can show a one-line summary per bill. */
     @Query("SELECT * FROM order_items WHERE orderId IN (:orderIds)")
     suspend fun getItemsForOrders(orderIds: List<String>): List<OrderItem>
+
+    // --- Dashboard live queries ------------------------------------------------
+
+    /** Completed revenue grouped by hour (0–23) for a date range. Used by the live dashboard. */
+    @Query("""
+        SELECT CAST(SUBSTR(createdAt, 12, 2) AS INTEGER) AS hour,
+               COALESCE(SUM(total), 0.0) AS revenue,
+               COUNT(*) AS orderCount
+        FROM orders
+        WHERE createdAt >= :startDate AND createdAt < :endDate AND status = 'COMPLETED'
+        GROUP BY hour
+        ORDER BY hour ASC
+    """)
+    suspend fun getHourlyRevenue(startDate: String, endDate: String): List<HourlyRevenue>
+
+    /** Active (non-terminal) orders — reactive for live dashboard counter. */
+    @Query("SELECT COUNT(*) FROM orders WHERE status NOT IN ('COMPLETED', 'CANCELLED')")
+    fun getActiveOrderCountFlow(): Flow<Int>
+
+    /** Today's completed order count — reactive. */
+    @Query("SELECT COUNT(*) FROM orders WHERE createdAt >= :since AND status = 'COMPLETED'")
+    fun getCompletedOrderCountFlow(since: String): Flow<Int>
+
+    /** Today's total revenue — reactive. */
+    @Query("SELECT COALESCE(SUM(total), 0.0) FROM orders WHERE createdAt >= :since AND status = 'COMPLETED'")
+    fun getTotalRevenueFlow(since: String): Flow<Double>
+
+    /** Completed revenue grouped by date (YYYY-MM-DD) for a date range. Used for the daily trend chart. */
+    @Query("""
+        SELECT SUBSTR(createdAt, 1, 10) AS date,
+               COALESCE(SUM(total), 0.0) AS revenue,
+               COUNT(*) AS orderCount
+        FROM orders
+        WHERE createdAt >= :startDate AND createdAt < :endDate AND status = 'COMPLETED'
+        GROUP BY date
+        ORDER BY date ASC
+    """)
+    suspend fun getDailyRevenue(startDate: String, endDate: String): List<DailyRevenue>
 }
+
+/** Room result for hourly revenue aggregation. */
+data class HourlyRevenue(
+    val hour: Int,
+    val revenue: Double,
+    val orderCount: Int
+)
+
+/** Room result for daily revenue aggregation. */
+data class DailyRevenue(
+    val date: String,
+    val revenue: Double,
+    val orderCount: Int
+)

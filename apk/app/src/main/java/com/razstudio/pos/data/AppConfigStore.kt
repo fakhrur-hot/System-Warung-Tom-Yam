@@ -207,6 +207,43 @@ class AppConfigStore @Inject constructor(
         if (websiteUrl.isNotBlank()) write(KEY_WEBSITE_URL, websiteUrl.trim().trimEnd('/'))
         return true
     }
+    /**
+     * Forget the café this device belongs to, so it can be provisioned for a different one.
+     *
+     * ## Why this exists
+     *
+     * [adoptBackendFromRecoveryQr] refuses to repoint a device that already has a backend, and that
+     * refusal is a security boundary worth keeping — a QR handed over by a stranger must not be able
+     * to move a working till onto a project they control. But with no way to clear the backend at
+     * all, the boundary also meant a terminal could never legitimately change café: moving one from
+     * a closed stall to a new one required clearing the app's data from Android settings, and
+     * scanning the new café's key simply reported the key as rejected, because the token was being
+     * sent to the OLD café's Supabase.
+     *
+     * This is the legitimate path. It is not a hole in that boundary: it cannot be triggered by
+     * scanning anything. It runs from inside Settings, on a device where an admin is already signed
+     * in, behind a confirmation — which is precisely the "deliberately, with the values on screen"
+     * case the refusal above carves out.
+     *
+     * Café-scoped values only. The device identity is left alone: it is a property of the hardware,
+     * not of the café, and regenerating it would orphan the device row on a backend this call has
+     * no way to reach.
+     */
+    fun unlinkFromCafe() {
+        write(KEY_SUPABASE_URL, "")
+        write(KEY_SUPABASE_ANON_KEY, "")
+        write(KEY_WEBSITE_URL, "")
+        write(KEY_CAFE_NAME, "")
+        write(KEY_LAN_SERVER_URL, "")
+        write(KEY_OPERATING_MODE, "")
+        // The payment QR is the previous café's bank account. Leaving it behind would point the new
+        // café's customers at the old café's money — the single worst thing this could get wrong.
+        write(KEY_PAYMENT_QR_HASH, "")
+        write(KEY_PAYMENT_QR_URL, "")
+        write(KEY_SIGN_IN_SETTLED, "")
+        write(KEY_LAST_BACKUP_AT, "")
+    }
+
     fun websiteUrl(): String = read(KEY_WEBSITE_URL)
     fun cafeName(): String = read(KEY_CAFE_NAME)
 

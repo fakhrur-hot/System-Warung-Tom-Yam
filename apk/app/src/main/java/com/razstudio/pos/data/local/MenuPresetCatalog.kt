@@ -2,6 +2,7 @@ package com.razstudio.pos.data.local
 
 import android.content.Context
 import android.util.Log
+import com.razstudio.pos.BuildConfig
 import com.razstudio.pos.data.ModeRepository
 import com.razstudio.pos.data.OperatingMode
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -66,10 +67,14 @@ class MenuPresetCatalog @Inject constructor(
         /**
          * Where shared presets are published. Raw GitHub rather than an API endpoint: it needs no
          * key, no Edge Function and no Supabase row, and a café's starter menu is public data.
-         * A café can also point this at its own fork by editing one file.
+         *
+         * Owner/repo are baked from `template-repo.properties` at the monorepo root — the same file
+         * the provisioning Wizard derives from, so the repo a café's website is deployed from and the
+         * repo its starter menu comes from cannot drift apart. A fork edits that one file.
          */
-        const val REMOTE_INDEX_URL =
-            "https://raw.githubusercontent.com/fakhrur-hot/System-Warung-Tom-Yam/main/presets/index.json"
+        val REMOTE_INDEX_URL =
+            "https://raw.githubusercontent.com/${BuildConfig.RAZSTUDIO_GITHUB_OWNER}/" +
+                "${BuildConfig.RAZSTUDIO_GITHUB_REPO}/main/presets/index.json"
 
         private const val TIMEOUT_SECONDS = 10L
     }

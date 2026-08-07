@@ -76,10 +76,37 @@ data class SetupState(
      * from branding. Everything the manual tab asks for is already in that QR.
      */
     val connectionTab: ConnectionTab = ConnectionTab.OWNER_QR,
+
+    /**
+     * The provisioning Wizard endpoint, offered on the existing-café tab and stored on the device.
+     *
+     * Optional, and deliberately so: connecting a device to a running café needs nothing from the
+     * Wizard. It is collected here only because this is the one screen where an owner has all of their
+     * café's deployment values in front of them, and the alternative is hunting for the URL later on
+     * the Provision screen with no prompt telling them where it came from.
+     */
+    val provisionerWorkerUrl: String = "",
+
+    /** True while [SetupViewModel.runPreflight] is probing. */
+    val isPreflighting: Boolean = false,
+
+    /** Per-surface results from the last preflight. Empty until one has been run. */
+    val preflight: List<com.razstudio.pos.data.SetupPreflight.Item> = emptyList(),
 )
 
-/** The two ways to point a device at a Cloud café. */
-enum class ConnectionTab { OWNER_QR, MANUAL }
+/**
+ * The three ways to point a device at a Cloud café.
+ *
+ * [OWNER_QR] joins a café whose owner has their key to hand — nothing typed. [PROVISION_NEW_CAFE]
+ * builds a café that does not exist yet. [EXISTING_CAFE] is the case neither covered: a café that is
+ * already running, whose QR is lost or was never saved, reached by typing the same values its own
+ * Cloudflare Pages project holds (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, the site URL).
+ *
+ * That path used to exist as an "Enter manually" toggle and was dropped when these tabs arrived — the
+ * fields and the fetch/verify logic stayed in this ViewModel, but nothing rendered them, so a running
+ * café with no QR had no way in at all.
+ */
+enum class ConnectionTab { OWNER_QR, PROVISION_NEW_CAFE, EXISTING_CAFE }
 
 /**
  * Backs the in-app Setup screen (reachable from the three-dots menu on the login page).
@@ -97,7 +124,30 @@ class SetupViewModel @Inject constructor(
     private val modeRepository: ModeRepository,
     private val secureStorage: SecureStorage,
     private val appConfigFetcher: AppConfigFetcher,
+    private val setupPreflight: com.razstudio.pos.data.SetupPreflight,
 ) : ViewModel() {
+
+    /**
+     * Probe all three surfaces and report each separately.
+     *
+     * Distinct from [verifyConnection], which asks one question — "can this device talk to this
+     * backend?" — and gates Save on it. This asks "is this café fully stood up?", including the parts
+     * that do not block Save: a customer website serving no config, or a Wizard whose API never
+     * deployed. Those are invisible from the device until someone needs them and they are missing.
+     */
+    fun runPreflight() {
+        val s = _state.value
+        _state.value = s.copy(isPreflighting = true, preflight = emptyList())
+        viewModelScope.launch {
+            val items = setupPreflight.check(
+                websiteUrl = s.websiteUrl,
+                wizardUrl = s.provisionerWorkerUrl,
+                supabaseUrl = s.supabaseUrl,
+                supabaseKey = s.supabaseAnonKey,
+            )
+            _state.value = _state.value.copy(isPreflighting = false, preflight = items)
+        }
+    }
 
     private val _state = MutableStateFlow(
         run {
@@ -113,6 +163,7 @@ class SetupViewModel @Inject constructor(
                 supabaseUrl = existingUrl,
                 supabaseAnonKey = existingKey,
                 cafeName = appConfig.cafeName(),
+                provisionerWorkerUrl = secureStorage.getProvisionerWorkerUrl().orEmpty(),
             )
         }
     )
@@ -352,12 +403,12 @@ class SetupViewModel @Inject constructor(
     fun blockingReason(): String? {
         val s = _state.value
 
-        // The owner-key tab has no form to block. Everything Save would check — backend, key,
-        // website, café name — arrives from the QR itself, so demanding a typed café name there was
-        // asking the owner to fill in a field the next screen was about to overwrite. That is the
-        // defect this tab exists to remove: a Full QR café could not be saved at all without
-        // manually retyping details it already had in its hand.
-        if (s.operatingMode == OperatingMode.CLOUD && s.connectionTab == ConnectionTab.OWNER_QR) {
+        // The owner-key and provision-new-café tabs have no form to block. Everything Save would
+        // check arrives from the owner key or the provisioning run, so demanding a typed café name
+        // here would ask the owner to retype details that are about to be supplied automatically.
+        if (s.operatingMode == OperatingMode.CLOUD &&
+            (s.connectionTab == ConnectionTab.OWNER_QR || s.connectionTab == ConnectionTab.PROVISION_NEW_CAFE)
+        ) {
             return null
         }
 
@@ -394,6 +445,14 @@ class SetupViewModel @Inject constructor(
             websiteUrl = if (cloud) s.websiteUrl else "",
             cafeName = s.cafeName,
         )
+
+        // The Wizard URL is not part of the café's identity — it is a tool endpoint — so it goes to
+        // SecureStorage rather than into appConfig.save. Same slot the Provision screen prefills from,
+        // so an owner who records it here while connecting to their running café does not have to find
+        // it again the day they need to re-run a provisioning step against that café.
+        s.provisionerWorkerUrl.trim().takeIf { it.isNotBlank() }?.let {
+            secureStorage.saveProvisionerWorkerUrl(it)
+        }
 
         // Task 9.3: the cloud session token and ordering api key go too. Clearing the URL alone is
         // not enough — SecureStorage.isAuthenticated() answers from whichever credential matches the

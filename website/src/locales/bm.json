@@ -60,5 +60,6 @@
   "closeScanner": "Tutup",
   "cafeClosedTitle": "Belum dibuka",
   "cafeClosedBody": "Restoran belum dibuka lagi. Sila kembali sebentar lagi!",
-  "searchMenu": "Cari"
+  "searchMenu": "Cari",
+  "tableNotFound": "Meja tidak ditemui"
 }

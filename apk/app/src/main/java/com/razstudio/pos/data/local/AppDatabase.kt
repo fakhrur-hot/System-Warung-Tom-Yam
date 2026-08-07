@@ -3,6 +3,8 @@ package com.razstudio.pos.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.razstudio.pos.notification.CapturedPayment
+import com.razstudio.pos.notification.CapturedPaymentDao
 
 /**
  * Room database holding local menu items, orders, tables, settings, pending orders,
@@ -34,9 +36,11 @@ import androidx.room.TypeConverters
         PairingToken::class,
         CafeSession::class,
         DailyAggregate::class,
-        PaymentTransaction::class
+        PaymentTransaction::class,
+        CashDrawerEvent::class,
+        CapturedPayment::class
     ],
-    version = 17,
+    version = 20,
     // exportSchema = true so MigrationTestHelper can validate the schema after migration.
     // Schema JSON files are written to app/schemas/ and committed to source control so that
     // future migration tests can verify against a stable baseline (Requirement 8.1, 12.6).
@@ -57,4 +61,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun cafeSessionDao(): CafeSessionDao
     abstract fun dailyAggregateDao(): DailyAggregateDao
     abstract fun paymentTransactionDao(): PaymentTransactionDao
+    abstract fun cashDrawerEventDao(): CashDrawerEventDao
+    abstract fun capturedPaymentDao(): CapturedPaymentDao
 }

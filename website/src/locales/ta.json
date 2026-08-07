@@ -60,5 +60,6 @@
   "closeScanner": "மூடு",
   "cafeClosedTitle": "இன்னும் திறக்கவில்லை",
   "cafeClosedBody": "உணவகம் இன்னும் திறக்கவில்லை. சிறிது நேரத்தில் மீண்டும் பார்க்கவும்!",
-  "searchMenu": "தேடு"
+  "searchMenu": "தேடு",
+  "tableNotFound": "மேசை கிடைக்கவில்லை"
 }

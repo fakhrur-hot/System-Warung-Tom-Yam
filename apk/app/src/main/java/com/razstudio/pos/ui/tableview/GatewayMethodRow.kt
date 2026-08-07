@@ -42,6 +42,7 @@ fun paymentMethodLabel(method: PaymentMethod, strings: UiStrings): String = when
     PaymentMethod.SHOPEEPAY -> strings.paymentMethodShopeePay
     PaymentMethod.FPX -> strings.paymentMethodFpx
     PaymentMethod.CARD -> strings.paymentMethodCard
+    PaymentMethod.NOTIFICATION -> "eWallet (Notification)"
 }
 
 /**

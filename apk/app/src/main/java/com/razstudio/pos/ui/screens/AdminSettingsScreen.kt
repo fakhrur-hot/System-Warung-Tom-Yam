@@ -9,6 +9,7 @@ import android.location.LocationManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,8 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -92,10 +95,14 @@ import com.razstudio.pos.ui.viewmodels.AdminSettingsViewModel
 fun AdminSettingsScreen(
     viewModel: AdminSettingsViewModel = hiltViewModel(),
     onBack: () -> Unit,
+    onNavigateToPrinters: () -> Unit = {},
+    onNavigateToHardwareDevices: () -> Unit = {},
+    onNavigateToCashDrawerSettings: () -> Unit = {},
+    onNavigateToKeepAliveSetup: () -> Unit = {},
     languageViewModel: LanguageViewModel = hiltViewModel(),
     pinLockViewModel: com.razstudio.pos.ui.viewmodels.PinLockViewModel = hiltViewModel(),
     devicePrefsViewModel: com.razstudio.pos.ui.viewmodels.DevicePrefsViewModel = hiltViewModel(),
-    presetViewModel: com.razstudio.pos.ui.viewmodels.MenuPresetViewModel = hiltViewModel(),
+    sessionViewModel: com.razstudio.pos.ui.viewmodels.AdminSessionViewModel = hiltViewModel(),
     modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel()
 ) {
     // Task 11.4 / Requirements 7.4, 7.5. Collected from a StateFlow, so the gate is re-evaluated on
@@ -109,14 +116,30 @@ fun AdminSettingsScreen(
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
 
-    // Menu preset loader (deep in settings): replaces the whole menu, then soft-restarts.
-    val presetLoading by presetViewModel.loading.collectAsState()
-    var showPresetConfirm by remember { mutableStateOf(false) }
+    // A secondary-admin device has no local printer — it prints via the Main Admin — so the
+    // two hardware entries are greyed rather than hidden: the café can see the capability
+    // exists and understand why this particular till does not have it.
+    LaunchedEffect(Unit) { sessionViewModel.refreshRole() }
+    val currentRole by sessionViewModel.currentRole.collectAsState()
+    val localHardwareAllowed = currentRole != com.razstudio.pos.data.SecureStorage.Role.ADMIN_SECONDARY
 
     // PIN lock state (device-local, immediate — not part of the staged Save/Cancel bar).
     var pinLockEnabled by remember { mutableStateOf(pinLockViewModel.isPinLockEnabled()) }
     var showSetPin by remember { mutableStateOf(false) }
     var showChangePin by remember { mutableStateOf(false) }
+    val secureStorage = remember { com.razstudio.pos.data.SecureStorage(context) }
+    var showDrawerPin by remember { mutableStateOf(false) }
+    var showUnlinkConfirm by remember { mutableStateOf(false) }
+    val unlinkViewModel: com.razstudio.pos.ui.viewmodels.UnlinkDeviceViewModel = hiltViewModel()
+    var fullscreenMode by remember { mutableStateOf(devicePrefsViewModel.fullscreenMode()) }
+    val setFullscreen: (Boolean) -> Unit = { enable ->
+        devicePrefsViewModel.setFullscreenMode(enable)
+        fullscreenMode = enable
+        com.razstudio.pos.ui.util.FullscreenMode.activityOf(context)?.let {
+            com.razstudio.pos.ui.util.FullscreenMode.apply(it, enable)
+        }
+    }
+    var hasDrawerPin by remember { mutableStateOf(secureStorage.hasCustomDrawerPin()) }
     // Device-local UI prefs (immediate).
     var showPrintStatus by remember { mutableStateOf(devicePrefsViewModel.showPrintStatus()) }
 
@@ -146,26 +169,6 @@ fun AdminSettingsScreen(
     var ambientTimeout by remember { mutableStateOf(ambientStore.getTimeoutMinutes()) }
     var ambientCustomerFacing by remember { mutableStateOf(ambientStore.isCustomerFacing()) }
 
-    // Location permission helper
-    val locationPermHelper = rememberPermissionHelper(Manifest.permission.ACCESS_FINE_LOCATION)
-
-    // Image picker launcher
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { viewModel.processLogo(it) }
-    }
-
-    // Payment QR picker (task 16.1). Separate launcher from the logo one so the two uploads cannot be
-    // confused — they go through different pipelines with different rules: the logo is center-cropped
-    // and JPEG-compressed for thermal printing, which would smear a dense QR until it stops scanning.
-    // The MIME type is passed through so PaymentQrPipeline can keep a PNG lossless.
-    val paymentQrPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let { viewModel.processPaymentQr(it, context.contentResolver.getType(it)) }
-    }
-
     LaunchedEffect(uiState.error) {
         uiState.error?.let { error ->
             snackbarHostState.showSnackbar(error)
@@ -192,40 +195,6 @@ fun AdminSettingsScreen(
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        bottomBar = {
-            // Sticky Save / Cancel — always visible so changes are never "lost" off-screen.
-            // Disabled until something changes (isDirty); shows a spinner while persisting.
-            val isAnyLoading = uiState.permissionsLoading || uiState.locationLoading || uiState.brandingLoading
-            androidx.compose.material3.Surface(tonalElevation = 3.dp) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { viewModel.cancelAll() },
-                        enabled = uiState.isDirty && !isAnyLoading,
-                        modifier = Modifier.weight(1f)
-                    ) { Text(strings.commonCancel) }
-                    Button(
-                        onClick = { viewModel.saveAll() },
-                        enabled = uiState.isDirty && !isAnyLoading,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (isAnyLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        Text(strings.commonSave)
-                    }
-                }
-            }
-        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -235,72 +204,9 @@ fun AdminSettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // === Café Profile (identity — shown first) ===
-            SettingsSection(title = strings.cafeProfileSection) {
-                OutlinedTextField(
-                    value = uiState.cafeName,
-                    onValueChange = { viewModel.updateCafeName(it) },
-                    label = { Text(strings.cafeNameLabel) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Logo preview — a freshly-picked local image takes priority; otherwise
-                // fall back to whatever logo is already saved server-side, so the
-                // screen doesn't look like the logo was lost on a fresh install/relogin.
-                // Centred. A 120dp square pinned to the left edge of a full-width column reads as
-                // a thumbnail that failed to lay out, not as the café's identity.
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    when {
-                        uiState.logoPreview != null -> Image(
-                            bitmap = uiState.logoPreview!!.asImageBitmap(),
-                            contentDescription = "Logo preview",
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                        uiState.existingLogoUrl != null -> AsyncImage(
-                            model = uiState.existingLogoUrl,
-                            contentDescription = "Current logo",
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop
-                        )
-                    }
-                }
-                if (uiState.logoPreview != null || uiState.existingLogoUrl != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-
-                OutlinedButton(
-                    onClick = { imagePickerLauncher.launch("image/*") },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    val hasLogo = uiState.logoPreview != null || uiState.existingLogoUrl != null
-                    Text(if (hasLogo) strings.changeLogoButton else strings.pickLogoButton)
-                }
-
-                if (uiState.brandingLoading) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                }
-
-                // Directly under the logo, because this is the other half of "what this café is":
-                // its identity on this device, and its identity in the owner's Google account.
-                Spacer(modifier = Modifier.height(16.dp))
-                com.razstudio.pos.ui.components.GoogleAccountSection()
-
-                // Save Branding button removed — committed via the sticky Save/Cancel bar
-            }
-
-            HorizontalDivider()
 
             // === Staff Permissions ===
-            SettingsSection(title = strings.staffPermissionsSection) {
+            SettingsCard(title = strings.staffPermissionsSection) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -326,10 +232,9 @@ fun AdminSettingsScreen(
                 }
             }
 
-            HorizontalDivider()
 
             // === Default Language (café-wide, per surface) ===
-            SettingsSection(title = strings.defaultLanguageSection) {
+            SettingsCard(title = strings.defaultLanguageSection) {
                 LanguagePickerRow(
                     label = strings.defaultLangAdminLabel,
                     selectedCode = uiState.defaultLangAdmin,
@@ -367,83 +272,6 @@ fun AdminSettingsScreen(
                 )
             }
 
-            HorizontalDivider()
-
-            // === Café Location (GPS Lock) ===
-            SettingsSection(title = strings.cafeLocationSection) {
-                Button(
-                    onClick = {
-                        val hasPerm = ContextCompat.checkSelfPermission(
-                            context, Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == PackageManager.PERMISSION_GRANTED
-
-                        if (hasPerm) {
-                            // Get GPS fix
-                            try {
-                                val locationManager = context.getSystemService(
-                                    android.content.Context.LOCATION_SERVICE
-                                ) as LocationManager
-                                val location = locationManager.getLastKnownLocation(
-                                    LocationManager.GPS_PROVIDER
-                                ) ?: locationManager.getLastKnownLocation(
-                                    LocationManager.NETWORK_PROVIDER
-                                )
-                                if (location != null) {
-                                    viewModel.onLocationCaptured(
-                                        location.latitude,
-                                        location.longitude
-                                    )
-                                }
-                            } catch (e: SecurityException) {
-                                // Shouldn't happen if permission granted
-                            }
-                        } else {
-                            locationPermHelper.request()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(strings.captureLocationButton)
-                }
-
-                if (uiState.latitude != null && uiState.longitude != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Lat: ${String.format("%.6f", uiState.latitude)}, " +
-                                "Lng: ${String.format("%.6f", uiState.longitude)}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = uiState.radiusMeters.toString(),
-                    onValueChange = { value ->
-                        value.toIntOrNull()?.let { viewModel.updateRadius(it) }
-                    },
-                    label = { Text(strings.radiusLabel) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                // Auto-detected timezone (set when location is captured) — synced across
-                // reports, kitchen slips, receipts and attendance on Save.
-                if (uiState.timezone.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "${strings.timezoneLabel}: ${uiState.timezone}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                // Save Location button removed — committed via the bottom Save/Cancel bar
-            }
-
-            HorizontalDivider()
 
             // === Customer Order ===
             // "Hold before kitchen" delay for customer-placed orders. The order waits this
@@ -454,7 +282,7 @@ fun AdminSettingsScreen(
             // that does not exist. Hidden rather than disabled — a café that cannot have web ordering
             // should not be shown a dial for it and left wondering what it does.
             if (capabilities.customerQrOrdering) {
-            SettingsSection(title = strings.customerOrderSection) {
+            SettingsCard(title = strings.customerOrderSection) {
                 // Auto-print vs buffer-to-pending-modal.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -514,58 +342,69 @@ fun AdminSettingsScreen(
             }
             }
 
-            HorizontalDivider()
 
             // === Reports ===
-            SettingsSection(title = strings.reportsTitle) {
-                OutlinedTextField(
-                    value = uiState.reportEmail,
-                    onValueChange = { viewModel.updateReportEmail(it) },
-                    label = { Text(strings.reportEmailLabel) },
-                    supportingText = { Text(strings.reportEmailHint) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+            SettingsCard(title = strings.reportsTitle) {
+                // No email recipient any more.
+                //
+                // The field wrote a `report_email` setting that the app never used: the Brevo send
+                // lives in the reports-closing Edge Function, and nothing in the app had ever
+                // called it. Owners were configuring a delivery that could not happen. The report
+                // now lands on the device itself, which needs no mail provider and no account.
+                Text(
+                    text = strings.reportSavedToDownloads,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = uiState.businessDayStartHour.toString(),
-                    onValueChange = { v ->
-                        v.filter { it.isDigit() }.take(2).toIntOrNull()?.let {
-                            viewModel.updateBusinessDayStartHour(it)
-                        }
-                        if (v.isBlank()) viewModel.updateBusinessDayStartHour(0)
-                    },
-                    label = { Text(strings.businessDayStartLabel) },
-                    supportingText = {
-                        Text(strings.businessDayStartHint)
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                // A 24-hour number field asked an owner to translate "we close at 2am" into 2, and
+                // "we open at 3pm" into 15 — arithmetic nobody should do to describe their own
+                // opening hours, and the commonest way to end up with a report anchored to the
+                // wrong half of the day.
+                HourPickerRow(
+                    label = strings.businessDayStartLabel,
+                    hour = uiState.businessDayStartHour,
+                    onHourChange = { viewModel.updateBusinessDayStartHour(it) },
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                HourPickerRow(
+                    label = strings.businessDayEndLabel,
+                    hour = uiState.businessDayEndHour,
+                    onHourChange = { viewModel.updateBusinessDayEndHour(it) },
+                )
+                Text(
+                    text = strings.businessDayHoursHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            HorizontalDivider()
 
             // === Security (device-local, applied immediately) ===
-            SettingsSection(title = strings.securitySection) {
+            SettingsCard(title = strings.securitySection) {
+                // The whole row is the control, not just the switch.
+                //
+                // On a 1280dp-wide till the label and the switch are a hand's width apart, and
+                // tapping the label — which is what everyone does — did nothing at all. The lock
+                // was wired correctly the whole time and read as broken, because the only live
+                // pixels were the ones nobody aimed at.
+                val togglePinLock: (Boolean) -> Unit = { enable ->
+                    if (enable) {
+                        showSetPin = true   // set a PIN before turning the lock on
+                    } else {
+                        pinLockViewModel.disable()
+                        pinLockEnabled = false
+                    }
+                }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { togglePinLock(!pinLockEnabled) },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(strings.pinLockLabel)
-                    Switch(
-                        checked = pinLockEnabled,
-                        onCheckedChange = { enable ->
-                            if (enable) {
-                                showSetPin = true   // set a PIN before turning the lock on
-                            } else {
-                                pinLockViewModel.disable()
-                                pinLockEnabled = false
-                            }
-                        }
-                    )
+                    Switch(checked = pinLockEnabled, onCheckedChange = togglePinLock)
                 }
                 Text(
                     text = strings.pinLockDesc,
@@ -580,38 +419,70 @@ fun AdminSettingsScreen(
                     ) { Text(strings.changePinButton) }
                 }
 
+                // ── Unlink ───────────────────────────────────────────────────────────────
+                // Last, and behind a confirmation: this is the most destructive control in the
+                // app, and the only one that cannot be undone from inside the app afterwards.
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider()
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(strings.receiptLogoLabel)
-                    Switch(
-                        checked = uiState.receiptLogo,
-                        onCheckedChange = { viewModel.updateReceiptLogo(it) }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(strings.escAsteriskLabel)
-                    Switch(
-                        checked = uiState.escAsteriskMode,
-                        onCheckedChange = { viewModel.updateEscAsteriskMode(it) }
-                    )
-                }
+                Text(strings.unlinkDeviceLabel, fontWeight = FontWeight.Bold)
                 Text(
-                    text = strings.escAsteriskDesc,
+                    text = strings.unlinkDeviceDesc,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-
                 Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { showUnlinkConfirm = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+                ) { Text(strings.unlinkDeviceButton) }
+            }
+
+
+            // === Printing & hardware (this terminal) ===
+            //
+            // Printers and Devices & Hardware moved here from Café Management. They describe
+            // THIS till — which printer it talks to, whether it has a drawer — not the café,
+            // so they do not belong beside the menu and the floor plan, and they do not travel
+            // to a replacement device the way café settings do.
+            //
+            // The print toggles below were in "Security", which they never had anything to do
+            // with; they are printer behaviour and sit with the printers now.
+            SettingsCard(title = strings.settingsHardwareSection) {
+                SettingsNavRow(
+                    title = strings.printersTitle,
+                    description = strings.printersManagementDesc,
+                    enabled = localHardwareAllowed,
+                    onClick = onNavigateToPrinters,
+                )
+                SettingsNavRow(
+                    title = strings.devicesAndHardwareTitle,
+                    description = strings.devicesAndHardwareDesc,
+                    enabled = localHardwareAllowed,
+                    onClick = onNavigateToHardwareDevices,
+                )
+                // Drawer + printer-transport + auto-cut settings, moved out of Devices &
+                // Hardware (cash-drawer-settings R2.8). Same localHardwareAllowed gate as its
+                // siblings: a Secondary Admin has no local printer, so no drawer either (R5.3).
+                SettingsNavRow(
+                    title = "Cash Drawer",
+                    description = "Enable the drawer, choose which printer kicks it, paper auto-cut.",
+                    enabled = localHardwareAllowed,
+                    onClick = onNavigateToCashDrawerSettings,
+                )
+                // Battery/OEM plumbing that keeps the till awake — the same "this terminal"
+                // concern as its printer, and previously stranded in the home overflow menu
+                // beside Reports and Backup, which are café-wide.
+                SettingsNavRow(
+                    title = strings.backgroundSetupTitle,
+                    description = strings.backgroundSetupDesc,
+                    enabled = true,
+                    onClick = onNavigateToKeepAliveSetup,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -632,12 +503,10 @@ fun AdminSettingsScreen(
                 )
             }
 
-            HorizontalDivider()
-
             // === New-order alert sound (device-local, applied immediately) ===
             // Uses the SYSTEM ringtone picker so the operator gets every tone already on the
             // device (plus any they've added) rather than a bundled subset.
-            SettingsSection(title = strings.alertSoundSection) {
+            SettingsCard(title = strings.alertSoundSection) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -702,12 +571,30 @@ fun AdminSettingsScreen(
                 ) { Text(strings.alertSoundTest) }
             }
 
-            HorizontalDivider()
+
+            // === Screen (device-local, applied immediately) ===
+            SettingsCard(title = strings.screenSection) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { setFullscreen(!fullscreenMode) },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(strings.fullscreenLabel)
+                    Switch(checked = fullscreenMode, onCheckedChange = setFullscreen)
+                }
+                Text(
+                    text = strings.fullscreenDesc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             // === Ambient / screensaver mode (device-local, applied immediately) ===
             // Describes THIS terminal's physical situation (powered counter, guest-visible screen),
             // so it is stored per device rather than café-wide.
-            SettingsSection(title = strings.ambientSection) {
+            SettingsCard(title = strings.ambientSection) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -764,99 +651,8 @@ fun AdminSettingsScreen(
                 }
             }
 
-            HorizontalDivider()
-
-            // === Menu Preset (advanced — replaces the entire menu) ===
-            SettingsSection(title = strings.menuPresetSection) {
-                OutlinedButton(
-                    onClick = { showPresetConfirm = true },
-                    enabled = !presetLoading,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    if (presetLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-                    Text(strings.loadPresetTani)
-                }
-            }
-
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ── Payment QR (task 16.1, Requirements 14.1–14.3, 14.5) ─────────────────────────────
-            // Available in ALL three operating modes (Requirement 14.7), so this section is never
-            // gated on ModeCapabilities. Visibility of the *Show QR* button elsewhere depends solely
-            // on whether a hash is stored — absence of a hash IS the "not configured" state, so there
-            // is no separate enabled flag that could drift from whether the image really exists.
-            SettingsSection(title = strings.paymentQrSection) {
-                Text(
-                    text = strings.paymentQrHelp,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val qrPreview = uiState.paymentQrPreview
-                if (qrPreview != null && uiState.paymentQrHash != null) {
-                    Image(
-                        bitmap = qrPreview.asImageBitmap(),
-                        contentDescription = strings.paymentQrSection,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = { paymentQrPickerLauncher.launch("image/*") },
-                            enabled = !uiState.paymentQrBusy,
-                        ) { Text(strings.paymentQrReplace) }
-                        OutlinedButton(
-                            onClick = { viewModel.removePaymentQr() },
-                            enabled = !uiState.paymentQrBusy,
-                        ) { Text(strings.removeButton) }
-                    }
-                } else {
-                    Text(
-                        text = strings.paymentQrNone,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(
-                        onClick = { paymentQrPickerLauncher.launch("image/*") },
-                        enabled = !uiState.paymentQrBusy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (uiState.paymentQrBusy) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        Text(strings.paymentQrUpload)
-                    }
-                }
-
-                // Rejection reason shown inline rather than as a snackbar: "this image has no QR code
-                // in it" is a correction the admin must act on, and a transient toast is too easy to
-                // miss while they are looking at the picker result (Requirement 14.3).
-                uiState.paymentQrError?.let { err ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = err,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
 
             // Third-party licence notices. This app ships proprietary (see LICENSE), but it is built
             // on MIT- and Apache-2.0-licensed components, both of which require their copyright
@@ -868,7 +664,7 @@ fun AdminSettingsScreen(
             // Labels come from res/values rather than UiStrings because the licence texts themselves
             // are English-only; see THIRD-PARTY-NOTICES.md for the audit and the one component
             // (ZXing) the generator cannot detect.
-            SettingsSection(title = strings.aboutSection) {
+            SettingsCard(title = strings.aboutSection) {
                 OutlinedButton(
                     onClick = {
                         context.startActivity(
@@ -879,134 +675,28 @@ fun AdminSettingsScreen(
                 ) {
                     Text(strings.openSourceLicenses)
                 }
+
+                // The generated screen is the compliance record, but it has two holes worth naming
+                // on screen rather than only in THIRD-PARTY-NOTICES.md: a debug build emits a
+                // placeholder instead of the real list, and the generator does not detect ZXing at
+                // all. Reproducing ZXing's notice here is what keeps the in-app record complete.
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = strings.licenceGeneratorNote,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = strings.licenceExtraNotices,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
-
-    // Preset picker, then a confirmation naming the chosen preset.
-    //
-    // Two steps rather than one: the load is destructive, and "replace my menu" is a very
-    // different decision from "replace my menu with these 152 items". The second dialog is where
-    // the café sees what it is actually getting.
-    if (showPresetConfirm) {
-        val presets by presetViewModel.presets.collectAsState()
-        var chosen by remember { mutableStateOf<com.razstudio.pos.data.local.MenuPreset?>(null) }
-
-        val selected = chosen
-        if (selected == null) {
-            AlertDialog(
-                onDismissRequest = { showPresetConfirm = false },
-                title = { Text(strings.loadPresetConfirmTitle) },
-                text = {
-                    if (presets.isEmpty()) {
-                        Text(strings.presetNoneAvailable)
-                    } else {
-                        Column(
-                            modifier = Modifier.verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = strings.presetPickerHelp,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            presets.forEach { preset ->
-                                OutlinedButton(
-                                    onClick = { chosen = preset },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = preset.presetName,
-                                            style = MaterialTheme.typography.titleSmall
-                                        )
-                                        Text(
-                                            text = strings.presetItemCount
-                                                .format(preset.itemCount, preset.categoryCount),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {},
-                dismissButton = {
-                    TextButton(onClick = { showPresetConfirm = false }) {
-                        Text(strings.commonCancel)
-                    }
-                }
-            )
-        } else {
-            AlertDialog(
-                onDismissRequest = { chosen = null },
-                title = { Text(selected.presetName) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (selected.description.isNotBlank()) {
-                            Text(selected.description)
-                        }
-                        Text(
-                            text = strings.presetItemCount
-                                .format(selected.itemCount, selected.categoryCount),
-                            style = MaterialTheme.typography.labelMedium
-                        )
-                        // The warning belongs here, next to the name, not on the earlier screen —
-                        // this is the tap that destroys the current menu.
-                        Text(
-                            text = strings.loadPresetConfirmBody,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showPresetConfirm = false
-                        presetViewModel.loadPreset(selected)
-                    }) {
-                        Text(strings.commonConfirm)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { chosen = null }) { Text(strings.commonBack) }
-                }
-            )
-        }
-    }
-
-    // Café renamed — prompt to restart so every screen that reads the name once (RoleSelectScreen,
-    // OEM keep-alive instructions) picks up the change. Not dismissable by tapping outside — the
-    // admin must explicitly choose Restart Now or Later, since accidentally losing this prompt
-    // just means the stale name lingers until the next natural app restart, not a data-loss risk.
-    if (uiState.restartRequired) {
-        AlertDialog(
-            onDismissRequest = { },
-            title = { Text(strings.restartRequiredTitle) },
-            text = { Text(strings.restartRequiredBody) },
-            confirmButton = {
-                TextButton(onClick = { viewModel.restartApp() }) {
-                    Text(strings.restartNowButton)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissRestartPrompt() }) {
-                    Text(strings.restartLaterButton)
-                }
-            }
-        )
-    }
-
-    // Location permission dialog
-    PermissionSettingsDialog(
-        state = locationPermHelper,
-        title = strings.locationPermTitle,
-        message = strings.locationPermMessage
-    )
 
     // Set / change admin PIN dialogs
     if (showSetPin) {
@@ -1021,6 +711,40 @@ fun AdminSettingsScreen(
             onCancel = { showSetPin = false } // toggle stays off if they back out
         )
     }
+    if (showUnlinkConfirm) {
+        AlertDialog(
+            onDismissRequest = { showUnlinkConfirm = false },
+            title = { Text(strings.unlinkConfirmTitle) },
+            text = { Text(strings.unlinkConfirmBody) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showUnlinkConfirm = false
+                    // Restarted rather than navigated: every ViewModel on the back stack is
+                    // holding data for a café that no longer exists on this device.
+                    unlinkViewModel.unlink { viewModel.restartApp() }
+                }) { Text(strings.unlinkDeviceButton) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnlinkConfirm = false }) { Text(strings.commonCancel) }
+            },
+        )
+    }
+    if (showDrawerPin) {
+        com.razstudio.pos.ui.components.DrawerPinDialog(
+            strings = strings,
+            // Always required, even before the café has set its own: the shipped default is
+            // still the PIN that opens the drawer right now, and skipping the check would let
+            // anyone holding the phone re-key the till without knowing anything at all.
+            requiresCurrent = true,
+            onVerifyCurrent = { it == secureStorage.getDrawerPin() },
+            onSet = { pin ->
+                secureStorage.saveDrawerPin(pin)
+                hasDrawerPin = true
+                showDrawerPin = false
+            },
+            onDismiss = { showDrawerPin = false },
+        )
+    }
     if (showChangePin) {
         com.razstudio.pos.ui.components.ChangePinDialog(
             strings = strings,
@@ -1031,19 +755,59 @@ fun AdminSettingsScreen(
     }
 }
 
+/**
+ * One settings category.
+ *
+ * Every group on this screen is the same card so the eye can find the boundaries: the screen is
+ * long, it mixes café-wide settings with per-device ones, and the previous bold-heading-plus-rule
+ * rhythm left it reading as a single unbroken column. Matches `HardwareDevicesScreen`'s card
+ * exactly, since that screen is now reached from this one.
+ */
 @Composable
-private fun SettingsSection(
+private fun SettingsCard(
     title: String,
     content: @Composable () -> Unit
 ) {
-    Column {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        content()
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            content()
+        }
+    }
+}
+
+/** A row inside a card that opens another screen, rather than toggling something in place. */
+@Composable
+private fun SettingsNavRow(
+    title: String,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -1085,4 +849,53 @@ private fun LanguagePickerRow(
             }
         }
     }
+}
+
+/**
+ * An hour of the day, chosen in 12-hour time.
+ *
+ * Stored as 0–23 throughout — the backend, the reports and the trading-day maths all speak 24-hour,
+ * and converting at the edge keeps one representation in the data and the familiar one on screen.
+ * The dropdown lists all 24 hours already formatted, so there is no separate AM/PM control to get
+ * out of step with the hour beside it.
+ */
+@Composable
+private fun HourPickerRow(
+    label: String,
+    hour: Int,
+    onHourChange: (Int) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label)
+        Box {
+            OutlinedButton(onClick = { expanded = true }) {
+                Text(formatHour12(hour))
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                (0..23).forEach { h ->
+                    DropdownMenuItem(
+                        text = { Text(formatHour12(h)) },
+                        onClick = {
+                            expanded = false
+                            onHourChange(h)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 0 -> "12:00 AM", 13 -> "1:00 PM". Midnight and noon are the two everyone gets wrong. */
+private fun formatHour12(hour: Int): String {
+    val h = ((hour % 12) + 12) % 12
+    val display = if (h == 0) 12 else h
+    val suffix = if (hour % 24 < 12) "AM" else "PM"
+    return "$display:00 $suffix"
 }

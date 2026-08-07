@@ -56,10 +56,13 @@ import com.razstudio.pos.ui.screens.MenuManagementScreen
 import com.razstudio.pos.ui.screens.OrderingConnectScreen
 import com.razstudio.pos.ui.screens.OrderingHomeScreen
 import com.razstudio.pos.ui.screens.PaymentGatewaySettingsScreen
+import com.razstudio.pos.ui.screens.PaymentMonitorScreen
 import com.razstudio.pos.ui.screens.PendingApprovalScreen
 import com.razstudio.pos.ui.screens.ProvisionerScreen
 import com.razstudio.pos.ui.screens.PrintersScreen
 import com.razstudio.pos.ui.screens.QrPdfScreen
+import com.razstudio.pos.ui.screens.CashDrawerScreen
+import com.razstudio.pos.ui.screens.CashDrawerSettingsScreen
 import com.razstudio.pos.ui.screens.ReportsScreen
 import com.razstudio.pos.ui.screens.RoleSelectScreen
 import com.razstudio.pos.ui.screens.LanPairingScreen
@@ -240,7 +243,6 @@ fun AppNavGraph(
                     }
                 },
                 onSetup = { navController.navigate(NavRoutes.SETUP) },
-                onProvision = { navController.navigate(NavRoutes.PROVISIONER) },
                 // "Reload from Google Drive" is the sign-in screen again: it re-authenticates and
                 // re-lists the account's cafés, which is exactly what that screen already does.
                 // A second code path would be a second place for the chooser to drift.
@@ -284,6 +286,7 @@ fun AppNavGraph(
                         popUpTo(NavRoutes.ROLE_SELECT) { inclusive = true }
                     }
                 },
+                onProvision = { navController.navigate(NavRoutes.PROVISIONER) },
             )
         }
 
@@ -398,6 +401,9 @@ fun AppNavGraph(
                 onNavigateToReports = {
                     navController.navigate(NavRoutes.REPORTS)
                 },
+                onNavigateToCashDrawer = {
+                    navController.navigate(NavRoutes.CASH_DRAWER)
+                },
                 onNavigateToBackup = {
                     navController.navigate(NavRoutes.BACKUP)
                 },
@@ -406,8 +412,15 @@ fun AppNavGraph(
                 },
                 onNavigateToCafeManagement = {
                     navController.navigate(NavRoutes.CAFE_MANAGEMENT)
+                },
+                onNavigateToPaymentMonitor = {
+                    navController.navigate(NavRoutes.PAYMENT_MONITOR)
                 }
             )
+        }
+
+        composable(NavRoutes.PAYMENT_MONITOR) {
+            PaymentMonitorScreen(onBack = { navController.popBackStack() })
         }
 
         composable(NavRoutes.ADMIN_LOCK) {
@@ -507,9 +520,19 @@ fun AppNavGraph(
                 onNavigateToHardwareDevices = {
                     navController.navigate(NavRoutes.HARDWARE_DEVICES)
                 },
+                onNavigateToCashDrawerSettings = {
+                    navController.navigate(NavRoutes.CASH_DRAWER_SETTINGS)
+                },
                 onNavigateToKeepAliveSetup = {
                     navController.navigate(NavRoutes.KEEP_ALIVE_SETUP)
                 },
+            )
+        }
+
+        // Cash Drawer Settings: enable toggle + drawer assignment + auto-cut + printer transport.
+        composable(NavRoutes.CASH_DRAWER_SETTINGS) {
+            CashDrawerSettingsScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 
@@ -532,6 +555,13 @@ fun AppNavGraph(
             ReportsScreen(
                 onBack = { navController.popBackStack() },
                 onNavigateToBillHistory = { navController.navigate(NavRoutes.BILL_HISTORY) }
+            )
+        }
+
+        // Cash-drawer ledger: opening float, PIN-gated cash out, audit trail.
+        composable(NavRoutes.CASH_DRAWER) {
+            CashDrawerScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

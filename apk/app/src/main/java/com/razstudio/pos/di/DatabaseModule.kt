@@ -10,8 +10,12 @@ import com.razstudio.pos.data.local.MIGRATION_13_14
 import com.razstudio.pos.data.local.MIGRATION_14_15
 import com.razstudio.pos.data.local.MIGRATION_15_16
 import com.razstudio.pos.data.local.MIGRATION_16_17
+import com.razstudio.pos.data.local.MIGRATION_17_18
+import com.razstudio.pos.data.local.MIGRATION_18_19
+import com.razstudio.pos.data.local.MIGRATION_19_20
 import com.razstudio.pos.data.local.MIGRATION_8_9
 import com.razstudio.pos.data.local.MIGRATION_9_10
+import com.razstudio.pos.data.local.CashDrawerEventDao
 import com.razstudio.pos.data.local.CafeSessionDao
 import com.razstudio.pos.data.local.DailyAggregateDao
 import com.razstudio.pos.data.local.MenuDao
@@ -25,6 +29,7 @@ import com.razstudio.pos.data.local.PrintJobDao
 import com.razstudio.pos.data.local.PrinterConfigDao
 import com.razstudio.pos.data.local.SettingsDao
 import com.razstudio.pos.data.local.TableDao
+import com.razstudio.pos.notification.CapturedPaymentDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -60,6 +65,9 @@ object DatabaseModule {
                 MIGRATION_14_15,
                 MIGRATION_15_16,
                 MIGRATION_16_17,
+                MIGRATION_17_18,
+                MIGRATION_18_19,
+                MIGRATION_19_20,
             )
             .build()
     }
@@ -127,5 +135,15 @@ object DatabaseModule {
     @Provides
     fun providePaymentTransactionDao(database: AppDatabase): PaymentTransactionDao {
         return database.paymentTransactionDao()
+    }
+
+    @Provides
+    fun provideCashDrawerEventDao(database: AppDatabase): CashDrawerEventDao {
+        return database.cashDrawerEventDao()
+    }
+
+    @Provides
+    fun provideCapturedPaymentDao(database: AppDatabase): CapturedPaymentDao {
+        return database.capturedPaymentDao()
     }
 }
