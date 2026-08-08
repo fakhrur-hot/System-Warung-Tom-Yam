@@ -366,12 +366,23 @@ fun AdminHomeScreen(
                             // Printers moved into Café Management (under Generate Table QR).
 
                             // --- Payment Monitor ---
-                            // Main Admin only: this device is the one that actually receives the
-                            // bank/e-wallet notifications and holds the printer that acts on a
-                            // match. A Secondary Admin has neither — it never routes a captured
-                            // payment back to itself — so surfacing the toggle there would offer a
-                            // control with no effect on that device.
-                            if (!sessionViewModel.isSecondaryAdmin) {
+                            //
+                            // Shown on Secondary Admin too, which it was not originally.
+                            //
+                            // The first cut reasoned that a Secondary Admin "never routes a
+                            // captured payment back to itself", so the controls would do nothing
+                            // there. That was true of the code at the time and false about the
+                            // café: the phone holding the banking app is usually the owner's own
+                            // handset, running as Secondary Admin — so it is precisely the device
+                            // that sees the notification, and hiding the listener there meant the
+                            // captures nobody could make were the only ones that mattered.
+                            //
+                            // A capture on a Secondary Admin is now forwarded to the backend and
+                            // drained by the Main Admin's poll (PaymentAlertBroadcaster ->
+                            // /payment-alerts -> RealtimeService.pollPaymentAlerts), which matches
+                            // it to an order on the device that holds the printer. So the toggle
+                            // has an effect on every admin device and belongs on all of them.
+                            run {
                                 HorizontalDivider()
                                 DropdownMenuItem(
                                     text = { Text("Payment Monitor") },

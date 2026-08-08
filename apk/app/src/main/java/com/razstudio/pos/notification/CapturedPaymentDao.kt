@@ -36,4 +36,15 @@ interface CapturedPaymentDao {
     /** How many captures are already matched to a given order (prevents double-matching). */
     @Query("SELECT COUNT(*) FROM captured_payments WHERE matchedOrderId = :orderId AND matchStatus = 'MATCHED'")
     suspend fun countMatchesForOrder(orderId: String): Int
+
+    /**
+     * Whether this capture is already known locally, by id.
+     *
+     * Used by the payment-alert poll: an alert forwarded by another admin device carries the
+     * capturing device's own id, and the poll cursor can legitimately be replayed (the app dies
+     * before persisting it). Inserting again would be harmless, but re-running the matcher would
+     * not — it could credit a second order with the same payment.
+     */
+    @Query("SELECT COUNT(*) FROM captured_payments WHERE id = :id")
+    suspend fun countById(id: String): Int
 }

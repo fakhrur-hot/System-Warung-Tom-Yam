@@ -482,6 +482,9 @@ verify_jwt = false
 [functions.orders-items-void]
 verify_jwt = false
 
+[functions.payment-alerts]
+verify_jwt = false
+
 [functions.orders-kitchen]
 verify_jwt = false
 

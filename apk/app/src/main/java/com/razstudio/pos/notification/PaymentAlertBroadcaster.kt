@@ -1,6 +1,8 @@
 package com.razstudio.pos.notification
 
 import android.util.Log
+import com.razstudio.pos.data.ApiResult
+import com.razstudio.pos.data.BackendGateway
 import com.razstudio.pos.data.ModeRepository
 import com.razstudio.pos.data.OperatingMode
 import com.razstudio.pos.data.lan.LanPushBus
@@ -26,6 +28,7 @@ import javax.inject.Singleton
 class PaymentAlertBroadcaster @Inject constructor(
     private val modeRepository: ModeRepository,
     private val lanPushBus: LanPushBus,
+    private val backendGateway: BackendGateway,
 ) {
 
     /**
@@ -55,12 +58,38 @@ class PaymentAlertBroadcaster @Inject constructor(
         Log.d(TAG, "LAN broadcast: PAYMENT_RECEIVED ${payment.amountSen} sen from ${payment.walletApp}")
     }
 
-    private fun broadcastCloud(payment: CapturedPayment) {
-        // Cloud broadcasting is handled by the existing Supabase Realtime infrastructure.
-        // The RealtimeService already maintains the WebSocket connection to admin-orders.
-        // The actual Supabase broadcast mechanism (sending a message on the existing channel)
-        // will be wired when the RealtimeService integration point is available.
-        Log.d(TAG, "Cloud broadcast: PAYMENT_RECEIVED ${payment.amountSen} sen from ${payment.walletApp}")
+    /**
+     * Forward the capture to the backend, where the Main Admin's catch-up poll will collect it.
+     *
+     * ## Why a POST rather than the Realtime channel this was originally meant to use
+     *
+     * The placeholder this replaces was waiting on "the RealtimeService integration point". That
+     * point never arrived, and it would not have helped: this deployment receives no Realtime
+     * broadcast frames at all — every live feature here rides the poll instead. A socket frame also
+     * vanishes if the till happens to be asleep or out of signal at the moment of capture, and a
+     * payment that silently fails to reach the device holding the printer is a customer recorded as
+     * unpaid. A row waits.
+     *
+     * Failures are logged, not thrown or retried here: the caller is a notification listener
+     * reacting to a system callback, and the backend upserts on `clientId`, so the honest recovery
+     * is the next capture rather than a retry loop inside a NotificationListenerService.
+     */
+    private suspend fun broadcastCloud(payment: CapturedPayment) {
+        when (val result = backendGateway.postPaymentAlert(
+            clientId = payment.id,
+            amountSen = payment.amountSen,
+            walletApp = payment.walletApp,
+            sender = payment.sender,
+            rawText = payment.rawText,
+            capturedAt = payment.capturedAt,
+        )) {
+            is ApiResult.Success ->
+                Log.i(TAG, "Forwarded payment alert: ${payment.amountSen} sen from ${payment.walletApp}")
+            is ApiResult.Error ->
+                Log.w(TAG, "Payment alert forward failed: ${result.code} ${result.message}")
+            is ApiResult.NetworkError ->
+                Log.w(TAG, "Payment alert forward offline: ${result.message}")
+        }
     }
 
     companion object {

@@ -64,7 +64,20 @@ class OrderingViewModel @Inject constructor(
             when (intent.action) {
                 OrderingForegroundService.ACTION_CAFE_OPEN -> {
                     Log.i(TAG, "Received CAFE_OPEN broadcast")
-                    _state.value = CafeState.CHECK_IN
+                    // "The café is open" only lifts the CLOSED state — it must never clobber a
+                    // screen the staff member is working on.
+                    //
+                    // This used to assign CHECK_IN unconditionally, and the service re-announces
+                    // CAFE_OPEN periodically rather than only on the closed→open edge. So a waiter
+                    // taking an order got thrown off the table grid a couple of minutes later,
+                    // mid-service, onto what looks like a login screen — which is why this was
+                    // reported as the app signing itself out, the one thing it had not done.
+                    //
+                    // LOADING is deliberately excluded: fetchInitialState() owns that transition,
+                    // and racing it here would fight the launch path.
+                    if (_state.value == CafeState.CAFE_CLOSED) {
+                        _state.value = CafeState.ORDERING
+                    }
                     _errorMessage.value = null
                 }
                 OrderingForegroundService.ACTION_CAFE_CLOSED -> {
@@ -126,8 +139,29 @@ class OrderingViewModel @Inject constructor(
     }
 
     /**
-     * Fetch initial café state. If we can reach the backend, determine open/closed.
-     * For now, default to CHECK_IN and let the foreground service correct if closed.
+     * Fetch initial café state and land on the ordering screen.
+     *
+     * ## Why there is no GPS clock-in gate here any more
+     *
+     * An ordering device used to open on a "Ready to Check In" screen and stay there until a staff
+     * member passed a GPS proximity check. That was one tap between a waiter and the table grid on
+     * every launch, and every time anything reset the state machine — and because the gate looks
+     * like a login screen, landing on it read as "the app signed me out" even though the session was
+     * untouched.
+     *
+     * These devices are already bound to one café: they were paired to it, approved by an admin, and
+     * carry its credentials. Asking them to prove they are at the café they are permanently
+     * installed in was verifying something already established. So the ordering surface now opens
+     * where the work is.
+     *
+     * **This means attendance rows are no longer written by ordering devices.** Nothing else posts
+     * them — the CHECK_IN event only ever came from that gate — so if attendance is wanted back it
+     * needs a deliberate replacement, not a revert of this line. [CafeState.CHECK_IN] is kept and is
+     * still reachable, but now only via an admin's explicit FORCE_CHECKOUT.
+     *
+     * The café location is still fetched: it confirms connectivity and [cafeLocation] is used
+     * elsewhere. A failure is no longer a reason to hold the screen — an ordering device that cannot
+     * reach the backend still needs its table grid, which Room can serve offline.
      */
     private fun fetchInitialState() {
         viewModelScope.launch {
@@ -142,21 +176,16 @@ class OrderingViewModel @Inject constructor(
             val client = apiClient
 
             when (val result = client.getCafeLocation()) {
-                is ApiResult.Success -> {
-                    cafeLocation = result.data
-                    // If we can reach the backend, default to CHECK_IN
-                    // The foreground service will broadcast CAFE_CLOSED if applicable
-                    _state.value = CafeState.CHECK_IN
-                }
-                is ApiResult.Error -> {
+                is ApiResult.Success -> cafeLocation = result.data
+                is ApiResult.Error ->
                     Log.w(TAG, "Failed to fetch café location: ${result.message}")
-                    _state.value = CafeState.CHECK_IN
-                }
-                is ApiResult.NetworkError -> {
+                is ApiResult.NetworkError ->
                     Log.w(TAG, "Network error fetching café location: ${result.message}")
-                    _state.value = CafeState.CHECK_IN
-                }
             }
+
+            // Open on the table grid either way. The foreground service still broadcasts
+            // CAFE_CLOSED if the café is not trading, which moves us off this state.
+            _state.value = CafeState.ORDERING
         }
     }
 

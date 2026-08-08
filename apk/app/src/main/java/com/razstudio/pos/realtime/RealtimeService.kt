@@ -72,6 +72,7 @@ class RealtimeService : Service() {
         private const val NEW_ORDER_NOTIF_BASE = 2000
         private const val SYNC_PREFS_NAME = "realtime_sync_prefs"
         private const val KEY_LAST_SEEN = "last_seen_timestamp"
+        private const val KEY_LAST_SEEN_PAYMENT = "last_seen_payment_alert"
 
         // Reconnection backoff
         private const val INITIAL_BACKOFF_MS = 1_000L
@@ -181,6 +182,9 @@ class RealtimeService : Service() {
     @Inject lateinit var secureStorage: com.razstudio.pos.data.SecureStorage
     @Inject lateinit var newOrderSound: NewOrderSoundPlayer
     @Inject lateinit var posNotificationStatus: PosNotificationStatus
+    @Inject lateinit var capturedPaymentDao: com.razstudio.pos.notification.CapturedPaymentDao
+    @Inject lateinit var paymentMatcher: com.razstudio.pos.notification.PaymentMatcher
+    @Inject lateinit var paymentAlertHandler: com.razstudio.pos.notification.PaymentAlertHandler
 
     private fun s() = uiStrings(languageManager.language.value)
 
@@ -235,6 +239,7 @@ class RealtimeService : Service() {
                 }
                 delay(if (ambientModeActive) AMBIENT_POLL_INTERVAL_MS else baseInterval)
                 performCatchUpSync()
+                pollPaymentAlerts()
 
                 // Stale-socket watchdog: force reconnect if no WS message in >90s
                 val silentMs = System.currentTimeMillis() - lastMessageTime
@@ -264,6 +269,95 @@ class RealtimeService : Service() {
     }
 
     // --- Catch-up Sync ---
+
+    /**
+     * Collect payment notifications captured on *other* admin devices and treat each one exactly as
+     * if this device had captured it: store it, match it to an open order, alert the cashier.
+     *
+     * ## Why this device and not the one that captured it
+     *
+     * The phone holding the café's banking app is often the owner's own handset running as a
+     * Secondary Admin. The till is what holds the printer and owns order matching. Without this hop
+     * a payment seen on the owner's phone never reaches the order it belongs to, and the customer
+     * stays recorded as unpaid.
+     *
+     * ## Why the role gate is here rather than trusted from the backend
+     *
+     * `RealtimeService` is started by *any* device that reaches Admin Home, and by `BootReceiver`
+     * with no role check at all — so a Secondary Admin runs this loop too. The backend already
+     * refuses a non-main-admin GET with 403, but relying on that alone would mean every secondary
+     * device issuing a request every ten seconds forever just to be told no.
+     */
+    private fun pollPaymentAlerts() {
+        if (secureStorage.getRole() != com.razstudio.pos.data.SecureStorage.Role.ADMIN) return
+        if (modeRepository.currentMode() != com.razstudio.pos.data.OperatingMode.CLOUD) return
+
+        serviceScope.launch {
+            val since = syncPrefs.getString(KEY_LAST_SEEN_PAYMENT, null)
+                ?: Instant.now().minusSeconds(3600).toString()
+
+            when (val result = apiClient.getPaymentAlerts(since)) {
+                is ApiResult.Success -> {
+                    for (alert in result.data.alerts) {
+                        ingestForwardedPayment(alert)
+                    }
+                    // Server clock, not ours — a till running fast would skip alerts in the gap.
+                    syncPrefs.edit()
+                        .putString(KEY_LAST_SEEN_PAYMENT, result.data.serverTime)
+                        .apply()
+                }
+                is ApiResult.Error ->
+                    Log.d(TAG, "Payment alert poll: ${result.code} ${result.message}")
+                is ApiResult.NetworkError ->
+                    Log.d(TAG, "Payment alert poll offline: ${result.message}")
+            }
+        }
+    }
+
+    /** Store and match one forwarded capture. Skips anything already ingested. */
+    private suspend fun ingestForwardedPayment(alert: com.razstudio.pos.data.PaymentAlertDto) {
+        // The cursor can legitimately be replayed — the process can die between handling an alert
+        // and persisting the new cursor. Re-inserting would be harmless; re-matching would not, so
+        // this is checked before anything else happens.
+        if (capturedPaymentDao.countById(alert.clientId) > 0) return
+
+        val captured = com.razstudio.pos.notification.CapturedPayment(
+            // Reuse the capturing device's id, which is what makes the check above work at all.
+            id = alert.clientId,
+            amountSen = alert.amountSen,
+            walletApp = alert.walletApp,
+            // The forwarding device's package is not carried: what matters downstream is the wallet
+            // and the amount, and inventing a package name here would be a value nothing verified.
+            packageName = "",
+            sender = alert.sender.ifBlank { null },
+            reference = null,
+            rawTitle = "",
+            rawText = alert.rawText,
+            matchStatus = com.razstudio.pos.notification.MatchStatus.UNMATCHED.name,
+            matchedOrderId = null,
+            capturedAt = alert.capturedAt.ifBlank { Instant.now().toString() },
+            matchedAt = null,
+        )
+        capturedPaymentDao.insert(captured)
+
+        paymentAlertHandler.handlePaymentAlert(
+            amountSen = alert.amountSen,
+            sender = alert.sender.ifBlank { null },
+            walletApp = alert.walletApp,
+            rawText = alert.rawText,
+        )
+
+        when (val match = paymentMatcher.matchPayment(captured)) {
+            is com.razstudio.pos.notification.MatchResult.SingleMatch ->
+                Log.i(TAG, "Forwarded payment auto-matched to order ${match.orderId}")
+            is com.razstudio.pos.notification.MatchResult.MultipleMatches ->
+                Log.i(TAG, "Forwarded payment ambiguous: ${match.orders.size} candidates")
+            is com.razstudio.pos.notification.MatchResult.NoMatch ->
+                Log.d(TAG, "Forwarded payment matched no open order")
+            is com.razstudio.pos.notification.MatchResult.Error ->
+                Log.e(TAG, "Forwarded payment match error: ${match.message}")
+        }
+    }
 
     private fun getLastSeenTimestamp(): String {
         return syncPrefs.getString(KEY_LAST_SEEN, null)

@@ -237,4 +237,37 @@ interface BackendGateway {
     suspend fun getCafeLocation(): ApiResult<CafeLocationResponse>
     suspend fun putCafeLocation(lat: Double, lng: Double, radius: Int): ApiResult<Unit>
     suspend fun postAttendance(event: String, lat: Double, lng: Double, forced: Boolean = false): ApiResult<Unit>
+
+    // ── Payment alerts (admin → admin) ────────────────────────────────────────────
+    //
+    // The phone holding the café's banking app is often the owner's own handset running as a
+    // Secondary Admin, not the till. The till is what holds the printer and matches payments to
+    // orders, so a capture has to travel between them. These two calls are that hop.
+    //
+    // Both default to an error rather than being abstract: off-cloud there is no second device to
+    // forward to (Kiosk) or the LAN push bus already carries it (LAN), and Demo Mode has no backend
+    // at all. Declaring them abstract would force three implementations that all mean "not here".
+
+    /**
+     * Forward a notification this device captured, so the main admin can match it to an order.
+     *
+     * [clientId] is this device's own id for the capture and is what makes the call idempotent —
+     * the caller is a notification listener that does not await the result, so a retry after a
+     * dropped response is ordinary, and a second row would let the till match one payment twice.
+     */
+    suspend fun postPaymentAlert(
+        clientId: String,
+        amountSen: Long,
+        walletApp: String,
+        sender: String?,
+        rawText: String,
+        capturedAt: String,
+    ): ApiResult<Unit> = ApiResult.Error(
+        "UNSUPPORTED", "Payment alert forwarding needs a cloud backend",
+    )
+
+    /** Drain alerts forwarded since [since]. Main-admin only — the backend enforces that. */
+    suspend fun getPaymentAlerts(since: String): ApiResult<PaymentAlertsResponse> = ApiResult.Error(
+        "UNSUPPORTED", "Payment alert forwarding needs a cloud backend",
+    )
 }

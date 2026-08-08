@@ -14,6 +14,7 @@ import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -1868,6 +1869,110 @@ class ApiClient @Inject constructor(
         }
     }
 
+    // --- Payment alerts (admin → admin) ---
+
+    override suspend fun postPaymentAlert(
+        clientId: String,
+        amountSen: Long,
+        walletApp: String,
+        sender: String?,
+        rawText: String,
+        capturedAt: String,
+    ): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (DemoSession.active) return@withContext ApiResult.Success(Unit)
+        try {
+            val token = adminBearerToken()
+                ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+
+            val body = JSONObject().apply {
+                put("clientId", clientId)
+                put("amountSen", amountSen)
+                put("walletApp", walletApp)
+                put("sender", sender ?: "")
+                put("rawText", rawText)
+                put("capturedAt", capturedAt)
+            }.toString()
+
+            val request = Request.Builder()
+                .url("${baseUrl()}/payment-alerts")
+                .addHeader("Content-Type", "application/json")
+                .addHeader("apikey", anonKey())
+                .addHeader("Authorization", "Bearer $token")
+                .post(body.toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            val response = client.newCall(request).execute()
+            response.consumeBody()
+
+            when (response.code) {
+                200 -> ApiResult.Success(Unit)
+                401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
+                else -> unexpectedStatus(response.code)
+            }
+        } catch (e: IOException) {
+            networkError(e)
+        } catch (e: Exception) {
+            ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+        }
+    }
+
+    override suspend fun getPaymentAlerts(since: String): ApiResult<PaymentAlertsResponse> =
+        withContext(Dispatchers.IO) {
+            if (DemoSession.active) {
+                return@withContext ApiResult.Success(
+                    PaymentAlertsResponse(emptyList(), Instant.now().toString()),
+                )
+            }
+            try {
+                val token = adminBearerToken()
+                    ?: return@withContext ApiResult.Error("NO_TOKEN", "No admin session token")
+
+                val encodedSince = java.net.URLEncoder.encode(since, "UTF-8")
+                val request = Request.Builder()
+                    .url("${baseUrl()}/payment-alerts?since=$encodedSince")
+                    .addHeader("apikey", anonKey())
+                    .addHeader("Authorization", "Bearer $token")
+                    .get()
+                    .build()
+
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string() ?: ""
+
+                when (response.code) {
+                    200 -> {
+                        val json = JSONObject(responseBody)
+                        val arr = json.optJSONArray("alerts") ?: org.json.JSONArray()
+                        val alerts = (0 until arr.length()).map { i ->
+                            val o = arr.getJSONObject(i)
+                            PaymentAlertDto(
+                                clientId = o.getString("clientId"),
+                                amountSen = o.getLong("amountSen"),
+                                walletApp = o.optString("walletApp", ""),
+                                sender = o.optString("sender", ""),
+                                rawText = o.optString("rawText", ""),
+                                capturedAt = o.optString("capturedAt", ""),
+                            )
+                        }
+                        ApiResult.Success(
+                            PaymentAlertsResponse(
+                                alerts = alerts,
+                                serverTime = json.optString("serverTime", Instant.now().toString()),
+                            )
+                        )
+                    }
+                    401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
+                    // Expected on a secondary admin: only the main admin drains the queue. Not an
+                    // error worth surfacing — the poll simply has nothing to do on this device.
+                    403 -> ApiResult.Error("FORBIDDEN", "Not the main admin device")
+                    else -> unexpectedStatus(response.code)
+                }
+            } catch (e: IOException) {
+                networkError(e)
+            } catch (e: Exception) {
+                ApiResult.Error("PARSE_ERROR", e.message ?: "Unexpected error")
+            }
+        }
+
     // --- Café Location ---
 
     /**
@@ -3122,6 +3227,23 @@ data class CafeLocationResponse(
     val latitude: Double,
     val longitude: Double,
     val radiusMeters: Int
+)
+
+/** One bank/e-wallet capture forwarded by another admin device. */
+data class PaymentAlertDto(
+    /** The capturing device's own id for it — reused as the local row id so re-delivery is a no-op. */
+    val clientId: String,
+    val amountSen: Long,
+    val walletApp: String,
+    val sender: String,
+    val rawText: String,
+    val capturedAt: String,
+)
+
+data class PaymentAlertsResponse(
+    val alerts: List<PaymentAlertDto>,
+    /** The server's clock, to be used as the next `since` — never the device's own. */
+    val serverTime: String,
 )
 
 data class SettingsResponse(
