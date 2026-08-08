@@ -75,6 +75,37 @@ Selepas login, anda akan nampak **grid meja** berwarna mengikut status:
 - **Tap meja kosong** → Buka lembaran buat pesanan baru
 - **Tap meja berisi** → Buka butiran pesanan (bayar, tambah, hantar ke dapur)
 
+### Dashboard (Halaman Swipe Kiri)
+
+Swipe **kiri** dari Table Grid untuk melihat **Dashboard** — papan pemuka prestasi kafe hari ini.
+
+#### Kad KPI (5 kad di atas)
+
+| Kad | Maksud | Warna |
+|-----|--------|-------|
+| **Revenue** | Jumlah pendapatan hari ini (RM) | Hijau |
+| **Orders** | Bilangan pesanan hari ini (+ perbandingan semalam) | Biru |
+| **Avg** | Purata nilai setiap pesanan (RM) | Ungu |
+| **Active** | Pesanan aktif sekarang (belum dibayar) | Kuning |
+| **Cancelled** | Bilangan + peratusan pesanan dibatalkan | Merah jika >10%, kelabu jika rendah |
+
+#### Carta
+
+| Carta | Apa yang Ditunjukkan |
+|-------|---------------------|
+| **Hourly Revenue** (garis) | Pendapatan mengikut jam — nampak waktu puncak |
+| **Daily Trend** (garis) | Pendapatan harian beberapa hari lepas — nampak trend naik/turun |
+| **Payment Methods** (donut) | Pecahan kaedah bayar (Cash vs QR vs Gateway) — nampak pilihan pelanggan |
+| **Best Sellers** (bar) | Item paling laris hari ini — tahu apa yang popular |
+
+#### Cara Baca Dashboard
+
+- **Revenue naik, Orders naik** → Hari yang baik, lebih ramai pelanggan
+- **Revenue naik, Orders tetap** → Purata nilai pesanan meningkat (pelanggan pesan lebih banyak)
+- **Active tinggi** → Banyak meja belum bayar — mungkin perlu tambah staff
+- **Cancelled tinggi (>10%)** → Periksa stok atau sebab pembatalan
+- **Hourly peak** → Tahu bila waktu paling sibuk untuk sediakan lebih banyak bahan
+
 ### Butang-Butang Utama
 
 | Butang | Fungsi |
@@ -120,6 +151,38 @@ Akses: **Menu ⋮ → Café Management**
 | **Payment QR** (Upload/Replace/Remove) | QR kod pembayaran e-wallet untuk dipaparkan |
 | **Menu Preset** (Load Preset) | Muatkan template menu siap pakai |
 | **Cancel / Save** (bottom bar) | Batal atau simpan perubahan |
+
+---
+
+#### 3.1.1 Muat Naik Logo Kafe / Uploading Café Logo
+
+Logo kafe dipaparkan di **tiga tempat**:
+- Pada **resit cetakan** (bahagian atas resit termal)
+- Pada **kad QR meja** (jika mod Logo dipilih semasa generate QR)
+- Pada **menu digital pelanggan** (website QR ordering)
+
+**Langkah:**
+1. Buka **Café Management → Café Profile**
+2. Tekan butang **"Pick Logo"** (atau **"Change Logo"** jika sudah ada)
+3. Pilih gambar dari galeri peranti anda
+4. Preview logo dipaparkan — pastikan ia jelas pada saiz kecil
+5. Tekan **Save** di bar bawah untuk simpan
+
+> 💡 **Tips untuk logo resit:**
+> - Gunakan gambar **hitam-putih atau kontras tinggi** — pencetak termal tidak mencetak warna
+> - Saiz disyorkan: **300×300 piksel** minimum
+> - Logo akan dicrop ke bentuk segi empat sama (square) secara automatik
+> - Format: JPG atau PNG
+
+> 💡 **Nota:** Logo yang sama digunakan untuk resit DAN kad QR meja. Jika anda mahu logo berbeza pada QR meja, gunakan mod "Text" (nama kafe sahaja) pada Generate Table QR.
+
+#### 3.1.2 Logo pada Kad QR Meja vs Resit
+
+| Lokasi | Sumber Logo | Bagaimana Tukar |
+|--------|-------------|-----------------|
+| Resit cetakan | Logo dari Café Profile | Tukar di Café Profile → Pick Logo → Save |
+| Kad QR Meja | Logo dari Café Profile ATAU teks nama kafe | Pilih mod pada skrin Generate Table QR |
+| Menu pelanggan online | Logo dari Café Profile | Sama — tukar di Café Profile |
 
 ### 3.2 Pengurusan Menu / Menu Management
 
@@ -331,11 +394,58 @@ Take-Out (3 slot):
    TW003 — "Tapaw 3"
 ```
 
-### 3.4 Generate Table QR
+### 3.4 Generate Table QR (Cetak Kad QR Meja)
 
-> Hanya ada jika web ordering aktif
+> Hanya ada jika web ordering aktif (Cloud Mode dengan website)
 
-Menjana kad QR meja dalam format PDF untuk dicetak dan diletak di setiap meja.
+**Akses:** Café Management → Generate Table QR
+
+Menjana kad QR meja dalam format PDF (A6 per kad, 4 kad per halaman A4) untuk dicetak dan diletak di setiap meja. Pelanggan scan QR ini untuk pesan sendiri tanpa menunggu staff.
+
+---
+
+#### 3.4.1 Langkah Menjana QR Meja
+
+1. Buka **Café Management → Generate Table QR**
+2. **Pilih header kad** (apa yang terpapar di atas QR pada setiap kad):
+   - **○ Text** — Nama kafe (dari Settings) dicetak sebagai teks
+   - **○ Logo** — Logo kafe (dari Café Profile) dicetak sebagai gambar
+3. **Pilih meja** — tandakan checkbox (☑) pada meja yang dikehendaki:
+   - Paparan: label meja + ID
+   - Jumlah dipilih dipapar: "(3/12 selected)"
+   - Anda boleh pilih semua atau hanya meja tertentu
+4. Tekan butang **"Generate PDF"**
+5. Tunggu sehingga PDF siap dijana
+6. Selepas siap:
+   - Tekan **"Share"** (ikon 🔗 di top bar atau butang bawah) untuk:
+     - Hantar ke pencetak (Print)
+     - Simpan ke Files
+     - Kongsi via WhatsApp/email
+   - Atau tekan **"Generate New PDF"** untuk jana semula dengan pilihan berbeza
+
+#### 3.4.2 Format Kad QR
+
+Setiap kad mengandungi:
+```
+┌─────────────────────────┐
+│      [LOGO / NAMA]      │  ← Header (logo atau teks)
+│                         │
+│      ┌───────────┐      │
+│      │  QR CODE  │      │
+│      │           │      │
+│      └───────────┘      │
+│                         │
+│       Meja 1 (T0001)   │  ← Label + ID meja
+└─────────────────────────┘
+```
+
+#### 3.4.3 Tips Cetakan
+
+- **Kertas:** Gunakan kertas A4 biasa atau kertas sticker
+- **Pencetak:** Mana-mana pencetak yang disambungkan ke peranti (Bluetooth/WiFi/USB)
+- **Laminate:** Disyorkan laminate kad selepas cetak supaya tahan lama
+- **Letak di meja:** Guna acrylic stand atau tampal terus di meja
+- **Jika meja ditambah:** Jana semula PDF untuk meja baru sahaja (pilih hanya meja baru)
 
 ### 3.5 Payment Gateway Settings
 
@@ -785,7 +895,69 @@ Tekan **Save** selepas selesai konfigurasi.
 | Google Sign-In | 🧪 Testing | Hanya akaun tester berdaftar |
 | Google Drive Backup | 🧪 Testing | Hanya akaun tester berdaftar |
 | Payment Monitor / Notification Listener | 🔬 Alpha | Masih dalam pembangunan awal, mungkin tidak stabil |
+| Payment Listener Cloud Sync (FullQR) | 🧪 Testing | Lihat Fasa Ujian di bawah |
 | Semua ciri lain | ✅ Production | Stabil dan sedia digunakan |
+
+## Fasa Ujian: Payment Listener Cloud Sync (Mod FullQR)
+
+Payment Notification Listener kini menyokong **penyampaian cloud** dalam mod FullQR Cloud.
+Ini membolehkan peranti Secondary Admin menangkap notifikasi e-wallet dan menghantar ke
+peranti Main Admin untuk padanan automatik dengan pesanan aktif.
+
+### Bagaimana Ia Berfungsi (Pipeline Hujung-ke-Hujung)
+
+```
+Secondary Admin (cth: Infinix)
+  1. Jalankan Notification Listener
+  2. Tangkap notifikasi pembayaran bank/e-wallet
+  3. Masukkan ke Room DB tempatan
+  4. Serta-merta panggil broadcastCloud()
+  5. POST JSON ke /api/payment-alerts (Supabase Edge Function)
+
+Supabase Edge Function
+  - Terima mana-mana token Admin (ADMIN atau ADMIN_SECONDARY)
+  - Masukkan tangkapan ke jadual payment_alerts dengan source_device_id
+  - Hanya role = ADMIN boleh ambil (GET) alerts
+
+Main Admin (cth: D3 Mini terminal POS)
+  - Gelung poll dalam RealtimeService panggil pollCapturedPayments()
+  - Ambil baris baru sejak lastSeenPaymentTimestamp
+  - Untuk setiap baris, panggil paymentAlertHandler.handlePaymentAlert(...)
+  - Cetuskan toast, bunyi, getaran (ikut tetapan Payment Monitor)
+  - Padanan automatik jumlah pembayaran dengan pesanan aktif
+```
+
+### Pelan Ujian
+
+1. Pasangkan semula peranti Secondary Admin (cth: Infinix) melalui Devices & Staff
+2. Aktifkan **Notification Listener** dalam menu overflow
+3. Cetuskan notifikasi pembayaran sebenar (cth: Touch 'n Go, GrabPay)
+4. Dalam ~10 saat, peranti Main Admin sepatutnya:
+   - Poll dan ambil alert yang dihantar
+   - Padanan automatik dengan pesanan aktif
+   - Papar toast/bunyi/getaran (jika diaktifkan dalam tetapan Payment Monitor)
+
+### Diagnostik (Jika Gagal)
+
+**Pada Main Admin (D3 Mini) - jalankan:**
+```
+adb logcat -s "PaymentAlertPoll" "RealtimeService"
+```
+Cari: `Forwarded payment auto-matched` atau `Payment alert poll`
+
+**Pada Secondary Admin (Infinix) - jalankan:**
+```
+adb logcat -s "PaymentBroadcast" "NotificationListener"
+```
+Cari: `Forwarded payment alert` atau `broadcastCloud success`
+
+### Keperluan untuk Ciri Ini
+
+- Mod Operasi: **Cloud (FullQR)**
+- Peranti Main Admin: berjalan dan telah login
+- Peranti Secondary Admin: dipasangkan, diluluskan, Notification Listener diaktifkan
+- Kedua-dua peranti: disambungkan ke internet
+- Migrasi Supabase jadual `payment_alerts` mesti telah dijalankan
 
 ---
 
