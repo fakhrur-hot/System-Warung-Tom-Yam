@@ -1,0 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Operator APK local configuration — DO NOT COMMIT THIS FILE
+# Copy to local.properties and fill in your values.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Android SDK location (auto-detected by Android Studio, usually not needed manually)
+# sdk.dir=/path/to/android/sdk
+
+# Shopee Affiliate API credentials — required for the Affiliate Ads module.
+# When blank, the affiliate module degrades gracefully (no API calls, falls back to GitHub catalog).
+SHOPEE_APP_ID=
+SHOPEE_APP_SECRET=
