@@ -48,6 +48,8 @@ import com.razstudio.pos.data.local.DailyRevenue
 import com.razstudio.pos.data.local.HourlyRevenue
 import com.razstudio.pos.data.local.PaymentMethodCount
 import com.razstudio.pos.data.local.PopularItemRow
+import com.razstudio.pos.data.promos.AffiliateProduct
+import com.razstudio.pos.ui.tableview.AffiliateSection
 import com.razstudio.pos.ui.viewmodels.DashboardUiState
 import com.razstudio.pos.ui.viewmodels.DashboardViewModel
 
@@ -61,6 +63,9 @@ import com.razstudio.pos.ui.viewmodels.DashboardViewModel
 @Composable
 fun DashboardPage(
     viewModel: DashboardViewModel = hiltViewModel(),
+    affiliateProducts: List<AffiliateProduct> = emptyList(),
+    onAffiliateProductClick: (AffiliateProduct) -> Unit = {},
+    onAffiliateImpression: (AffiliateProduct) -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val activeOrders by viewModel.activeOrderCount.collectAsState()
@@ -166,6 +171,13 @@ fun DashboardPage(
                 )
             }
         }
+
+        // ── Affiliate product tiles ──────────────────────────────────────────────────
+        AffiliateSection(
+            products = affiliateProducts,
+            onProductClick = onAffiliateProductClick,
+            onImpression = onAffiliateImpression,
+        )
 
         Spacer(modifier = Modifier.height(80.dp)) // Room for FAB
     }

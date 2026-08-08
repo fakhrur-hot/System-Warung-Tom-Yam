@@ -159,6 +159,10 @@ fun OrderEntrySheet(
             )
         },
     ) {
+        // Boxed so the busy state covers the sheet — see [BlockingProgressOverlay]. The spinner
+        // inside the Submit button was the only signal that an order was being sent, and on a
+        // scrolled cart that button is often not the part of the screen being looked at.
+        Box(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -289,6 +293,12 @@ fun OrderEntrySheet(
                     }
                 }
             }
+        }
+
+            BlockingProgressOverlay(
+                visible = isSubmitting,
+                label = strings.processingLabel,
+            )
         }
     }
 }

@@ -24,6 +24,11 @@ val supabaseAnonKey = localProps.getProperty("SUPABASE_ANON_KEY") ?: ""
 val websiteUrl = localProps.getProperty("WEBSITE_URL") ?: ""
 val deepLinkHost = localProps.getProperty("DEEP_LINK_HOST") ?: "your-cafe.pages.dev"
 
+// Shopee Affiliate API credentials — stored in local.properties, never committed to git.
+// When blank, the affiliate module gracefully degrades (no API calls, falls back to GitHub catalog).
+val shopeeAppId = localProps.getProperty("SHOPEE_APP_ID") ?: ""
+val shopeeAppSecret = localProps.getProperty("SHOPEE_APP_SECRET") ?: ""
+
 // ── The RAZStudio template repo — baked, because it is not a backend ──────────────────────────
 //
 // Read from template-repo.properties at the monorepo root: committed, tracked, and shared with the
@@ -142,6 +147,8 @@ android {
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
         buildConfigField("String", "RAZSTUDIO_GITHUB_OWNER", "\"$razstudioGithubOwner\"")
         buildConfigField("String", "RAZSTUDIO_GITHUB_REPO", "\"$razstudioGithubRepo\"")
+        buildConfigField("String", "SHOPEE_APP_ID", "\"$shopeeAppId\"")
+        buildConfigField("String", "SHOPEE_APP_SECRET", "\"$shopeeAppSecret\"")
         // DEEP_LINK_HOST: manifest placeholder for the /join deep link host (Requirement 4.1, 4.2).
         manifestPlaceholders["deepLinkHost"] = deepLinkHost
         // CAFE_NAME: generated string resource for the app launcher name. Overrides the value

@@ -50,6 +50,9 @@ object NavRoutes {
     const val PAYMENT_GATEWAY_SETTINGS = "payment_gateway_settings"
     const val PAYMENT_MONITOR = "payment_monitor"
 
+    /** Debug-only affiliate test panel — API query tester, link generator, cache inspector. */
+    const val AFFILIATE_DEBUG = "affiliate_debug"
+
     // Category names can contain "/", spaces or "()" (e.g. "UDANG/SOTONG", "MINUMAN (AIS)"),
     // so URL-encode the path segment; AppNavGraph decodes it when reading the argument.
     fun addMenuItemRoute(category: String): String =

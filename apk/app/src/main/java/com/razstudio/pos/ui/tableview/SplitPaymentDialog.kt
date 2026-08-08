@@ -131,7 +131,6 @@ fun SplitPaymentDialog(
         is SplitPaymentPlanner.Plan.SliceOff -> plan.amount
         SplitPaymentPlanner.Plan.NothingSelected -> 0.0
     }
-    val remainder = SplitPaymentPlanner.remainderAfter(items, taken)
     val canPay = plan !is SplitPaymentPlanner.Plan.NothingSelected && !isLoading
 
     val configuration = LocalConfiguration.current
@@ -159,10 +158,14 @@ fun SplitPaymentDialog(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
         ) {
+            // Boxed for the busy overlay. This dialog had NO progress indicator at all — a share
+            // payment only greyed out its buttons, so tapping Pay Cash looked identical to tapping
+            // nothing while the order was created, charged and the bill shrunk. (BlockingProgressOverlay)
+            Box(modifier = Modifier.fillMaxSize()) {
             if (isLandscape) {
                 Row(modifier = Modifier.fillMaxSize().padding(20.dp)) {
                     Box(modifier = Modifier.weight(0.4f).fillMaxHeight()) {
-                        SplitQrPane(strings = strings)
+                        SplitQrPane(strings = strings, amount = amount)
                     }
                     VerticalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     Column(modifier = Modifier.weight(0.6f).fillMaxHeight()) {
@@ -170,7 +173,7 @@ fun SplitPaymentDialog(
                             items = items, strings = strings, isLoading = isLoading,
                             gatewayMethods = gatewayMethods, taken = taken,
                             fixMode = fixMode, onFixModeChange = { fixMode = it },
-                            amount = amount, remainder = remainder, canPay = canPay,
+                            amount = amount, canPay = canPay,
                             plan = plan, onPay = onPay, onDismiss = onDismiss,
                             onRequestReduce = { pendingReduce = it },
                         )
@@ -179,7 +182,7 @@ fun SplitPaymentDialog(
             } else {
                 Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
                     Box(modifier = Modifier.weight(0.4f).fillMaxWidth()) {
-                        SplitQrPane(strings = strings)
+                        SplitQrPane(strings = strings, amount = amount)
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                     Column(modifier = Modifier.weight(0.6f).fillMaxWidth()) {
@@ -187,12 +190,18 @@ fun SplitPaymentDialog(
                             items = items, strings = strings, isLoading = isLoading,
                             gatewayMethods = gatewayMethods, taken = taken,
                             fixMode = fixMode, onFixModeChange = { fixMode = it },
-                            amount = amount, remainder = remainder, canPay = canPay,
+                            amount = amount, canPay = canPay,
                             plan = plan, onPay = onPay, onDismiss = onDismiss,
                             onRequestReduce = { pendingReduce = it },
                         )
                     }
                 }
+            }
+
+                BlockingProgressOverlay(
+                    visible = isLoading,
+                    label = strings.processingLabel,
+                )
             }
         }
     }
@@ -228,15 +237,19 @@ fun SplitPaymentDialog(
 }
 
 /**
- * The café's payment QR, sized to whatever share of the dialog it was given.
+ * The café's payment QR — or, flipped by the toggle, a cash tender calculator — sized to whatever
+ * share of the dialog this pane was given.
  *
- * The code is squared off against the *smaller* of the pane's two dimensions, minus the room the
+ * The QR is squared off against the *smaller* of the pane's two dimensions, minus the room the
  * brand label and its picker need. Sizing on width alone — which is what a plain `fillMaxWidth`
  * image does — overflows the moment the pane is wider than it is tall, which is exactly the portrait
  * case: a full-width strip only 40% of the dialog's height.
+ *
+ * [amount] is the CURRENT selection's total, so the calculator follows the tally live: change a
+ * counter on the right and the change due on the left is already correct.
  */
 @Composable
-private fun SplitQrPane(strings: UiStrings) {
+private fun SplitQrPane(strings: UiStrings, amount: Double) {
     val context = LocalContext.current
     val prefs = remember(context) {
         context.getSharedPreferences("app_local_prefs", android.content.Context.MODE_PRIVATE)
@@ -248,31 +261,58 @@ private fun SplitQrPane(strings: UiStrings) {
     // the config hash is deliberately not consulted.
     val qr = remember { PaymentQrPipeline.loadFromInternal(context) }
 
-    BoxWithConstraints(
+    var showTenderPad by remember { mutableStateOf(false) }
+
+    Column(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (qr == null) {
-            // The pane keeps its share of the dialog rather than collapsing: a layout that changes
-            // shape depending on whether a café has uploaded a QR is harder to learn than one that
-            // always looks the same and occasionally says it is empty.
-            Text(
-                text = strings.paymentQrNone,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-        } else {
-            val side = minOf(maxWidth, maxHeight - BRAND_CHROME_HEIGHT).coerceAtLeast(96.dp)
-            PaymentQrPanel(
-                qr = qr,
-                brand = brand,
-                onBrandChange = { chosen ->
-                    brand = chosen
-                    prefs.edit().putString("payment_qr_brand", chosen.name).apply()
-                },
-                modifier = Modifier.width(side),
-            )
+        QrNumpadToggle(
+            showNumpad = showTenderPad,
+            onChange = { showTenderPad = it },
+            strings = strings,
+        )
+        if (showTenderPad) {
+            // Scrolls because the pane is a fixed 40% of the dialog: on a portrait phone that is
+            // shorter than the numpad, and clipping the bottom row would hide the 0.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                CashTenderCalculator(
+                    totalSen = Math.round(amount * 100),
+                    strings = strings,
+                )
+            }
+            return@Column
+        }
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (qr == null) {
+                // The pane keeps its share of the dialog rather than collapsing: a layout that changes
+                // shape depending on whether a café has uploaded a QR is harder to learn than one that
+                // always looks the same and occasionally says it is empty.
+                Text(
+                    text = strings.paymentQrNone,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                val side = minOf(maxWidth, maxHeight - BRAND_CHROME_HEIGHT).coerceAtLeast(96.dp)
+                PaymentQrPanel(
+                    qr = qr,
+                    brand = brand,
+                    onBrandChange = { chosen ->
+                        brand = chosen
+                        prefs.edit().putString("payment_qr_brand", chosen.name).apply()
+                    },
+                    modifier = Modifier.width(side),
+                )
+            }
         }
     }
 }
@@ -291,25 +331,30 @@ private fun ColumnScope.SplitTally(
     fixMode: Boolean,
     onFixModeChange: (Boolean) -> Unit,
     amount: Double,
-    remainder: Double,
     canPay: Boolean,
     plan: SplitPaymentPlanner.Plan,
     onPay: (SplitPaymentPlanner.Plan, String) -> Unit,
     onDismiss: () -> Unit,
     onRequestReduce: (OrderItem) -> Unit,
 ) {
-    Text(
-        text = strings.splitDialogTitle,
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
-    )
-    Spacer(modifier = Modifier.height(12.dp))
-
-    FilterChip(
-        selected = fixMode,
-        onClick = { onFixModeChange(!fixMode) },
-        label = { Text(strings.splitEditItems) },
-    )
+    // Title and the Fix-items chip share one row: they were stacked, and together with the
+    // remainder line below cost the item list three rows of a pane that is only 60% of the dialog.
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = strings.splitDialogTitle,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
+        FilterChip(
+            selected = fixMode,
+            onClick = { onFixModeChange(!fixMode) },
+            label = { Text(strings.splitEditItems) },
+        )
+    }
     if (fixMode) {
         Spacer(modifier = Modifier.height(4.dp))
         Text(
@@ -318,7 +363,7 @@ private fun ColumnScope.SplitTally(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(8.dp))
 
     // The list takes the slack so the totals and the pay buttons stay pinned to the bottom of the
     // pane. A cashier reaching for Pay Cash should find it in the same place on every table,
@@ -370,8 +415,9 @@ private fun ColumnScope.SplitTally(
     }
 
     Spacer(modifier = Modifier.height(12.dp))
+    // The remainder row ("still on the table") was dropped from here: it duplicated arithmetic the
+    // list already shows, and its row was worth more as item-list space on a phone.
     AmountRow(strings.splitThisCustomerPays, amount, emphasised = true)
-    AmountRow(strings.splitRemaining, remainder, emphasised = false)
 
     if (gatewayMethods.isNotEmpty()) {
         Spacer(modifier = Modifier.height(8.dp))

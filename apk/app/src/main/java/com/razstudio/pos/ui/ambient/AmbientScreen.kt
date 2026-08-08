@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.razstudio.pos.ui.tableview.AmbientAffiliateCard
 import com.razstudio.pos.ui.tableview.TableState
 import com.razstudio.pos.ui.tableview.TableUiStatus
 import kotlin.math.roundToInt
@@ -65,6 +66,9 @@ fun AmbientScreen(
     cafeName: String,
     isCustomerFacing: Boolean,
     strings: com.razstudio.pos.ui.i18n.UiStrings,
+    affiliateProducts: List<com.razstudio.pos.data.promos.AffiliateProduct> = emptyList(),
+    onAffiliateClick: (com.razstudio.pos.data.promos.AffiliateProduct) -> Unit = {},
+    onAffiliateImpression: (com.razstudio.pos.data.promos.AffiliateProduct) -> Unit = {},
 ) {
     // Monotonic seconds since this screen appeared. A monotonic clock (rather than a looping
     // animateFloat) keeps the procedural motion seamless — a restarting transition would make every
@@ -121,6 +125,13 @@ fun AmbientScreen(
                     )
                 }
             }
+
+            // Affiliate product card — below the table grid, above the resume hint.
+            AmbientAffiliateCard(
+                products = affiliateProducts,
+                onClick = onAffiliateClick,
+                onImpression = onAffiliateImpression,
+            )
 
             Text(
                 text = strings.ambientTapToResume,

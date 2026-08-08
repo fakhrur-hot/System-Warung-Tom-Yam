@@ -386,6 +386,8 @@ data class UiStringsGroup5(
     val noteOneSizeSmaller: String,
     val secondaryAdminSection: String,
     val addSecondaryAdmin: String,
+    val operatorSection: String,
+    val addOperator: String,
     val ownerRecoveryKeySection: String,
     val showOwnerRecoveryQr: String,
     val recoveryKeyLoadFailed: String,
@@ -549,6 +551,10 @@ data class UiStringsGroup7(
     val itemsAdded: String,
     val statusUpdatedTo: String,
     val paymentCompleted: String,
+    val processingLabel: String,
+    val cashReceivedLabel: String,
+    val changeDueLabel: String,
+    val numpadLabel: String,
     val orderCancelled: String,
     val maxTablesReached: String,
     val tableNumberLimitReached: String,
@@ -654,6 +660,14 @@ data class UiStringsGroup8(
     val rejectButton: String,
     val escAsteriskLabel: String,
     val escAsteriskDesc: String,
+    val receiptLogoImageLabel: String,
+    val receiptLogoImageDesc: String,
+    val receiptLogoUploadButton: String,
+    val receiptLogoResetButton: String,
+    val receiptLogoInvertLabel: String,
+    val receiptLogoInvertDesc: String,
+    val receiptLogoUsingBranding: String,
+    val receiptLogoLoadFailed: String,
     val restartRequiredTitle: String,
     val restartRequiredBody: String,
     val restartNowButton: String,
@@ -1272,6 +1286,8 @@ class UiStrings(
     val noteOneSizeSmaller: String get() = g5.noteOneSizeSmaller
     val secondaryAdminSection: String get() = g5.secondaryAdminSection
     val addSecondaryAdmin: String get() = g5.addSecondaryAdmin
+    val operatorSection: String get() = g5.operatorSection
+    val addOperator: String get() = g5.addOperator
     val ownerRecoveryKeySection: String get() = g5.ownerRecoveryKeySection
     val showOwnerRecoveryQr: String get() = g5.showOwnerRecoveryQr
     val recoveryKeyLoadFailed: String get() = g5.recoveryKeyLoadFailed
@@ -1418,6 +1434,10 @@ class UiStrings(
     val itemsAdded: String get() = g7.itemsAdded
     val statusUpdatedTo: String get() = g7.statusUpdatedTo
     val paymentCompleted: String get() = g7.paymentCompleted
+    val processingLabel: String get() = g7.processingLabel
+    val cashReceivedLabel: String get() = g7.cashReceivedLabel
+    val changeDueLabel: String get() = g7.changeDueLabel
+    val numpadLabel: String get() = g7.numpadLabel
     val orderCancelled: String get() = g7.orderCancelled
     val maxTablesReached: String get() = g7.maxTablesReached
     val tableNumberLimitReached: String get() = g7.tableNumberLimitReached
@@ -1506,6 +1526,14 @@ class UiStrings(
     val rejectButton: String get() = g8.rejectButton
     val escAsteriskLabel: String get() = g8.escAsteriskLabel
     val escAsteriskDesc: String get() = g8.escAsteriskDesc
+    val receiptLogoImageLabel: String get() = g8.receiptLogoImageLabel
+    val receiptLogoImageDesc: String get() = g8.receiptLogoImageDesc
+    val receiptLogoUploadButton: String get() = g8.receiptLogoUploadButton
+    val receiptLogoResetButton: String get() = g8.receiptLogoResetButton
+    val receiptLogoInvertLabel: String get() = g8.receiptLogoInvertLabel
+    val receiptLogoInvertDesc: String get() = g8.receiptLogoInvertDesc
+    val receiptLogoUsingBranding: String get() = g8.receiptLogoUsingBranding
+    val receiptLogoLoadFailed: String get() = g8.receiptLogoLoadFailed
     val restartRequiredTitle: String get() = g8.restartRequiredTitle
     val restartRequiredBody: String get() = g8.restartRequiredBody
     val restartNowButton: String get() = g8.restartNowButton
@@ -2106,6 +2134,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             noteOneSizeSmaller = "Nota arahan khas dicetak satu saiz lebih kecil.",
             secondaryAdminSection = "Admin Pembantu",
             addSecondaryAdmin = "Tambah Admin Pembantu",
+            operatorSection = "Operator",
+            addOperator = "Tambah Operator",
             ownerRecoveryKeySection = "Kunci Pemulihan Pemilik",
             showOwnerRecoveryQr = "Tunjuk QR Pemulihan Pemilik",
             recoveryKeyLoadFailed = "Gagal memuatkan kunci pemulihan. Cuba lagi.",
@@ -2256,6 +2286,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             itemsAdded = "Barangan ditambah",
             statusUpdatedTo = "Status dikemas kini kepada %s",
             paymentCompleted = "Pembayaran selesai (%s)",
+            processingLabel = "Sedang diproses…",
+            cashReceivedLabel = "Tunai diterima",
+            changeDueLabel = "Baki pulangan",
+            numpadLabel = "Pad nombor",
             orderCancelled = "Pesanan dibatalkan",
             maxTablesReached = "Maksimum %d meja telah dicapai",
             tableNumberLimitReached = "Had nombor meja (T%d) dicapai",
@@ -2346,6 +2380,14 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "Tolak",
             escAsteriskLabel = "Mod imej ESC * (keserasian)",
             escAsteriskDesc = "Hidupkan jika logo/slip tidak keluar pada pencetak murah.",
+            receiptLogoImageLabel = "Imej logo resit",
+            receiptLogoImageDesc = "Disimpan pada peranti ini sahaja. Pratonton ini tepat seperti yang akan dicetak — hitam putih sepenuhnya, tiada kelabu.",
+            receiptLogoUploadButton = "Muat naik",
+            receiptLogoResetButton = "Buang",
+            receiptLogoInvertLabel = "Songsangkan warna",
+            receiptLogoInvertDesc = "Hidupkan untuk logo terang atas latar gelap. Latar gelap dicetak sebagai blok hitam pekat dan keluar berjalur.",
+            receiptLogoUsingBranding = "Tiada ditetapkan — logo penjenamaan kafe akan digunakan.",
+            receiptLogoLoadFailed = "Imej itu tidak dapat dibaca.",
             restartRequiredTitle = "Mulakan semula diperlukan",
             restartRequiredBody = "Nama kafe telah ditukar. Mulakan semula apl supaya semua skrin memaparkan nama baharu.",
             restartNowButton = "Mulakan Semula",
@@ -2950,6 +2992,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             noteOneSizeSmaller = "The special-instruction note prints one size smaller.",
             secondaryAdminSection = "Secondary Admin",
             addSecondaryAdmin = "Add Secondary Admin",
+            operatorSection = "Operator",
+            addOperator = "Add Operator",
             ownerRecoveryKeySection = "Owner Recovery Key",
             showOwnerRecoveryQr = "Show Owner Recovery QR",
             recoveryKeyLoadFailed = "Couldn't load the recovery key. Try again.",
@@ -3100,6 +3144,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             itemsAdded = "Items added",
             statusUpdatedTo = "Status updated to %s",
             paymentCompleted = "Payment completed (%s)",
+            processingLabel = "Processing…",
+            cashReceivedLabel = "Cash received",
+            changeDueLabel = "Change",
+            numpadLabel = "Numpad",
             orderCancelled = "Order cancelled",
             maxTablesReached = "Maximum of %d tables reached",
             tableNumberLimitReached = "Table number limit (T%d) reached",
@@ -3190,6 +3238,14 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "Reject",
             escAsteriskLabel = "ESC * image mode (compatibility)",
             escAsteriskDesc = "Turn on if logos/slips don't print on cheap printers.",
+            receiptLogoImageLabel = "Receipt logo image",
+            receiptLogoImageDesc = "Stored on this device only. The preview is exactly what will print — pure black and white, no grey.",
+            receiptLogoUploadButton = "Upload",
+            receiptLogoResetButton = "Remove",
+            receiptLogoInvertLabel = "Invert colours",
+            receiptLogoInvertDesc = "Turn on for a logo drawn light-on-dark. A dark background prints as a solid black block and comes out banded.",
+            receiptLogoUsingBranding = "None set — the café's branding logo will be used.",
+            receiptLogoLoadFailed = "Couldn't read that image.",
             restartRequiredTitle = "Restart required",
             restartRequiredBody = "The café name changed. Restart the app so every screen shows the new name.",
             restartNowButton = "Restart Now",
@@ -3794,6 +3850,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             noteOneSizeSmaller = "特别说明备注会以小一号字体打印。",
             secondaryAdminSection = "副管理员",
             addSecondaryAdmin = "添加副管理员",
+            operatorSection = "操作员",
+            addOperator = "添加操作员",
             ownerRecoveryKeySection = "店主恢复密钥",
             showOwnerRecoveryQr = "显示店主恢复二维码",
             recoveryKeyLoadFailed = "无法加载恢复密钥，请重试。",
@@ -3944,6 +4002,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             itemsAdded = "已添加项目",
             statusUpdatedTo = "状态已更新为 %s",
             paymentCompleted = "付款完成（%s）",
+            processingLabel = "处理中…",
+            cashReceivedLabel = "收到现金",
+            changeDueLabel = "找零",
+            numpadLabel = "数字键盘",
             orderCancelled = "订单已取消",
             maxTablesReached = "已达到最多 %d 张餐桌",
             tableNumberLimitReached = "已达到餐桌编号上限（T%d）",
@@ -4034,6 +4096,14 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "拒绝",
             escAsteriskLabel = "ESC * 图像模式（兼容）",
             escAsteriskDesc = "如果廉价打印机不打印标志/单据，请开启。",
+            receiptLogoImageLabel = "小票 Logo 图片",
+            receiptLogoImageDesc = "仅存储在本机。预览即为实际打印效果——纯黑白，无灰度。",
+            receiptLogoUploadButton = "上传",
+            receiptLogoResetButton = "移除",
+            receiptLogoInvertLabel = "反色",
+            receiptLogoInvertDesc = "若 Logo 为深色背景浅色图案请开启。深色背景会打印成整块黑色并出现条纹。",
+            receiptLogoUsingBranding = "未设置——将使用咖啡厅的品牌 Logo。",
+            receiptLogoLoadFailed = "无法读取该图片。",
             restartRequiredTitle = "需要重启",
             restartRequiredBody = "咖啡厅名称已更改。请重启应用，让所有界面显示新名称。",
             restartNowButton = "立即重启",
@@ -4636,6 +4706,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             noteOneSizeSmaller = "சிறப்பு அறிவுறுத்தல் குறிப்பு ஒரு அளவு சிறியதாக அச்சிடப்படும்.",
             secondaryAdminSection = "துணை நிர்வாகி",
             addSecondaryAdmin = "துணை நிர்வாகியைச் சேர்",
+            operatorSection = "ஆப்பரேட்டர்",
+            addOperator = "ஆப்பரேட்டரைச் சேர்",
             ownerRecoveryKeySection = "உரிமையாளர் மீட்பு விசை",
             showOwnerRecoveryQr = "உரிமையாளர் மீட்பு QR காட்டு",
             recoveryKeyLoadFailed = "மீட்பு விசையை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
@@ -4786,6 +4858,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             itemsAdded = "பொருட்கள் சேர்க்கப்பட்டன",
             statusUpdatedTo = "நிலை %s ஆக புதுப்பிக்கப்பட்டது",
             paymentCompleted = "பணம் செலுத்துதல் முடிந்தது (%s)",
+            processingLabel = "செயலாக்கப்படுகிறது…",
+            cashReceivedLabel = "பெறப்பட்ட பணம்",
+            changeDueLabel = "மீதி",
+            numpadLabel = "எண் பலகை",
             orderCancelled = "ஆர்டர் ரத்து செய்யப்பட்டது",
             maxTablesReached = "அதிகபட்சம் %d மேசைகள் எட்டப்பட்டது",
             tableNumberLimitReached = "மேசை எண் வரம்பு (T%d) எட்டப்பட்டது",
@@ -4876,6 +4952,14 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "நிராகரி",
             escAsteriskLabel = "ESC * பட முறை (இணக்கம்)",
             escAsteriskDesc = "மலிவு அச்சுப்பொறிகளில் லோகோ/சீட்டு அச்சாகவில்லை எனில் இயக்கவும்.",
+            receiptLogoImageLabel = "ரசீது லோகோ படம்",
+            receiptLogoImageDesc = "இந்தச் சாதனத்தில் மட்டும் சேமிக்கப்படும். இந்த முன்னோட்டம் அச்சிடப்படுவது போலவே — முழு கருப்பு வெள்ளை, சாம்பல் இல்லை.",
+            receiptLogoUploadButton = "பதிவேற்று",
+            receiptLogoResetButton = "நீக்கு",
+            receiptLogoInvertLabel = "நிறங்களை மாற்று",
+            receiptLogoInvertDesc = "இருண்ட பின்னணியில் வெளிர் லோகோ எனில் இயக்கவும். இருண்ட பின்னணி திடமான கருப்புத் தொகுதியாக அச்சாகி கோடுகளுடன் வரும்.",
+            receiptLogoUsingBranding = "எதுவும் அமைக்கப்படவில்லை — கஃபேவின் பிராண்டிங் லோகோ பயன்படுத்தப்படும்.",
+            receiptLogoLoadFailed = "அந்தப் படத்தைப் படிக்க முடியவில்லை.",
             restartRequiredTitle = "மறுதொடக்கம் தேவை",
             restartRequiredBody = "கஃபே பெயர் மாற்றப்பட்டது. புதிய பெயரை எல்லா திரைகளிலும் காட்ட ஆப்பை மறுதொடக்கம் செய்யவும்.",
             restartNowButton = "இப்போது மறுதொடக்கம் செய்",
@@ -5480,6 +5564,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             noteOneSizeSmaller = "หมายเหตุคำสั่งพิเศษจะพิมพ์เล็กลงหนึ่งขนาด",
             secondaryAdminSection = "ผู้ดูแลระบบสำรอง",
             addSecondaryAdmin = "เพิ่มผู้ดูแลระบบสำรอง",
+            operatorSection = "โอเปอเรเตอร์",
+            addOperator = "เพิ่มโอเปอเรเตอร์",
             ownerRecoveryKeySection = "กุญแจกู้คืนของเจ้าของ",
             showOwnerRecoveryQr = "แสดง QR กู้คืนของเจ้าของ",
             recoveryKeyLoadFailed = "ไม่สามารถโหลดกุญแจกู้คืนได้ กรุณาลองใหม่",
@@ -5630,6 +5716,10 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             itemsAdded = "เพิ่มรายการแล้ว",
             statusUpdatedTo = "อัปเดตสถานะเป็น %s",
             paymentCompleted = "ชำระเงินเสร็จสิ้น (%s)",
+            processingLabel = "กำลังดำเนินการ…",
+            cashReceivedLabel = "เงินสดที่รับ",
+            changeDueLabel = "เงินทอน",
+            numpadLabel = "แป้นตัวเลข",
             orderCancelled = "ยกเลิกออเดอร์แล้ว",
             maxTablesReached = "ถึงจำนวนโต๊ะสูงสุด %d โต๊ะแล้ว",
             tableNumberLimitReached = "ถึงขีดจำกัดหมายเลขโต๊ะ (T%d) แล้ว",
@@ -5720,6 +5810,14 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             rejectButton = "ปฏิเสธ",
             escAsteriskLabel = "โหมดภาพ ESC * (ความเข้ากันได้)",
             escAsteriskDesc = "เปิดหากโลโก้/สลิปไม่พิมพ์บนเครื่องพิมพ์ราคาถูก",
+            receiptLogoImageLabel = "รูปโลโก้ใบเสร็จ",
+            receiptLogoImageDesc = "เก็บไว้ในเครื่องนี้เท่านั้น ตัวอย่างนี้คือสิ่งที่จะพิมพ์จริง — ขาวดำล้วน ไม่มีสีเทา",
+            receiptLogoUploadButton = "อัปโหลด",
+            receiptLogoResetButton = "ลบ",
+            receiptLogoInvertLabel = "กลับสี",
+            receiptLogoInvertDesc = "เปิดถ้าโลโก้เป็นภาพสว่างบนพื้นเข้ม พื้นเข้มจะพิมพ์เป็นบล็อกดำทึบและออกมาเป็นริ้ว",
+            receiptLogoUsingBranding = "ยังไม่ได้ตั้งค่า — จะใช้โลโก้แบรนด์ของร้าน",
+            receiptLogoLoadFailed = "อ่านรูปภาพนั้นไม่ได้",
             restartRequiredTitle = "ต้องรีสตาร์ท",
             restartRequiredBody = "ชื่อร้านมีการเปลี่ยนแปลง กรุณารีสตาร์ทแอปเพื่อให้ทุกหน้าจอแสดงชื่อใหม่",
             restartNowButton = "รีสตาร์ทเลย",

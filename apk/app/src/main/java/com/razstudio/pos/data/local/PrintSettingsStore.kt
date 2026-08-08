@@ -43,6 +43,24 @@ class PrintSettingsStore @Inject constructor(
     }
 
     /**
+     * Print the device-local receipt logo inverted (see
+     * [com.razstudio.pos.printing.ReceiptLogoStore]).
+     *
+     * A wordmark drawn light-on-dark is the normal way to design a logo and the worst possible
+     * thing to hand a thermal head: the background becomes near-total ink coverage, which the head
+     * cannot sustain, so it prints as black bands separated by white gutters. Inverting turns that
+     * into a few strokes of ink on bare paper.
+     *
+     * Defaulted from the picked image at upload time rather than fixed here, because only the image
+     * itself knows which way round it is — this stores the operator's answer, not a guess.
+     */
+    fun getReceiptLogoInvert(): Boolean = prefs.getBoolean(KEY_RECEIPT_LOGO_INVERT, false)
+
+    fun setReceiptLogoInvert(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_RECEIPT_LOGO_INVERT, enabled).apply()
+    }
+
+    /**
      * Cut the paper after a receipt prints. Device-local, and ON by default so every printer
      * that has a cutter keeps behaving as it always did.
      *
@@ -77,6 +95,7 @@ class PrintSettingsStore @Inject constructor(
     private companion object {
         const val KEY_KITCHEN_FONT = "kitchen_font_size"
         const val KEY_RECEIPT_LOGO = "receipt_logo"
+        const val KEY_RECEIPT_LOGO_INVERT = "receipt_logo_invert"
         const val KEY_ESC_ASTERISK = "esc_asterisk_image_mode"
         const val KEY_RECEIPT_AUTO_CUT = "receipt_auto_cut"
         const val KEY_CASH_DRAWER_ENABLED = "cash_drawer_enabled"

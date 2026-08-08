@@ -128,12 +128,19 @@ class PrintService @Inject constructor(
      * @param cafeName The café branding name
      * @param gatewayTransactionId Optional gateway transaction ID to print on the receipt (PG-REQ-7, task 9.1)
      */
+    /**
+     * @param openDrawer whether a CASH receipt should also pop the till. True for a sale being
+     *   settled now; **false for a reprint** — reprinting a bill from history is a paperwork
+     *   action, and opening the till for a sale that was rung up hours ago is both a security
+     *   problem and a cash-count discrepancy waiting to happen.
+     */
     suspend fun printReceipt(
         order: Order,
         items: List<OrderItem>,
         paymentMethod: String,
         cafeName: String,
         gatewayTransactionId: String? = null,
+        openDrawer: Boolean = true,
     ) {
         if (!isPrinterHost()) return
 
@@ -167,13 +174,24 @@ class PrintService @Inject constructor(
             )
         }
 
-        // Cash means the cashier needs the till open to give change, so the drawer follows the
-        // receipt without a second tap — the behaviour Loyverse has on this same hardware.
-        //
-        // Cash only, deliberately: a drawer that springs open during a QR or card payment is a
-        // security problem in a busy café, and there is no reason to open it for money that never
-        // becomes notes and coins. A café that wants it on every sale needs a setting, not a
-        // silent default.
+        if (openDrawer) kickCashDrawerForCashSale(paymentMethod)
+    }
+
+    /**
+     * Kick the cash drawer for a cash sale, independent of whether a receipt is printed for it.
+     *
+     * A split-share customer's own slice never gets a receipt (by design), and a whole-order sale
+     * can be settled with receipt printing skipped — neither should keep the till shut. The drawer
+     * setting is the only thing that should gate this: enabled means every cash sale pops it,
+     * disabled means none do. (Cash-drawer-settings Requirement 1.2's toggle already lives in
+     * [PrinterDispatcher.kickCashDrawer]; this just reaches it without requiring a receipt first.)
+     *
+     * Cash only, deliberately: a drawer that springs open during a QR or card payment is a
+     * security problem in a busy café, and there is no reason to open it for money that never
+     * becomes notes and coins.
+     */
+    suspend fun kickCashDrawerForCashSale(paymentMethod: String) {
+        if (!isPrinterHost()) return
         if (paymentMethod.equals("CASH", ignoreCase = true)) {
             printerDispatcher.kickCashDrawer()
         }

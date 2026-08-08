@@ -156,6 +156,12 @@ async function handleCreateOrder(req: Request, _url: URL): Promise<Response> {
   const { tableId, items } = body;
   const supabase = getSupabaseClient();
 
+  // A split share settles one customer's slice of a bill while the table's main order is still
+  // open — the two coexist on the same table by design (Split Payment). Staff/admin only: a QR
+  // customer has no reason to ever create one. See migration 0016 for the matching DB-level carve
+  // -out in `one_active_order_per_table`.
+  const isSplitShare = body.splitShare === true && source === "STAFF";
+
   // Resolve the incoming identifier — customers send the opaque QR token, admin/staff send
   // the raw id. Either way the order is stored against the real table id so admin views and
   // kitchen slips resolve correctly.
@@ -171,17 +177,20 @@ async function handleCreateOrder(req: Request, _url: URL): Promise<Response> {
   }
   const realTableId = table.id;
 
-  // Check for active session on this table (one_active_order_per_table enforced by DB too)
-  const { data: activeOrder } = await supabase
-    .from("orders")
-    .select("id")
-    .eq("table_id", realTableId)
-    .not("status", "in", "(COMPLETED,CANCELLED)")
-    .limit(1)
-    .single();
+  // Check for active session on this table (one_active_order_per_table enforced by DB too) —
+  // skipped for a split share, which is expected to land on a table that already has one.
+  if (!isSplitShare) {
+    const { data: activeOrder } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("table_id", realTableId)
+      .not("status", "in", "(COMPLETED,CANCELLED)")
+      .limit(1)
+      .single();
 
-  if (activeOrder) {
-    return errorResponse(409, "TABLE_OCCUPIED", `Table '${realTableId}' already has an active order`);
+    if (activeOrder) {
+      return errorResponse(409, "TABLE_OCCUPIED", `Table '${realTableId}' already has an active order`);
+    }
   }
 
   // Load current menu snapshot for server-side pricing
@@ -210,6 +219,14 @@ async function handleCreateOrder(req: Request, _url: URL): Promise<Response> {
     .single();
   const autoPrint = autoPrintSetting?.value !== "false"; // default true if row missing
 
+  // Staff-originated orders (including split shares) are always confirmed — the cashier who
+  // created them IS the confirmation. Only customer-submitted orders (QR/kiosk) respect the
+  // autoPrint setting (hold for cashier review when disabled). Computed once, up front, so the
+  // order's status AND every one of its item lines agree on whether the kitchen already has
+  // them — a line marked "not sent" on an order already marked SENT_TO_KITCHEN would sit in the
+  // Pending Kitchen Prints queue forever.
+  const effectiveAutoPrint = source === "STAFF" ? true : autoPrint;
+
   // Re-price and validate each item
   const orderItems: OrderItemLine[] = [];
   let total = 0;
@@ -225,7 +242,7 @@ async function handleCreateOrder(req: Request, _url: URL): Promise<Response> {
       if (source !== "STAFF") {
         return errorResponse(403, "FORBIDDEN", "Only staff can add a custom charge");
       }
-      const custom = customChargeLine(item, autoPrint);
+      const custom = customChargeLine(item, effectiveAutoPrint);
       if (!custom) {
         return errorResponse(422, "VALIDATION", "A custom charge needs a name and a price above 0");
       }
@@ -256,7 +273,7 @@ async function handleCreateOrder(req: Request, _url: URL): Promise<Response> {
       marketPriceSnapshot: menuItem.marketPrice,
       quantity: item.quantity,
       note: item.note || null,
-      sentToKitchen: autoPrint,
+      sentToKitchen: effectiveAutoPrint,
       sessionNumber: 1,
     };
     orderItems.push(lineItem);
@@ -266,19 +283,19 @@ async function handleCreateOrder(req: Request, _url: URL): Promise<Response> {
   const now = new Date().toISOString();
 
   // Insert order.
-  // autoPrint=true  → status SENT_TO_KITCHEN + sent_to_kitchen_at timestamp (legacy behaviour).
-  // autoPrint=false → status RECEIVED (initial default) + sent_to_kitchen_at null
-  //                   (cashier must confirm before the kitchen receives the order).
+  // effectiveAutoPrint=true  → status SENT_TO_KITCHEN + sent_to_kitchen_at timestamp.
+  // effectiveAutoPrint=false → status RECEIVED (cashier must confirm before kitchen gets it).
   const { data: newOrder, error: insertError } = await supabase
     .from("orders")
     .insert({
       table_id: realTableId,
       source,
       browser_id: browserId || null,
-      status: autoPrint ? "SENT_TO_KITCHEN" : "RECEIVED",
-      sent_to_kitchen_at: autoPrint ? now : null,
+      status: effectiveAutoPrint ? "SENT_TO_KITCHEN" : "RECEIVED",
+      sent_to_kitchen_at: effectiveAutoPrint ? now : null,
       items_json: orderItems,
       total: Math.round(total * 100) / 100,
+      is_split_share: isSplitShare,
     })
     .select("*")
     .single();
@@ -491,6 +508,7 @@ function mapOrderRow(row: any) {
     cancelledBy: row.cancelled_by,
     total: Number(row.total),
     createdAt: row.created_at,
+    isSplitShare: row.is_split_share === true,
     items: row.items_json || [],
   };
 }

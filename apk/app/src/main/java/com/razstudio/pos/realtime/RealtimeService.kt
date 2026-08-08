@@ -327,6 +327,13 @@ class RealtimeService : Service() {
     private suspend fun reconcileOrder(dao: OrderDao, orderDto: OrderDto) {
         dao.insertOrder(orderDto.toEntity())
         if (orderDto.items.isNotEmpty()) {
+            // Replace, never append. A split share is written to Room twice: once locally at
+            // creation (insertShareIntoRoom, client-minted line ids) and again when this sync pulls
+            // the server's copy (server-minted ids). REPLACE on differing primary keys is an
+            // insert, so without clearing first every share ended up with two copies of each line
+            // — and anything that summed them (the session's combined receipt) came out doubled.
+            // The void path has done delete-then-insert for the same reason all along.
+            dao.deleteItemsForOrder(orderDto.id)
             dao.insertOrderItems(orderDto.items.map { it.toEntity(orderDto.id) })
         }
     }
@@ -355,6 +362,14 @@ class RealtimeService : Service() {
                 val items = orderDto.items.map { it.toEntity(orderDto.id) }
                 val newlySent = items.filter { it.sentToKitchen && it.id !in printedKitchenIds }
                 if (newlySent.isEmpty()) continue
+
+                // A split share's items are already part of the bill someone else is still
+                // sitting at — already sent, already cooking. Record them as seen so this poll
+                // never reconsiders them, but never print a slip: there is no new food to make.
+                if (orderDto.isSplitShare) {
+                    printedKitchenIds.addCapped(newlySent.map { it.id })
+                    continue
+                }
 
                 if (shouldPrint) {
                     // Print one slip per session (order round) so each round's ticket is
@@ -688,6 +703,9 @@ class RealtimeService : Service() {
                 val dto = OrderMapper.orderDto(orderJson)
                 dao.insertOrder(dto.toEntity())
                 if (dto.items.isNotEmpty()) {
+                    // Replace, never append — see reconcileOrder: the local copy of a split
+                    // share carries different line ids than the server's, so appending doubles it.
+                    dao.deleteItemsForOrder(dto.id)
                     dao.insertOrderItems(dto.items.map { it.toEntity(dto.id) })
                 }
 
@@ -699,8 +717,10 @@ class RealtimeService : Service() {
                 // Only print to kitchen if at least one item is marked sentToKitchen.
                 // When customerOrderAutoPrint is false, all items arrive with
                 // sentToKitchen = false — still beep/badge, but skip the print.
+                // A split share is bookkeeping for an already-open table, not a new order —
+                // never a slip to print (see autoPrintFromSync's identical poll-path guard).
                 val itemEntities = dto.items.map { it.toEntity(dto.id) }
-                if (itemEntities.any { it.sentToKitchen }) {
+                if (!dto.isSplitShare && itemEntities.any { it.sentToKitchen }) {
                     printService.printKitchenSlip(
                         orderNumber = dto.orderNumber,
                         tableId = dto.tableId,
@@ -837,6 +857,12 @@ class RealtimeService : Service() {
             for (orderDto in orders) {
                 val itemIds = orderDto.items.map { it.id }
                 if (itemIds.isEmpty()) continue
+                // Same reasoning as autoPrintFromSync: a split share is bookkeeping for an
+                // already-open table, not a new order arriving — never worth a heads-up alert.
+                if (orderDto.isSplitShare) {
+                    notifiedItemIds.addCapped(itemIds)
+                    continue
+                }
                 val newIds = itemIds.filter { it !in notifiedItemIds }
                 if (newIds.isNotEmpty() && firstNotifySeeded) {
                     val wholeOrderNew = itemIds.all { it !in notifiedItemIds }

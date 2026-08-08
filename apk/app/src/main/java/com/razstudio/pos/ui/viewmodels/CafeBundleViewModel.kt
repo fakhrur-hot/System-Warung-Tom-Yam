@@ -68,6 +68,16 @@ class CafeBundleViewModel @Inject constructor(
     val state: StateFlow<State> = _state.asStateFlow()
 
     /**
+     * What to redo once consent is granted — see the class note on [authorize] for why this
+     * exists at all: a `NeedsConsent` result was previously a dead end.
+     */
+    private var pendingRetry: (suspend (String) -> Unit)? = null
+
+    /** The Authorization API's consent screen, for the composable to launch. */
+    private val _consentRequest = MutableStateFlow<android.app.PendingIntent?>(null)
+    val consentRequest: StateFlow<android.app.PendingIntent?> = _consentRequest.asStateFlow()
+
+    /**
      * Whether to show this at all. Off-cloud cafés store no backend and have no internet, so a
      * bundle would be both unfillable and unreachable (task 23.4).
      */
@@ -85,46 +95,46 @@ class CafeBundleViewModel @Inject constructor(
     /** Runs only after the owner has confirmed the dialog that states the trade. */
     fun save(activity: Activity) {
         _state.value = State(busy = true)
-        viewModelScope.launch {
-            val token = authorize(activity) ?: return@launch
+        viewModelScope.launch { authorize(activity) { token -> doSave(token) } }
+    }
 
-            // The recovery QR is fetched fresh rather than read from storage — it is minted by the
-            // backend and this device may never have held one. A café that cannot supply it still
-            // saves: the rest of the bundle spares the owner the whole wizard, and a blank recovery
-            // field is a smaller loss than refusing to save anything at all.
-            val recoveryQr = when (val r = backend.getRecoveryToken()) {
-                is ApiResult.Success -> r.data.url
-                else -> ""
-            }
-
-            val payload = CafeConfigPayload(
-                mode = modeRepository.currentMode(),
-                cafeName = appConfigStore.cafeName(),
-                supabaseUrl = appConfigStore.supabaseUrl(),
-                supabaseAnonKey = appConfigStore.supabaseAnonKey(),
-                websiteUrl = appConfigStore.websiteUrl(),
-                ownerRecoveryQr = recoveryQr,
-                setupData = setupDataJson(),
-                savedAtMs = System.currentTimeMillis(),
-                savedByDevice = android.os.Build.MODEL ?: "",
-            )
-
-            // The café's menu photos travel with it. They live in app-private storage and are
-            // deleted with the app, so a replacement phone would otherwise restore a picture menu
-            // with no pictures.
-            // The payment QR travels the same way and for a sharper reason: it lives only in
-            // app-private storage and on the backend, so a café that loses its Supabase access
-            // has no other copy of the code its customers pay into.
-            val failure = bundleStore.save(
-                token,
-                payload,
-                imageStore.allFiles(),
-                com.razstudio.pos.ui.util.PaymentQrPipeline.storedFileOrNull(context),
-            )
-            _state.value = State(
-                outcome = if (failure == null) Outcome.SAVED else Outcome.UPLOAD_REJECTED
-            )
+    private suspend fun doSave(token: String) {
+        // The recovery QR is fetched fresh rather than read from storage — it is minted by the
+        // backend and this device may never have held one. A café that cannot supply it still
+        // saves: the rest of the bundle spares the owner the whole wizard, and a blank recovery
+        // field is a smaller loss than refusing to save anything at all.
+        val recoveryQr = when (val r = backend.getRecoveryToken()) {
+            is ApiResult.Success -> r.data.url
+            else -> ""
         }
+
+        val payload = CafeConfigPayload(
+            mode = modeRepository.currentMode(),
+            cafeName = appConfigStore.cafeName(),
+            supabaseUrl = appConfigStore.supabaseUrl(),
+            supabaseAnonKey = appConfigStore.supabaseAnonKey(),
+            websiteUrl = appConfigStore.websiteUrl(),
+            ownerRecoveryQr = recoveryQr,
+            setupData = setupDataJson(),
+            savedAtMs = System.currentTimeMillis(),
+            savedByDevice = android.os.Build.MODEL ?: "",
+        )
+
+        // The café's menu photos travel with it. They live in app-private storage and are
+        // deleted with the app, so a replacement phone would otherwise restore a picture menu
+        // with no pictures.
+        // The payment QR travels the same way and for a sharper reason: it lives only in
+        // app-private storage and on the backend, so a café that loses its Supabase access
+        // has no other copy of the code its customers pay into.
+        val failure = bundleStore.save(
+            token,
+            payload,
+            imageStore.allFiles(),
+            com.razstudio.pos.ui.util.PaymentQrPipeline.storedFileOrNull(context),
+        )
+        _state.value = State(
+            outcome = if (failure == null) Outcome.SAVED else Outcome.UPLOAD_REJECTED
+        )
     }
 
     /**
@@ -150,43 +160,63 @@ class CafeBundleViewModel @Inject constructor(
     /** Lets an owner take this café back out of their Google account. */
     fun remove(activity: Activity) {
         _state.value = State(busy = true)
-        viewModelScope.launch {
-            val token = authorize(activity) ?: return@launch
-            // Only the café this device is running. An account may hold several — a WLAN till, a
-            // Kiosk — and removing all of them because the owner tidied up one would be a much
-            // larger action than the button says.
-            val folderId = session.selected.value?.folderId
-                ?: run {
-                    _state.value = State(outcome = Outcome.REMOVED)
-                    return@launch
-                }
-            val failure = bundleStore.delete(token, folderId)
-            _state.value = State(
-                outcome = if (failure == null) Outcome.REMOVED else Outcome.UPLOAD_REJECTED
-            )
-        }
+        viewModelScope.launch { authorize(activity) { token -> doRemove(token) } }
+    }
+
+    private suspend fun doRemove(token: String) {
+        // Only the café this device is running. An account may hold several — a WLAN till, a
+        // Kiosk — and removing all of them because the owner tidied up one would be a much
+        // larger action than the button says.
+        val folderId = session.selected.value?.folderId
+            ?: run {
+                _state.value = State(outcome = Outcome.REMOVED)
+                return
+            }
+        val failure = bundleStore.delete(token, folderId)
+        _state.value = State(
+            outcome = if (failure == null) Outcome.REMOVED else Outcome.UPLOAD_REJECTED
+        )
     }
 
     /**
-     * Returns an access token, or sets an error state and returns null.
+     * Runs [onGranted] with a fresh access token, or sets an error/consent state.
      *
-     * `NeedsConsent` is reported rather than silently launched: this path runs from Settings, where
-     * the owner is already in a deliberate flow, and the Authorization API will show its own consent
-     * on the next attempt. Telling them to press it again is honest and needs no intent plumbing on
-     * a screen that otherwise has none.
+     * `NeedsConsent` carries a `pendingIntent` the Authorization API needs shown before the scope
+     * is ever granted — without launching it, every retry re-asks the same still-unconsented scope
+     * and gets `NeedsConsent` again, forever. [consentRequest] is what the screen launches; once it
+     * reports back via [onConsentResult], [onGranted] runs with the token that attempt produced.
      */
-    private suspend fun authorize(activity: Activity): String? =
+    private suspend fun authorize(activity: Activity, onGranted: suspend (String) -> Unit) {
         when (val auth = bundleStore.authorizeDrive(activity)) {
-            is CafeBundleStore.AuthResult.Granted -> auth.accessToken
+            is CafeBundleStore.AuthResult.Granted -> onGranted(auth.accessToken)
             is CafeBundleStore.AuthResult.NeedsConsent -> {
+                pendingRetry = onGranted
                 _state.value = State(outcome = Outcome.NEEDS_CONSENT)
-                null
+                _consentRequest.value = auth.pendingIntent
             }
             is CafeBundleStore.AuthResult.Failed -> {
                 _state.value = State(outcome = Outcome.NO_PERMISSION)
-                null
             }
         }
+    }
+
+    /** The screen calls this after showing [consentRequest] and getting a result back. */
+    fun onConsentResult(granted: Boolean, activity: Activity) {
+        val retry = pendingRetry
+        pendingRetry = null
+        _consentRequest.value = null
+        if (!granted || retry == null) {
+            _state.value = State(outcome = Outcome.NO_PERMISSION)
+            return
+        }
+        _state.value = State(busy = true)
+        viewModelScope.launch {
+            when (val auth = bundleStore.authorizeDrive(activity)) {
+                is CafeBundleStore.AuthResult.Granted -> retry(auth.accessToken)
+                else -> _state.value = State(outcome = Outcome.NO_PERMISSION)
+            }
+        }
+    }
 
     fun clearMessages() {
         _state.value = _state.value.copy(outcome = null)

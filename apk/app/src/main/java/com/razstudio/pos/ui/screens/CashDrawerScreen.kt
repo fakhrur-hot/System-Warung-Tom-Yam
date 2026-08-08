@@ -123,14 +123,14 @@ fun CashDrawerScreen(
                 }
             }
 
-            // ── Opening float (autosaved) ───────────────────────────────────────────────
+            // ── Opening float (saved on demand) ─────────────────────────────────────────
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("Opening float", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Key in what you placed in the drawer this morning. It saves by " +
-                                "itself a moment after you stop typing — no button.",
+                            "Key in what you placed in the drawer this morning, then press Save. " +
+                                "Nothing is recorded until you do.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -144,22 +144,24 @@ fun CashDrawerScreen(
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         )
                         Spacer(Modifier.height(8.dp))
+                        // Keystrokes only move local entry state now — see
+                        // CashDrawerViewModel: a typing pause used to commit a half-keyed figure
+                        // as the expected balance.
                         CashNumpad(
-                            onDigit = { d ->
-                                floatEntry = cashEntryAppend(floatEntry, d)
-                                floatEntry?.let { viewModel.onOpeningFloatChanged(it) }
-                            },
-                            onBackspace = {
-                                floatEntry = cashEntryBackspace(floatEntry)
-                                viewModel.onOpeningFloatChanged(floatEntry ?: balanceSen)
-                            },
-                            onClear = {
-                                floatEntry = null
-                                // Re-arm the debounce at "no change" so digits keyed just before
-                                // C can't commit after the display already reads cleared.
-                                viewModel.onOpeningFloatChanged(balanceSen)
-                            },
+                            onDigit = { d -> floatEntry = cashEntryAppend(floatEntry, d) },
+                            onBackspace = { floatEntry = cashEntryBackspace(floatEntry) },
+                            onClear = { floatEntry = null },
                         )
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = { floatEntry?.let { viewModel.saveOpeningFloat(it) } },
+                            // Nothing keyed means there is nothing to save — the grey figure on
+                            // display is the balance already stored.
+                            enabled = floatEntry != null,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Save opening float")
+                        }
                     }
                 }
             }

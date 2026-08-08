@@ -76,6 +76,27 @@ export async function verifyAdminToken(req: Request): Promise<{
   return data;
 }
 
+/** Verify an operator session token. Scoped to the narrow endpoint allowlist — this is
+ *  deliberately NOT merged into verifyAdminToken, so every endpoint that doesn't explicitly call
+ *  this one stays closed to OPERATOR by default (Requirement 9.2). */
+export async function verifyOperatorToken(req: Request): Promise<{
+  id: string; device_identifier: string; role: string; status: string;
+} | null> {
+  const token = extractBearer(req);
+  if (!token) return null;
+  const hash = await sha256(token);
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("devices")
+    .select("id, device_identifier, role, status")
+    .eq("session_token_hash", hash)
+    .eq("role", "OPERATOR")
+    .eq("status", "APPROVED")
+    .single();
+  if (error || !data) return null;
+  return data;
+}
+
 /**
  * Verify an ordering device API key. Returns the device row or null.
  */

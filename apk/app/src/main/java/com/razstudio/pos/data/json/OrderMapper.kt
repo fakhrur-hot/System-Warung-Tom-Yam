@@ -41,6 +41,7 @@ object OrderMapper {
         cancelReason = json.optStringOrNull("cancelReason"),
         cancelledBy = json.optStringOrNull("cancelledBy"),
         createdAt = json.reqString("createdAt"),
+        isSplitShare = json.optBoolean("isSplitShare", false),
         items = orderItemDtos(json.optJSONArray("items")),
     )
 

@@ -127,7 +127,13 @@ class PrinterConnectionManager @Inject constructor(
             val body = payload.replace(RECEIPT_LOGO_MARKER, "").trimStart('\n')
             val logoMarkup = if (hasLogo) {
                 loadReceiptLogo(paperWidth.pixelWidth)?.let { logo ->
-                    val hex = PrinterTextParserImg.bitmapToHexadecimalString(escPosPrinter, logo)
+                    // gradient=false, explicitly. The 2-arg overload defaults it to TRUE, which
+                    // runs the library's own ordered dither over the pixel values — and this logo
+                    // arrives already reduced to pure #000/#FFF, so that dither has nothing to
+                    // gain and one thing to lose: on a solid black area it punches a regular grid
+                    // of white specks straight through the ink. A flat threshold reproduces an
+                    // already-1-bit image exactly.
+                    val hex = PrinterTextParserImg.bitmapToHexadecimalString(escPosPrinter, logo, false)
                     logo.recycle()
                     "[C]<img>$hex</img>\n"
                 } ?: ""
@@ -251,86 +257,48 @@ class PrinterConnectionManager @Inject constructor(
     }
 
     /**
-     * The café's own uploaded logo (Settings → Café Profile → Change Logo) if one exists, else the
-     * bundled default (res/raw/qr_default_logo — the same one the QR-card generator uses), scaled
-     * to a tasteful header width (~55% of the head), preserving aspect. Returns null on any failure
-     * so a receipt still prints without a logo.
+     * The logo to print at the top of a receipt, already reduced to pure black and white by
+     * [ReceiptLogoStore.prepare]. Returns null on any failure, so a receipt still prints without it.
      *
-     * After scaling, a contrast LUT is applied before the bitmap reaches the ESC/POS 1-bit
-     * ditherer. Thermal dithering maps every grey pixel to black or white based on its luminance,
-     * so a flat-contrast source collapses mid-tones into muddy grey. The LUT pushes mid-greys
-     * toward black (so they print as solid ink) while pushing near-whites toward white (so
-     * highlights stay open). The curve is a two-segment piecewise linear ramp through three
-     * control points: (0,0) → (midIn, midOut) → (255,255), where midOut < midIn darkens greys
-     * and the upper segment's steeper slope brightens highlights.
+     * ## The fallback order, and why each step exists
+     *
+     * 1. **This device's own receipt logo** (Printers → Receipt logo image). It was picked for this
+     *    printer, it is the only one the operator can see a true preview of, and it is the only one
+     *    they can set the invert switch for.
+     * 2. **The café's branding logo**, so a café that never opens printer settings still gets a
+     *    header.
+     * 3. **The bundled default**, so a café with no branding logo does too.
+     *
+     * For 2 and 3 nobody chose an invert, so it is decided from the image itself — a wordmark drawn
+     * light-on-dark would otherwise print as a solid slab of ink.
+     *
+     * ## A correction to what this used to say
+     *
+     * An earlier version of this function rounded the logo width down to a multiple of 8 and
+     * claimed a non-multiple width was what sheared the logo. Reading DantSu 3.3.0 shows that is
+     * **not true**: `EscPosPrinterCommands.bitmapToBytes` computes `bytesByLine = ceil(width / 8)`,
+     * zero-pads the tail byte, and writes the padded width into the GS v 0 header that
+     * `convertGSv0ToEscAsterisk` later reads back — so any width is self-consistent. The rounding
+     * is retained in [ReceiptLogoStore.prepare] because it costs nothing and keeps the raster whole
+     * bytes, but it was never the defect.
+     *
+     * The actual defect was that the stored logo was a **black square**: `LogoPipeline` JPEG-encoded
+     * an image whose transparent background had already become opaque black, because JPEG has no
+     * alpha channel. The printer was faithfully reproducing it, and the evenly spaced white gutters
+     * were the ESC * 24-dot band boundaries showing through a near-solid raster.
      */
-    private fun loadReceiptLogo(pixelWidth: Int): android.graphics.Bitmap? = try {
-        val raw = com.razstudio.pos.ui.util.LogoPipeline.loadJpegFromInternal(context)
-            ?: android.graphics.BitmapFactory.decodeResource(
-                context.resources, com.razstudio.pos.R.raw.qr_default_logo
-            )
-        val scaled = when {
-            raw == null -> return null
-            raw.width <= (pixelWidth * 0.55f).toInt() -> raw
-            else -> {
-                val targetW = (pixelWidth * 0.55f).toInt().coerceAtLeast(1)
-                val targetH = (raw.height * targetW.toFloat() / raw.width).toInt().coerceAtLeast(1)
-                android.graphics.Bitmap.createScaledBitmap(raw, targetW, targetH, true)
-                    .also { if (it !== raw) raw.recycle() }
-            }
-        }
-        applyReceiptContrast(scaled)
-    } catch (e: Exception) {
-        null
-    }
+    private fun loadReceiptLogo(pixelWidth: Int): android.graphics.Bitmap? =
+        ReceiptLogoStore.effectiveLogo(
+            context,
+            pixelWidth,
+            printSettingsStore.getReceiptLogoInvert(),
+        )
 
-    /**
-     * Applies a piecewise-linear contrast curve to [src] in-place (ARGB_8888) so the bitmap
-     * dithers crisply on a thermal head.
-     *
-     * Curve: two line segments through (0, 0) → (midIn, midOut) → (255, 255).
-     *
-     *   midIn  = 128  (the grey midpoint in the source)
-     *   midOut =  80  (mapped output — darker than the input mid, pushing greys toward black)
-     *
-     * Below midIn the slope is midOut/midIn ≈ 0.625 — mid-greys get darker.
-     * Above midIn the slope is (255−midOut)/(255−midIn) ≈ 1.37 — near-whites get brighter.
-     *
-     * The LUT is computed once and applied via a [android.graphics.ColorMatrix] paint pass,
-     * which keeps the inner loop in native code.
-     */
-    private fun applyReceiptContrast(src: android.graphics.Bitmap): android.graphics.Bitmap {
-        val midIn = 128f
-        val midOut = 80f
-
-        // Build a 256-entry LUT for the piecewise ramp.
-        val lut = FloatArray(256) { i ->
-            if (i <= midIn) {
-                (i * midOut / midIn).coerceIn(0f, 255f)
-            } else {
-                (midOut + (i - midIn) * (255f - midOut) / (255f - midIn)).coerceIn(0f, 255f)
-            }
-        }
-
-        // ColorMatrix expects scale/translate in the [-255,255] range expressed as linear
-        // per-channel y = scale*x + translate. For a LUT we approximate via a single-point
-        // tangent at the midpoint — good enough for this monotone curve, but a per-pixel path
-        // is exact. Use per-pixel for correctness.
-        val out = src.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
-        val pixels = IntArray(out.width * out.height)
-        out.getPixels(pixels, 0, out.width, 0, 0, out.width, out.height)
-        for (i in pixels.indices) {
-            val px = pixels[i]
-            val a = px ushr 24 and 0xFF
-            val r = lut[px ushr 16 and 0xFF].toInt()
-            val g = lut[px ushr 8  and 0xFF].toInt()
-            val b = lut[px         and 0xFF].toInt()
-            pixels[i] = (a shl 24) or (r shl 16) or (g shl 8) or b
-        }
-        out.setPixels(pixels, 0, out.width, 0, 0, out.width, out.height)
-        if (out !== src) src.recycle()
-        return out
-    }
+    // NOTE: the old `applyReceiptContrast` LUT pass lived here. It existed to push mid-greys toward
+    // black so the ESC/POS encoder's own threshold would render them as ink. Nothing needs it now:
+    // ReceiptLogoStore.prepare error-diffuses the logo all the way down to 1-bit itself, so there
+    // are no mid-greys left by the time the encoder sees it, and the encoder is called with
+    // gradient=false so it does not re-dither what is already decided.
 
     private fun scheduleEcoDisconnect(mac: String) {
         ecoDisconnectJobs.remove(mac)?.cancel()

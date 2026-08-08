@@ -268,6 +268,11 @@ fun AppNavGraph(
                     onBack = { navController.popBackStack() },
                 )
             }
+            composable(NavRoutes.AFFILIATE_DEBUG) {
+                com.razstudio.pos.ui.screens.AffiliateDebugScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
 
         composable(NavRoutes.SETUP) {
@@ -415,6 +420,9 @@ fun AppNavGraph(
                 },
                 onNavigateToPaymentMonitor = {
                     navController.navigate(NavRoutes.PAYMENT_MONITOR)
+                },
+                onNavigateToAffiliateDebug = {
+                    navController.navigate(NavRoutes.AFFILIATE_DEBUG)
                 }
             )
         }

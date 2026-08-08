@@ -4,7 +4,7 @@
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { handleCors } from "../_shared/cors.ts";
-import { verifyAdminToken, verifyOrderingKey } from "../_shared/auth.ts";
+import { verifyAdminToken, verifyOperatorToken, verifyOrderingKey } from "../_shared/auth.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
 import { errorResponse, jsonResponse } from "../_shared/errors.ts";
 
@@ -24,7 +24,7 @@ serve(async (req) => {
 
 // ── PUT /api/cafe-location ─────────────────────────────────────────────────
 async function handlePutCafeLocation(req: Request): Promise<Response> {
-  const admin = await verifyAdminToken(req);
+  const admin = await verifyAdminToken(req) ?? await verifyOperatorToken(req);
   if (!admin) {
     return errorResponse(401, "UNAUTHORIZED", "Admin token required");
   }
@@ -81,7 +81,7 @@ async function handlePutCafeLocation(req: Request): Promise<Response> {
 async function handleGetCafeLocation(req: Request): Promise<Response> {
   // The admin sets the location (PUT is admin-only) and its own Settings screen must be able to
   // read it back, so accept the admin token here too — not just an ordering device's key.
-  const admin = await verifyAdminToken(req);
+  const admin = await verifyAdminToken(req) ?? await verifyOperatorToken(req);
   const device = admin ? null : await verifyOrderingKey(req);
   if (!admin && !device) {
     return errorResponse(401, "UNAUTHORIZED", "Admin or ordering credentials required");

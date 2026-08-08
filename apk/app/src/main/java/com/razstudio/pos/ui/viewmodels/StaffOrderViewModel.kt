@@ -403,7 +403,7 @@ class StaffOrderViewModel @Inject constructor(
                 return@launch
             }
 
-            val created = apiClient.createOrderAsStaff(table, plan.sliceItems)
+            val created = apiClient.createOrderAsStaff(table, plan.sliceItems, splitShare = true)
             if (created !is ApiResult.Success) {
                 _orderDetail.value = _orderDetail.value.copy(
                     isLoading = false, error = str().splitShareFailed,
@@ -436,7 +436,7 @@ class StaffOrderViewModel @Inject constructor(
                 )
                 return@launch
             }
-            val created = apiClient.createOrderAsStaff(table, plan.sliceItems)
+            val created = apiClient.createOrderAsStaff(table, plan.sliceItems, splitShare = true)
             if (created !is ApiResult.Success) {
                 _orderDetail.value = _orderDetail.value.copy(
                     isLoading = false, error = str().splitShareFailed,
@@ -471,7 +471,10 @@ class StaffOrderViewModel @Inject constructor(
                 id = shareId,
                 tableId = tableId,
                 source = "STAFF",
-                status = OrderStatus.RECEIVED,
+                // Staff-created split shares are immediately payable — the cashier IS the
+                // confirmation. Must match the backend's status so LAN-mode processPayment
+                // doesn't reject it with PAYMENT_CONFLICT.
+                status = OrderStatus.SENT_TO_KITCHEN,
                 total = plan.amount,
                 createdAt = PaymentTransaction.nowIso(),
             )
@@ -1246,6 +1249,9 @@ class StaffOrderViewModel @Inject constructor(
     private suspend fun reconcileOrderFromDto(dto: OrderDto) {
         orderDao.insertOrder(dto.toEntity())
         if (dto.items.isNotEmpty()) {
+            // Replace, never append — local and server copies of the same lines carry different
+            // ids, so a plain insert duplicated them. See RealtimeService.reconcileOrder.
+            orderDao.deleteItemsForOrder(dto.id)
             orderDao.insertOrderItems(dto.items.map { it.toEntity(dto.id) })
         }
     }

@@ -120,6 +120,25 @@ class LocalPrefs @Inject constructor(@ApplicationContext context: Context) {
             else prefs.edit().remove(KEY_DISPLAY_DRIVER).apply()
         }
 
+    /**
+     * The affiliate product carousel's round-robin cursor — see
+     * [com.razstudio.pos.ui.viewmodels.AffiliateAdsViewModel]. Persisted rather than kept only in
+     * the ViewModel so a device reboot or app relaunch (routine on a POS tablet) continues the
+     * cycle instead of restarting it, and so the table grid, dashboard, and ambient screen — each
+     * with their own ViewModel instance — read the same starting point rather than three
+     * independently-seeded ones. Null until the first rotation ever happens on this device.
+     */
+    var affiliateRotationOffset: Int?
+        get() = if (prefs.contains(KEY_AFFILIATE_ROTATION_OFFSET)) {
+            prefs.getInt(KEY_AFFILIATE_ROTATION_OFFSET, 0)
+        } else {
+            null
+        }
+        set(value) {
+            if (value != null) prefs.edit().putInt(KEY_AFFILIATE_ROTATION_OFFSET, value).apply()
+            else prefs.edit().remove(KEY_AFFILIATE_ROTATION_OFFSET).apply()
+        }
+
     companion object {
         private const val KEY_SHOW_PRINT_STATUS = "show_print_status"
         private const val KEY_LOW_STOCK_ALERTS = "low_stock_alerts"
@@ -131,5 +150,6 @@ class LocalPrefs @Inject constructor(@ApplicationContext context: Context) {
         private const val KEY_DRAWER_PRINTER_ID = "selected_drawer_printer_id"
         private const val KEY_DISPLAY_DRIVER = "selected_display_driver"
         private const val KEY_PAYMENT_QR_BRAND = "payment_qr_brand"
+        private const val KEY_AFFILIATE_ROTATION_OFFSET = "affiliate_rotation_offset"
     }
 }

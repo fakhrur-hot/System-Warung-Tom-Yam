@@ -34,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -68,6 +69,10 @@ import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.UiStrings
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.data.local.PaymentMethod
+import android.content.Intent
+import android.net.Uri
+import com.razstudio.pos.data.promos.AffiliateProduct
+import com.razstudio.pos.ui.tableview.AffiliateSection
 import com.razstudio.pos.ui.tableview.CartLine
 import com.razstudio.pos.ui.tableview.GatewayCheckoutOverlay
 import com.razstudio.pos.ui.tableview.MerchantScanRequest
@@ -76,6 +81,7 @@ import com.razstudio.pos.ui.tableview.OrderEntrySheet
 import com.razstudio.pos.ui.tableview.StaffPermissions
 import com.razstudio.pos.ui.tableview.TableGrid
 import com.razstudio.pos.ui.tableview.TableUiStatus
+import com.razstudio.pos.ui.viewmodels.AffiliateAdsViewModel
 import com.razstudio.pos.ui.viewmodels.AdminSessionViewModel
 import com.razstudio.pos.ui.viewmodels.TableViewViewModel
 
@@ -101,6 +107,8 @@ fun AdminHomeScreen(
     devicesViewModel: com.razstudio.pos.ui.viewmodels.DevicesViewModel = hiltViewModel(),
     modeViewModel: com.razstudio.pos.ui.viewmodels.ModeViewModel = hiltViewModel(),
     cashDrawerViewModel: com.razstudio.pos.ui.viewmodels.CashDrawerViewModel = hiltViewModel(),
+    paymentMonitorViewModel: com.razstudio.pos.ui.viewmodels.PaymentMonitorViewModel = hiltViewModel(),
+    affiliateAdsViewModel: AffiliateAdsViewModel = hiltViewModel(),
     /**
      * Avatar -> Mode Logout finished. The caller clears the stack back to the home screen; the
      * Google account is untouched, so the owner's other cafés are still listed when they land.
@@ -118,7 +126,8 @@ fun AdminHomeScreen(
     onNavigateToBackup: () -> Unit = {},
     onNavigateToKeepAliveSetup: () -> Unit = {},
     onNavigateToCafeManagement: () -> Unit = {},
-    onNavigateToPaymentMonitor: () -> Unit = {}
+    onNavigateToPaymentMonitor: () -> Unit = {},
+    onNavigateToAffiliateDebug: () -> Unit = {}
 ) {
     val sessionState by sessionViewModel.uiState.collectAsState()
     val tableStates by tableViewModel.tableStates.collectAsState()
@@ -133,6 +142,8 @@ fun AdminHomeScreen(
     val pendingPrints by tableViewModel.pendingKitchenPrints.collectAsState()
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
+    val affiliateProducts by affiliateAdsViewModel.products.collectAsState()
+    val paymentMonitorUiState by paymentMonitorViewModel.uiState.collectAsState()
 
     var showOverflowMenu by remember { mutableStateOf(false) }
     var showClosingDialog by remember { mutableStateOf(false) }
@@ -354,17 +365,39 @@ fun AdminHomeScreen(
                             )
                             // Printers moved into Café Management (under Generate Table QR).
 
-                            HorizontalDivider()
-
                             // --- Payment Monitor ---
-                            DropdownMenuItem(
-                                text = { Text("Payment Monitor") },
-                                onClick = {
-                                    showOverflowMenu = false
-                                    onNavigateToPaymentMonitor()
-                                }
-                            )
-                            HorizontalDivider()
+                            // Main Admin only: this device is the one that actually receives the
+                            // bank/e-wallet notifications and holds the printer that acts on a
+                            // match. A Secondary Admin has neither — it never routes a captured
+                            // payment back to itself — so surfacing the toggle there would offer a
+                            // control with no effect on that device.
+                            if (!sessionViewModel.isSecondaryAdmin) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Payment Monitor") },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToPaymentMonitor()
+                                    }
+                                )
+                                // Inline enable/disable — the listener is opportunistic (a detected
+                                // e-wallet notification auto-matches a payment) but never something a
+                                // cashier waits on, so this toggle can live right here rather than
+                                // forcing a trip to the Payment Monitor screen just to flip it off.
+                                DropdownMenuItem(
+                                    text = { Text("Notification Listener") },
+                                    trailingIcon = {
+                                        Switch(
+                                            checked = paymentMonitorUiState.isListenerEnabled,
+                                            onCheckedChange = { paymentMonitorViewModel.toggleListener(it) },
+                                        )
+                                    },
+                                    onClick = {
+                                        paymentMonitorViewModel.toggleListener(!paymentMonitorUiState.isListenerEnabled)
+                                    }
+                                )
+                                HorizontalDivider()
+                            }
 
                             // --- Setup ---
                             // "Generate Table QR" moved into Café Management (under Tables).
@@ -402,6 +435,18 @@ fun AdminHomeScreen(
                                     onNavigateToSettings()
                                 }
                             )
+
+                            // Debug-only: Affiliate integration test panel
+                            if (com.razstudio.pos.BuildConfig.DEBUG) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Affiliate Debug") },
+                                    onClick = {
+                                        showOverflowMenu = false
+                                        onNavigateToAffiliateDebug()
+                                    }
+                                )
+                            }
 
                             HorizontalDivider()
 
@@ -490,23 +535,42 @@ fun AdminHomeScreen(
                     modifier = Modifier.fillMaxSize(),
                 ) { page ->
                     when (page) {
-                        0 -> DashboardPage()
-                        1 -> TableGrid(
-                            tableStates = tableStates,
-                            strings = strings,
-                            onTableClick = { tableState ->
-                                if (tableState.status == TableUiStatus.FREE) {
-                                    // Free table → open the tabbed new-order menu modal
-                                    tableViewModel.startOrderEntry(tableState.table.id, tableState.table.label)
-                                } else {
-                                    // Occupied table → open the receipt-style order detail
-                                    selectedTableLabel = tableState.table.label
-                                    tableViewModel.loadOrderForTable(tableState.table.id)
-                                    showOrderSheet = true
-                                }
+                        0 -> DashboardPage(
+                            affiliateProducts = affiliateProducts,
+                            onAffiliateProductClick = { product ->
+                                affiliateAdsViewModel.onClick(product)
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(product.url))
+                                context.startActivity(intent)
                             },
-                            modifier = Modifier.fillMaxSize(),
+                            onAffiliateImpression = affiliateAdsViewModel::onImpression,
                         )
+                        1 -> Column(modifier = Modifier.fillMaxSize()) {
+                            TableGrid(
+                                tableStates = tableStates,
+                                strings = strings,
+                                onTableClick = { tableState ->
+                                    if (tableState.status == TableUiStatus.FREE) {
+                                        // Free table → open the tabbed new-order menu modal
+                                        tableViewModel.startOrderEntry(tableState.table.id, tableState.table.label)
+                                    } else {
+                                        // Occupied table → open the receipt-style order detail
+                                        selectedTableLabel = tableState.table.label
+                                        tableViewModel.loadOrderForTable(tableState.table.id)
+                                        showOrderSheet = true
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                            AffiliateSection(
+                                products = affiliateProducts,
+                                onImpression = affiliateAdsViewModel::onImpression,
+                                onProductClick = { product ->
+                                    affiliateAdsViewModel.onClick(product)
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(product.url))
+                                    context.startActivity(intent)
+                                },
+                            )
+                        }
                     }
                 }
             }

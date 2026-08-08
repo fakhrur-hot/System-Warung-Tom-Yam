@@ -55,7 +55,6 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -778,14 +777,9 @@ fun OrderDetailSheet(
                 }
             }
 
-            // ── Loading indicator ─────────────────────────────────────────────────
-            if (state.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .padding(vertical = 8.dp),
-                )
-            }
+            // Progress is NOT drawn here any more — it lives in [BlockingProgressOverlay] over the
+            // whole sheet. Inside this pane it scrolled out of view on a long bill, which is
+            // exactly when a cashier most needs to know the payment is still in flight.
 
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -908,7 +902,29 @@ fun OrderDetailSheet(
                     // and for a panel that only draws what it has, a hash mismatch hiding a
                     // perfectly good code is a worse failure than showing a stale one.
                     val panelQr = remember(order.id) { PaymentQrPipeline.loadFromInternal(panelContext) }
-                    panelQr?.let { bitmap ->
+
+                    // QR or numpad, cashier's choice. Keyed on order.id so one table's keyed
+                    // tender can't linger into the next table's sheet.
+                    var showTenderPad by remember(order.id) { mutableStateOf(false) }
+                    QrNumpadToggle(
+                        showNumpad = showTenderPad,
+                        onChange = { showTenderPad = it },
+                        strings = strings,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    if (showTenderPad) {
+                        // The cash customer's mirror of the QR: key what they handed over, the
+                        // change to give back sits right under the total.
+                        CashTenderCalculator(
+                            totalSen = Math.round(order.total * 100),
+                            strings = strings,
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .widthIn(max = (configuration.screenHeightDp * 0.45f).dp),
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    } else panelQr?.let { bitmap ->
                         // Capped against the screen's HEIGHT, not the pane's width. A landscape
                         // phone is only ~400dp tall, and a code sized to fill half its width would
                         // be taller than the sheet — pushing Pay Cash, Pay QR and the split radio
@@ -1079,6 +1095,11 @@ fun OrderDetailSheet(
         val isLandscape =
             LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+        // Boxed so the busy state can be drawn OVER both pane layouts. See
+        // [BlockingProgressOverlay]: progress used to be a spinner inside the scrolling receipt
+        // pane, which a long order pushed off-screen entirely — the cashier tapped Pay and the
+        // sheet looked untouched.
+        Box(modifier = Modifier.fillMaxWidth()) {
         if (isLandscape) {
             Row(
                 modifier = Modifier
@@ -1135,6 +1156,12 @@ fun OrderDetailSheet(
                 actionsPane()
             }
         }
+
+            BlockingProgressOverlay(
+                visible = state.isLoading,
+                label = strings.processingLabel,
+            )
+        }
     }
 
     // ── Cancel confirmation dialog ────────────────────────────────────────────────
@@ -1176,17 +1203,22 @@ fun OrderDetailSheet(
                         else pendingPaymentMethod = method
                     }
                     is SplitPaymentPlanner.Plan.SliceOff -> {
-                        // Charged immediately: no prompt, no receipt for an individual share.
+                        // Charged immediately: no prompt, and **no printing at all** for a share.
                         //
-                        // This used to raise a print-confirm per share, so a group of four answered
-                        // four dialogs. The receipt question is now asked ONCE, when the bill is
-                        // finally cleared — the last payer always resolves to SettleWholeOrder (see
-                        // SplitPaymentPlanner: `takesEverything`), which routes into the ordinary
-                        // whole-bill path and its single 10s prompt.
+                        // `false` here is the whole point, not an oversight. Two earlier attempts
+                        // failed in opposite directions: prompting per share made a table of four
+                        // answer four dialogs, and printing per share silently put the payment
+                        // behind a printer — a till with none configured, or one that is off, sits
+                        // in the dispatcher's connect/timeout, so the overlay stays up and the Pay
+                        // button reads as doing nothing. Payment must never wait on paper.
                         //
-                        // The cost, stated because it is a real loss: an individual payer can no
-                        // longer walk away with a receipt for their own share. Anyone who needs one
-                        // for expenses has to be handled another way.
+                        // The cash drawer still opens: `completeSplitShare` calls
+                        // `kickCashDrawerForCashSale`, which pops the till for CASH whenever the
+                        // drawer setting is on — receipt or no receipt.
+                        //
+                        // The last share is not handled here: it resolves to SettleWholeOrder (see
+                        // SplitPaymentPlanner `takesEverything`) and keeps the ordinary whole-bill
+                        // path, including its 10s receipt prompt.
                         state.order?.let { order ->
                             val gateway = PaymentMethod.fromCode(method)?.takeIf { !it.worksOffline }
                             when {

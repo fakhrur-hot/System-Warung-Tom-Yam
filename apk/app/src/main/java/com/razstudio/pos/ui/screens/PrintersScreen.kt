@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,8 +16,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -127,6 +133,12 @@ fun PrintersScreen(
             btPermissionLauncher.launch(btPermissions)
         }
     }
+
+    // Receipt logo image picker. Device-local — see ReceiptLogoStore for why the receipt logo is
+    // its own upload and not the café's branding logo.
+    val receiptLogoPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { viewModel.pickReceiptLogo(it) } }
 
     // Show errors/success via snackbar
     LaunchedEffect(uiState.error) {
@@ -476,6 +488,80 @@ fun PrintersScreen(
                         onCheckedChange = { viewModel.updateReceiptLogo(it) },
                     )
                 }
+
+                // The logo image itself, only once the header is actually switched on — a preview
+                // of something that is not being printed is noise on an already-long screen.
+                if (uiState.receiptLogo) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(strings.receiptLogoImageLabel, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = strings.receiptLogoImageDesc,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Drawn on white, always: this bitmap is pure black-on-white and would be
+                    // invisible against a dark-theme surface. White here is the paper.
+                    uiState.receiptLogoImage?.let { bmp ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White)
+                                .padding(8.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = strings.receiptLogoImageLabel,
+                                modifier = Modifier.heightIn(max = 120.dp),
+                                contentScale = ContentScale.Fit,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    if (!uiState.receiptLogoCustom) {
+                        Text(
+                            text = strings.receiptLogoUsingBranding,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { receiptLogoPickerLauncher.launch("image/*") }) {
+                            Text(strings.receiptLogoUploadButton)
+                        }
+                        if (uiState.receiptLogoCustom) {
+                            TextButton(onClick = { viewModel.clearReceiptLogo() }) {
+                                Text(strings.receiptLogoResetButton)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(strings.receiptLogoInvertLabel)
+                            Text(
+                                text = strings.receiptLogoInvertDesc,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = uiState.receiptLogoInvert,
+                            onCheckedChange = { viewModel.setReceiptLogoInvert(it) },
+                            enabled = uiState.receiptLogoCustom,
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),

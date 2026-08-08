@@ -52,12 +52,27 @@ class GoogleBackupStatusViewModel @Inject constructor(
         val folderName: String = "",
         val message: String? = null,
         val isError: Boolean = false,
+        /**
+         * Set when the Authorization API says the `drive.appdata` scope needs an interactive
+         * consent screen. The screen launches this via `startIntentSenderForResult` and reports
+         * back through [onConsentResult] — see the class note on why this never used to happen.
+         */
+        val consentRequest: android.app.PendingIntent? = null,
     )
 
     private val _state = MutableStateFlow(
         State(account = session.account.value, folderName = currentFolderName())
     )
     val state: StateFlow<State> = _state.asStateFlow()
+
+    /**
+     * What to redo once consent is granted. `authorizeDrive` returns `NeedsConsent` with a
+     * `pendingIntent` that nobody launched — every retry re-asked the same still-unconsented
+     * scope and got `NeedsConsent` again, forever. The screen owns the launcher (a `PendingIntent`
+     * needs an Activity Result contract), so the retry itself has to live here, sent for once
+     * consent has actually been shown to the owner.
+     */
+    private var pendingRetry: (suspend (String) -> Unit)? = null
 
     private fun currentFolderName(): String =
         CafeBundleStore.folderNameFor(modeRepository.currentMode(), appConfig.cafeName())
@@ -86,91 +101,119 @@ class GoogleBackupStatusViewModel @Inject constructor(
     /** Ask Drive what it holds for this café, in this mode. */
     fun refresh(activity: Activity) {
         _state.value = _state.value.copy(busy = true, message = null, isError = false)
-        viewModelScope.launch {
-            val token = authorize(activity) ?: return@launch
-            val wanted = currentFolderName()
-            when (val listed = bundleStore.listBundles(token)) {
-                is CafeBundleStore.ListResult.Found -> {
-                    // Matched on mode AND name. An account may hold several cafés; only the one this
-                    // device is actually running counts as "backed up" here.
-                    val mine = listed.bundles.any {
-                        CafeBundleStore.folderNameFor(modeRepository.currentMode(), it.cafeName) == wanted &&
-                            it.mode == modeRepository.currentMode().name
-                    }
-                    _state.value = _state.value.copy(
-                        busy = false, driveReachable = true,
-                        bundleExists = mine, folderName = wanted,
-                    )
+        viewModelScope.launch { authorize(activity) { token -> doRefresh(token) } }
+    }
+
+    private suspend fun doRefresh(token: String) {
+        val wanted = currentFolderName()
+        when (val listed = bundleStore.listBundles(token)) {
+            is CafeBundleStore.ListResult.Found -> {
+                // Matched on mode AND name. An account may hold several cafés; only the one this
+                // device is actually running counts as "backed up" here.
+                val mine = listed.bundles.any {
+                    CafeBundleStore.folderNameFor(modeRepository.currentMode(), it.cafeName) == wanted &&
+                        it.mode == modeRepository.currentMode().name
                 }
-                is CafeBundleStore.ListResult.Failed -> _state.value = _state.value.copy(
-                    busy = false, driveReachable = false, folderName = wanted,
-                    isError = true, message = listed.reason,
+                _state.value = _state.value.copy(
+                    busy = false, driveReachable = true,
+                    bundleExists = mine, folderName = wanted,
                 )
             }
+            is CafeBundleStore.ListResult.Failed -> _state.value = _state.value.copy(
+                busy = false, driveReachable = false, folderName = wanted,
+                isError = true, message = listed.reason,
+            )
         }
     }
 
     /** Create the folder, or refresh what is already in it. */
     fun saveBundle(activity: Activity) {
         _state.value = _state.value.copy(busy = true, message = null, isError = false)
-        viewModelScope.launch {
-            val token = authorize(activity) ?: return@launch
-
-            // Fetched fresh rather than read from storage: it is minted by the backend and this
-            // device may never have held one. A café that cannot supply it still backs up — the rest
-            // of the bundle still spares the owner the whole wizard.
-            val recoveryQr = when (val r = backend.getRecoveryToken()) {
-                is ApiResult.Success -> r.data.url
-                else -> ""
-            }
-
-            val payload = CafeConfigPayload(
-                mode = modeRepository.currentMode(),
-                cafeName = appConfig.cafeName(),
-                supabaseUrl = appConfig.supabaseUrl(),
-                supabaseAnonKey = appConfig.supabaseAnonKey(),
-                websiteUrl = appConfig.websiteUrl(),
-                ownerRecoveryQr = recoveryQr,
-                // The café's own site IS the Cloudflare Pages domain — the backend builds the owner
-                // QR as "${WEBSITE_ORIGIN}/join?recover=…", so it is already known and needs nobody
-                // to type it. No API token is stored: the app never calls Cloudflare, and a token
-                // that can edit DNS sitting in a Drive file would be a risk bought for nothing.
-                cloudflareDomain = appConfig.websiteUrl(),
-                setupData = setupDataJson(),
-                savedAtMs = System.currentTimeMillis(),
-                savedByDevice = android.os.Build.MODEL ?: "",
-            )
-
-            val failure = bundleStore.save(token, payload, imageStore.allFiles())
-            _state.value = _state.value.copy(
-                busy = false,
-                driveReachable = failure == null,
-                bundleExists = failure == null || _state.value.bundleExists,
-                folderName = currentFolderName(),
-                isError = failure != null,
-                message = failure ?: "Saved. A new phone can restore this café by signing in.",
-            )
-        }
+        viewModelScope.launch { authorize(activity) { token -> doSaveBundle(token) } }
     }
 
-    private suspend fun authorize(activity: Activity): String? =
+    private suspend fun doSaveBundle(token: String) {
+        // Fetched fresh rather than read from storage: it is minted by the backend and this
+        // device may never have held one. A café that cannot supply it still backs up — the rest
+        // of the bundle still spares the owner the whole wizard.
+        val recoveryQr = when (val r = backend.getRecoveryToken()) {
+            is ApiResult.Success -> r.data.url
+            else -> ""
+        }
+
+        val payload = CafeConfigPayload(
+            mode = modeRepository.currentMode(),
+            cafeName = appConfig.cafeName(),
+            supabaseUrl = appConfig.supabaseUrl(),
+            supabaseAnonKey = appConfig.supabaseAnonKey(),
+            websiteUrl = appConfig.websiteUrl(),
+            ownerRecoveryQr = recoveryQr,
+            // The café's own site IS the Cloudflare Pages domain — the backend builds the owner
+            // QR as "${WEBSITE_ORIGIN}/join?recover=…", so it is already known and needs nobody
+            // to type it. No API token is stored: the app never calls Cloudflare, and a token
+            // that can edit DNS sitting in a Drive file would be a risk bought for nothing.
+            cloudflareDomain = appConfig.websiteUrl(),
+            setupData = setupDataJson(),
+            savedAtMs = System.currentTimeMillis(),
+            savedByDevice = android.os.Build.MODEL ?: "",
+        )
+
+        val failure = bundleStore.save(token, payload, imageStore.allFiles())
+        _state.value = _state.value.copy(
+            busy = false,
+            driveReachable = failure == null,
+            bundleExists = failure == null || _state.value.bundleExists,
+            folderName = currentFolderName(),
+            isError = failure != null,
+            message = failure ?: "Saved. A new phone can restore this café by signing in.",
+        )
+    }
+
+    private suspend fun authorize(activity: Activity, onGranted: suspend (String) -> Unit) {
         when (val auth = bundleStore.authorizeDrive(activity)) {
-            is CafeBundleStore.AuthResult.Granted -> auth.accessToken
+            is CafeBundleStore.AuthResult.Granted -> onGranted(auth.accessToken)
             is CafeBundleStore.AuthResult.NeedsConsent -> {
-                _state.value = _state.value.copy(
-                    busy = false, isError = true,
-                    message = "Google needs your permission first. Tap again and allow access.",
-                )
-                null
+                pendingRetry = onGranted
+                _state.value = _state.value.copy(busy = false, consentRequest = auth.pendingIntent)
             }
             is CafeBundleStore.AuthResult.Failed -> {
                 _state.value = _state.value.copy(
                     busy = false, isError = true,
                     message = "Couldn't get permission for Google Drive.",
                 )
-                null
             }
         }
+    }
+
+    /**
+     * The screen calls this after showing [State.consentRequest] and getting a result back.
+     *
+     * A granted consent screen does not itself hand back an access token — the original
+     * `authorize` call already returned, so the retry re-asks the Authorization API, which now
+     * succeeds because the scope is actually consented, and resumes whatever the owner pressed.
+     */
+    fun onConsentResult(granted: Boolean, activity: Activity) {
+        val retry = pendingRetry
+        pendingRetry = null
+        _state.value = _state.value.copy(consentRequest = null)
+        if (!granted || retry == null) {
+            _state.value = _state.value.copy(
+                busy = false, isError = true,
+                message = "Google Drive access wasn't granted.",
+            )
+            return
+        }
+        _state.value = _state.value.copy(busy = true)
+        viewModelScope.launch {
+            when (val auth = bundleStore.authorizeDrive(activity)) {
+                is CafeBundleStore.AuthResult.Granted -> retry(auth.accessToken)
+                else -> _state.value = _state.value.copy(
+                    busy = false, isError = true,
+                    message = "Still couldn't get permission for Google Drive.",
+                )
+            }
+        }
+    }
 
     /** The café's setup, with the trading history emptied — see `CafeConfigPayload.setupData`. */
     private suspend fun setupDataJson(): String = try {

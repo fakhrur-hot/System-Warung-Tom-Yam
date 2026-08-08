@@ -81,6 +81,9 @@ interface BackendGateway {
         items: List<NewOrderItem>,
         source: String = "STAFF",
         orderNumber: Int? = null,
+        /** A split share settles one customer's slice while the table's main order stays open —
+         *  the two orders coexist by design. Staff/admin only; see migration 0016. */
+        splitShare: Boolean = false,
     ): ApiResult<CreateOrderResponse>
     suspend fun getOrdersSince(since: String): ApiResult<OrdersSyncResponse>
     suspend fun sendToKitchen(orderId: String, sessionNumber: Int? = null): ApiResult<KitchenResponse>
@@ -98,7 +101,11 @@ interface BackendGateway {
     suspend fun cancelOrder(orderId: String, reason: String, cancelledBy: String): ApiResult<Unit>
 
     // ── Orders - ordering staff (separate credential, server-enforced RBAC) ───────
-    suspend fun createOrderAsStaff(tableId: String, items: List<NewOrderItem>): ApiResult<CreateOrderResponse>
+    suspend fun createOrderAsStaff(
+        tableId: String,
+        items: List<NewOrderItem>,
+        splitShare: Boolean = false,
+    ): ApiResult<CreateOrderResponse>
     suspend fun getOrdersSinceAsStaff(since: String): ApiResult<OrdersSyncResponse>
     suspend fun sendToKitchenAsStaff(orderId: String, sessionNumber: Int? = null): ApiResult<KitchenResponse>
     suspend fun addItemsToOrderAsStaff(orderId: String, items: List<NewOrderItem>): ApiResult<OrderDto>

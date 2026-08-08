@@ -51,8 +51,11 @@ class QrPdfViewModel @Inject constructor(
     val uiState: StateFlow<QrPdfUiState> = _uiState.asStateFlow()
 
     init {
-        // Header logo defaults to the bundled built-in logo (res/raw/qr_default_logo).
-        _uiState.value = _uiState.value.copy(logoPreview = loadDefaultLogo())
+        // Header logo: a logo picked specifically here (persisted, see pickLogo), else the café's
+        // branding logo, else the bundled built-in logo (res/raw/qr_default_logo).
+        _uiState.value = _uiState.value.copy(
+            logoPreview = LogoPipeline.loadQrLogoFromInternal(context) ?: loadDefaultLogo()
+        )
         // Café name comes from the live backend branding (single source of truth); it's the
         // header in "text only" mode and the PDF file name. Not editable here — it's set in
         // Settings → Branding.
@@ -74,11 +77,23 @@ class QrPdfViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(headerMode = mode)
     }
 
-    /** Pick a logo image (jpg/png); decoded and downscaled so its longest side is ≤ 1024 px. */
+    /**
+     * Pick a logo image (jpg/png); decoded and downscaled so its longest side is ≤ 1024 px, and
+     * persisted so it is still here the next time this screen opens or the PDF is regenerated —
+     * previously this only lived in the ViewModel's own state and vanished the moment the admin
+     * left the screen (Hilt scopes this ViewModel to the screen's own nav back-stack entry).
+     */
     fun pickLogo(uri: Uri) {
         viewModelScope.launch {
             val bmp = withContext(Dispatchers.IO) { decodeAndResize(uri, MAX_LOGO_PX) }
             if (bmp != null) {
+                withContext(Dispatchers.IO) {
+                    val bytes = java.io.ByteArrayOutputStream().use { out ->
+                        bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                        out.toByteArray()
+                    }
+                    LogoPipeline.saveQrLogoToInternal(context, bytes)
+                }
                 _uiState.value = _uiState.value.copy(logoPreview = bmp, headerMode = QrHeaderMode.LOGO)
             } else {
                 _uiState.value = _uiState.value.copy(error = str().failedToGeneratePdf)
@@ -86,8 +101,9 @@ class QrPdfViewModel @Inject constructor(
         }
     }
 
-    /** Reset the header logo back to the bundled built-in logo. */
+    /** Reset the header logo back to the café's branding logo (or the bundled built-in logo). */
     fun resetLogo() {
+        LogoPipeline.clearQrLogoFromInternal(context)
         _uiState.value = _uiState.value.copy(logoPreview = loadDefaultLogo())
     }
 

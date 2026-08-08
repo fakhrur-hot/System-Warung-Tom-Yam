@@ -1,6 +1,8 @@
 package com.razstudio.pos.ui.viewmodels
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.razstudio.pos.data.local.PaperWidth
@@ -12,6 +14,9 @@ import com.razstudio.pos.data.local.SunmiInnerPrinter
 import com.razstudio.pos.data.local.DrawerKick
 import com.razstudio.pos.printing.PrinterConnectionManager
 import com.razstudio.pos.printing.PrinterDispatcher
+import com.razstudio.pos.printing.ReceiptLogoStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.razstudio.pos.ui.i18n.LanguageManager
 import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.util.BluetoothHelper
@@ -63,6 +68,86 @@ class PrintersViewModel @Inject constructor(
         )
     )
     val uiState: StateFlow<PrintersUiState> = _uiState.asStateFlow()
+
+    init {
+        refreshReceiptLogoPreview()
+    }
+
+    // ── Receipt logo image (device-local) ────────────────────────────────────────────────────
+
+    /**
+     * The dot width the receipt logo should be prepared for: this device's active printer, or a
+     * 58mm head if nothing is configured yet — that being the overwhelmingly common case at this
+     * price point, and the narrower of the two, so a logo prepared for it is never too wide.
+     */
+    private fun receiptDotWidth(): Int =
+        printers.value.firstOrNull { it.isActive }?.paperWidth?.pixelWidth
+            ?: PaperWidth.FIFTY_EIGHT_MM.pixelWidth
+
+    /**
+     * Re-derive the preview from whatever the print path would use right now.
+     *
+     * Deliberately shows the *effective* logo — including the branding/bundled fallback when this
+     * device has no logo of its own — because the question the operator is asking is "what comes
+     * out of the printer", not "what did I upload".
+     */
+    private fun refreshReceiptLogoPreview() {
+        viewModelScope.launch {
+            val custom = ReceiptLogoStore.exists(appContext)
+            val invert = printSettingsStore.getReceiptLogoInvert()
+            val preview = withContext(Dispatchers.IO) {
+                ReceiptLogoStore.effectiveLogo(appContext, receiptDotWidth(), invert)
+            }
+            _uiState.value = _uiState.value.copy(
+                receiptLogoImage = preview,
+                receiptLogoInvert = invert,
+                receiptLogoCustom = custom,
+            )
+        }
+    }
+
+    /** Store a picked image as this device's receipt logo and show what it will print as. */
+    fun pickReceiptLogo(uri: Uri) {
+        viewModelScope.launch {
+            val prepared: Pair<Boolean, Bitmap>? = withContext(Dispatchers.IO) {
+                val source = ReceiptLogoStore.saveSourceFromUri(appContext, uri)
+                if (source == null) {
+                    null
+                } else {
+                    // Default the invert switch from the image itself. A light-on-dark wordmark
+                    // needs it, and making the operator work that out from a printed sample costs
+                    // them paper and a service interruption to find out.
+                    val invert = ReceiptLogoStore.isDarkDominant(source)
+                    val preview = ReceiptLogoStore.prepare(source, receiptDotWidth(), invert)
+                    source.recycle()
+                    invert to preview
+                }
+            }
+            if (prepared == null) {
+                _uiState.value = _uiState.value.copy(error = str().receiptLogoLoadFailed)
+                return@launch
+            }
+            printSettingsStore.setReceiptLogoInvert(prepared.first)
+            _uiState.value = _uiState.value.copy(
+                receiptLogoImage = prepared.second,
+                receiptLogoInvert = prepared.first,
+                receiptLogoCustom = true,
+            )
+        }
+    }
+
+    /** Drop this device's receipt logo; receipts fall back to the branding/bundled logo. */
+    fun clearReceiptLogo() {
+        ReceiptLogoStore.clear(appContext)
+        printSettingsStore.setReceiptLogoInvert(false)
+        refreshReceiptLogoPreview()
+    }
+
+    /** Flip the receipt logo's polarity and re-render the preview from the stored source. */
+    fun setReceiptLogoInvert(enabled: Boolean) {
+        printSettingsStore.setReceiptLogoInvert(enabled)
+        refreshReceiptLogoPreview()
+    }
 
     /** Switch the Bluetooth connection strategy (fast persistent vs eco). */
     fun setKeepAliveMode(mode: String) {
@@ -401,6 +486,11 @@ data class PrintersUiState(
     // Receipt-image settings (moved here from AdminSettingsScreen, Printing & Hardware)
     val receiptLogo: Boolean = false,
     val escAsteriskMode: Boolean = true,
+    // The receipt logo exactly as it will print — 1-bit, already scaled to the head width.
+    val receiptLogoImage: Bitmap? = null,
+    // True when this device has its own logo; false means the preview is the branding fallback.
+    val receiptLogoCustom: Boolean = false,
+    val receiptLogoInvert: Boolean = false,
     // Receipt paper auto-cut (moved from Devices & Hardware)
     val receiptAutoCut: Boolean = true,
     val error: String? = null,

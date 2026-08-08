@@ -85,6 +85,13 @@
     <!-- Notification permission (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Vibration: the payment-received alert buzzes the till so a cashier facing away from the
+         screen still notices a customer has paid (PaymentAlertHandler). Without this declared the
+         vibrate() call is a silent no-op, so the alert was half-working — sound but no haptic —
+         with nothing in the logs to say why. A normal permission: granted at install, never
+         prompted for at runtime. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
     <!-- Location: GPS lock for café attendance and geofencing -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -122,6 +129,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
             android:theme="@style/Theme.WarungTomYam">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

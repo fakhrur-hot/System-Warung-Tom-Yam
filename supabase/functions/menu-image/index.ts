@@ -6,7 +6,7 @@
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { handleCors } from "../_shared/cors.ts";
-import { verifyAdminToken } from "../_shared/auth.ts";
+import { verifyAdminToken, verifyOperatorToken } from "../_shared/auth.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
 import { errorResponse, jsonResponse } from "../_shared/errors.ts";
 
@@ -23,7 +23,7 @@ serve(async (req) => {
     return errorResponse(405, "METHOD_NOT_ALLOWED", "Only POST and DELETE are supported");
   }
 
-  const admin = await verifyAdminToken(req);
+  const admin = await verifyAdminToken(req) ?? await verifyOperatorToken(req);
   if (!admin) {
     return errorResponse(401, "UNAUTHORIZED", "Admin token required");
   }
@@ -80,7 +80,7 @@ serve(async (req) => {
 
 // ── DELETE /api/menu-image — admin: remove a superseded image by storage path ──
 async function handleDeleteImage(req: Request): Promise<Response> {
-  const admin = await verifyAdminToken(req);
+  const admin = await verifyAdminToken(req) ?? await verifyOperatorToken(req);
   if (!admin) {
     return errorResponse(401, "UNAUTHORIZED", "Admin token required");
   }

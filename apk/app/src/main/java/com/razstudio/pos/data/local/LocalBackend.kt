@@ -578,12 +578,30 @@ class LocalBackend @Inject constructor(
         items: List<NewOrderItem>,
         source: String,
         orderNumber: Int?,
+        // LAN never enforced one-active-order-per-table in the first place (createOrder always
+        // inserts a fresh row, unconditionally) — nothing here needs bypassing, so the flag is
+        // accepted only to satisfy the BackendGateway contract shared with the Cloud client.
+        @Suppress("UNUSED_PARAMETER") splitShare: Boolean,
     ): ApiResult<CreateOrderResponse> {
         val orderId = UUID.randomUUID().toString()
         val now = nowTimestamp()
         val menuIndex = menuDao.getAll().associateBy { it.id }
-        val orderItems = items.map { it.toEntity(orderId, menuIndex, sessionNumber = 1) }
+
+        // Staff-originated orders (including split shares) are always confirmed — the cashier
+        // who created them IS the confirmation. Only customer-submitted orders respect the
+        // customerOrderAutoPrint setting (hold for cashier review when disabled). Decided before
+        // the item lines are built so the order's status and every one of its lines agree on
+        // whether the kitchen already has them — a line left "not sent" on an order already
+        // marked SENT_TO_KITCHEN would sit in the Pending Kitchen Prints queue forever.
+        val settings = settingsDao.get() ?: SystemSettings()
+        val effectiveAutoPrint = source == "STAFF" || settings.customerOrderAutoPrint
+        val status = if (effectiveAutoPrint) OrderStatus.SENT_TO_KITCHEN else OrderStatus.RECEIVED
+
+        val orderItems = items.map {
+            it.toEntity(orderId, menuIndex, sessionNumber = 1, sentToKitchen = effectiveAutoPrint)
+        }
         val total = orderItems.sumOf { it.unitPriceSnapshot * it.quantity }
+
         orderDao.insertOrder(
             Order(
                 id = orderId,
@@ -592,15 +610,15 @@ class LocalBackend @Inject constructor(
                 // read-and-increment stays atomic. Null in every mode that has tables.
                 orderNumber = orderNumber,
                 source = source,
-                status = OrderStatus.RECEIVED,
+                status = status,
                 total = total,
                 createdAt = now,
             )
         )
         orderDao.insertOrderItems(orderItems)
-        pushOrderChanged(orderId, OrderStatus.RECEIVED.name, tableId = tableId, total = total)
+        pushOrderChanged(orderId, status.name, tableId = tableId, total = total)
         return ApiResult.Success(
-            CreateOrderResponse(orderId = orderId, total = total, status = "RECEIVED")
+            CreateOrderResponse(orderId = orderId, total = total, status = status.name)
         )
     }
 
@@ -869,7 +887,8 @@ class LocalBackend @Inject constructor(
     override suspend fun createOrderAsStaff(
         tableId: String,
         items: List<NewOrderItem>,
-    ): ApiResult<CreateOrderResponse> = createOrder(tableId, items, source = "STAFF")
+        splitShare: Boolean,
+    ): ApiResult<CreateOrderResponse> = createOrder(tableId, items, source = "STAFF", splitShare = splitShare)
 
     /**
      * Fetch orders since a timestamp for an ordering-staff (Client) device.
@@ -1266,6 +1285,7 @@ class LocalBackend @Inject constructor(
         orderId: String,
         menuIndex: Map<String, MenuItem>,
         sessionNumber: Int,
+        sentToKitchen: Boolean = false,
     ): OrderItem {
         val menu = menuIndex[menuItemId]
         // A custom charge has no menu row to price from — the cashier typed both the name and the
@@ -1283,7 +1303,7 @@ class LocalBackend @Inject constructor(
             categorySnapshot = menu?.category ?: "",
             quantity = quantity,
             note = note,
-            sentToKitchen = false,
+            sentToKitchen = sentToKitchen,
             sessionNumber = sessionNumber,
         )
     }

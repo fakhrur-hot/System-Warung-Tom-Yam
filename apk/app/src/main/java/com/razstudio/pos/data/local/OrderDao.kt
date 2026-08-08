@@ -216,6 +216,25 @@ interface OrderDao {
     @Query("SELECT * FROM order_items WHERE orderId IN (:orderIds)")
     suspend fun getItemsForOrders(orderIds: List<String>): List<OrderItem>
 
+    /**
+     * Split shares already settled in the CURRENT table session: completed orders on the same
+     * table, created at or after the session's original order, excluding that original itself.
+     *
+     * `createdAt >= :sessionStart` is what scopes this to one sitting without a schema flag —
+     * a share is by construction created *during* its session, and any order completed on this
+     * table in an earlier sitting predates the current original by definition (that sitting had
+     * to end before this one could begin). ISO-8601 strings compare correctly as text.
+     */
+    @Query(
+        "SELECT * FROM orders WHERE tableId = :tableId AND status = 'COMPLETED' " +
+            "AND createdAt >= :sessionStart AND id != :excludeOrderId ORDER BY createdAt ASC"
+    )
+    suspend fun getCompletedSessionShares(
+        tableId: String,
+        sessionStart: String,
+        excludeOrderId: String,
+    ): List<Order>
+
     // --- Dashboard live queries ------------------------------------------------
 
     /** Completed revenue grouped by hour (0–23) for a date range. Used by the live dashboard. */

@@ -238,6 +238,11 @@ class BillHistoryViewModel @Inject constructor(
                     // silently drops the one number a customer disputing a charge needs. Cash and
                     // static QR have no gateway leg and correctly resolve to null. (9.1)
                     gatewayTransactionId = gatewayTransactionIdFor(detail.order.id, method),
+                    // A reprint must never pop the till. The money was taken when the bill was
+                    // originally settled; opening the drawer again for a cash bill from earlier in
+                    // the day is an unexplained open on the audit trail and hands anyone holding an
+                    // old receipt a way to make the till spring open.
+                    openDrawer = false,
                 )
                 _uiState.value = _uiState.value.copy(
                     selected = _uiState.value.selected?.copy(isReprinting = false),

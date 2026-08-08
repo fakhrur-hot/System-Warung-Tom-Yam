@@ -67,19 +67,53 @@ export function withSubId(href: string, subId?: string): string {
   }
 }
 
+const ROTATION_STORAGE_KEY = 'shopee_rotation_cursor'
+
+/** Set once the first slot on a page reads it, so every later slot on the same page agrees. */
+let cachedRotationOffset: number | null = null
+
+/**
+ * This page load's rotation offset — round-robin, not random.
+ *
+ * A random offset per mount (the previous design) can show the same product several visits in a
+ * row by chance, and never guarantees the catalog's tail ever gets shown at all. This instead
+ * reads a cursor from `localStorage`, hands it out, and advances it by one, so the NEXT page load
+ * on this browser picks up exactly where this one left off — every product gets its turn before
+ * any repeats. Mirrors the Android app's `AffiliateAdsViewModel.rotationOffset`, which is the same
+ * wrap-around cursor kept in memory across a table grid's own redraws.
+ *
+ * Cached per module load rather than re-read per call: two slots on one page must agree on the
+ * base offset (their own `slotIndex` is what keeps them from showing the same item), not each
+ * advance the cursor independently and skip products.
+ *
+ * Falls back to a one-off random value when storage throws (private browsing, or a test
+ * environment with no `window`) — still varies the product, just without persisting the cycle.
+ */
+function rotationOffsetForThisLoad(): number {
+  if (cachedRotationOffset !== null) return cachedRotationOffset
+  try {
+    const stored = Number(window.localStorage.getItem(ROTATION_STORAGE_KEY))
+    const current = Number.isFinite(stored) ? stored : 0
+    window.localStorage.setItem(ROTATION_STORAGE_KEY, String(current + 1))
+    cachedRotationOffset = current
+  } catch {
+    cachedRotationOffset = Math.floor(Math.random() * 1000)
+  }
+  return cachedRotationOffset
+}
+
 /**
  * Which product a given slot shows.
  *
- * Rotation is **per mount and per slot index**, not on a timer. A timer was the obvious design and
- * is the wrong one here: the banner is a tap target inside a menu the customer is actively
- * scrolling, and swapping it under their finger produces exactly the accidental clicks that ad
- * placement policies exist to prevent — and an accidental tap here navigates a customer away
- * mid-order. Per-mount rotation still varies the product every page load, and the index offset
- * means two slots on one page never show the same item.
+ * Not on a timer. A timer was the obvious design and is the wrong one here: the banner is a tap
+ * target inside a menu the customer is actively scrolling, and swapping it under their finger
+ * produces exactly the accidental clicks that ad placement policies exist to prevent — and an
+ * accidental tap here navigates a customer away mid-order. Rotation instead advances once per page
+ * load (see [rotationOffsetForThisLoad]), and the slot index means two slots on one page never
+ * show the same item.
  */
 export function pickProduct(products: ShopeeProduct[], slotIndex: number): ShopeeProduct {
-  // A per-session offset so a returning customer does not always meet the same first product.
-  const offset = Math.floor(Math.random() * products.length)
+  const offset = rotationOffsetForThisLoad()
   return products[(offset + slotIndex) % products.length]
 }
 

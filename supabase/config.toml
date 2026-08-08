@@ -473,6 +473,15 @@ verify_jwt = false
 [functions.orders-items]
 verify_jwt = false
 
+# Every function here authenticates by its own device token, never a Supabase JWT, so the gateway's
+# JWT check must be off or it rejects the call with 401 before the function runs. This entry was
+# missing, so `orders-items-void` deployed with the default (true) — and because it is the last call
+# of a split payment (shrinking the original bill after the share is charged), the share was taken
+# and the app then signed itself out: ApiClient treats a 401 on an admin Bearer call as a revoked
+# session. Undeclared is not "default false"; it is this bug waiting for the next deploy.
+[functions.orders-items-void]
+verify_jwt = false
+
 [functions.orders-kitchen]
 verify_jwt = false
 

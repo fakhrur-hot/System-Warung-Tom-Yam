@@ -1,5 +1,7 @@
 package com.razstudio.pos.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -59,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.razstudio.pos.data.local.MenuCategory
@@ -67,6 +70,8 @@ import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.UiStrings
 import com.razstudio.pos.ui.i18n.AppLanguage
 import com.razstudio.pos.ui.i18n.uiStrings
+import com.razstudio.pos.ui.tableview.AffiliateBanner
+import com.razstudio.pos.ui.viewmodels.AffiliateAdsViewModel
 import com.razstudio.pos.ui.viewmodels.ManualDineInViewModel
 
 /**
@@ -298,6 +303,13 @@ private fun MenuItemsList(
     var query by remember { mutableStateOf("") }
     val visibleItems = menuItems.filter { it.matches(query) }
 
+    // One compact affiliate banner every 6 menu rows (Requirement: same landscape-style banner
+    // used on the home table view, not the larger square tile). Renders nothing when the catalog
+    // has no products, same silent-empty convention as every other affiliate placement.
+    val affiliateAdsViewModel: AffiliateAdsViewModel = hiltViewModel()
+    val affiliateProducts by affiliateAdsViewModel.products.collectAsState()
+    val context = LocalContext.current
+
     // Group into separate category sections. Categories are dynamic (driven by the menu),
     // so custom preset categories like "SAYUR" appear in the order they occur in the menu.
     // An item appears under each of its allCategories() (primary + "also show in" extras),
@@ -328,6 +340,9 @@ private fun MenuItemsList(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxSize()
     ) {
+        // Counts menu rows across the whole scroll (not reset per category) so the ad cadence is
+        // "every 6th menu row", matching how it reads while scrolling continuously through tabs.
+        var menuRowsShown = 0
         orderedCategories.forEach { category ->
             val itemsInCategory = grouped[category].orEmpty()
 
@@ -341,7 +356,8 @@ private fun MenuItemsList(
                 )
             }
 
-            items(itemsInCategory, key = { it.id }) { item ->
+            itemsInCategory.forEach { item ->
+            item(key = item.id) {
                 // The plain (no-size) quantity — the stepper only applies to non-variable items.
                 val cartQty = cartItems.find { it.menuItemId == item.id && it.size == null }?.quantity ?: 0
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -447,6 +463,25 @@ private fun MenuItemsList(
                         }
                     }
                 }
+            }
+
+            menuRowsShown++
+            if (menuRowsShown % 6 == 0 && affiliateProducts.isNotEmpty()) {
+                val bannerIndex = (menuRowsShown / 6 - 1) % affiliateProducts.size
+                val product = affiliateProducts[bannerIndex]
+                item(key = "affiliate_ad_$menuRowsShown") {
+                    LaunchedEffect(product.id) { affiliateAdsViewModel.onImpression(product) }
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        AffiliateBanner(
+                            product = product,
+                            onClick = {
+                                affiliateAdsViewModel.onClick(product)
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(product.url)))
+                            },
+                        )
+                    }
+                }
+            }
             }
         }
     }

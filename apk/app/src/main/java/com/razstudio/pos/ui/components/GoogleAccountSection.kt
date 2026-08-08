@@ -1,6 +1,9 @@
 package com.razstudio.pos.ui.components
 
 import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -58,6 +62,20 @@ fun GoogleAccountSection(
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
     val activity = LocalContext.current as? Activity
+
+    // Launches the system consent screen the Authorization API hands back for `drive.appdata`.
+    // Without this, `NeedsConsent` had nothing showing it and every retry re-asked the same
+    // still-unconsented scope forever — see GoogleBackupStatusViewModel's class note.
+    val consentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        activity?.let { viewModel.onConsentResult(result.resultCode == Activity.RESULT_OK, it) }
+    }
+    LaunchedEffect(state.consentRequest) {
+        state.consentRequest?.let { pending ->
+            consentLauncher.launch(IntentSenderRequest.Builder(pending.intentSender).build())
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(

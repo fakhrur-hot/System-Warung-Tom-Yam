@@ -13,6 +13,8 @@ import com.razstudio.pos.data.local.MIGRATION_16_17
 import com.razstudio.pos.data.local.MIGRATION_17_18
 import com.razstudio.pos.data.local.MIGRATION_18_19
 import com.razstudio.pos.data.local.MIGRATION_19_20
+import com.razstudio.pos.data.local.MIGRATION_20_21
+import com.razstudio.pos.data.local.MIGRATION_21_22
 import com.razstudio.pos.data.local.MIGRATION_8_9
 import com.razstudio.pos.data.local.MIGRATION_9_10
 import com.razstudio.pos.data.local.CashDrawerEventDao
@@ -30,6 +32,7 @@ import com.razstudio.pos.data.local.PrinterConfigDao
 import com.razstudio.pos.data.local.SettingsDao
 import com.razstudio.pos.data.local.TableDao
 import com.razstudio.pos.notification.CapturedPaymentDao
+import com.razstudio.pos.data.promos.AffiliateProductDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -68,6 +71,8 @@ object DatabaseModule {
                 MIGRATION_17_18,
                 MIGRATION_18_19,
                 MIGRATION_19_20,
+                MIGRATION_20_21,
+                MIGRATION_21_22,
             )
             .build()
     }
@@ -145,5 +150,10 @@ object DatabaseModule {
     @Provides
     fun provideCapturedPaymentDao(database: AppDatabase): CapturedPaymentDao {
         return database.capturedPaymentDao()
+    }
+
+    @Provides
+    fun provideAffiliateProductDao(database: AppDatabase): AffiliateProductDao {
+        return database.affiliateProductDao()
     }
 }

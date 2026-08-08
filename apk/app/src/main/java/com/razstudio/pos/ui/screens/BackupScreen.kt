@@ -2,6 +2,7 @@ package com.razstudio.pos.ui.screens
 
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -331,6 +332,20 @@ private fun CafeBundleCard(
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
     val activity = LocalContext.current as? android.app.Activity
+
+    // Launches the system consent screen the Authorization API hands back for `drive.appdata` —
+    // see GoogleBackupStatusViewModel's class note on why NeedsConsent used to be a dead end.
+    val consentRequest by viewModel.consentRequest.collectAsState()
+    val consentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        activity?.let { viewModel.onConsentResult(result.resultCode == android.app.Activity.RESULT_OK, it) }
+    }
+    LaunchedEffect(consentRequest) {
+        consentRequest?.let { pending ->
+            consentLauncher.launch(IntentSenderRequest.Builder(pending.intentSender).build())
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),

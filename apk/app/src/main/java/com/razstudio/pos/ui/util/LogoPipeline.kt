@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
@@ -26,6 +27,7 @@ object LogoPipeline {
     private const val PRINT_MAX_WIDTH = 384            // 58mm printer width in pixels
     private const val MONO_FILENAME = "print_logo.bin"
     private const val JPEG_FILENAME = "custom_logo.jpg"
+    private const val QR_LOGO_FILENAME = "qr_card_logo.jpg"
 
     /**
      * Result of the logo pipeline processing.
@@ -53,8 +55,24 @@ object LogoPipeline {
     fun process(context: Context, imageUri: Uri): LogoResult? {
         // 1. Decode bitmap
         val inputStream = context.contentResolver.openInputStream(imageUri) ?: return null
-        val original = BitmapFactory.decodeStream(inputStream) ?: return null
+        val decoded = BitmapFactory.decodeStream(inputStream) ?: return null
         inputStream.close()
+
+        // 1b. Flatten transparency onto white before anything else touches the image.
+        //
+        // JPEG has no alpha channel, and Android's encoder does not composite — it drops alpha and
+        // writes the stored RGB. A premultiplied transparent pixel is stored as 0x00000000, so it
+        // encodes as pure BLACK. Every logo uploaded with a cut-out background therefore came out
+        // of this pipeline as a solid black square: on the customer website, and — via
+        // `custom_logo.jpg` — as the receipt header, where a thermal head rendered it as a slab of
+        // ink banded by the print head's own duty cycle.
+        //
+        // Nothing downstream could recover it, because the alpha was already gone on disk. This is
+        // the same defect DantSu's own library carries (ESCPOS-ThermalPrinter-Android issue #332,
+        // "transparent print is black") one layer further on, and the fix is the same: composite
+        // onto white first, once, at the point the alpha still exists.
+        val original = flattenOntoWhite(decoded)
+        decoded.recycle()
 
         // 2. Center crop to square
         val square = centerCropSquare(original)
@@ -91,6 +109,19 @@ object LogoPipeline {
         val x = (source.width - size) / 2
         val y = (source.height - size) / 2
         return Bitmap.createBitmap(source, x, y, size, size)
+    }
+
+    /**
+     * Composite onto white so no transparent pixel can later be read as black. See the note in
+     * [process] for why this has to happen before the JPEG step rather than after it.
+     */
+    private fun flattenOntoWhite(source: Bitmap): Bitmap {
+        val flat = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+        Canvas(flat).apply {
+            drawColor(Color.WHITE)
+            drawBitmap(source, 0f, 0f, null)
+        }
+        return flat
     }
 
     /**
@@ -273,5 +304,36 @@ object LogoPipeline {
         if (file.exists()) BitmapFactory.decodeFile(file.absolutePath) else null
     } catch (e: Exception) {
         null
+    }
+
+    /**
+     * Persist a logo picked specifically for the printable table-QR cards, distinct from the
+     * café-wide branding logo ([saveJpegToInternal]). Generate Table QR previously kept the picked
+     * bitmap only in the screen's ViewModel state, so it vanished the moment the admin left the
+     * screen or regenerated the PDF a second time — this is what makes that pick stick.
+     */
+    fun saveQrLogoToInternal(context: Context, jpegBytes: ByteArray) {
+        try {
+            File(context.filesDir, QR_LOGO_FILENAME).writeBytes(jpegBytes)
+        } catch (e: Exception) {
+            // Non-fatal: the PDF just falls back to the branding logo / bundled default.
+        }
+    }
+
+    /** The QR-card-specific logo, if one was ever picked — see [saveQrLogoToInternal]. */
+    fun loadQrLogoFromInternal(context: Context): Bitmap? = try {
+        val file = File(context.filesDir, QR_LOGO_FILENAME)
+        if (file.exists()) BitmapFactory.decodeFile(file.absolutePath) else null
+    } catch (e: Exception) {
+        null
+    }
+
+    /** Drop the QR-card-specific logo so the screen falls back to branding / the bundled default. */
+    fun clearQrLogoFromInternal(context: Context) {
+        try {
+            File(context.filesDir, QR_LOGO_FILENAME).delete()
+        } catch (e: Exception) {
+            // Non-fatal: worst case the stale file lingers and keeps being used until overwritten.
+        }
     }
 }

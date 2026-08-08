@@ -138,20 +138,20 @@ class LocalBackendOrderLifecycleTest {
         val id = newOrder()
 
         // Created, priced from the menu snapshot: 8.00 + (3.00 x 2).
+        // Staff orders are immediately SENT_TO_KITCHEN — the cashier IS the confirmation.
         val created = db.orderDao().getOrderById(id)!!
-        assertEquals(OrderStatus.RECEIVED, created.status)
+        assertEquals(OrderStatus.SENT_TO_KITCHEN, created.status)
         assertEquals(14.0, created.total, 0.001)
 
-        // Sent to the kitchen — round 1's lines are marked and returned to print.
-        val kitchen = backend.sendToKitchen(id, sessionNumber = 1)
-        assertTrue(kitchen is ApiResult.Success)
-        assertEquals(2, (kitchen as ApiResult.Success).data.linesToPrint.size)
+        // The item lines must agree with the order status: a line still flagged "not sent" on an
+        // order already marked SENT_TO_KITCHEN would sit in the Pending Kitchen Prints queue
+        // forever, with nothing left to call sendToKitchen() on it.
         assertTrue(
-            "the round must be recorded as sent, or it reprints as new on the next poll",
+            "a staff order's lines must already be marked sent, matching its SENT_TO_KITCHEN status",
             db.orderDao().getItemsForOrder(id).all { it.sentToKitchen },
         )
 
-        // Payment is only valid once past RECEIVED, so move it along first.
+        // Payment is valid once past RECEIVED — staff orders start at SENT_TO_KITCHEN already.
         backend.updateOrderStatus(id, "READY")
         val paid = backend.processPayment(id, "CASH")
         assertTrue(paid is ApiResult.Success)
@@ -165,15 +165,31 @@ class LocalBackendOrderLifecycleTest {
     // ── OrderActions is genuinely enforced, not merely consulted ──────────────────────────────────
 
     @Test
-    fun paymentIsRefusedOnAFreshOrderBecauseOrderActionsSaysSo() = runTest {
+    fun paymentIsRefusedOnAFreshCustomerOrderWhenAutoPrintIsDisabled() = runTest {
         seedMenu()
-        val id = newOrder()
+        // Disable autoPrint so customer orders land in RECEIVED.
+        db.settingsDao().upsert(SystemSettings(customerOrderAutoPrint = false))
+
+        val result = backend.createOrder(
+            tableId = "T0001",
+            items = listOf(
+                NewOrderItem(menuItemId = "m-nasi", quantity = 1),
+            ),
+            source = "CUSTOMER",
+        )
+        val id = (result as ApiResult.Success).data.orderId
 
         // RECEIVED is not payable — OrderActions.canTakePayment covers SENT_TO_KITCHEN/PREPARING/READY.
-        val result = backend.processPayment(id, "CASH")
-        assertTrue(result is ApiResult.Error)
-        assertEquals("PAYMENT_CONFLICT", (result as ApiResult.Error).code)
+        val payResult = backend.processPayment(id, "CASH")
+        assertTrue(payResult is ApiResult.Error)
+        assertEquals("PAYMENT_CONFLICT", (payResult as ApiResult.Error).code)
         assertEquals(OrderStatus.RECEIVED, db.orderDao().getOrderById(id)!!.status)
+
+        // Held for cashier confirmation on the item lines too — ping mode is the point.
+        assertTrue(
+            "a held customer order's lines must not be marked sent yet",
+            db.orderDao().getItemsForOrder(id).none { it.sentToKitchen },
+        )
     }
 
     @Test
@@ -236,7 +252,8 @@ class LocalBackendOrderLifecycleTest {
             val r = backend.updateOrderStatus(id, forbidden)
             assertTrue("$forbidden must be refused by the status endpoint", r is ApiResult.Error)
         }
-        assertEquals(OrderStatus.RECEIVED, db.orderDao().getOrderById(id)!!.status)
+        // Staff orders start at SENT_TO_KITCHEN; the forbidden attempts above must not change that.
+        assertEquals(OrderStatus.SENT_TO_KITCHEN, db.orderDao().getOrderById(id)!!.status)
 
         assertTrue(backend.updateOrderStatus(id, "PREPARING") is ApiResult.Success)
         assertTrue(backend.updateOrderStatus(id, "READY") is ApiResult.Success)

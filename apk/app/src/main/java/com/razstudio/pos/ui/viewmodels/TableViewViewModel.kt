@@ -660,7 +660,7 @@ class TableViewViewModel @Inject constructor(
         viewModelScope.launch {
             _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null)
 
-            val created = apiClient.createOrder(tableId, plan.sliceItems, source = "STAFF")
+            val created = apiClient.createOrder(tableId, plan.sliceItems, source = "STAFF", splitShare = true)
             if (created !is ApiResult.Success) {
                 _orderDetail.value = _orderDetail.value.copy(
                     isLoading = false, error = str().splitShareFailed,
@@ -689,7 +689,7 @@ class TableViewViewModel @Inject constructor(
     ) {
         viewModelScope.launch {
             _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null)
-            val created = apiClient.createOrder(tableId, plan.sliceItems, source = "STAFF")
+            val created = apiClient.createOrder(tableId, plan.sliceItems, source = "STAFF", splitShare = true)
             if (created !is ApiResult.Success) {
                 _orderDetail.value = _orderDetail.value.copy(
                     isLoading = false, error = str().splitShareFailed,
@@ -732,7 +732,10 @@ class TableViewViewModel @Inject constructor(
                 id = shareId,
                 tableId = tableId,
                 source = "STAFF",
-                status = OrderStatus.RECEIVED,
+                // Staff-created split shares are immediately payable — the cashier IS the
+                // confirmation. Must match the backend's status so LAN-mode processPayment
+                // doesn't reject it with PAYMENT_CONFLICT.
+                status = OrderStatus.SENT_TO_KITCHEN,
                 total = plan.amount,
                 createdAt = PaymentTransaction.nowIso(),
             )
@@ -800,6 +803,17 @@ class TableViewViewModel @Inject constructor(
                 // with no reference number — the one line a customer needs to dispute it. (9.1)
                 gatewayTransactionId = gatewayTransactionIdFor(shareId, method),
             )
+        } else {
+            // A split share never gets a receipt, but the till still needs to open for a cash
+            // share exactly like it would for the whole bill — the drawer setting is the only
+            // thing that should gate it, not whether a receipt printed alongside it.
+            //
+            // Launched rather than awaited: the drawer is hardware on the far end of a Bluetooth
+            // link, and one that is switched off sits in connect/timeout. Awaiting it would hold
+            // this payment — and the busy overlay over the sheet — open on a solenoid, which is
+            // the same "the button did nothing" failure printing here caused. The money is already
+            // recorded; the till opening is a side effect and is allowed to lag or fail.
+            viewModelScope.launch { printService.kickCashDrawerForCashSale(method) }
         }
 
         when (val shrunk = apiClient.voidOrderItems(orderId, plan.keepLines, SPLIT_REASON)) {
@@ -847,6 +861,33 @@ class TableViewViewModel @Inject constructor(
             ?.gatewayTransactionId
     }
 
+    /**
+     * The final receipt's contents: this order plus every split share settled earlier in the same
+     * sitting, so the paper reads as the table's bill rather than the last payer's leftovers.
+     *
+     * Shares are found by time, not by a schema flag: completed orders on this table created at or
+     * after the original order began (see [OrderDao.getCompletedSessionShares]). Lines are then
+     * consolidated — a share lifted "1× Kailan" off a "3× Kailan" line put the same dish in two
+     * orders, and the combined receipt should show "3× Kailan", not two rows of the same name.
+     * The total is summed from the orders' own totals, which survived the void arithmetic, rather
+     * than recomputed from lines. Ordinary unsplit tables have no shares and pass through untouched.
+     */
+    private suspend fun withSessionShares(
+        order: Order,
+        items: List<OrderItem>,
+    ): Pair<Order, List<OrderItem>> {
+        val tableId = order.tableId ?: return order to items // Kiosk: no tables, no splits
+        val shares = orderDao.getCompletedSessionShares(tableId, order.createdAt, order.id)
+        if (shares.isEmpty()) return order to items
+
+        val shareItems = orderDao.getItemsForOrders(shares.map { it.id })
+        val combined = (items + shareItems)
+            .groupBy { listOf(it.menuItemId, it.nameSnapshot, it.unitPriceSnapshot, it.note) }
+            .map { (_, group) -> group.first().copy(quantity = group.sumOf { it.quantity }) }
+
+        return order.copy(total = order.total + shares.sumOf { it.total }) to combined
+    }
+
     fun processPayment(orderId: String, method: String, printReceipt: Boolean) {
         viewModelScope.launch {
             _orderDetail.value = _orderDetail.value.copy(isLoading = true, error = null)
@@ -860,13 +901,24 @@ class TableViewViewModel @Inject constructor(
                     orderDao.completePayment(orderId, method)
 
                     if (printReceipt && order != null) {
+                        // The receipt covers the whole SITTING, not just this final payment. On a
+                        // split table the order being paid here is only what was left after each
+                        // share was lifted off — printing it alone produced a "receipt" listing one
+                        // person's food for a table of four. Fold the session's settled shares
+                        // back in so the paper matches what the table actually ordered and paid.
+                        val (receiptOrder, receiptItems) = withSessionShares(order, items)
                         printService.printReceipt(
-                            order = order,
-                            items = items,
+                            order = receiptOrder,
+                            items = receiptItems,
                             paymentMethod = method,
                             cafeName = resolveCafeName(),
                             gatewayTransactionId = gatewayTransactionIdFor(orderId, method),
                         )
+                    } else {
+                        // No receipt this sale — the drawer setting alone decides whether cash
+                        // still pops the till (kickCashDrawerForCashSale is itself a no-op if
+                        // the setting is off or the method isn't CASH).
+                        printService.kickCashDrawerForCashSale(method)
                     }
 
                     _orderDetail.value = OrderDetailState(
@@ -1386,6 +1438,9 @@ class TableViewViewModel @Inject constructor(
     private suspend fun reconcileOrderFromDto(dto: OrderDto) {
         orderDao.insertOrder(dto.toEntity())
         if (dto.items.isNotEmpty()) {
+            // Replace, never append — local and server copies of the same lines carry different
+            // ids, so a plain insert duplicated them. See RealtimeService.reconcileOrder.
+            orderDao.deleteItemsForOrder(dto.id)
             orderDao.insertOrderItems(dto.items.map { it.toEntity(dto.id) })
         }
     }

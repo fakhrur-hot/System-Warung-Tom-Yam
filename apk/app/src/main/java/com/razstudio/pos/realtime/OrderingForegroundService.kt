@@ -430,6 +430,9 @@ class OrderingForegroundService : Service() {
                 val dto = OrderMapper.orderDto(orderJson)
                 dao.insertOrder(dto.toEntity())
                 if (dto.items.isNotEmpty()) {
+                    // Replace, never append — see RealtimeService.reconcileOrder: a split share's
+                    // local rows carry different line ids than the server's copy of the same lines.
+                    dao.deleteItemsForOrder(dto.id)
                     dao.insertOrderItems(dto.items.map { it.toEntity(dto.id) })
                 }
 

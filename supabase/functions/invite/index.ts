@@ -38,13 +38,25 @@ serve(async (req) => {
   const url = new URL(req.url);
   const path = url.pathname;
 
-  // Which invite to operate on. `?role=admin` (or secondary) → the SECONDARY-ADMIN invite
-  // (row id=2); anything else → the ordering-staff invite (row id=1). Both mint /join
-  // links; `register` derives the granted role from whichever token was scanned.
+  // Which invite to operate on: `?role=admin` (or secondary) → SECONDARY-ADMIN (row id=2),
+  // `?role=operator` → OPERATOR (row id=3, seeded by migration 0015), anything else → the
+  // ordering-staff invite (row id=1). All mint /join links; `register` derives the granted role
+  // from whichever token was scanned.
+  //
+  // `operator` used to be missing from this mapping, so it fell through to the id=1 default: the
+  // admin app's "Add Operator" panel rendered the ORDERING token as its QR, and its Regenerate
+  // button rotated the *staff* invite. An operator device that scanned it registered as ORDERING,
+  // was issued an api_key instead of a session token, and could never finish connecting.
   const roleParam = (url.searchParams.get("role") ?? "").toLowerCase();
-  const isAdminInvite = roleParam === "admin" || roleParam === "secondary" || roleParam === "admin_secondary";
-  const inviteId = isAdminInvite ? 2 : 1;
-  const inviteRole = isAdminInvite ? "ADMIN_SECONDARY" : "ORDERING";
+  const INVITE_TARGETS: Record<string, { id: number; role: string }> = {
+    admin: { id: 2, role: "ADMIN_SECONDARY" },
+    secondary: { id: 2, role: "ADMIN_SECONDARY" },
+    admin_secondary: { id: 2, role: "ADMIN_SECONDARY" },
+    operator: { id: 3, role: "OPERATOR" },
+  };
+  const inviteTarget = INVITE_TARGETS[roleParam] ?? { id: 1, role: "ORDERING" };
+  const inviteId = inviteTarget.id;
+  const inviteRole = inviteTarget.role;
 
   // Determine if this is a regenerate request
   const isRegenerate = req.method === "POST" && path.endsWith("/regenerate");

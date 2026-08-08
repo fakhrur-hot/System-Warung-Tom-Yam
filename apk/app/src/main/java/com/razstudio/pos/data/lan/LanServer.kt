@@ -298,6 +298,7 @@ class LanServer @Inject constructor(
             backend.createOrderAsStaff(
                 tableId = body.optString("tableId", ""),
                 items = body.newOrderItems(),
+                splitShare = body.optBoolean("splitShare", false),
             ).toJson {
                 JSONObject().put("orderId", it.orderId).put("total", it.total).put("status", it.status)
             }

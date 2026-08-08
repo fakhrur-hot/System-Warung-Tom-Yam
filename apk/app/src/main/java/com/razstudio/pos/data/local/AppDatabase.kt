@@ -3,6 +3,9 @@ package com.razstudio.pos.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.razstudio.pos.data.promos.AffiliateProductDao
+import com.razstudio.pos.data.promos.AffiliateProductEntity
+import com.razstudio.pos.data.promos.CampaignEntity
 import com.razstudio.pos.notification.CapturedPayment
 import com.razstudio.pos.notification.CapturedPaymentDao
 
@@ -38,9 +41,11 @@ import com.razstudio.pos.notification.CapturedPaymentDao
         DailyAggregate::class,
         PaymentTransaction::class,
         CashDrawerEvent::class,
-        CapturedPayment::class
+        CapturedPayment::class,
+        AffiliateProductEntity::class,
+        CampaignEntity::class,
     ],
-    version = 20,
+    version = 22,
     // exportSchema = true so MigrationTestHelper can validate the schema after migration.
     // Schema JSON files are written to app/schemas/ and committed to source control so that
     // future migration tests can verify against a stable baseline (Requirement 8.1, 12.6).
@@ -63,4 +68,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun paymentTransactionDao(): PaymentTransactionDao
     abstract fun cashDrawerEventDao(): CashDrawerEventDao
     abstract fun capturedPaymentDao(): CapturedPaymentDao
+    abstract fun affiliateProductDao(): AffiliateProductDao
 }

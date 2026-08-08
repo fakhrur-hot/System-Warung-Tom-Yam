@@ -1411,7 +1411,8 @@ class ApiClient @Inject constructor(
      */
     override suspend fun createOrderAsStaff(
         tableId: String,
-        items: List<NewOrderItem>
+        items: List<NewOrderItem>,
+        splitShare: Boolean,
     ): ApiResult<CreateOrderResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.createOrder(tableId, items, "STAFF")
         try {
@@ -1432,6 +1433,7 @@ class ApiClient @Inject constructor(
             val body = JSONObject().apply {
                 put("tableId", tableId)
                 put("items", itemsArray)
+                if (splitShare) put("splitShare", true)
             }.toString()
 
             val request = Request.Builder()
@@ -2193,6 +2195,7 @@ class ApiClient @Inject constructor(
         // Cloud cafés have tables, so this is always null here. Kiosk never reaches ApiClient —
         // it runs entirely on LocalBackend with no network of any kind (Requirement 3.1).
         orderNumber: Int?,
+        splitShare: Boolean,
     ): ApiResult<CreateOrderResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.createOrder(tableId, items, source)
         try {
@@ -2213,6 +2216,7 @@ class ApiClient @Inject constructor(
             val body = JSONObject().apply {
                 put("tableId", tableId)
                 put("items", itemsArray)
+                if (splitShare) put("splitShare", true)
             }.toString()
 
             val request = Request.Builder()
@@ -3026,6 +3030,9 @@ data class OrderDto(
     val cancelReason: String?,
     val cancelledBy: String?,
     val createdAt: String,
+    /** True for a Split Payment share order — its items belong to a bill someone else is still
+     *  sitting at, already sent/cooked. Never a "new order" to alert on or a slip to print. */
+    val isSplitShare: Boolean = false,
     val items: List<OrderItemDto> = emptyList()
 )
 

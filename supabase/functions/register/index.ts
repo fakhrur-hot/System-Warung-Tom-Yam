@@ -56,7 +56,9 @@ serve(async (req) => {
     return errorResponse(403, "INVALID_INVITE", "Invite token is invalid or expired");
   }
 
-  const grantedRole = invite.role === "ADMIN_SECONDARY" ? "ADMIN_SECONDARY" : "ORDERING";
+  const grantedRole = invite.role === "ADMIN_SECONDARY" ? "ADMIN_SECONDARY"
+                    : invite.role === "OPERATOR" ? "OPERATOR"
+                    : "ORDERING";
 
   // Insert the device as PENDING in the granted role
   const { data: device, error } = await supabase

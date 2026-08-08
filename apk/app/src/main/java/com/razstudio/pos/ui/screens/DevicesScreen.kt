@@ -105,6 +105,7 @@ fun DevicesScreen(
     var renameText by remember { mutableStateOf("") }
     // Reveals the secondary-admin invite QR (loaded on demand, separate from staff invite).
     var showAdminInvite by remember { mutableStateOf(false) }
+    // Reveals the operator invite QR (loaded on demand, separate from staff/admin invites).
     // Reveals the permanent owner-recovery QR (loaded on demand).
     var showRecovery by remember { mutableStateOf(false) }
     // Requests already approved, rejected, or dismissed here — so one popup does not reappear.
@@ -730,6 +731,9 @@ private fun DeviceCard(
                         StatusBadge(device.status, strings)
                         if (device.role.isNotBlank()) {
                             Spacer(modifier = Modifier.width(8.dp))
+                            // Generic plain-text rendering — intentionally no allowlist or
+                            // when-block so any role value (ORDERING, ADMIN_SECONDARY, OPERATOR,
+                            // etc.) renders correctly without code changes.
                             Text(
                                 text = device.role,
                                 style = MaterialTheme.typography.bodySmall,

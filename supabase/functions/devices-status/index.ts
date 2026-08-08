@@ -66,7 +66,7 @@ serve(async (req) => {
       return jsonResponse({ status: "APPROVED", role: device.role, apiKey });
     }
 
-    if (!alreadyDelivered && device.role === "ADMIN_SECONDARY" && !device.session_token_hash) {
+    if (!alreadyDelivered && (device.role === "ADMIN_SECONDARY" || device.role === "OPERATOR") && !device.session_token_hash) {
       const sessionToken = generateToken(32);
       const tokenHash = await sha256(sessionToken);
 

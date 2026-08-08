@@ -70,6 +70,10 @@ class StaffOrderSync @Inject constructor(
     private suspend fun reconcile(dto: OrderDto) {
         orderDao.insertOrder(dto.toEntity())
         if (dto.items.isNotEmpty()) {
+            // Replace, never append — the local copy of an order this device created (split
+            // shares especially) carries different line ids than the server's copy of the same
+            // lines, so a plain insert duplicated every line. See RealtimeService.reconcileOrder.
+            orderDao.deleteItemsForOrder(dto.id)
             orderDao.insertOrderItems(dto.items.map { it.toEntity(dto.id) })
         }
     }

@@ -8,8 +8,6 @@ import com.razstudio.pos.data.local.CashDrawerEventDao
 import com.razstudio.pos.data.local.CashDrawerLedger
 import com.razstudio.pos.printing.PrinterDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -55,24 +53,26 @@ class CashDrawerViewModel @Inject constructor(
     val notice: StateFlow<Notice?> = _notice.asStateFlow()
     fun clearNotice() { _notice.value = null }
 
-    // ── Opening float: autosaved, debounced ──────────────────────────────────────────────
+    // ── Opening float: committed only on an explicit Save ────────────────────────────────
     //
-    // The requirement is "no Save button": the manager keys RM 300 and walks away. Committing
-    // per keystroke would write FLOAT_SET rows for 3, 30, 300 — three audit entries for one
-    // action — so the write waits for a typing pause, the same debounce idea the Settings page
-    // uses for its free-text fields.
+    // This used to autosave on a 1.2s typing pause, with no button. That turned every pause
+    // mid-entry into a committed figure: keying RM 300 slowly wrote the float as RM 3, then RM 30,
+    // and a manager who was interrupted halfway left the drawer's expected balance set to a number
+    // they never meant to enter. The expected balance is what the end-of-day count is judged
+    // against, so a half-typed value is a real discrepancy, not a cosmetic one.
+    //
+    // Keying is now free — nothing is written until Save is pressed, which is also what makes the
+    // FLOAT_SET audit row correspond to a decision rather than to a pause in typing.
 
-    private var floatCommitJob: Job? = null
-
-    /** Called on every keystroke of the float editor with the current entry, in sen. */
-    fun onOpeningFloatChanged(floatSen: Long) {
-        floatCommitJob?.cancel()
-        floatCommitJob = viewModelScope.launch {
-            delay(1_200)
-            if (ledger.balanceSen() != floatSen) {
-                ledger.setOpeningFloat(floatSen)
-                _notice.value = Notice("Opening float saved: RM %.2f".format(floatSen / 100.0))
+    /** Commit the keyed opening float. Called from the Save button, never from a keystroke. */
+    fun saveOpeningFloat(floatSen: Long) {
+        viewModelScope.launch {
+            if (ledger.balanceSen() == floatSen) {
+                _notice.value = Notice("Opening float unchanged: RM %.2f".format(floatSen / 100.0))
+                return@launch
             }
+            ledger.setOpeningFloat(floatSen)
+            _notice.value = Notice("Opening float saved: RM %.2f".format(floatSen / 100.0))
         }
     }
 

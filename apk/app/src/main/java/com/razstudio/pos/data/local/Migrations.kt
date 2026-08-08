@@ -386,3 +386,71 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
         )
     }
 }
+
+/**
+ * v20 → v21: add affiliate product cache and campaign tables for the Shopee Affiliate Ads feature.
+ *
+ * Purely additive — two new tables. The APK fetches product offers from the Shopee Affiliate API,
+ * caches them locally in Room, and serves them to the table grid / ambient display UI.
+ */
+val MIGRATION_20_21 = object : Migration(20, 21) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS affiliate_products (
+                id TEXT NOT NULL PRIMARY KEY,
+                itemId INTEGER NOT NULL,
+                productName TEXT NOT NULL,
+                offerLink TEXT NOT NULL,
+                imageUrl TEXT NOT NULL,
+                price INTEGER NOT NULL,
+                originalPrice INTEGER NOT NULL,
+                commissionRate REAL NOT NULL,
+                commissionXtra REAL,
+                shopName TEXT NOT NULL,
+                isOfficialShop INTEGER NOT NULL,
+                salesCount INTEGER NOT NULL,
+                rating REAL NOT NULL,
+                subId TEXT NOT NULL,
+                validationStatus TEXT NOT NULL,
+                lastFetchedAt TEXT NOT NULL,
+                impressions INTEGER NOT NULL DEFAULT 0,
+                clicks INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS affiliate_campaigns (
+                id TEXT NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                xtraRate REAL NOT NULL,
+                startsAt TEXT NOT NULL,
+                expiresAt TEXT NOT NULL,
+                productCount INTEGER NOT NULL,
+                lastSyncedAt TEXT NOT NULL
+            )
+            """.trimIndent()
+        )
+    }
+}
+
+/**
+ * v21 → v22: tag each cached affiliate product row with which source produced it
+ * (`SHOPEE_API` or `GITHUB_FALLBACK`).
+ *
+ * Purely additive — one new column with a default. Without this tag, rows from the Shopee API
+ * (keyed by `itemId`) and rows from the GitHub-catalog fallback (keyed by `github_$index`) live in
+ * disjoint id spaces, so switching between the two sources never replaced the abandoned source's
+ * rows and both accumulated forever. `AffiliateRepository` now deletes the other source's rows on
+ * every successful sync (bugfix Requirement 5). Existing v21 rows all came from the fallback path
+ * (the Shopee API path could never authenticate before this bugfix — see bugfix/design.md Bug 1),
+ * so `'GITHUB_FALLBACK'` is the correct default for anything already on disk.
+ */
+val MIGRATION_21_22 = object : Migration(21, 22) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE affiliate_products ADD COLUMN source TEXT NOT NULL DEFAULT 'GITHUB_FALLBACK'"
+        )
+    }
+}

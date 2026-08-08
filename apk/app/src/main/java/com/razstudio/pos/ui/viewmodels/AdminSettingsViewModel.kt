@@ -18,7 +18,9 @@ import com.razstudio.pos.ui.i18n.uiStrings
 import com.razstudio.pos.ui.util.LogoPipeline
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -83,6 +85,7 @@ class AdminSettingsViewModel @Inject constructor(
         // Invite for adding a SECONDARY ADMIN device (full management, no local printer)
         val adminInvite: InviteResponse? = null,
         val adminInviteLoading: Boolean = false,
+        // Invite for adding an OPERATOR device (scoped access: menu, tables, branding, location)
         // Permanent owner-recovery key (restores Main Admin on a fresh device). Keep secret.
         val recoveryInvite: InviteResponse? = null,
         val recoveryLoading: Boolean = false,
@@ -531,9 +534,19 @@ class AdminSettingsViewModel @Inject constructor(
      */
     private var autoSaveJob: Job? = null
 
+    /**
+     * This screen is a nav-graph `composable()` destination, so `hiltViewModel()` scopes this
+     * ViewModel (and [viewModelScope]) to its NavBackStackEntry: backing out of Settings clears
+     * it immediately. Tap a value, then hit Back within the debounce window, and a
+     * `viewModelScope`-launched job would be cancelled before it ever reached the backend — the
+     * change silently vanishes with no error shown. This scope is deliberately NOT tied to the
+     * ViewModel's lifecycle so a pending autosave still lands after the screen is gone.
+     */
+    private val autoSaveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private fun scheduleAutoSave() {
         autoSaveJob?.cancel()
-        autoSaveJob = viewModelScope.launch {
+        autoSaveJob = autoSaveScope.launch {
             delay(AUTO_SAVE_DEBOUNCE_MS)
             saveAll()
         }
@@ -924,9 +937,12 @@ class AdminSettingsViewModel @Inject constructor(
      * Only sections that differ from [UiState.savedSnapshot] are sent.
      * On full success, updates the snapshot and shows "Settings saved".
      * On any failure, sets [UiState.error] with the section that failed.
+     *
+     * Runs on [autoSaveScope], not [viewModelScope]: this is also reached from the debounced
+     * autosave, and a save that outlives the screen must not be cancelled by the screen closing.
      */
     fun saveAll() {
-        viewModelScope.launch {
+        autoSaveScope.launch {
             val state = _uiState.value
             var anyError = false
 

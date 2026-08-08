@@ -1,5 +1,7 @@
 package com.razstudio.pos.ui.ambient
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
@@ -20,6 +23,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.razstudio.pos.R
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.uiStrings
+import com.razstudio.pos.ui.viewmodels.AffiliateAdsViewModel
 import com.razstudio.pos.ui.viewmodels.AmbientViewModel
 import kotlinx.coroutines.delay
 
@@ -38,11 +42,14 @@ fun AmbientOverlay(
     onDismiss: () -> Unit,
     viewModel: AmbientViewModel = hiltViewModel(),
     languageViewModel: LanguageViewModel = hiltViewModel(),
+    affiliateAdsViewModel: AffiliateAdsViewModel = hiltViewModel(),
 ) {
     val tables by viewModel.tableStates.collectAsState()
     val newOrder by viewModel.newOrder.collectAsState()
     val language by languageViewModel.language.collectAsState()
     val strings = uiStrings(language)
+    val affiliateProducts by affiliateAdsViewModel.products.collectAsState()
+    val context = LocalContext.current
 
     // Retire the celebration card on its own timer.
     LaunchedEffect(newOrder) {
@@ -111,6 +118,15 @@ fun AmbientOverlay(
             cafeName = cafeName,
             isCustomerFacing = viewModel.isCustomerFacing(),
             strings = strings,
+            affiliateProducts = affiliateProducts,
+            onAffiliateClick = { product ->
+                // Explicit rather than relying on the outer Box's tap-to-dismiss to also fire:
+                // dismiss ambient mode AND open the link, deterministically, on every tap.
+                affiliateAdsViewModel.onClick(product)
+                onDismiss()
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(product.url)))
+            },
+            onAffiliateImpression = affiliateAdsViewModel::onImpression,
         )
     }
 }
