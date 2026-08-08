@@ -96,7 +96,7 @@ fun OrderEntrySheet(
     language: AppLanguage,
     strings: UiStrings,
     isSubmitting: Boolean,
-    onAdd: (item: MenuItem, note: String?, size: String?, unitPrice: Double?) -> Unit,
+    onAdd: (item: MenuItem, note: String?, size: String?, unitPrice: Double?, variant: String?) -> Unit,
     /**
      * A hand-typed charge with no menu item behind it — see [CustomChargeButton]. The caller turns
      * the name+price into a cart line with [com.razstudio.pos.data.customChargeMenuItem].
@@ -311,21 +311,38 @@ private data class SizedRow(
     val priceText: String,
     val size: String?,
     val unitPrice: Double?,
+    /** "HOT" / "COLD" for a Hot/Cold-split item; null otherwise. */
+    val variant: String? = null,
 )
 
-/** Expand a menu item into its tappable rows: 3 for a variable-price (S/M/L) item, else 1. */
-private fun sizedRows(item: MenuItem, name: String, marketPriceLabel: String): List<SizedRow> {
+/** Expand a menu item into its tappable rows: respects priceTierCount (2 or 3) and Hot/Cold. */
+private fun sizedRows(item: MenuItem, name: String, marketPriceLabel: String, strings: UiStrings): List<SizedRow> {
     if (item.hasVariablePrice) {
-        val opts = listOf("S" to item.priceOption1, "M" to item.priceOption2, "L" to item.priceOption3)
-        val rows = opts.mapNotNull { (label, price) ->
-            if (price != null && price > 0)
-                SizedRow(item, "$name ($label)", "RM %.2f".format(price), label, price)
-            else null
+        val slots = if (item.priceTierCount == 2)
+            listOf(Triple("S", item.priceOption1, item.coldPriceOption1), Triple("L", item.priceOption3, item.coldPriceOption3))
+        else
+            listOf(Triple("S", item.priceOption1, item.coldPriceOption1),
+                   Triple("M", item.priceOption2, item.coldPriceOption2),
+                   Triple("L", item.priceOption3, item.coldPriceOption3))
+        val rows = slots.flatMap { (label, hot, cold) ->
+            expandHotCold(item, "$name ($label)", label, hot, cold, strings)
         }
         if (rows.isNotEmpty()) return rows
     }
+    if (item.hotColdEnabled) return expandHotCold(item, name, null, item.price, item.coldPrice, strings)
     val priceText = if (item.marketPrice) marketPriceLabel else "RM %.2f".format(item.price)
-    return listOf(SizedRow(item, name, priceText, null, null))
+    return listOf(SizedRow(item, name, priceText, null, null, null))
+}
+
+/** One row per HOT/COLD variant actually priced (>0); a non-Hot/Cold item yields its one row unchanged. */
+private fun expandHotCold(item: MenuItem, baseName: String, size: String?, hot: Double?, cold: Double?, strings: UiStrings): List<SizedRow> {
+    if (!item.hotColdEnabled) {
+        return if (hot != null && hot > 0) listOf(SizedRow(item, baseName, "RM %.2f".format(hot), size, hot, null)) else emptyList()
+    }
+    return listOfNotNull(
+        hot?.takeIf { it > 0 }?.let { SizedRow(item, "$baseName (${strings.hotVariantLabel})", "RM %.2f".format(it), size, it, "HOT") },
+        cold?.takeIf { it > 0 }?.let { SizedRow(item, "$baseName (${strings.coldVariantLabel})", "RM %.2f".format(it), size, it, "COLD") },
+    )
 }
 
 /**
@@ -338,7 +355,7 @@ fun CategoryMenuPicker(
     menuItems: List<MenuItem>,
     language: AppLanguage,
     strings: UiStrings,
-    onAdd: (item: MenuItem, note: String?, size: String?, unitPrice: Double?) -> Unit,
+    onAdd: (item: MenuItem, note: String?, size: String?, unitPrice: Double?, variant: String?) -> Unit,
     modifier: Modifier = Modifier,
     categoryOrder: List<String> = emptyList(),
 ) {
@@ -407,7 +424,7 @@ fun CategoryMenuPicker(
             } else {
                 emptyList()
             }
-            val rows = results.flatMap { sizedRows(it, language.menuName(it), strings.marketPriceMode) }
+            val rows = results.flatMap { sizedRows(it, language.menuName(it), strings.marketPriceMode, strings) }
             // Lighter ground than the sheet around it — the menu list is the scroll area, and it
             // reads as a bounded inset panel rather than melting into the dialog. See the
             // surfaceContainer mapping in ThemePreset.
@@ -423,20 +440,20 @@ fun CategoryMenuPicker(
                     .padding(horizontal = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                items(rows, key = { "${it.item.id}_${it.size ?: ""}" }) { row ->
+                items(rows, key = { "${it.item.id}_${it.size ?: ""}_${it.variant ?: ""}" }) { row ->
                     MenuEntryRow(
                         name = row.displayName,
                         priceText = row.priceText,
                         addContentDescription = strings.addToCart,
                         noteLabel = strings.noteOptionalLabel,
-                        onAdd = { note -> onAdd(row.item, note, row.size, row.unitPrice) },
+                        onAdd = { note -> onAdd(row.item, note, row.size, row.unitPrice, row.variant) },
                     )
                 }
             }
             }
         } else {
             val itemsInCategory = menuItems.filter { selectedCategory in it.allCategories() }
-            val rows = itemsInCategory.flatMap { sizedRows(it, language.menuName(it), strings.marketPriceMode) }
+            val rows = itemsInCategory.flatMap { sizedRows(it, language.menuName(it), strings.marketPriceMode, strings) }
             // Lighter ground than the sheet around it — the menu list is the scroll area, and it
             // reads as a bounded inset panel rather than melting into the dialog. See the
             // surfaceContainer mapping in ThemePreset.
@@ -452,13 +469,13 @@ fun CategoryMenuPicker(
                     .padding(horizontal = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                items(rows, key = { "${it.item.id}_${it.size ?: ""}" }) { row ->
+                items(rows, key = { "${it.item.id}_${it.size ?: ""}_${it.variant ?: ""}" }) { row ->
                     MenuEntryRow(
                         name = row.displayName,
                         priceText = row.priceText,
                         addContentDescription = strings.addToCart,
                         noteLabel = strings.noteOptionalLabel,
-                        onAdd = { note -> onAdd(row.item, note, row.size, row.unitPrice) },
+                        onAdd = { note -> onAdd(row.item, note, row.size, row.unitPrice, row.variant) },
                     )
                 }
             }

@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -104,7 +105,7 @@ fun AddMenuItemScreen(
     }
     var nameEn by remember { mutableStateOf(existingItem?.nameEn ?: "") }
     var code by remember { mutableStateOf(existingItem?.code ?: "") }
-    var marketPrice by remember { mutableStateOf(existingItem?.marketPrice ?: false) }
+
     var priceText by remember { mutableStateOf(existingItem?.price?.let { "%.2f".format(it) } ?: "") }
     var hasVariablePrice by remember { mutableStateOf(existingItem?.hasVariablePrice ?: false) }
     var variablePriceDailyPrompt by remember { mutableStateOf(existingItem?.variablePriceDailyPrompt ?: false) }
@@ -120,6 +121,12 @@ fun AddMenuItemScreen(
             }
         )
     }
+    var priceTierCount by remember { mutableStateOf(existingItem?.priceTierCount ?: 3) }
+    var hotColdEnabled by remember { mutableStateOf(existingItem?.hotColdEnabled ?: false) }
+    var coldPriceText by remember { mutableStateOf(existingItem?.coldPrice?.let { "%.2f".format(it) } ?: "") }
+    var coldPriceOption1Text by remember { mutableStateOf(existingItem?.coldPriceOption1?.let { "%.2f".format(it) } ?: "") }
+    var coldPriceOption2Text by remember { mutableStateOf(existingItem?.coldPriceOption2?.let { "%.2f".format(it) } ?: "") }
+    var coldPriceOption3Text by remember { mutableStateOf(existingItem?.coldPriceOption3?.let { "%.2f".format(it) } ?: "") }
     var askMeDaily by remember { mutableStateOf(existingItem?.askMeDaily ?: false) }
     var doNotTranslate by remember { mutableStateOf(existingItem?.doNotTranslate ?: false) }
     var imageUrl by remember { mutableStateOf(existingItem?.imageUrl ?: "") }
@@ -160,7 +167,6 @@ fun AddMenuItemScreen(
         existingItem?.let {
             nameEn = it.nameEn
             code = it.code
-            marketPrice = it.marketPrice
             priceText = "%.2f".format(it.price)
             hasVariablePrice = it.hasVariablePrice
             variablePriceDailyPrompt = it.variablePriceDailyPrompt
@@ -172,6 +178,12 @@ fun AddMenuItemScreen(
                 it.priceOption3 -> 3
                 else -> 1
             }
+            priceTierCount = it.priceTierCount ?: if (it.priceOption3 != null) 3 else 2
+            hotColdEnabled = it.hotColdEnabled
+            coldPriceText = it.coldPrice?.let { p -> "%.2f".format(p) } ?: ""
+            coldPriceOption1Text = it.coldPriceOption1?.let { p -> "%.2f".format(p) } ?: ""
+            coldPriceOption2Text = it.coldPriceOption2?.let { p -> "%.2f".format(p) } ?: ""
+            coldPriceOption3Text = it.coldPriceOption3?.let { p -> "%.2f".format(p) } ?: ""
             askMeDaily = it.askMeDaily
             doNotTranslate = it.doNotTranslate
             imageUrl = it.imageUrl
@@ -182,6 +194,17 @@ fun AddMenuItemScreen(
             nameTh = it.nameTh
             selectedCategory = it.category
             selectedExtraCategories = it.extraCategories.split(",").map { c -> c.trim() }.filter { c -> c.isNotBlank() }.toSet()
+        }
+    }
+
+    // Compute whether the selected category is beverage-routed (for Hot/Cold gating)
+    val isBeverageRouted = viewModel.routeForCategory(selectedCategory) == "BEVERAGE"
+
+    // Force-uncheck Hot/Cold and clear cold prices when category changes away from Beverage
+    LaunchedEffect(selectedCategory) {
+        if (viewModel.routeForCategory(selectedCategory) != "BEVERAGE" && hotColdEnabled) {
+            hotColdEnabled = false
+            coldPriceText = ""; coldPriceOption1Text = ""; coldPriceOption2Text = ""; coldPriceOption3Text = ""
         }
     }
 
@@ -229,8 +252,7 @@ fun AddMenuItemScreen(
                 },
                 code = code,
                 onCodeChange = { code = it },
-                marketPrice = marketPrice,
-                onMarketPriceChange = { marketPrice = it },
+
                 nameBm = nameBm,
                 onNameBmChange = { nameBm = it },
                 nameEn = nameEn,
@@ -245,6 +267,27 @@ fun AddMenuItemScreen(
                 onPriceChange = { priceText = it },
                 hasVariablePrice = hasVariablePrice,
                 onHasVariablePriceChange = { hasVariablePrice = it },
+                priceTierCount = priceTierCount,
+                onPriceTierCountChange = { newCount ->
+                    priceTierCount = newCount
+                    if (newCount == 2) priceOption2Text = ""
+                },
+                hotColdEnabled = hotColdEnabled,
+                isBeverageRouted = isBeverageRouted,
+                onHotColdEnabledChange = { checked ->
+                    hotColdEnabled = checked
+                    if (!checked) {
+                        coldPriceText = ""; coldPriceOption1Text = ""; coldPriceOption2Text = ""; coldPriceOption3Text = ""
+                    }
+                },
+                coldPriceText = coldPriceText,
+                onColdPriceChange = { coldPriceText = it },
+                coldPriceOption1Text = coldPriceOption1Text,
+                onColdPriceOption1Change = { coldPriceOption1Text = it },
+                coldPriceOption2Text = coldPriceOption2Text,
+                onColdPriceOption2Change = { coldPriceOption2Text = it },
+                coldPriceOption3Text = coldPriceOption3Text,
+                onColdPriceOption3Change = { coldPriceOption3Text = it },
                 variablePriceDailyPrompt = variablePriceDailyPrompt,
                 onVariablePriceDailyPromptChange = { variablePriceDailyPrompt = it },
                 priceOption1Text = priceOption1Text,
@@ -272,30 +315,46 @@ fun AddMenuItemScreen(
                     val option1: Double?
                     val option2: Double?
                     val option3: Double?
+                    val coldOption1: Double?
+                    val coldOption2: Double?
+                    val coldOption3: Double?
+                    val effectiveColdPrice: Double?
+                    val effectiveTierCount: Int?
 
-                    if (marketPrice) {
-                        // Market-price item: price decided at the counter, no numeric price required.
-                        effectivePrice = 0.0
-                        option1 = null
-                        option2 = null
-                        option3 = null
-                    } else if (hasVariablePrice) {
+                    if (hasVariablePrice) {
                         option1 = priceOption1Text.toDoubleOrNull()
-                        option2 = priceOption2Text.toDoubleOrNull()
+                        option2 = if (priceTierCount == 3) priceOption2Text.toDoubleOrNull() else null
                         option3 = priceOption3Text.toDoubleOrNull()
                         if (option1 == null || option1 <= 0) return@ItemFormContent
-                        if (option2 == null || option2 <= 0) return@ItemFormContent
                         if (option3 == null || option3 <= 0) return@ItemFormContent
-                        // No single "active" price — Small/Medium/Large are all offered when
-                        // ordering. Store Small as the item's base price for snapshots/fallback.
+                        if (priceTierCount == 3 && (option2 == null || option2 <= 0)) return@ItemFormContent
                         effectivePrice = option1
+                        effectiveTierCount = priceTierCount
+                        if (hotColdEnabled) {
+                            coldOption1 = coldPriceOption1Text.toDoubleOrNull()
+                            coldOption2 = if (priceTierCount == 3) coldPriceOption2Text.toDoubleOrNull() else null
+                            coldOption3 = coldPriceOption3Text.toDoubleOrNull()
+                            if (coldOption1 == null || coldOption1 <= 0) return@ItemFormContent
+                            if (coldOption3 == null || coldOption3 <= 0) return@ItemFormContent
+                            if (priceTierCount == 3 && (coldOption2 == null || coldOption2 <= 0)) return@ItemFormContent
+                        } else {
+                            coldOption1 = null; coldOption2 = null; coldOption3 = null
+                        }
+                        effectiveColdPrice = null
                     } else {
                         val price = priceText.toDoubleOrNull() ?: 0.0
                         if (price <= 0) return@ItemFormContent
                         effectivePrice = price
-                        option1 = null
-                        option2 = null
-                        option3 = null
+                        effectiveTierCount = null
+                        option1 = null; option2 = null; option3 = null
+                        if (hotColdEnabled) {
+                            val cold = coldPriceText.toDoubleOrNull()
+                            if (cold == null || cold <= 0) return@ItemFormContent
+                            effectiveColdPrice = cold
+                        } else {
+                            effectiveColdPrice = null
+                        }
+                        coldOption1 = null; coldOption2 = null; coldOption3 = null
                     }
 
                     // English is still the field Room/the backend require to be non-blank;
@@ -312,7 +371,7 @@ fun AddMenuItemScreen(
                             askMeDaily = askMeDaily,
                             doNotTranslate = doNotTranslate,
                             code = code.trim(),
-                            marketPrice = marketPrice,
+                            marketPrice = false,
                             imageUrl = imageUrl.trim(),
                             imagePath = imagePath,
                             hasVariablePrice = hasVariablePrice,
@@ -324,7 +383,13 @@ fun AddMenuItemScreen(
                             nameZh = nameZh.trim(),
                             nameTa = nameTa.trim(),
                             nameTh = nameTh.trim(),
-                            extraCategories = selectedExtraCategories.filter { it != selectedCategory }.joinToString(",")
+                            extraCategories = selectedExtraCategories.filter { it != selectedCategory }.joinToString(","),
+                            priceTierCount = effectiveTierCount,
+                            hotColdEnabled = hotColdEnabled,
+                            coldPrice = effectiveColdPrice,
+                            coldPriceOption1 = coldOption1,
+                            coldPriceOption2 = coldOption2,
+                            coldPriceOption3 = coldOption3
                         )
                     } else {
                         viewModel.addItem(
@@ -335,7 +400,7 @@ fun AddMenuItemScreen(
                             askMeDaily = askMeDaily,
                             doNotTranslate = doNotTranslate,
                             code = code.trim(),
-                            marketPrice = marketPrice,
+                            marketPrice = false,
                             imageUrl = imageUrl.trim(),
                             imagePath = imagePath,
                             hasVariablePrice = hasVariablePrice,
@@ -347,7 +412,13 @@ fun AddMenuItemScreen(
                             nameZh = nameZh.trim(),
                             nameTa = nameTa.trim(),
                             nameTh = nameTh.trim(),
-                            extraCategories = selectedExtraCategories.filter { it != selectedCategory }.joinToString(",")
+                            extraCategories = selectedExtraCategories.filter { it != selectedCategory }.joinToString(","),
+                            priceTierCount = effectiveTierCount,
+                            hotColdEnabled = hotColdEnabled,
+                            coldPrice = effectiveColdPrice,
+                            coldPriceOption1 = coldOption1,
+                            coldPriceOption2 = coldOption2,
+                            coldPriceOption3 = coldOption3
                         )
                     }
                     onBack()
@@ -450,8 +521,6 @@ private fun ItemFormContent(
     selectedCategory: String,
     code: String,
     onCodeChange: (String) -> Unit,
-    marketPrice: Boolean,
-    onMarketPriceChange: (Boolean) -> Unit,
     nameBm: String,
     onNameBmChange: (String) -> Unit,
     nameEn: String,
@@ -466,6 +535,19 @@ private fun ItemFormContent(
     onPriceChange: (String) -> Unit,
     hasVariablePrice: Boolean,
     onHasVariablePriceChange: (Boolean) -> Unit,
+    priceTierCount: Int,
+    onPriceTierCountChange: (Int) -> Unit,
+    hotColdEnabled: Boolean,
+    isBeverageRouted: Boolean,
+    onHotColdEnabledChange: (Boolean) -> Unit,
+    coldPriceText: String,
+    onColdPriceChange: (String) -> Unit,
+    coldPriceOption1Text: String,
+    onColdPriceOption1Change: (String) -> Unit,
+    coldPriceOption2Text: String,
+    onColdPriceOption2Change: (String) -> Unit,
+    coldPriceOption3Text: String,
+    onColdPriceOption3Change: (String) -> Unit,
     variablePriceDailyPrompt: Boolean,
     onVariablePriceDailyPromptChange: (Boolean) -> Unit,
     priceOption1Text: String,
@@ -625,8 +707,7 @@ private fun ItemFormContent(
             }
         }
 
-        // Pricing type: Single Price (plain, default), Multiple Price (3 admin-editable
-        // presets), or Market Price (price decided at the counter — no fixed value).
+        // Pricing type: Single Price (plain, default) or Multiple Price (size presets).
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = strings.pricingModeLabel,
@@ -635,78 +716,123 @@ private fun ItemFormContent(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(
-                    selected = !hasVariablePrice && !marketPrice,
-                    onClick = { onMarketPriceChange(false); onHasVariablePriceChange(false) }
+                    selected = !hasVariablePrice,
+                    onClick = { onHasVariablePriceChange(false) }
                 )
                 Text(
                     text = strings.singlePriceLabel,
                     modifier = Modifier
-                        .clickable { onMarketPriceChange(false); onHasVariablePriceChange(false) }
+                        .clickable { onHasVariablePriceChange(false) }
                         .padding(end = 16.dp)
                 )
                 RadioButton(
-                    selected = hasVariablePrice && !marketPrice,
-                    onClick = { onMarketPriceChange(false); onHasVariablePriceChange(true) }
+                    selected = hasVariablePrice,
+                    onClick = { onHasVariablePriceChange(true) }
                 )
                 Text(
                     text = strings.multiplePriceLabel,
-                    modifier = Modifier.clickable { onMarketPriceChange(false); onHasVariablePriceChange(true) }
+                    modifier = Modifier.clickable { onHasVariablePriceChange(true) }
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Market price is decided daily, so selecting it auto-enables "Ask me daily"
-                // (the daily popup then prompts for today's price). The admin can still turn
-                // the switch back off if they prefer to set the price manually in Menu Mgmt.
-                val selectMarket = {
-                    onMarketPriceChange(true)
-                    onHasVariablePriceChange(false)
-                    onAskMeDailyChange(true)
-                }
-                RadioButton(
-                    selected = marketPrice,
-                    onClick = selectMarket
-                )
+            // Market_Price_Option radio: REMOVED.
+        }
+
+        // Price Tier Count radio group — shown only when Multiple Price is selected
+        if (hasVariablePrice) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = strings.marketPriceMode,
-                    modifier = Modifier.clickable(onClick = selectMarket)
+                    text = strings.priceTierCountLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = priceTierCount == 2,
+                        onClick = { onPriceTierCountChange(2) }
+                    )
+                    Text(
+                        text = strings.tierCountTwoLabel,
+                        modifier = Modifier
+                            .clickable { onPriceTierCountChange(2) }
+                            .padding(end = 16.dp)
+                    )
+                    RadioButton(
+                        selected = priceTierCount == 3,
+                        onClick = { onPriceTierCountChange(3) }
+                    )
+                    Text(
+                        text = strings.tierCountThreeLabel,
+                        modifier = Modifier.clickable { onPriceTierCountChange(3) }
+                    )
+                }
             }
         }
 
-        if (marketPrice) {
-            // No numeric price for market-price items.
-            Text(
-                text = strings.marketPriceMode,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else if (!hasVariablePrice) {
-            // Single Price
-            OutlinedTextField(
-                value = priceText,
-                onValueChange = { value ->
-                    // Allow only valid decimal input
-                    if (value.isEmpty() || value.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
-                        onPriceChange(value)
-                    }
-                },
-                label = { Text("${strings.priceLabel} *") },
+        // Hot/Cold checkbox — visible only for Beverage-routed categories
+        if (isBeverageRouted) {
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                prefix = { Text("RM ") }
-            )
-        } else {
-            // Multiple Price: three fixed sizes — Small / Medium / Large. All three are shown
-            // as separate options when ordering; there's no single "active" price.
-            Text(
-                text = "Small / Medium / Large — all three appear when ordering",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SizePriceField("Small (S)", priceOption1Text, onPriceOption1Change)
-            SizePriceField("Medium (M)", priceOption2Text, onPriceOption2Change)
-            SizePriceField("Large (L)", priceOption3Text, onPriceOption3Change)
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(checked = hotColdEnabled, onCheckedChange = onHotColdEnabledChange)
+                Text(strings.hotColdCheckboxLabel)
+            }
+        }
+
+        // Price field layout: 2×2 matrix on (hasVariablePrice, hotColdEnabled)
+        when {
+            !hasVariablePrice && !hotColdEnabled -> {
+                // Single Price
+                OutlinedTextField(
+                    value = priceText,
+                    onValueChange = { value ->
+                        // Allow only valid decimal input
+                        if (value.isEmpty() || value.matches(Regex("^\\d*\\.?\\d{0,2}$"))) {
+                            onPriceChange(value)
+                        }
+                    },
+                    label = { Text("${strings.priceLabel} *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    prefix = { Text("RM ") }
+                )
+            }
+            !hasVariablePrice && hotColdEnabled -> {
+                // Hot/Cold side-by-side pair
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SizePriceField(strings.hotPriceLabel, priceText, onPriceChange, modifier = Modifier.weight(1f))
+                    SizePriceField(strings.coldPriceLabel, coldPriceText, onColdPriceChange, modifier = Modifier.weight(1f))
+                }
+            }
+            hasVariablePrice && !hotColdEnabled -> {
+                // Multiple Price: tier-count-aware sizes.
+                Text(
+                    text = if (priceTierCount == 2) strings.tierCountTwoHint else strings.tierCountThreeHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SizePriceField(strings.sizeSmallLabel, priceOption1Text, onPriceOption1Change)
+                if (priceTierCount == 3) {
+                    SizePriceField(strings.sizeMediumLabel, priceOption2Text, onPriceOption2Change)
+                }
+                SizePriceField(strings.sizeLargeLabel, priceOption3Text, onPriceOption3Change)
+            }
+            else -> { // hasVariablePrice && hotColdEnabled
+                Text(
+                    text = if (priceTierCount == 2) strings.tierCountTwoHint else strings.tierCountThreeHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                HotColdSizeRow(strings.sizeSmallLabel, priceOption1Text, onPriceOption1Change, coldPriceOption1Text, onColdPriceOption1Change, strings)
+                if (priceTierCount == 3) {
+                    HotColdSizeRow(strings.sizeMediumLabel, priceOption2Text, onPriceOption2Change, coldPriceOption2Text, onColdPriceOption2Change, strings)
+                }
+                HotColdSizeRow(strings.sizeLargeLabel, priceOption3Text, onPriceOption3Change, coldPriceOption3Text, onColdPriceOption3Change, strings)
+            }
         }
 
         // Toggles
@@ -768,14 +894,25 @@ private fun ItemFormContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Save button. Market-price items need no numeric price.
+        // Save button.
         val priceValid = when {
-            marketPrice -> true
-            hasVariablePrice ->
-                (priceOption1Text.toDoubleOrNull() ?: 0.0) > 0 &&
-                    (priceOption2Text.toDoubleOrNull() ?: 0.0) > 0 &&
-                    (priceOption3Text.toDoubleOrNull() ?: 0.0) > 0
-            else -> (priceText.toDoubleOrNull() ?: 0.0) > 0
+            hasVariablePrice -> {
+                val s = priceOption1Text.toDoubleOrNull() ?: 0.0
+                val l = priceOption3Text.toDoubleOrNull() ?: 0.0
+                val m = priceOption2Text.toDoubleOrNull() ?: 0.0
+                val baseOk = s > 0 && l > 0 && (priceTierCount == 2 || m > 0)
+                if (!hotColdEnabled) baseOk else {
+                    val sc = coldPriceOption1Text.toDoubleOrNull() ?: 0.0
+                    val lc = coldPriceOption3Text.toDoubleOrNull() ?: 0.0
+                    val mc = coldPriceOption2Text.toDoubleOrNull() ?: 0.0
+                    baseOk && sc > 0 && lc > 0 && (priceTierCount == 2 || mc > 0)
+                }
+            }
+            else -> {
+                val hot = priceText.toDoubleOrNull() ?: 0.0
+                val hotOk = hot > 0
+                if (!hotColdEnabled) hotOk else hotOk && (coldPriceText.toDoubleOrNull() ?: 0.0) > 0
+            }
         }
         Button(
             onClick = onSave,
@@ -794,12 +931,35 @@ private fun ItemFormContent(
     }
 }
 
+/** Hot/Cold price pair for a single size (e.g. Small → Hot S, Cold S). */
+@Composable
+private fun HotColdSizeRow(
+    sizeLabel: String,
+    hotText: String,
+    onHotChange: (String) -> Unit,
+    coldText: String,
+    onColdChange: (String) -> Unit,
+    strings: UiStrings
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(sizeLabel, style = MaterialTheme.typography.labelMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            SizePriceField("${strings.hotPriceLabel} ($sizeLabel)", hotText, onHotChange, modifier = Modifier.weight(1f))
+            SizePriceField("${strings.coldPriceLabel} ($sizeLabel)", coldText, onColdChange, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
 /** One size's price field (Small/Medium/Large) — no "active" selection; all sizes are offered. */
 @Composable
 private fun SizePriceField(
     label: String,
     value: String,
     onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth()
 ) {
     OutlinedTextField(
         value = value,
@@ -809,7 +969,7 @@ private fun SizePriceField(
             }
         },
         label = { Text(label) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         prefix = { Text("RM ") }

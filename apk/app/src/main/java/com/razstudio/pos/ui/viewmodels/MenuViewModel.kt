@@ -307,7 +307,13 @@ class MenuViewModel @Inject constructor(
         nameTa: String = "",
         nameTh: String = "",
         extraCategories: String = "",
-        id: String = UUID.randomUUID().toString()
+        id: String = UUID.randomUUID().toString(),
+        priceTierCount: Int? = null,
+        hotColdEnabled: Boolean = false,
+        coldPrice: Double? = null,
+        coldPriceOption1: Double? = null,
+        coldPriceOption2: Double? = null,
+        coldPriceOption3: Double? = null
     ) {
         viewModelScope.launch {
             ensureCategory(category)
@@ -333,7 +339,13 @@ class MenuViewModel @Inject constructor(
                 variablePriceDailyPrompt = variablePriceDailyPrompt,
                 priceOption1 = priceOption1,
                 priceOption2 = priceOption2,
-                priceOption3 = priceOption3
+                priceOption3 = priceOption3,
+                priceTierCount = priceTierCount,
+                hotColdEnabled = hotColdEnabled,
+                coldPrice = coldPrice,
+                coldPriceOption1 = coldPriceOption1,
+                coldPriceOption2 = coldPriceOption2,
+                coldPriceOption3 = coldPriceOption3
             )
             menuDao.upsertAll(listOf(newItem))
             loadItems()
@@ -361,7 +373,13 @@ class MenuViewModel @Inject constructor(
         nameZh: String = "",
         nameTa: String = "",
         nameTh: String = "",
-        extraCategories: String = ""
+        extraCategories: String = "",
+        priceTierCount: Int? = null,
+        hotColdEnabled: Boolean = false,
+        coldPrice: Double? = null,
+        coldPriceOption1: Double? = null,
+        coldPriceOption2: Double? = null,
+        coldPriceOption3: Double? = null
     ) {
         viewModelScope.launch {
             ensureCategory(category)
@@ -387,7 +405,13 @@ class MenuViewModel @Inject constructor(
                 variablePriceDailyPrompt = variablePriceDailyPrompt,
                 priceOption1 = priceOption1,
                 priceOption2 = priceOption2,
-                priceOption3 = priceOption3
+                priceOption3 = priceOption3,
+                priceTierCount = priceTierCount,
+                hotColdEnabled = hotColdEnabled,
+                coldPrice = coldPrice,
+                coldPriceOption1 = coldPriceOption1,
+                coldPriceOption2 = coldPriceOption2,
+                coldPriceOption3 = coldPriceOption3
             )
             menuDao.upsertAll(listOf(updatedItem))
             loadItems()
@@ -504,6 +528,12 @@ class MenuViewModel @Inject constructor(
                 item.priceOption1?.let { put("priceOption1", it) }
                 item.priceOption2?.let { put("priceOption2", it) }
                 item.priceOption3?.let { put("priceOption3", it) }
+                item.priceTierCount?.let { put("priceTierCount", it) }
+                put("hotColdEnabled", item.hotColdEnabled)
+                item.coldPrice?.let { put("coldPrice", it) }
+                item.coldPriceOption1?.let { put("coldPriceOption1", it) }
+                item.coldPriceOption2?.let { put("coldPriceOption2", it) }
+                item.coldPriceOption3?.let { put("coldPriceOption3", it) }
                 put("name", nameObj)
             }
         }

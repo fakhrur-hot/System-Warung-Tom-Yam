@@ -416,7 +416,7 @@ fun StaffTableViewScreen(
             language = language,
             strings = strings,
             isSubmitting = orderEntry.isSubmitting,
-            onAdd = { item, note, size, price -> viewModel.addToCart(item, 1, note, size, price) },
+            onAdd = { item, note, size, price, variant -> viewModel.addToCart(item, 1, note, size, price, variant) },
             // A hand-typed charge enters the cart as a synthetic menu item, so every existing cart
             // path (dedupe, receipt preview, submit) handles it unchanged.
             onAddCustom = { name, price ->

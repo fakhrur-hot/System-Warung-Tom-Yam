@@ -108,6 +108,8 @@ class ManualDineInViewModel @Inject constructor(
         /** Size label ("S"/"M"/"L") + chosen price for a variable-price item; null otherwise. */
         val size: String? = null,
         val unitPrice: Double? = null,
+        /** "HOT" or "COLD" for a Hot/Cold-split item; null otherwise. */
+        val variant: String? = null,
     )
 
     data class UiState(
@@ -237,13 +239,13 @@ class ManualDineInViewModel @Inject constructor(
     }
 
     /** Add one unit of a specific Small/Medium/Large size (its own cart line). */
-    fun addSized(menuItemId: String, size: String, unitPrice: Double) {
+    fun addSized(menuItemId: String, size: String, unitPrice: Double, variant: String? = null) {
         val currentCart = _uiState.value.cartItems.toMutableList()
-        val idx = currentCart.indexOfFirst { it.menuItemId == menuItemId && it.size == size }
+        val idx = currentCart.indexOfFirst { it.menuItemId == menuItemId && it.size == size && it.variant == variant }
         if (idx >= 0) {
             currentCart[idx] = currentCart[idx].copy(quantity = currentCart[idx].quantity + 1)
         } else {
-            currentCart.add(CartItem(menuItemId = menuItemId, quantity = 1, size = size, unitPrice = unitPrice))
+            currentCart.add(CartItem(menuItemId = menuItemId, quantity = 1, size = size, unitPrice = unitPrice, variant = variant))
         }
         _uiState.value = _uiState.value.copy(cartItems = currentCart)
     }
@@ -261,9 +263,9 @@ class ManualDineInViewModel @Inject constructor(
     }
 
     /** Remove one unit of a specific size line (for the size steppers on variable-price items). */
-    fun removeSized(menuItemId: String, size: String) {
+    fun removeSized(menuItemId: String, size: String, variant: String? = null) {
         val currentCart = _uiState.value.cartItems.toMutableList()
-        val idx = currentCart.indexOfFirst { it.menuItemId == menuItemId && it.size == size }
+        val idx = currentCart.indexOfFirst { it.menuItemId == menuItemId && it.size == size && it.variant == variant }
         if (idx < 0) return
         val line = currentCart[idx]
         if (line.quantity > 1) currentCart[idx] = line.copy(quantity = line.quantity - 1)
@@ -343,7 +345,8 @@ class ManualDineInViewModel @Inject constructor(
                 quantity = cartItem.quantity,
                 note = cartItem.note,
                 unitPrice = cartItem.unitPrice,
-                size = cartItem.size
+                size = cartItem.size,
+                variant = cartItem.variant
             )
         }
 

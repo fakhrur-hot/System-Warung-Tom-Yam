@@ -260,6 +260,8 @@ class TableViewViewModel @Inject constructor(
         val size: String? = null,
         /** Chosen size price; null means use the item's base price. */
         val unitPrice: Double? = null,
+        /** "HOT" or "COLD" for a Hot/Cold-split item; null otherwise. */
+        val variant: String? = null,
     )
 
     data class OrderEntryState(
@@ -295,16 +297,16 @@ class TableViewViewModel @Inject constructor(
         }
     }
 
-    fun addToCart(item: MenuItem, note: String? = null, size: String? = null, unitPrice: Double? = null) {
+    fun addToCart(item: MenuItem, note: String? = null, size: String? = null, unitPrice: Double? = null, variant: String? = null) {
         val n = note?.trim()?.ifBlank { null }
         val cart = _orderEntry.value.cart.toMutableList()
-        // Plain repeats of the same dish+size merge (×2, ×3); a different note or size is its
-        // own line (so Small and Large of the same dish stay separate).
-        val idx = cart.indexOfFirst { it.menuItem.id == item.id && it.note == n && it.size == size }
+        // Plain repeats of the same dish+size+variant merge (×2, ×3); a different note, size, or
+        // variant is its own line (so Small and Large of the same dish stay separate).
+        val idx = cart.indexOfFirst { it.menuItem.id == item.id && it.note == n && it.size == size && it.variant == variant }
         if (idx >= 0) {
             cart[idx] = cart[idx].copy(quantity = cart[idx].quantity + 1)
         } else {
-            cart.add(EntryCartItem(item, 1, n, size, unitPrice))
+            cart.add(EntryCartItem(item, 1, n, size, unitPrice, variant))
         }
         _orderEntry.value = _orderEntry.value.copy(cart = cart)
     }
@@ -330,7 +332,7 @@ class TableViewViewModel @Inject constructor(
         // toNewOrderItem, not a raw NewOrderItem: a hand-typed "+ Customized" line lives in the cart
         // as a synthetic menu item, and only that helper carries its typed name onto the wire.
         val items = entry.cart.map {
-            it.menuItem.toNewOrderItem(it.quantity, it.note, it.size, it.unitPrice)
+            it.menuItem.toNewOrderItem(it.quantity, it.note, it.size, it.unitPrice, it.variant)
         }
 
         orderHoldJob = viewModelScope.launch {

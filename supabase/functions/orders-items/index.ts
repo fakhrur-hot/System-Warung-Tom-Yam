@@ -135,7 +135,12 @@ serve(async (req) => {
 
     // Small/Medium/Large: honor the client's chosen size price (validated) and bake the size
     // into the display name ("Nasi Goreng (L)").
-    const priced = resolveSizedLine(menuItem, item);
+    let priced: { name: string; price: number };
+    try {
+      priced = resolveSizedLine(menuItem, item);
+    } catch (e) {
+      return errorResponse(422, "VALIDATION", (e as Error).message);
+    }
 
     // sentToKitchen follows the customerOrderAutoPrint setting: true means print
     // immediately (current default), false means hold for cashier confirmation.
@@ -257,6 +262,12 @@ interface MenuItemInfo {
   marketPrice: boolean;
   hasVariablePrice: boolean;
   priceOptions: number[];
+  /** True when the item offers separate Hot/Cold pricing. */
+  hotColdEnabled: boolean;
+  /** Cold counterpart of price (single-price Hot/Cold item). */
+  coldPrice: number | null;
+  /** Cold counterparts of priceOption1/2/3 (variable-price Hot/Cold item). */
+  coldPriceOptions: number[];
 }
 
 // Collect the Small/Medium/Large preset prices present on a menu item.
@@ -266,27 +277,71 @@ function priceOptionsOf(mi: Record<string, unknown>): number[] {
     .filter((n) => Number.isFinite(n) && n > 0);
 }
 
+// Collect the Cold Small/Medium/Large preset prices present on a menu item.
+function coldPriceOptionsOf(mi: Record<string, unknown>): number[] {
+  return [mi.coldPriceOption1, mi.coldPriceOption2, mi.coldPriceOption3]
+    .map((v) => Number(v))
+    .filter((n) => Number.isFinite(n) && n > 0);
+}
+
 /**
- * Resolve a line's price + display name for a Small/Medium/Large item. A client unitPrice is
- * honored only when it matches a preset (anti-tamper); the size is baked inline into the name.
+ * Resolve a line's price + display name for a Small/Medium/Large item, now also
+ * handling the Hot/Cold variant.
+ *
+ * A client unitPrice is honored only when it matches a preset (anti-tamper);
+ * the size and variant are baked inline into the name as a combined suffix →
+ * "Nasi Goreng (L, Hot)".
  */
 function resolveSizedLine(
   menuItem: MenuItemInfo,
-  item: { unitPrice?: unknown; size?: unknown },
+  item: { unitPrice?: unknown; size?: unknown; variant?: unknown },
 ): { name: string; price: number } {
-  let price = menuItem.price;
+  // Determine the variant
+  const variant = typeof item.variant === "string" &&
+    (item.variant === "HOT" || item.variant === "COLD")
+    ? item.variant
+    : null;
+
+  // Validate variant against hotColdEnabled
+  if (variant && !menuItem.hotColdEnabled) {
+    throw new Error("Item does not offer Hot/Cold");
+  }
+
+  // Resolve the price
+  let price = variant === "COLD" && menuItem.coldPrice != null && menuItem.coldPrice > 0
+    ? menuItem.coldPrice
+    : menuItem.price;
+
   const chosen = Number(item.unitPrice);
-  if (
-    Number.isFinite(chosen) && chosen > 0 &&
-    menuItem.hasVariablePrice && menuItem.priceOptions.includes(chosen)
-  ) {
-    price = chosen;
+  if (Number.isFinite(chosen) && chosen > 0) {
+    if (variant === "COLD") {
+      // For COLD variant: validate against cold price options (variable) or coldPrice (single)
+      if (menuItem.hasVariablePrice && menuItem.coldPriceOptions.includes(chosen)) {
+        price = chosen;
+      } else if (!menuItem.hasVariablePrice && menuItem.coldPrice != null && chosen === menuItem.coldPrice) {
+        price = chosen;
+      }
+    } else {
+      // For HOT or no variant: validate against hot/base price options
+      if (menuItem.hasVariablePrice && menuItem.priceOptions.includes(chosen)) {
+        price = chosen;
+      }
+    }
   }
+
+  // Build the combined suffix from size + variant
   let name = menuItem.name;
+  const parts: string[] = [];
   if (typeof item.size === "string" && item.size.trim()) {
-    const size = item.size.trim().slice(0, 8).replace(/[()]/g, "");
-    if (size) name = `${name} (${size})`;
+    parts.push(item.size.trim().slice(0, 8).replace(/[()]/g, ""));
   }
+  if (variant) {
+    parts.push(variant === "HOT" ? "Hot" : "Cold");
+  }
+  if (parts.length) {
+    name = `${name} (${parts.join(", ")})`;
+  }
+
   return { name, price };
 }
 
@@ -322,6 +377,7 @@ function buildMenuLookup(menuJson: unknown): Map<string, MenuItemInfo> {
         for (const item of category.items) {
           const mi = item as Record<string, unknown>;
           if (mi.id && mi.available !== false) {
+            const coldP = Number(mi.coldPrice);
             map.set(mi.id as string, {
               name: extractDisplayName(mi.name),
               price: Number(mi.price) || 0,
@@ -330,6 +386,9 @@ function buildMenuLookup(menuJson: unknown): Map<string, MenuItemInfo> {
               marketPrice: mi.marketPrice === true,
               hasVariablePrice: mi.hasVariablePrice === true,
               priceOptions: priceOptionsOf(mi),
+              hotColdEnabled: mi.hotColdEnabled === true,
+              coldPrice: Number.isFinite(coldP) && coldP > 0 ? coldP : null,
+              coldPriceOptions: coldPriceOptionsOf(mi),
             });
           }
         }
@@ -341,6 +400,7 @@ function buildMenuLookup(menuJson: unknown): Map<string, MenuItemInfo> {
     for (const item of menu.items) {
       const mi = item as Record<string, unknown>;
       if (mi.id && mi.available !== false) {
+        const coldP = Number(mi.coldPrice);
         map.set(mi.id as string, {
           name: extractDisplayName(mi.name),
           price: Number(mi.price) || 0,
@@ -349,6 +409,9 @@ function buildMenuLookup(menuJson: unknown): Map<string, MenuItemInfo> {
           marketPrice: mi.marketPrice === true,
           hasVariablePrice: mi.hasVariablePrice === true,
           priceOptions: priceOptionsOf(mi),
+          hotColdEnabled: mi.hotColdEnabled === true,
+          coldPrice: Number.isFinite(coldP) && coldP > 0 ? coldP : null,
+          coldPriceOptions: coldPriceOptionsOf(mi),
         });
       }
     }

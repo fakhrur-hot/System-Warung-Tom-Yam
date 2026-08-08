@@ -713,7 +713,7 @@ fun AdminHomeScreen(
             language = language,
             strings = strings,
             isSubmitting = orderEntry.isSubmitting,
-            onAdd = { item, note, size, price -> tableViewModel.addToCart(item, note, size, price) },
+            onAdd = { item, note, size, price, variant -> tableViewModel.addToCart(item, note, size, price, variant) },
             // A hand-typed charge enters the cart as a synthetic menu item, so every existing cart
             // path (dedupe, receipt preview, submit) handles it unchanged.
             onAddCustom = { name, price ->

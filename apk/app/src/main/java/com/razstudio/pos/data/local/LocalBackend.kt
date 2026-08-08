@@ -1292,13 +1292,27 @@ class LocalBackend @Inject constructor(
         // price, and they are all this line will ever have.
         val custom = customName?.takeIf { menuItemId.startsWith(CUSTOM_CHARGE_ID_PREFIX) }?.trim()
             ?.take(CUSTOM_CHARGE_NAME_MAX)?.ifBlank { null }
+
+        val baseName = custom ?: menu?.nameEn ?: menuItemId
+        // Build a combined suffix from size and variant, e.g. "(M, Hot)", "(S)", "(Cold)".
+        // Only bake when there's no custom name (custom charges keep their typed name verbatim).
+        val suffixParts = buildList {
+            this@toEntity.size?.trim()?.take(8)?.replace("(", "")?.replace(")", "")
+                ?.takeIf { it.isNotBlank() }?.let(::add)
+            if (menu?.hotColdEnabled == true && (variant == "HOT" || variant == "COLD")) {
+                add(if (variant == "HOT") "Hot" else "Cold")
+            }
+        }
+        val name = if (custom != null || suffixParts.isEmpty()) baseName
+            else "$baseName (${suffixParts.joinToString(", ")})"
+
         return OrderItem(
             id = UUID.randomUUID().toString(),
             orderId = orderId,
             menuItemId = menuItemId,
             // Backend bakes the English name as the line-item snapshot; clients re-resolve per locale
             // at display/print time from the live menu (PrintService.localizeItemNames).
-            nameSnapshot = custom ?: menu?.nameEn ?: menuItemId,
+            nameSnapshot = name,
             unitPriceSnapshot = unitPrice ?: menu?.price ?: 0.0,
             categorySnapshot = menu?.category ?: "",
             quantity = quantity,

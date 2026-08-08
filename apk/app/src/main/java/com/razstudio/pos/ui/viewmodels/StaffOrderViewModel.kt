@@ -134,7 +134,9 @@ class StaffOrderViewModel @Inject constructor(
         val quantity: Int,
         val note: String? = null,
         val size: String? = null,
-        val unitPrice: Double? = null
+        val unitPrice: Double? = null,
+        /** "HOT" or "COLD" for a Hot/Cold-split item; null otherwise. */
+        val variant: String? = null,
     )
 
     data class OrderEntryState(
@@ -931,18 +933,19 @@ class StaffOrderViewModel @Inject constructor(
         note: String? = null,
         size: String? = null,
         unitPrice: Double? = null,
+        variant: String? = null,
     ) {
         val n = note?.trim()?.ifBlank { null }
         val currentCart = _orderEntry.value.cart.toMutableList()
-        // Same dish + same note + same size merges (×2, ×3); a distinct note or size is its own line.
+        // Same dish + same note + same size + same variant merges (×2, ×3); a distinct note, size, or variant is its own line.
         val existing = currentCart.indexOfFirst {
-            it.menuItem.id == menuItem.id && it.note == n && it.size == size
+            it.menuItem.id == menuItem.id && it.note == n && it.size == size && it.variant == variant
         }
         if (existing >= 0) {
             val item = currentCart[existing]
             currentCart[existing] = item.copy(quantity = item.quantity + quantity)
         } else {
-            currentCart.add(CartItem(menuItem = menuItem, quantity = quantity, note = n, size = size, unitPrice = unitPrice))
+            currentCart.add(CartItem(menuItem = menuItem, quantity = quantity, note = n, size = size, unitPrice = unitPrice, variant = variant))
         }
         _orderEntry.value = _orderEntry.value.copy(cart = currentCart)
     }
@@ -1008,6 +1011,7 @@ class StaffOrderViewModel @Inject constructor(
                 note = cartItem.note,
                 size = cartItem.size,
                 unitPrice = cartItem.unitPrice,
+                variant = cartItem.variant,
             )
         }
 
@@ -1078,6 +1082,7 @@ class StaffOrderViewModel @Inject constructor(
                     if (item.note != null) put("note", item.note)
                     if (item.unitPrice != null) put("unitPrice", item.unitPrice)
                     if (item.size != null) put("size", item.size)
+                    if (item.variant != null) put("variant", item.variant)
                     // Without this an offline-queued custom charge would replay as a nameless line.
                     if (item.customName != null) put("customName", item.customName)
                 })
@@ -1130,6 +1135,7 @@ class StaffOrderViewModel @Inject constructor(
                         note = obj.optStringOrNull("note"),
                         unitPrice = if (obj.has("unitPrice")) obj.getDouble("unitPrice") else null,
                         size = obj.optStringOrNull("size"),
+                        variant = obj.optStringOrNull("variant"),
                         customName = obj.optStringOrNull("customName")
                     )
                 )

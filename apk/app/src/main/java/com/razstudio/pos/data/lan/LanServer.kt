@@ -540,6 +540,7 @@ class LanServer @Inject constructor(
                 note = o.optString("note", "").ifBlank { null },
                 unitPrice = if (o.has("unitPrice")) o.optDouble("unitPrice") else null,
                 size = o.optString("size", "").ifBlank { null },
+                variant = o.optString("variant", "").ifBlank { null },
                 // A staff device may relay a cashier-typed custom charge; the name has to survive
                 // the hop or the line arrives priced-but-nameless on the admin device.
                 customName = o.optString("customName", "").ifBlank { null },

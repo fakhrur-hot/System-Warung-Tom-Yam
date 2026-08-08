@@ -803,6 +803,7 @@ class ApiClient @Inject constructor(
                         if (item.note != null) put("note", item.note)
                         if (item.unitPrice != null) put("unitPrice", item.unitPrice)
                         if (item.size != null) put("size", item.size)
+                        if (item.variant != null) put("variant", item.variant)
                         if (item.customName != null) put("customName", item.customName)
                     })
                 }
@@ -1428,6 +1429,7 @@ class ApiClient @Inject constructor(
                     if (item.note != null) put("note", item.note)
                     if (item.unitPrice != null) put("unitPrice", item.unitPrice)
                     if (item.size != null) put("size", item.size)
+                    if (item.variant != null) put("variant", item.variant)
                     if (item.customName != null) put("customName", item.customName)
                 })
             }
@@ -1639,6 +1641,7 @@ class ApiClient @Inject constructor(
                         if (item.note != null) put("note", item.note)
                         if (item.unitPrice != null) put("unitPrice", item.unitPrice)
                         if (item.size != null) put("size", item.size)
+                        if (item.variant != null) put("variant", item.variant)
                         if (item.customName != null) put("customName", item.customName)
                     })
                 }
@@ -2315,6 +2318,7 @@ class ApiClient @Inject constructor(
                     if (item.note != null) put("note", item.note)
                     if (item.unitPrice != null) put("unitPrice", item.unitPrice)
                     if (item.size != null) put("size", item.size)
+                    if (item.variant != null) put("variant", item.variant)
                     if (item.customName != null) put("customName", item.customName)
                 })
             }
@@ -3178,6 +3182,10 @@ data class NewOrderItem(
     val unitPrice: Double? = null,
     /** Size label baked into the name server-side, e.g. "S"/"M"/"L". */
     val size: String? = null,
+    /** "HOT" or "COLD" for a Hot/Cold-split item; null otherwise. Baked into the name
+     *  alongside [size], same trust model — validated server-side against the menu item's
+     *  hotColdEnabled flag, never trusted as free text. */
+    val variant: String? = null,
     /**
      * Cashier-typed name for a **custom charge** — a bill line with no menu item behind it (see
      * [CUSTOM_CHARGE_ID_PREFIX]). Non-null only when [menuItemId] carries that prefix, in which case

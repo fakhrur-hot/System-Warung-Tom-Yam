@@ -66,6 +66,7 @@ fun MenuItem.toNewOrderItem(
     note: String? = null,
     size: String? = null,
     unitPrice: Double? = null,
+    variant: String? = null,
 ): NewOrderItem = NewOrderItem(
     menuItemId = id,
     quantity = quantity,
@@ -73,6 +74,7 @@ fun MenuItem.toNewOrderItem(
     // A custom charge's price is the only price it has — there is no menu row to fall back to.
     unitPrice = if (isCustomCharge) (unitPrice ?: price) else unitPrice,
     size = size,
+    variant = variant,
     customName = if (isCustomCharge) nameEn else null,
 )
 

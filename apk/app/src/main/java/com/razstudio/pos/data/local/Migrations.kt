@@ -454,3 +454,45 @@ val MIGRATION_21_22 = object : Migration(21, 22) {
         )
     }
 }
+
+/**
+ * v22 → v23: Menu Pricing Redesign — add tier count, Hot/Cold columns, and backfill.
+ *
+ * Adds six columns to `menu_items`:
+ *  - `priceTierCount`   — nullable INTEGER; 2 or 3 for variable-price items.
+ *  - `hotColdEnabled`   — non-null INTEGER (boolean), default 0.
+ *  - `coldPrice`        — nullable REAL; cold single-price counterpart.
+ *  - `coldPriceOption1` — nullable REAL; cold Small price.
+ *  - `coldPriceOption2` — nullable REAL; cold Medium price.
+ *  - `coldPriceOption3` — nullable REAL; cold Large price.
+ *
+ * Backfills `priceTierCount` for existing variable-price rows so order entry and the daily
+ * popup work immediately after upgrade without requiring the admin to re-edit each item.
+ *
+ * Folds legacy `marketPrice = true` rows into `askMeDaily = true` (Requirement 1.4): the
+ * Market Price radio is removed from the UI, and its only behavioral difference (prompt for
+ * price daily) is already covered by `askMeDaily`.
+ */
+val MIGRATION_22_23 = object : Migration(22, 23) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE menu_items ADD COLUMN priceTierCount INTEGER")
+        db.execSQL("ALTER TABLE menu_items ADD COLUMN hotColdEnabled INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE menu_items ADD COLUMN coldPrice REAL")
+        db.execSQL("ALTER TABLE menu_items ADD COLUMN coldPriceOption1 REAL")
+        db.execSQL("ALTER TABLE menu_items ADD COLUMN coldPriceOption2 REAL")
+        db.execSQL("ALTER TABLE menu_items ADD COLUMN coldPriceOption3 REAL")
+
+        // Backfill priceTierCount for existing variable-price rows
+        db.execSQL(
+            """UPDATE menu_items SET priceTierCount = 3
+               WHERE hasVariablePrice = 1 AND priceOption3 IS NOT NULL"""
+        )
+        db.execSQL(
+            """UPDATE menu_items SET priceTierCount = 2
+               WHERE hasVariablePrice = 1 AND priceOption3 IS NULL"""
+        )
+
+        // Requirement 1.4: fold legacy Market Price into Single Price + Ask Me Daily
+        db.execSQL("UPDATE menu_items SET askMeDaily = 1 WHERE marketPrice = 1")
+    }
+}

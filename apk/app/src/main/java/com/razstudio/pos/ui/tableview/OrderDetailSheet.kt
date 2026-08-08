@@ -493,17 +493,17 @@ fun OrderDetailSheet(
                         menuItems = menuItems,
                         language = language,
                         strings = strings,
-                        onAdd = { menuItem, note, size, unitPrice ->
+                        onAdd = { menuItem, note, size, unitPrice, variant ->
                             val n = note?.trim()?.ifBlank { null }
                             val existing = stagedCart.indexOfFirst {
-                                it.menuItem.id == menuItem.id && it.note == n && it.size == size
+                                it.menuItem.id == menuItem.id && it.note == n && it.size == size && it.variant == variant
                             }
                             stagedCart = if (existing >= 0) {
                                 stagedCart.toMutableList().also {
                                     it[existing] = it[existing].copy(quantity = it[existing].quantity + 1)
                                 }
                             } else {
-                                stagedCart + StagedCartLine(menuItem, 1, n, size, unitPrice)
+                                stagedCart + StagedCartLine(menuItem, 1, n, size, unitPrice, variant)
                             }
                         },
                     )
@@ -566,7 +566,7 @@ fun OrderDetailSheet(
                             onAddItems(
                                 order.id,
                                 stagedCart.map {
-                                    it.menuItem.toNewOrderItem(it.quantity, it.note, it.size, it.unitPrice)
+                                    it.menuItem.toNewOrderItem(it.quantity, it.note, it.size, it.unitPrice, it.variant)
                                 },
                             )
                             stagedCart = emptyList()
@@ -1345,6 +1345,8 @@ private data class StagedCartLine(
     val note: String? = null,
     val size: String? = null,
     val unitPrice: Double? = null,
+    /** "HOT" or "COLD" for a Hot/Cold-split item; null otherwise. */
+    val variant: String? = null,
 )
 
 

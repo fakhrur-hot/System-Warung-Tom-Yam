@@ -47,7 +47,28 @@ data class MenuItem(
     val variablePriceDailyPrompt: Boolean = false,
     val priceOption1: Double? = null,
     val priceOption2: Double? = null,
-    val priceOption3: Double? = null
+    val priceOption3: Double? = null,
+
+    // ── NEW ──────────────────────────────────────────────────────────────
+    /**
+     * Meaningful only when [hasVariablePrice] is true: 2 (Small/Large, using
+     * [priceOption1]/[priceOption3] — priceOption2 stays null) or 3 (Small/Medium/Large,
+     * all three slots used). Stored explicitly rather than derived from which slots are
+     * non-null, because a null [priceOption2] must unambiguously mean "2-tier item", not
+     * "admin left Medium blank by mistake".
+     */
+    val priceTierCount: Int? = null,
+
+    /** True only for a Beverage-routed category item that offers separate Hot/Cold pricing. */
+    val hotColdEnabled: Boolean = false,
+
+    /** Cold counterpart of [price], used only when [hotColdEnabled] && !hasVariablePrice. */
+    val coldPrice: Double? = null,
+
+    /** Cold counterparts of priceOption1/2/3, used only when [hotColdEnabled] && [hasVariablePrice]. */
+    val coldPriceOption1: Double? = null,
+    val coldPriceOption2: Double? = null,
+    val coldPriceOption3: Double? = null
 ) {
     /** All categories this item belongs to: the primary [category] plus any [extraCategories]. */
     fun allCategories(): List<String> =
