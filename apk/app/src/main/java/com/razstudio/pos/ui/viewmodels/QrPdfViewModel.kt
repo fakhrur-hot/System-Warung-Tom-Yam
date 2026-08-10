@@ -51,8 +51,11 @@ class QrPdfViewModel @Inject constructor(
     val uiState: StateFlow<QrPdfUiState> = _uiState.asStateFlow()
 
     init {
-        // Header logo: a logo picked specifically here (persisted, see pickLogo), else the café's
-        // branding logo, else the bundled built-in logo (res/raw/qr_default_logo).
+        // Header logo: a logo picked specifically here (persisted locally, see pickLogo), else the
+        // café's branding logo, else the bundled built-in logo (res/raw/qr_default_logo). The local
+        // copy is the fast path; if it's missing (fresh install, or a second admin device that never
+        // picked one on THIS device) but the backend has one on record, hydrateQrLogoFromBackend
+        // below downloads and caches it, closing the gap this device would otherwise show.
         _uiState.value = _uiState.value.copy(
             logoPreview = LogoPipeline.loadQrLogoFromInternal(context) ?: loadDefaultLogo()
         )
@@ -66,10 +69,38 @@ class QrPdfViewModel @Inject constructor(
                     if (name.isNotBlank()) {
                         _uiState.value = _uiState.value.copy(cafeName = name)
                     }
+                    hydrateQrLogoFromBackend(result.data.qrCardLogoUrl)
                 }
                 else -> { /* leave blank; text mode falls back to a generic file name */ }
             }
         }
+    }
+
+    /**
+     * Reinstall/second-device recovery for the QR-card-specific logo (Requirement: it must survive
+     * a reinstall by living in the backend, not only in this device's `filesDir`). Only runs when
+     * this device has no local copy yet — a device that already has one keeps it, so an admin who
+     * picked a logo and immediately regenerates the PDF never pays for a network round-trip.
+     */
+    private suspend fun hydrateQrLogoFromBackend(qrCardLogoUrl: String?) {
+        if (qrCardLogoUrl.isNullOrBlank()) return
+        if (LogoPipeline.loadQrLogoFromInternal(context) != null) return
+        val bytes = withContext(Dispatchers.IO) {
+            try {
+                java.net.URL(qrCardLogoUrl).openStream().use { it.readBytes() }
+            } catch (e: Exception) {
+                null
+            }
+        } ?: return
+        val bmp = withContext(Dispatchers.IO) {
+            try {
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            } catch (e: Exception) {
+                null
+            }
+        } ?: return
+        withContext(Dispatchers.IO) { LogoPipeline.saveQrLogoToInternal(context, bytes) }
+        _uiState.value = _uiState.value.copy(logoPreview = bmp)
     }
 
     /** Switch the card header between the café-name text and a logo image. */
@@ -87,14 +118,18 @@ class QrPdfViewModel @Inject constructor(
         viewModelScope.launch {
             val bmp = withContext(Dispatchers.IO) { decodeAndResize(uri, MAX_LOGO_PX) }
             if (bmp != null) {
-                withContext(Dispatchers.IO) {
-                    val bytes = java.io.ByteArrayOutputStream().use { out ->
+                val bytes = withContext(Dispatchers.IO) {
+                    java.io.ByteArrayOutputStream().use { out ->
                         bmp.compress(Bitmap.CompressFormat.JPEG, 90, out)
                         out.toByteArray()
-                    }
-                    LogoPipeline.saveQrLogoToInternal(context, bytes)
+                    }.also { LogoPipeline.saveQrLogoToInternal(context, it) }
                 }
                 _uiState.value = _uiState.value.copy(logoPreview = bmp, headerMode = QrHeaderMode.LOGO)
+                // Upload so this logo survives a reinstall and shows up on every admin device, not
+                // just this one — mirrors how the branding logo and payment QR are persisted
+                // (Settings → Café Profile). Best-effort: the local copy above already took effect
+                // for this device/session regardless of whether the upload succeeds.
+                uploadQrLogoToBackend(bytes)
             } else {
                 _uiState.value = _uiState.value.copy(error = str().failedToGeneratePdf)
             }
@@ -105,6 +140,23 @@ class QrPdfViewModel @Inject constructor(
     fun resetLogo() {
         LogoPipeline.clearQrLogoFromInternal(context)
         _uiState.value = _uiState.value.copy(logoPreview = loadDefaultLogo())
+        viewModelScope.launch {
+            val name = _uiState.value.cafeName
+            if (name.isNotBlank()) apiClient.putBranding(cafeName = name, removeQrCardLogo = true)
+        }
+    }
+
+    /**
+     * Best-effort upload of the QR-card logo to the backend (Supabase Storage, via the branding
+     * Edge Function). Requires a non-blank café name — the endpoint validates that server-side —
+     * so this silently skips on a brand-new café that hasn't set one yet; the local copy already
+     * saved by [pickLogo] still works for this device in the meantime.
+     */
+    private suspend fun uploadQrLogoToBackend(jpegBytes: ByteArray) {
+        val name = _uiState.value.cafeName
+        if (name.isBlank()) return
+        val base64 = android.util.Base64.encodeToString(jpegBytes, android.util.Base64.NO_WRAP)
+        apiClient.putBranding(cafeName = name, qrCardLogoBase64 = base64)
     }
 
     /**

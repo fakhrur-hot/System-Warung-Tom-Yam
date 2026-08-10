@@ -16,6 +16,7 @@ import com.razstudio.pos.data.local.MIGRATION_19_20
 import com.razstudio.pos.data.local.MIGRATION_20_21
 import com.razstudio.pos.data.local.MIGRATION_21_22
 import com.razstudio.pos.data.local.MIGRATION_22_23
+import com.razstudio.pos.data.local.MIGRATION_23_24
 import com.razstudio.pos.data.local.MIGRATION_8_9
 import com.razstudio.pos.data.local.MIGRATION_9_10
 import com.razstudio.pos.data.local.CashDrawerEventDao
@@ -75,6 +76,7 @@ object DatabaseModule {
                 MIGRATION_20_21,
                 MIGRATION_21_22,
                 MIGRATION_22_23,
+                MIGRATION_23_24,
             )
             .build()
     }

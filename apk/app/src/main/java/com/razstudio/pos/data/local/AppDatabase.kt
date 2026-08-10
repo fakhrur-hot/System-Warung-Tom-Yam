@@ -45,7 +45,7 @@ import com.razstudio.pos.notification.CapturedPaymentDao
         AffiliateProductEntity::class,
         CampaignEntity::class,
     ],
-    version = 23,
+    version = 24,
     // exportSchema = true so MigrationTestHelper can validate the schema after migration.
     // Schema JSON files are written to app/schemas/ and committed to source control so that
     // future migration tests can verify against a stable baseline (Requirement 8.1, 12.6).

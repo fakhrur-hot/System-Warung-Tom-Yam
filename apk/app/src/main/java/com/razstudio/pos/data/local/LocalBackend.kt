@@ -941,6 +941,7 @@ class LocalBackend @Inject constructor(
                 topN = s.topN,
                 staffCanSendKitchen = s.staffCanSendKitchen,
                 staffCanTakePayment = s.staffCanTakePayment,
+                staffQrOnly = s.staffQrOnly,
                 // Customer-web pacing — meaningless without customer QR ordering.
                 customerOrderHoldSeconds = if (caps.customerQrOrdering) s.customerOrderHoldSeconds else 0,
                 customerOrderAutoPrint = if (caps.customerQrOrdering) s.customerOrderAutoPrint else false,
@@ -979,6 +980,7 @@ class LocalBackend @Inject constructor(
                 topN = body.optInt("topN", cur.topN),
                 staffCanSendKitchen = body.optBoolean("staffCanSendKitchen", cur.staffCanSendKitchen),
                 staffCanTakePayment = body.optBoolean("staffCanTakePayment", cur.staffCanTakePayment),
+                staffQrOnly = body.optBoolean("staffQrOnly", cur.staffQrOnly),
                 customerOrderHoldSeconds = body.optInt("customerOrderHoldSeconds", cur.customerOrderHoldSeconds),
                 customerOrderAutoPrint = body.optBoolean("customerOrderAutoPrint", cur.customerOrderAutoPrint),
                 todaysSpecial = body.optString("todaysSpecial", cur.todaysSpecial),
@@ -1050,7 +1052,12 @@ class LocalBackend @Inject constructor(
         paymentQrBase64: String?,
         paymentQrHash: String?,
         removePaymentQr: Boolean,
+        qrCardLogoBase64: String?,
+        removeQrCardLogo: Boolean,
     ): ApiResult<BrandingResponse> {
+        // No cloud Storage to upload to off-cloud (LAN/Kiosk); the QR-card logo stays device-local
+        // here exactly as the branding logo already does — see getBranding()'s KDoc above. Callers
+        // (QrPdfViewModel) already keep the local copy via LogoPipeline regardless of this result.
         if (cafeName.isNotBlank()) appConfigStore.setCafeName(cafeName)
 
         if (removePaymentQr) {

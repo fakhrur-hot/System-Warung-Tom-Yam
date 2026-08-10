@@ -204,6 +204,7 @@ class StaffOrderViewModel @Inject constructor(
         canSendToKitchen = false,
         canTakePayment = false,
         canCancel = true,
+        qrOnly = false,
     ))
     val permissions: StateFlow<StaffPermissions> = _permissions.asStateFlow()
 
@@ -226,7 +227,8 @@ class StaffOrderViewModel @Inject constructor(
             _permissions.value = StaffPermissions(
                 canSendToKitchen = settings.staffCanSendKitchen,
                 canTakePayment = settings.staffCanTakePayment,
-                canCancel = true
+                canCancel = true,
+                qrOnly = settings.staffQrOnly,
             )
         }
     }
@@ -1160,13 +1162,15 @@ class StaffOrderViewModel @Inject constructor(
                             timezone = s.timezone,
                             topN = s.topN,
                             staffCanSendKitchen = s.staffCanSendKitchen,
-                            staffCanTakePayment = s.staffCanTakePayment
+                            staffCanTakePayment = s.staffCanTakePayment,
+                            staffQrOnly = s.staffQrOnly
                         )
                     )
                     _permissions.value = StaffPermissions(
                         canSendToKitchen = s.staffCanSendKitchen,
                         canTakePayment = s.staffCanTakePayment,
-                        canCancel = true
+                        canCancel = true,
+                        qrOnly = s.staffQrOnly,
                     )
                 }
                 is ApiResult.Error -> { }

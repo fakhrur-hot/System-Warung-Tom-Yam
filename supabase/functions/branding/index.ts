@@ -50,7 +50,7 @@ async function handleGetBranding(): Promise<Response> {
   // "server error" tells them nothing they can act on.
   const { data, error } = await supabase
     .from("branding")
-    .select("cafe_name, logo_url, updated_at, payment_qr_url, payment_qr_hash")
+    .select("cafe_name, logo_url, updated_at, payment_qr_url, payment_qr_hash, qr_card_logo_url")
     .eq("id", 1)
     .maybeSingle();
 
@@ -72,6 +72,9 @@ async function handleGetBranding(): Promise<Response> {
     // like a change. See migration 0007 and PaymentQrResolver on the client.
     paymentQrUrl: data.payment_qr_url ?? null,
     paymentQrHash: data.payment_qr_hash ?? null,
+    // QR-card logo: versioned exactly like the branding logo (migration 0018) — a stale image here
+    // has no financial consequence, so it doesn't need the payment QR's hash-cache treatment.
+    qrCardLogoUrl: versionedLogoUrl(data.qr_card_logo_url, data.updated_at),
   });
 }
 
@@ -91,11 +94,16 @@ async function handlePutBranding(req: Request): Promise<Response> {
   let logoUrl: string | null = null;
   let paymentQrUrl: string | null = null;
   let paymentQrHash: string | null = null;
+  let qrCardLogoUrl: string | null = null;
   // Distinguish "not mentioned in this request" from "explicitly cleared". Omitting the field must
   // leave an existing QR alone (the admin is only renaming the café); sending null must remove it,
   // which is what makes the Show QR button disappear on every device (Requirement 14.5).
   const removePaymentQr = Object.prototype.hasOwnProperty.call(body, "paymentQrBase64") &&
     body.paymentQrBase64 === null;
+  // Same distinction for the QR-card-specific logo: omitted leaves it alone, explicit null removes
+  // it (Generate Table QR's "Reset to default" falls back to the branding logo / bundled default).
+  const removeQrCardLogo = Object.prototype.hasOwnProperty.call(body, "qrCardLogoBase64") &&
+    body.qrCardLogoBase64 === null;
 
   // Upload logo if base64 provided
   if (body.logoBase64) {
@@ -162,6 +170,33 @@ async function handlePutBranding(req: Request): Promise<Response> {
     }
   }
 
+  // Upload the QR-card-specific logo if one was supplied. Mirrors the branding logo path — a
+  // fixed object key so re-uploads overwrite, versioned via updated_at rather than content-hashed
+  // (see the qrCardLogoUrl comment in handleGetBranding for why the payment QR's stricter
+  // hash-cache treatment isn't needed here).
+  if (body.qrCardLogoBase64) {
+    try {
+      const binaryStr = atob(body.qrCardLogoBase64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+      const { error: qrLogoUploadError } = await supabase.storage
+        .from("logos")
+        .upload("qr-card-logo.jpg", bytes, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
+      if (qrLogoUploadError) {
+        return errorResponse(500, "SERVER_ERROR", `QR-card logo upload failed: ${qrLogoUploadError.message}`);
+      }
+
+      const { data: qrLogoUrlData } = supabase.storage.from("logos").getPublicUrl("qr-card-logo.jpg");
+      qrCardLogoUrl = qrLogoUrlData.publicUrl;
+    } catch (_e) {
+      return errorResponse(422, "VALIDATION", "Invalid base64 QR-card logo data");
+    }
+  }
+
   // Update branding row
   const now = new Date().toISOString();
   const updatePayload: Record<string, unknown> = {
@@ -178,6 +213,11 @@ async function handlePutBranding(req: Request): Promise<Response> {
     updatePayload.payment_qr_url = null;
     updatePayload.payment_qr_hash = null;
   }
+  if (qrCardLogoUrl) {
+    updatePayload.qr_card_logo_url = qrCardLogoUrl;
+  } else if (removeQrCardLogo) {
+    updatePayload.qr_card_logo_url = null;
+  }
 
   const { error: updateError } = await supabase
     .from("branding")
@@ -191,7 +231,7 @@ async function handlePutBranding(req: Request): Promise<Response> {
   // Read back to get current logo_url (in case no new upload)
   const { data: current } = await supabase
     .from("branding")
-    .select("cafe_name, logo_url, payment_qr_url, payment_qr_hash")
+    .select("cafe_name, logo_url, payment_qr_url, payment_qr_hash, qr_card_logo_url")
     .eq("id", 1)
     .single();
 
@@ -200,6 +240,7 @@ async function handlePutBranding(req: Request): Promise<Response> {
     logoUrl: current?.logo_url || logoUrl,
     paymentQrUrl: current?.payment_qr_url ?? null,
     paymentQrHash: current?.payment_qr_hash ?? null,
+    qrCardLogoUrl: current?.qr_card_logo_url ?? null,
   };
 
   // Broadcast BRANDING_CHANGED on the branding Realtime channel

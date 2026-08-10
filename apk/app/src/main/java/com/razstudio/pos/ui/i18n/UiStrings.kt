@@ -147,6 +147,7 @@ data class UiStringsGroup2(
     val staffPermissionsSection: String,
     val staffCanSendKitchenLabel: String,
     val staffCanTakePaymentLabel: String,
+    val staffQrOnlyLabel: String,
     val cafeLocationSection: String,
     val captureLocationButton: String,
     val radiusLabel: String,
@@ -1089,6 +1090,7 @@ class UiStrings(
     val staffPermissionsSection: String get() = g2.staffPermissionsSection
     val staffCanSendKitchenLabel: String get() = g2.staffCanSendKitchenLabel
     val staffCanTakePaymentLabel: String get() = g2.staffCanTakePaymentLabel
+    val staffQrOnlyLabel: String get() = g2.staffQrOnlyLabel
     val cafeLocationSection: String get() = g2.cafeLocationSection
     val captureLocationButton: String get() = g2.captureLocationButton
     val radiusLabel: String get() = g2.radiusLabel
@@ -1942,6 +1944,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             staffPermissionsSection = "Kebenaran Kakitangan",
             staffCanSendKitchenLabel = "Kakitangan boleh Hantar ke Dapur",
             staffCanTakePaymentLabel = "Kakitangan boleh Terima Bayaran",
+            staffQrOnlyLabel = "Hanya boleh terima QR",
             cafeLocationSection = "Lokasi Kafe (Kunci GPS)",
             captureLocationButton = "Tangkap Lokasi Semasa",
             radiusLabel = "Jejari (meter)",
@@ -2813,6 +2816,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             staffPermissionsSection = "Staff Permissions",
             staffCanSendKitchenLabel = "Staff can Send to Kitchen",
             staffCanTakePaymentLabel = "Staff can Take Payment",
+            staffQrOnlyLabel = "Can take QR only",
             cafeLocationSection = "Café Location (GPS Lock)",
             captureLocationButton = "Capture Current Location",
             radiusLabel = "Radius (meters)",
@@ -3141,8 +3145,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             todaysSpecialHint = "Cleared automatically at closing",
             reportEmailLabel = "Report email",
             reportEmailHint = "Closing/monthly reports are emailed here (sent from the server).",
-            businessDayStartLabel = "Business day starts at (hour 0–23)",
-            businessDayEndLabel = "Business day ends at",
+            businessDayStartLabel = "Business Starts",
+            businessDayEndLabel = "Business Ends",
             reportSavedToDownloads = "The closing report is saved to this device's Downloads folder when you Sign Out with Closing. File name: cafe_name-YYMMDDHHMM.html",
             businessDayHoursHint = "The closing time may be earlier than the opening time — for a café that trades past midnight.",
             businessDayStartHint = "e.g. 15 = 3 PM. Sales after midnight still count toward the opening day.",
@@ -3308,7 +3312,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             ambientEnableDesc = "Stops the display from ever sleeping, and after the station " +
                 "sits idle it shows a dimmed live table board instead of the bright POS screen. " +
                 "Best on a terminal that stays on a charger.",
-            ambientStartAfter = "Start after",
+            ambientStartAfter = "Start after (mins)",
             ambientMinutes = "%d min",
             ambientGuestVisibleLabel = "Guests can see this screen",
             ambientGuestVisibleDesc = "Hides order values on the ambient board — shows table " +
@@ -3684,6 +3688,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             staffPermissionsSection = "员工权限",
             staffCanSendKitchenLabel = "员工可送往厨房",
             staffCanTakePaymentLabel = "员工可收款",
+            staffQrOnlyLabel = "仅可收取QR付款",
             cafeLocationSection = "咖啡馆位置（GPS锁定）",
             captureLocationButton = "捕获当前位置",
             radiusLabel = "半径（米）",
@@ -4553,6 +4558,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             staffPermissionsSection = "பணியாளர் அனுமதிகள்",
             staffCanSendKitchenLabel = "பணியாளர் சமையலறைக்கு அனுப்பலாம்",
             staffCanTakePaymentLabel = "பணியாளர் பணம் பெறலாம்",
+            staffQrOnlyLabel = "QR மட்டும் பெறலாம்",
             cafeLocationSection = "கஃபே இருப்பிடம் (GPS லாக்)",
             captureLocationButton = "தற்போதைய இருப்பிடத்தைப் பிடி",
             radiusLabel = "ஆரம் (மீட்டர்)",
@@ -5424,6 +5430,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             staffPermissionsSection = "สิทธิ์พนักงาน",
             staffCanSendKitchenLabel = "พนักงานสามารถส่งไปยังครัวได้",
             staffCanTakePaymentLabel = "พนักงานสามารถรับชำระเงินได้",
+            staffQrOnlyLabel = "รับได้เฉพาะ QR เท่านั้น",
             cafeLocationSection = "ตำแหน่งร้าน (ล็อก GPS)",
             captureLocationButton = "จับตำแหน่งปัจจุบัน",
             radiusLabel = "รัศมี (เมตร)",

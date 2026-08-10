@@ -1755,6 +1755,7 @@ class ApiClient @Inject constructor(
                             topN = json.optInt("topN", 5),
                             staffCanSendKitchen = json.optBoolean("staffCanSendKitchen", false),
                             staffCanTakePayment = json.optBoolean("staffCanTakePayment", false),
+                            staffQrOnly = json.optBoolean("staffQrOnly", false),
                             customerOrderHoldSeconds = json.optInt("customerOrderHoldSeconds", 15),
                             customerOrderAutoPrint = json.optBoolean("customerOrderAutoPrint", true),
                             todaysSpecial = json.optString("todaysSpecial", ""),
@@ -2179,6 +2180,7 @@ class ApiClient @Inject constructor(
                                 logoUrl = json.optString("logoUrl", ""),
                                 paymentQrHash = json.optString("paymentQrHash", null),
                                 paymentQrUrl = json.optString("paymentQrUrl", null),
+                                qrCardLogoUrl = json.optString("qrCardLogoUrl", null),
                             )
                         )
                     }
@@ -2203,6 +2205,8 @@ class ApiClient @Inject constructor(
         paymentQrBase64: String?,
         paymentQrHash: String?,
         removePaymentQr: Boolean,
+        qrCardLogoBase64: String?,
+        removeQrCardLogo: Boolean,
     ): ApiResult<BrandingResponse> = withContext(Dispatchers.IO) {
         if (DemoSession.active) return@withContext demoBackend.putBranding(cafeName)
         try {
@@ -2220,6 +2224,10 @@ class ApiClient @Inject constructor(
                         if (paymentQrHash != null) put("paymentQrHash", paymentQrHash)
                     }
                     removePaymentQr -> put("paymentQrBase64", JSONObject.NULL)
+                }
+                when {
+                    qrCardLogoBase64 != null -> put("qrCardLogoBase64", qrCardLogoBase64)
+                    removeQrCardLogo -> put("qrCardLogoBase64", JSONObject.NULL)
                 }
             }.toString()
 
@@ -2243,6 +2251,7 @@ class ApiClient @Inject constructor(
                             logoUrl = json.getString("logoUrl"),
                             paymentQrHash = json.optString("paymentQrHash", null),
                             paymentQrUrl = json.optString("paymentQrUrl", null),
+                            qrCardLogoUrl = json.optString("qrCardLogoUrl", null),
                         )
                     )
                 }
@@ -3218,6 +3227,8 @@ data class BrandingResponse(
     val logoUrl: String,
     val paymentQrHash: String? = null,
     val paymentQrUrl: String? = null,
+    /** Public Storage URL of the logo picked specifically for printable table-QR cards, or null. */
+    val qrCardLogoUrl: String? = null,
 )
 
 data class MenuImageUploadResponse(
@@ -3260,6 +3271,8 @@ data class SettingsResponse(
     val topN: Int,
     val staffCanSendKitchen: Boolean,
     val staffCanTakePayment: Boolean,
+    /** When true, ordering-staff sessions see only "Pay QR" — "Pay Cash" is hidden. */
+    val staffQrOnly: Boolean = false,
     val customerOrderHoldSeconds: Int = 15,
     val customerOrderAutoPrint: Boolean = true,
     val todaysSpecial: String = "",

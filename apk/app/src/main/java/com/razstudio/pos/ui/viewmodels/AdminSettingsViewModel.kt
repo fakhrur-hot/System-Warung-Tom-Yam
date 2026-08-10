@@ -60,6 +60,7 @@ class AdminSettingsViewModel @Inject constructor(
     data class Snapshot(
         val staffCanSendKitchen: Boolean = false,
         val staffCanTakePayment: Boolean = false,
+        val staffQrOnly: Boolean = false,
         val cafeName: String = "",
         val logoBase64: String? = null,
         val latitude: Double? = null,
@@ -110,6 +111,9 @@ class AdminSettingsViewModel @Inject constructor(
         // Staff Permissions
         val staffCanSendKitchen: Boolean = false,
         val staffCanTakePayment: Boolean = false,
+        /** Sub-setting of [staffCanTakePayment]: hides "Pay Cash" on staff sessions, leaving only
+         *  "Pay QR". Meaningless (and hidden in the UI) when [staffCanTakePayment] is off. */
+        val staffQrOnly: Boolean = false,
         val permissionsLoading: Boolean = false,
 
         // GPS Location
@@ -185,6 +189,7 @@ class AdminSettingsViewModel @Inject constructor(
         val isDirty: Boolean
             get() = staffCanSendKitchen != savedSnapshot.staffCanSendKitchen ||
                 staffCanTakePayment != savedSnapshot.staffCanTakePayment ||
+                staffQrOnly != savedSnapshot.staffQrOnly ||
                 cafeName != savedSnapshot.cafeName ||
                 logoBase64 != savedSnapshot.logoBase64 ||
                 latitude != savedSnapshot.latitude ||
@@ -323,6 +328,7 @@ class AdminSettingsViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         staffCanSendKitchen = result.data.staffCanSendKitchen,
                         staffCanTakePayment = result.data.staffCanTakePayment,
+                        staffQrOnly = result.data.staffQrOnly,
                         timezone = tz,
                         holdSeconds = result.data.customerOrderHoldSeconds,
                         autoPrintToKitchen = result.data.customerOrderAutoPrint,
@@ -338,6 +344,7 @@ class AdminSettingsViewModel @Inject constructor(
                         savedSnapshot = _uiState.value.savedSnapshot.copy(
                             staffCanSendKitchen = result.data.staffCanSendKitchen,
                             staffCanTakePayment = result.data.staffCanTakePayment,
+                            staffQrOnly = result.data.staffQrOnly,
                             timezone = tz,
                             holdSeconds = result.data.customerOrderHoldSeconds,
                             autoPrintToKitchen = result.data.customerOrderAutoPrint,
@@ -563,8 +570,22 @@ class AdminSettingsViewModel @Inject constructor(
      * Does NOT call the backend — committed via [saveAll].
      */
     fun updateStaffCanTakePayment(enabled: Boolean) {
-        _uiState.value = _uiState.value.copy(staffCanTakePayment = enabled)
+        _uiState.value = _uiState.value.copy(
+            staffCanTakePayment = enabled,
+            // Turning payment off entirely makes "QR only" meaningless — and hidden in the UI —
+            // so clear it too rather than leave a stale true sitting behind a disabled control.
+            staffQrOnly = if (enabled) _uiState.value.staffQrOnly else false,
+        )
         // No pushPermissions() — staged, saved via saveAll()
+        scheduleAutoSave()
+    }
+
+    /**
+     * Stage a local change to the "Can take QR only" checkbox (sub-setting of
+     * [updateStaffCanTakePayment]). Does NOT call the backend — committed via [saveAll].
+     */
+    fun updateStaffQrOnly(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(staffQrOnly = enabled)
         scheduleAutoSave()
     }
 
@@ -577,6 +598,7 @@ class AdminSettingsViewModel @Inject constructor(
         val body = JSONObject().apply {
             put("staffCanSendKitchen", _uiState.value.staffCanSendKitchen)
             put("staffCanTakePayment", _uiState.value.staffCanTakePayment)
+            put("staffQrOnly", _uiState.value.staffQrOnly)
         }
         return when (val result = apiClient.putSettings(body)) {
             is ApiResult.Success -> {
@@ -946,9 +968,10 @@ class AdminSettingsViewModel @Inject constructor(
             val state = _uiState.value
             var anyError = false
 
-            // Permissions — dirty when either toggle differs from snapshot
+            // Permissions — dirty when any of the three differ from snapshot
             if (state.staffCanSendKitchen != state.savedSnapshot.staffCanSendKitchen ||
-                state.staffCanTakePayment != state.savedSnapshot.staffCanTakePayment
+                state.staffCanTakePayment != state.savedSnapshot.staffCanTakePayment ||
+                state.staffQrOnly != state.savedSnapshot.staffQrOnly
             ) {
                 if (!pushPermissions()) anyError = true
             }
@@ -1106,6 +1129,7 @@ class AdminSettingsViewModel @Inject constructor(
                     savedSnapshot = Snapshot(
                         staffCanSendKitchen = current.staffCanSendKitchen,
                         staffCanTakePayment = current.staffCanTakePayment,
+                        staffQrOnly = current.staffQrOnly,
                         cafeName = current.cafeName,
                         logoBase64 = current.logoBase64,
                         latitude = current.latitude,

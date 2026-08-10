@@ -223,6 +223,11 @@ interface BackendGateway {
      *
      * [paymentQrHash] is the SHA-256 of the uploaded bytes. Devices cache on that hash rather than the
      * URL, because the object key is stable across replacements — see `PaymentQrResolver`.
+     *
+     * [qrCardLogoBase64]/[removeQrCardLogo] follow the same omit/set/null-to-remove convention as the
+     * payment QR, but for the logo picked specifically on the Generate Table QR screen — uploading it
+     * here (rather than leaving it device-local) is what lets it survive an app reinstall or show up
+     * on a second admin device.
      */
     suspend fun putBranding(
         cafeName: String,
@@ -230,6 +235,8 @@ interface BackendGateway {
         paymentQrBase64: String? = null,
         paymentQrHash: String? = null,
         removePaymentQr: Boolean = false,
+        qrCardLogoBase64: String? = null,
+        removeQrCardLogo: Boolean = false,
     ): ApiResult<BrandingResponse>
     suspend fun getTables(): ApiResult<List<Pair<String, String>>>
     suspend fun getTableTokens(): ApiResult<Map<String, String>>

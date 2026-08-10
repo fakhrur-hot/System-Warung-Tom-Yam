@@ -904,16 +904,20 @@ fun OrderDetailSheet(
                     val panelQr = remember(order.id) { PaymentQrPipeline.loadFromInternal(panelContext) }
 
                     // QR or numpad, cashier's choice. Keyed on order.id so one table's keyed
-                    // tender can't linger into the next table's sheet.
+                    // tender can't linger into the next table's sheet. The toggle itself is
+                    // hidden under staffQrOnly — the panel always shows the QR, matching "Pay
+                    // Cash" being hidden below, so there is no cash-tender workflow left visible.
                     var showTenderPad by remember(order.id) { mutableStateOf(false) }
-                    QrNumpadToggle(
-                        showNumpad = showTenderPad,
-                        onChange = { showTenderPad = it },
-                        strings = strings,
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    if (showTenderPad) {
+                    if (!permissions.qrOnly) {
+                        QrNumpadToggle(
+                            showNumpad = showTenderPad,
+                            onChange = { showTenderPad = it },
+                            strings = strings,
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    if (showTenderPad && !permissions.qrOnly) {
                         // The cash customer's mirror of the QR: key what they handed over, the
                         // change to give back sits right under the total.
                         CashTenderCalculator(
@@ -1002,19 +1006,25 @@ fun OrderDetailSheet(
                 }
 
                 if (!splitMode) {
+                    // "Pay Cash" is hidden entirely (not merely disabled) when the café-wide
+                    // staffQrOnly setting is on for this session — every staff-collected sale then
+                    // leaves a QR-payment trail, with no cash button sitting there to tempt a
+                    // "just take cash anyway" workaround. Never applies to StaffPermissions.ADMIN.
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Button(
-                            // Through the tender pad, not straight to payment: the pad computes
-                            // the change and feeds the cash-drawer ledger before the existing
-                            // receipt-confirm flow continues unchanged.
-                            onClick = { showCashTender = true },
-                            modifier = Modifier.weight(1f),
-                            enabled = !state.isLoading,
-                        ) {
-                            Text(strings.payCash)
+                        if (!permissions.qrOnly) {
+                            Button(
+                                // Through the tender pad, not straight to payment: the pad computes
+                                // the change and feeds the cash-drawer ledger before the existing
+                                // receipt-confirm flow continues unchanged.
+                                onClick = { showCashTender = true },
+                                modifier = Modifier.weight(1f),
+                                enabled = !state.isLoading,
+                            ) {
+                                Text(strings.payCash)
+                            }
                         }
                         Button(
                             onClick = { pendingPaymentMethod = "QR" },
@@ -1191,6 +1201,7 @@ fun OrderDetailSheet(
             strings = strings,
             isLoading = state.isLoading,
             gatewayMethods = gatewayMethods,
+            qrOnly = permissions.qrOnly,
             onPay = { plan, method ->
                 // A gateway method code routes to the async checkout+poll flow instead of
                 // completing immediately — same generic (Plan, String) callback either way.

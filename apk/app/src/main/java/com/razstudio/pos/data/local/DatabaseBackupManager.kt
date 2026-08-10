@@ -129,6 +129,7 @@ class DatabaseBackupManager @Inject constructor(
                 put("topN", settings.topN)
                 put("staffCanSendKitchen", settings.staffCanSendKitchen)
                 put("staffCanTakePayment", settings.staffCanTakePayment)
+                put("staffQrOnly", settings.staffQrOnly)
             })
         } else {
             root.put("settings", JSONObject.NULL)
@@ -341,7 +342,8 @@ class DatabaseBackupManager @Inject constructor(
                     timezone = obj.optString("timezone", "Asia/Kuala_Lumpur"),
                     topN = obj.optInt("topN", 5),
                     staffCanSendKitchen = obj.optBoolean("staffCanSendKitchen", false),
-                    staffCanTakePayment = obj.optBoolean("staffCanTakePayment", false)
+                    staffCanTakePayment = obj.optBoolean("staffCanTakePayment", false),
+                    staffQrOnly = obj.optBoolean("staffQrOnly", false)
                 )
             )
         }

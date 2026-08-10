@@ -15,6 +15,7 @@ const KEY_MAP: Record<string, string> = {
   top_n_items: "topN",
   staff_can_send_kitchen: "staffCanSendKitchen",
   staff_can_take_payment: "staffCanTakePayment",
+  staff_qr_only: "staffQrOnly",
   report_email: "reportEmail",
   closing_report_auto: "autoSendClosingReport",
   customer_order_auto_print: "customerOrderAutoPrint",
@@ -58,6 +59,7 @@ const DEFAULT_SETTINGS: Record<string, string> = {
   closing_report_auto: "true",
   staff_can_send_kitchen: "false",
   staff_can_take_payment: "false",
+  staff_qr_only: "false",
   default_lang_admin: "BM",
   default_lang_ordering: "BM",
   default_lang_customer: "BM",
@@ -164,8 +166,7 @@ async function handlePutSettings(req: Request): Promise<Response> {
 
     const { error } = await supabase
       .from("settings")
-      .update({ value: String(value) })
-      .eq("key", dbKey);
+      .upsert({ key: dbKey, value: String(value) }, { onConflict: "key" });
 
     if (error) {
       return errorResponse(500, "SERVER_ERROR", error.message);
@@ -231,6 +232,7 @@ function coerceValue(apiKey: string, value: string): unknown {
       return parseInt(value, 10);
     case "staffCanSendKitchen":
     case "staffCanTakePayment":
+    case "staffQrOnly":
     case "autoSendClosingReport":
     case "customerOrderAutoPrint":
       return value === "true";
@@ -281,6 +283,7 @@ function validateSetting(apiKey: string, value: unknown): string | null {
     }
     case "staffCanSendKitchen":
     case "staffCanTakePayment":
+    case "staffQrOnly":
     case "autoSendClosingReport":
     case "customerOrderAutoPrint":
       if (typeof value !== "boolean") {

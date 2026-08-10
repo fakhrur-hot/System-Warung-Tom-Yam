@@ -15,6 +15,9 @@ data class SystemSettings(
     val topN: Int = 5,
     val staffCanSendKitchen: Boolean = false,
     val staffCanTakePayment: Boolean = false,
+    /** When true, ordering-staff sessions see only "Pay QR" — "Pay Cash" is hidden. Admin devices
+     *  are never affected; see [com.razstudio.pos.ui.tableview.StaffPermissions.qrOnly]. */
+    val staffQrOnly: Boolean = false,
     // Auto-generated table IDs are T0001..T9999, always incrementing — this is the next
     // number to assign. Never decremented on delete, so numbering never reuses a gap.
     val nextTableNumber: Int = 1,

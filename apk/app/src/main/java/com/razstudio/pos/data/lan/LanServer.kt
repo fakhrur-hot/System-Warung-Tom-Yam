@@ -362,6 +362,7 @@ class LanServer @Inject constructor(
                     .put("topN", s.topN)
                     .put("staffCanSendKitchen", s.staffCanSendKitchen)
                     .put("staffCanTakePayment", s.staffCanTakePayment)
+                    .put("staffQrOnly", s.staffQrOnly)
                     .put("customerOrderHoldSeconds", s.customerOrderHoldSeconds)
                     .put("customerOrderAutoPrint", s.customerOrderAutoPrint)
                     .put("todaysSpecial", s.todaysSpecial)

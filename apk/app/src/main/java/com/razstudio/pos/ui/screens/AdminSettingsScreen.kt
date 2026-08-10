@@ -34,6 +34,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -129,8 +130,6 @@ fun AdminSettingsScreen(
     var showChangePin by remember { mutableStateOf(false) }
     val secureStorage = remember { com.razstudio.pos.data.SecureStorage(context) }
     var showDrawerPin by remember { mutableStateOf(false) }
-    var showUnlinkConfirm by remember { mutableStateOf(false) }
-    val unlinkViewModel: com.razstudio.pos.ui.viewmodels.UnlinkDeviceViewModel = hiltViewModel()
     var fullscreenMode by remember { mutableStateOf(devicePrefsViewModel.fullscreenMode()) }
     val setFullscreen: (Boolean) -> Unit = { enable ->
         devicePrefsViewModel.setFullscreenMode(enable)
@@ -229,6 +228,25 @@ fun AdminSettingsScreen(
                         checked = uiState.staffCanTakePayment,
                         onCheckedChange = { viewModel.updateStaffCanTakePayment(it) }
                     )
+                }
+                // Sub-setting: only meaningful (and only shown) while staff can take payment at
+                // all. Hides "Pay Cash" on ordering-staff sessions, leaving only "Pay QR" — never
+                // affects the admin device's own payment buttons.
+                if (uiState.staffCanTakePayment) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp)
+                            .clickable { viewModel.updateStaffQrOnly(!uiState.staffQrOnly) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = uiState.staffQrOnly,
+                            onCheckedChange = { viewModel.updateStaffQrOnly(it) }
+                        )
+                        Text(strings.staffQrOnlyLabel)
+                    }
                 }
             }
 
@@ -418,27 +436,6 @@ fun AdminSettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(strings.changePinButton) }
                 }
-
-                // ── Unlink ───────────────────────────────────────────────────────────────
-                // Last, and behind a confirmation: this is the most destructive control in the
-                // app, and the only one that cannot be undone from inside the app afterwards.
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(strings.unlinkDeviceLabel, fontWeight = FontWeight.Bold)
-                Text(
-                    text = strings.unlinkDeviceDesc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { showUnlinkConfirm = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error,
-                    ),
-                ) { Text(strings.unlinkDeviceButton) }
             }
 
 
@@ -709,24 +706,6 @@ fun AdminSettingsScreen(
                 showSetPin = false
             },
             onCancel = { showSetPin = false } // toggle stays off if they back out
-        )
-    }
-    if (showUnlinkConfirm) {
-        AlertDialog(
-            onDismissRequest = { showUnlinkConfirm = false },
-            title = { Text(strings.unlinkConfirmTitle) },
-            text = { Text(strings.unlinkConfirmBody) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showUnlinkConfirm = false
-                    // Restarted rather than navigated: every ViewModel on the back stack is
-                    // holding data for a café that no longer exists on this device.
-                    unlinkViewModel.unlink { viewModel.restartApp() }
-                }) { Text(strings.unlinkDeviceButton) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showUnlinkConfirm = false }) { Text(strings.commonCancel) }
-            },
         )
     }
     if (showDrawerPin) {

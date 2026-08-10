@@ -460,7 +460,8 @@ class OrderingForegroundService : Service() {
                     timezone = payload.optString("timezone", "Asia/Kuala_Lumpur"),
                     topN = payload.optInt("topN", 5),
                     staffCanSendKitchen = payload.optBoolean("staffCanSendKitchen", false),
-                    staffCanTakePayment = payload.optBoolean("staffCanTakePayment", false)
+                    staffCanTakePayment = payload.optBoolean("staffCanTakePayment", false),
+                    staffQrOnly = payload.optBoolean("staffQrOnly", false)
                 )
                 dao.upsert(settings)
                 Log.i(TAG, "Settings updated from broadcast: kitchen=${settings.staffCanSendKitchen}, payment=${settings.staffCanTakePayment}")

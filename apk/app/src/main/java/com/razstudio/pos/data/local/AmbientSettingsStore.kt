@@ -25,7 +25,7 @@ class AmbientSettingsStore @Inject constructor(
         private const val KEY_CUSTOMER_FACING = "ambient_customer_facing"
 
         /** Selectable idle delays before ambient mode takes over. */
-        val TIMEOUT_OPTIONS = listOf(1, 3, 5, 10, 15)
+        val TIMEOUT_OPTIONS = listOf(1, 3, 5, 10)
         private const val DEFAULT_TIMEOUT_MIN = 5
     }
 
@@ -36,7 +36,7 @@ class AmbientSettingsStore @Inject constructor(
      * AppNavGraph) so the display never sleeps mid-service — ambient mode is what protects the
      * pixels once the station goes idle.
      */
-    fun isEnabled(): Boolean = prefs.getBoolean(KEY_ENABLED, false)
+    fun isEnabled(): Boolean = prefs.getBoolean(KEY_ENABLED, true)
 
     fun setEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()

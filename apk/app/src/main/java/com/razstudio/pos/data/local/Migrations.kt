@@ -496,3 +496,14 @@ val MIGRATION_22_23 = object : Migration(22, 23) {
         db.execSQL("UPDATE menu_items SET askMeDaily = 1 WHERE marketPrice = 1")
     }
 }
+
+/**
+ * Version 23 → 24: adds [SystemSettings.staffQrOnly] — the narrower gate under "Staff can Take
+ * Payment" that hides "Pay Cash" on ordering-staff sessions, leaving only "Pay QR". Defaults to
+ * false so an upgrading café's staff keep seeing both buttons exactly as before.
+ */
+val MIGRATION_23_24 = object : Migration(23, 24) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE system_settings ADD COLUMN staffQrOnly INTEGER NOT NULL DEFAULT 0")
+    }
+}

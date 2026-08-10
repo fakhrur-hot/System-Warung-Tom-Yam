@@ -107,6 +107,9 @@ fun SplitPaymentDialog(
     /** Gateway channels to offer alongside Cash/QR for this share (task 7.3, A13). Empty by
      *  default — the whole row disappears with it, same rule as [OrderDetailSheet]'s. */
     gatewayMethods: List<PaymentMethod> = emptyList(),
+    /** Mirrors [StaffPermissions.qrOnly] — hides "Pay Cash" for this share too, so a café-wide
+     *  QR-only staff session has no cash-taking path left, split or otherwise. */
+    qrOnly: Boolean = false,
     onPay: (SplitPaymentPlanner.Plan, String) -> Unit,
     onReduceItems: (List<VoidLine>) -> Unit,
     onDismiss: () -> Unit,
@@ -173,7 +176,7 @@ fun SplitPaymentDialog(
                             items = items, strings = strings, isLoading = isLoading,
                             gatewayMethods = gatewayMethods, taken = taken,
                             fixMode = fixMode, onFixModeChange = { fixMode = it },
-                            amount = amount, canPay = canPay,
+                            amount = amount, canPay = canPay, qrOnly = qrOnly,
                             plan = plan, onPay = onPay, onDismiss = onDismiss,
                             onRequestReduce = { pendingReduce = it },
                         )
@@ -190,7 +193,7 @@ fun SplitPaymentDialog(
                             items = items, strings = strings, isLoading = isLoading,
                             gatewayMethods = gatewayMethods, taken = taken,
                             fixMode = fixMode, onFixModeChange = { fixMode = it },
-                            amount = amount, canPay = canPay,
+                            amount = amount, canPay = canPay, qrOnly = qrOnly,
                             plan = plan, onPay = onPay, onDismiss = onDismiss,
                             onRequestReduce = { pendingReduce = it },
                         )
@@ -332,6 +335,7 @@ private fun ColumnScope.SplitTally(
     onFixModeChange: (Boolean) -> Unit,
     amount: Double,
     canPay: Boolean,
+    qrOnly: Boolean = false,
     plan: SplitPaymentPlanner.Plan,
     onPay: (SplitPaymentPlanner.Plan, String) -> Unit,
     onDismiss: () -> Unit,
@@ -437,7 +441,9 @@ private fun ColumnScope.SplitTally(
     ) {
         TextButton(onClick = onDismiss, enabled = !isLoading) { Text(strings.commonCancel) }
         Spacer(modifier = Modifier.weight(1f))
-        Button(onClick = { onPay(plan, "CASH") }, enabled = canPay) { Text(strings.payCash) }
+        if (!qrOnly) {
+            Button(onClick = { onPay(plan, "CASH") }, enabled = canPay) { Text(strings.payCash) }
+        }
         Button(onClick = { onPay(plan, "QR") }, enabled = canPay) { Text(strings.payQR) }
     }
 }
