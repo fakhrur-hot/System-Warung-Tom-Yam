@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -30,10 +31,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.razstudio.pos.data.local.Table
 import com.razstudio.pos.data.local.isTakeout
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.uiStrings
@@ -59,6 +64,12 @@ fun TableManagementScreen(
 
     // Populate the management state (tables + backend catch-up) when the page opens.
     LaunchedEffect(Unit) { viewModel.showTableManagement() }
+
+    // A deleted table's row (and its qr_token) is genuinely removed server-side — any
+    // QR card already printed for it stops resolving (tables-session 404s,
+    // "UNKNOWN_TABLE"). That's silent and irreversible from here without a warning, so
+    // deletion goes through a confirm step rather than firing straight off the icon tap.
+    var pendingDeleteTable by remember { mutableStateOf<Table?>(null) }
 
     Scaffold(
         topBar = {
@@ -203,7 +214,7 @@ fun TableManagementScreen(
                                 IconButton(onClick = { viewModel.startEditTable(table) }) {
                                     Icon(Icons.Default.Edit, contentDescription = strings.commonEdit)
                                 }
-                                IconButton(onClick = { viewModel.deleteTable(table.id) }) {
+                                IconButton(onClick = { pendingDeleteTable = table }) {
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = strings.commonDelete,
@@ -216,5 +227,26 @@ fun TableManagementScreen(
                 }
             }
         }
+    }
+
+    pendingDeleteTable?.let { table ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteTable = null },
+            title = { Text(strings.deleteTableConfirmTitle) },
+            text = { Text(strings.deleteTableConfirmMessage) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteTable(table.id)
+                    pendingDeleteTable = null
+                }) {
+                    Text(strings.commonDelete, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteTable = null }) {
+                    Text(strings.commonCancel)
+                }
+            }
+        )
     }
 }

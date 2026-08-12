@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -167,7 +169,17 @@ fun OrderEntrySheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 24.dp),
+                .padding(bottom = 24.dp)
+                // The header, CategoryMenuPicker (its own inner LazyColumn is height-capped at
+                // 320.dp, so nesting it here is safe), the staged cart lines, and the Submit
+                // button all lived in a plain, non-scrolling Column. With enough cart lines
+                // (reported: 13+ lines across a few categories) their combined height exceeded
+                // the sheet's visible area with no way to reach the rest — Submit Order
+                // scrolled off the bottom of the screen and stayed unreachable. This is the
+                // exact same class of bug as the customer website's cart sheet (see
+                // website/src/components/CartBar.tsx): a list that can grow taller than its
+                // container needs its OWN scroll, not an assumption that it'll always fit.
+                .verticalScroll(rememberScrollState()),
         ) {
             // Header
             Row(

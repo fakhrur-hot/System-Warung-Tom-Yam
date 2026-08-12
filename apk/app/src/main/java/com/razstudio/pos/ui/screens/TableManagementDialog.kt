@@ -23,6 +23,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -46,6 +50,12 @@ fun TableManagementDialog(
     onDeleteTable: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    // A deleted table's row (and its qr_token) is genuinely removed server-side — any
+    // QR card already printed for it stops resolving (tables-session 404s). That's
+    // silent and irreversible from the admin's point of view without this warning, so
+    // deletion goes through a confirm step here rather than firing on the icon tap.
+    var pendingDeleteTable by remember { mutableStateOf<Table?>(null) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(strings.manageTablesTitle) },
@@ -153,7 +163,7 @@ fun TableManagementDialog(
                                     IconButton(onClick = { onStartEdit(table) }) {
                                         Icon(Icons.Default.Edit, contentDescription = strings.commonEdit)
                                     }
-                                    IconButton(onClick = { onDeleteTable(table.id) }) {
+                                    IconButton(onClick = { pendingDeleteTable = table }) {
                                         Icon(
                                             Icons.Default.Delete,
                                             contentDescription = strings.commonDelete,
@@ -173,4 +183,25 @@ fun TableManagementDialog(
             }
         }
     )
+
+    pendingDeleteTable?.let { table ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteTable = null },
+            title = { Text(strings.deleteTableConfirmTitle) },
+            text = { Text(strings.deleteTableConfirmMessage) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDeleteTable(table.id)
+                    pendingDeleteTable = null
+                }) {
+                    Text(strings.commonDelete, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteTable = null }) {
+                    Text(strings.commonCancel)
+                }
+            }
+        )
+    }
 }

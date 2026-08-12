@@ -350,6 +350,8 @@ data class UiStringsGroup5(
     val addButton: String,
     val currentTablesLabel: String,
     val noTablesConfiguredHint: String,
+    val deleteTableConfirmTitle: String,
+    val deleteTableConfirmMessage: String,
     // ── Demo Walkthrough ──
     val walkthroughStep1Title: String,
     val walkthroughStep1Desc: String,
@@ -1269,6 +1271,8 @@ class UiStrings(
     val addButton: String get() = g5.addButton
     val currentTablesLabel: String get() = g5.currentTablesLabel
     val noTablesConfiguredHint: String get() = g5.noTablesConfiguredHint
+    val deleteTableConfirmTitle: String get() = g5.deleteTableConfirmTitle
+    val deleteTableConfirmMessage: String get() = g5.deleteTableConfirmMessage
     val walkthroughStep1Title: String get() = g5.walkthroughStep1Title
     val walkthroughStep1Desc: String get() = g5.walkthroughStep1Desc
     val walkthroughStep2Title: String get() = g5.walkthroughStep2Title
@@ -2129,6 +2133,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             addButton = "Tambah",
             currentTablesLabel = "Meja Semasa",
             noTablesConfiguredHint = "Tiada meja dikonfigurasi. Tambah meja pertama anda di atas.",
+            deleteTableConfirmTitle = "Padam meja ini?",
+            deleteTableConfirmMessage = "Kod QR yang telah dicetak untuk meja ini akan luput dan tidak lagi berfungsi selepas dipadam. Jika meja ini masih mempunyai pesanan aktif, ia akan dikekalkan secara automatik.",
             walkthroughStep1Title = "Selamat Datang ke Mod Demo!",
             walkthroughStep1Desc = "Ini adalah Paparan Meja anda. Anda boleh memantau meja aktif, status diduduki, dan tempat duduk masa nyata di kafe anda.",
             walkthroughStep2Title = "Membuat Pesanan",
@@ -3001,6 +3007,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             addButton = "Add",
             currentTablesLabel = "Current Tables",
             noTablesConfiguredHint = "No tables configured. Add your first table above.",
+            deleteTableConfirmTitle = "Delete this table?",
+            deleteTableConfirmMessage = "Any QR code already printed for this table will stop working after deletion — it will need to be reprinted. If this table still has an active order, it will be kept automatically.",
             walkthroughStep1Title = "Welcome to Demo Mode!",
             walkthroughStep1Desc = "This is your Table View. You can monitor active tables, occupied statuses, and real-time seating in your café.",
             walkthroughStep2Title = "Creating Orders",
@@ -3873,6 +3881,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             addButton = "添加",
             currentTablesLabel = "当前餐桌",
             noTablesConfiguredHint = "未配置餐桌。请在上方添加您的第一张餐桌。",
+            deleteTableConfirmTitle = "删除此餐桌？",
+            deleteTableConfirmMessage = "删除后，此前为该餐桌打印的二维码将失效，需要重新打印。若此餐桌仍有进行中的订单，系统会自动保留该餐桌。",
             walkthroughStep1Title = "欢迎使用演示模式！",
             walkthroughStep1Desc = "这是您的餐桌视图。您可以监控活动餐桌、占用状态以及咖啡馆的实时座位情况。",
             walkthroughStep2Title = "创建订单",
@@ -4743,6 +4753,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             addButton = "சேர்",
             currentTablesLabel = "தற்போதைய மேசைகள்",
             noTablesConfiguredHint = "மேசைகள் கட்டமைக்கப்படவில்லை. மேலே உங்கள் முதல் மேசையைச் சேர்க்கவும்.",
+            deleteTableConfirmTitle = "இந்த மேசையை நீக்கவா?",
+            deleteTableConfirmMessage = "இந்த மேசைக்காக ஏற்கனவே அச்சிடப்பட்ட QR குறியீடு நீக்கப்பட்ட பிறகு செயல்படாது — மீண்டும் அச்சிட வேண்டும். இந்த மேசையில் இன்னும் செயலில் உள்ள ஆர்டர் இருந்தால், அது தானாகவே தக்கவைக்கப்படும்.",
             walkthroughStep1Title = "டெமோ பயன்முறைக்கு வரவேற்கிறோம்!",
             walkthroughStep1Desc = "இது உங்கள் மேசை காட்சி. உங்கள் கஃபேயில் செயலில் உள்ள மேசைகள், ஆக்கிரமிப்பு நிலைகள் மற்றும் நேரடி இருக்கை அமைப்பை நீங்கள் கண்காணிக்கலாம்.",
             walkthroughStep2Title = "ஆர்டர்களை உருவாக்குதல்",
@@ -5615,6 +5627,8 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             addButton = "เพิ่ม",
             currentTablesLabel = "โต๊ะปัจจุบัน",
             noTablesConfiguredHint = "ยังไม่ได้ตั้งค่าโต๊ะ เพิ่มโต๊ะแรกของคุณด้านบน",
+            deleteTableConfirmTitle = "ลบโต๊ะนี้หรือไม่?",
+            deleteTableConfirmMessage = "คิวอาร์โค้ดที่พิมพ์ไว้แล้วสำหรับโต๊ะนี้จะใช้งานไม่ได้หลังจากลบ และต้องพิมพ์ใหม่ หากโต๊ะนี้ยังมีออเดอร์ที่ใช้งานอยู่ ระบบจะเก็บโต๊ะนี้ไว้โดยอัตโนมัติ",
             walkthroughStep1Title = "ยินดีต้อนรับสู่โหมดเดโม!",
             walkthroughStep1Desc = "นี่คือมุมมองโต๊ะของคุณ คุณสามารถตรวจสอบโต๊ะที่ใช้งานอยู่ สถานะการไม่ว่าง และที่นั่งแบบเรียลไทม์ในร้านของคุณ",
             walkthroughStep2Title = "การสร้างออเดอร์",
