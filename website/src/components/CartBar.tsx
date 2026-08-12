@@ -174,17 +174,25 @@ export default function CartBar({
         />
       )}
 
-      {/* Cart bar / sheet */}
+      {/* Cart bar / sheet.
+          When expanded, this is a flex COLUMN (not a fixed-pixel-budget box): the item
+          list below gets `flex-1 min-h-0 overflow-y-auto` and the bottom bar gets
+          `shrink-0`, so the bottom bar's REAL rendered height (button + text) is always
+          reserved correctly by the flex layout itself — a large system font size or a
+          long cart no longer competes for a hardcoded pixel guess (the previous
+          `calc(60vh - 120px)` assumed a fixed bottom-bar height, which broke once the
+          bar actually rendered taller than 120px, clipping the Submit button below the
+          visible sheet with no way to scroll to it). */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-40 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] transition-all duration-300 ease-in-out ${
-          isExpanded ? 'top-[40%] rounded-t-2xl overflow-hidden' : 'rounded-t-xl'
+        className={`fixed bottom-0 left-0 right-0 z-40 bg-white pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] transition-all duration-300 ease-in-out ${
+          isExpanded ? 'top-[40%] rounded-t-2xl overflow-hidden flex flex-col' : 'rounded-t-xl'
         }`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
         {/* Drag handle */}
         <div
-          className="flex cursor-pointer items-center justify-center py-3"
+          className="flex shrink-0 cursor-pointer items-center justify-center py-3"
           onClick={handleToggle}
           role="button"
           aria-label={isExpanded ? 'Collapse cart' : 'Expand cart'}
@@ -196,9 +204,13 @@ export default function CartBar({
           <div className="h-1 w-10 rounded-full bg-gray-300" />
         </div>
 
-        {/* Expanded content */}
+        {/* Expanded content — `flex-1 min-h-0` is what makes this the ONLY scrolling
+            region: it claims all space the flex column has left after the drag handle
+            and bottom bar take theirs, and `min-h-0` overrides flexbox's default
+            "never shrink below content size" so overflow-y-auto actually activates
+            instead of the box growing past the sheet's own bounds. */}
         {isExpanded && (
-          <div className="flex flex-col overflow-y-auto px-4 pb-4" style={{ maxHeight: 'calc(60vh - 120px)' }}>
+          <div className="flex flex-1 min-h-0 flex-col overflow-y-auto px-4 pb-4">
             {hasPlacedItems && (
               <>
                 <h3 className="mb-2 text-sm font-bold text-gray-500 uppercase tracking-wide">
@@ -244,8 +256,12 @@ export default function CartBar({
         {/* Bottom bar: item count + total + Place Order button.
             The whole info area (everything except the Place Order button) is a
             single button that expands/collapses the sheet, so tapping anywhere on
-            the banner works — not just the drag handle. */}
-        <div className="border-t border-emerald-100 px-4 py-3">
+            the banner works — not just the drag handle.
+            `shrink-0`: this bar's real height (which grows with system font size) is
+            reserved by the flex column above rather than being squeezed by the
+            item-list's flex-1 sibling — this is the other half of the fix, see the
+            comment on the sheet container above. */}
+        <div className="shrink-0 border-t border-emerald-100 px-4 py-3">
           <div className="mx-auto flex max-w-md items-center gap-3">
             <button
               type="button"
