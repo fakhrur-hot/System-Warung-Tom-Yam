@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { applyCafeDefault, serverCodeToLang } from './i18n'
-import { getSupabase } from './lib/supabase'
+import { getSupabase, functionErrorMessage } from './lib/supabase'
 import { getBrowserId } from './lib/browserId'
 import { useOrderPolling } from './hooks/useOrderPolling'
 import Header from './components/Header'
@@ -242,7 +242,7 @@ export default function App() {
         )
 
         if (sessionError) {
-          setView({ type: 'error', message: sessionError.message || t('error') })
+          setView({ type: 'error', message: await functionErrorMessage(sessionError, t('error')) })
           return
         }
 
@@ -299,9 +299,36 @@ export default function App() {
   // After the customer confirms, start the "hold before kitchen" countdown instead of
   // sending immediately. The order is only POSTed once the countdown expires, so the
   // customer can still cancel it (nothing reaches the kitchen during the hold).
-  const handleConfirmOrder = () => {
+  //
+  // Table validity is re-checked HERE, on the "Yes" tap — not just once when the page
+  // first loaded. A table's QR/session can go stale between page-load and this moment
+  // (the tab sat open a long time, staff removed/renamed the table, the café closed),
+  // and without this check a customer could confirm an order against a table that no
+  // longer resolves, only to land on a broken/blank status view afterward instead of a
+  // clear error at the moment they actually acted. Applies to every café built from
+  // this shared source, not a per-café patch — see tables-session's UNKNOWN_TABLE.
+  const handleConfirmOrder = async () => {
     setShowConfirm(false)
     if (!tableId || pendingOrderRef.current.length === 0) return
+
+    try {
+      const supabase = getSupabase()
+      const { error: sessionError } = await supabase.functions.invoke(`tables-session/${tableId}`, {
+        method: 'GET',
+        headers: { 'x-browser-id': browserId },
+      })
+      if (sessionError) {
+        pendingOrderRef.current = []
+        setView({ type: 'error', message: await functionErrorMessage(sessionError, t('error')) })
+        return
+      }
+    } catch (err: unknown) {
+      pendingOrderRef.current = []
+      const message = err instanceof Error ? err.message : t('error')
+      setView({ type: 'error', message })
+      return
+    }
+
     setHoldRemaining(holdSeconds)
   }
 
