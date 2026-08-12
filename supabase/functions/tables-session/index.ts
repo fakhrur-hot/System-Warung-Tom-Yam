@@ -35,7 +35,7 @@ serve(async (req) => {
     .maybeSingle();
 
   if (tableError || !table) {
-    return errorResponse(404, "UNKNOWN_TABLE", `Table '${tableId}' does not exist`);
+    return errorResponse(404, "UNKNOWN_TABLE", "Table QR Code not exist or expired.");
   }
   const realTableId = table.id;
   const displayName = table.display_name ?? realTableId;

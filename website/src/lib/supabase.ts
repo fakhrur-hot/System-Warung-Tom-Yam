@@ -21,3 +21,23 @@ export function getSupabase(): SupabaseClient {
   client = createClient(url, key)
   return client
 }
+
+/**
+ * supabase-js's `functions.invoke` error only ever has a generic message ("Edge
+ * Function returned a non-2xx status code") — the actual `{ error, message }` body
+ * our Edge Functions send back lives on `error.context`, a raw fetch `Response`, and
+ * is never parsed automatically. Without this, every Edge Function 4xx/404/409 shows
+ * the same unhelpful generic string regardless of what actually went wrong.
+ */
+export async function functionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const context = (error as { context?: Response })?.context
+  if (context && typeof context.json === 'function') {
+    try {
+      const body = await context.clone().json()
+      if (typeof body?.message === 'string' && body.message) return body.message
+    } catch {
+      // Body wasn't JSON (or already consumed) — fall through to the generic message.
+    }
+  }
+  return (error as { message?: string })?.message || fallback
+}
