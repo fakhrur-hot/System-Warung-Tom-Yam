@@ -60,7 +60,8 @@ import com.razstudio.pos.ui.viewmodels.SetupViewModel
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun RoleSelectScreen(
-    onAdminConnect: () -> Unit,
+    /** "owner" or "secondary" — which credential section AdminConnectScreen should show. */
+    onAdminConnect: (String) -> Unit,
     onOrderingConnect: () -> Unit,
     onWirelessAp: () -> Unit = {},
     /** Wireless AP host: open this café's till. See the Host button for why it is not the QR. */
@@ -189,32 +190,36 @@ fun RoleSelectScreen(
                             label = strings.joinAsOrderingMode,
                             onClick = onOrderingConnect,
                         )
-                        // The owner-key entry used to sit here as a second button. It moved into
-                        // the Setup Wizard's "Owner QR" tab, where it belongs: scanning that key is
-                        // how a Full QR café gets *configured*, not just how somebody signs in, and
-                        // having it here meant Setup demanded a café name the QR was about to
-                        // supply. Setup is one tap away at the bottom of this screen.
-                        //
-                        // Kept for a device that is ALREADY a configured Cloud café, where this is
-                        // a genuine re-login and sending the owner through a setup wizard to do it
-                        // would be absurd.
-                        if (cloudReady) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            NestedAction(
-                                label = strings.reloginAsCafeAdmin,
-                                onClick = onAdminConnect,
-                            )
-                        }
-                        // Secondary Admin joins through the SAME screen as an owner re-login — that
-                        // screen already carries the invite-code section for it. It gets its own
-                        // button because "Relogin as Café Admin" reads as owner-only, so a manager
-                        // holding an invite had no signposted way in and went looking in Setup.
-                        Spacer(modifier = Modifier.height(6.dp))
-                        NestedAction(
-                            label = strings.loginAsSecondaryAdmin,
-                            onClick = onAdminConnect,
-                        )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ── Cafe Owner / Secondary Admin log-in ─────────────────────────────────
+                // Always visible, always their own top-level buttons — not nested inside QR
+                // Ordering Mode, and not gated by cloudReady: an owner or a manager holding an
+                // invite needs a way in on a blank device too (each screen's own QR scan carries
+                // the café's backend and configures the device as a side effect of signing in).
+                //
+                // These used to be two NestedActions sharing one lambda inside the QR Ordering
+                // Mode expander, both landing on the SAME AdminConnectScreen with the owner-key
+                // fields shown first — a Secondary Admin holding an invite saw an owner-only
+                // looking page with their fields buried below a divider. AdminConnectScreen now
+                // takes a mode and renders only the fields the tapped button promised.
+                OutlinedButton(
+                    onClick = { onAdminConnect("owner") },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(strings.logInAsCafeOwner)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedButton(
+                    onClick = { onAdminConnect("secondary") },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(strings.loginAsSecondaryAdmin)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))

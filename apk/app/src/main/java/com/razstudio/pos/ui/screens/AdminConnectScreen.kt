@@ -455,11 +455,18 @@ internal fun decodeQrFromImage(context: Context, uri: Uri): String? {
     }
 }
 
+/** Which credential section this screen shows. A single generic page used to show both the
+ * owner-key fields and the Secondary Admin invite fields regardless of which entry-screen button
+ * sent the user here, so a Secondary Admin landed on a page dominated by owner-only fields with no
+ * signal that theirs were further down. Each caller now says which one it means. */
+enum class AdminConnectMode { OWNER, SECONDARY_ADMIN }
+
 @Composable
 fun AdminConnectScreen(
     onConnected: () -> Unit,
     onBack: () -> Unit,
     onSecondaryRegistered: () -> Unit,
+    mode: AdminConnectMode = AdminConnectMode.OWNER,
     viewModel: AdminConnectViewModel = hiltViewModel(),
     languageViewModel: LanguageViewModel = hiltViewModel()
 ) {
@@ -575,14 +582,14 @@ fun AdminConnectScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = strings.adminConnectTitle,
+                text = if (mode == AdminConnectMode.SECONDARY_ADMIN) strings.secondaryAdminHeading else strings.adminConnectTitle,
                 style = MaterialTheme.typography.headlineMedium
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = strings.signInWithOwnerKeyTitle,
+                text = if (mode == AdminConnectMode.SECONDARY_ADMIN) strings.secondaryAdminJoinHelp else strings.signInWithOwnerKeyTitle,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -591,7 +598,7 @@ fun AdminConnectScreen(
 
             if (viewModel.isLoading) {
                 CircularProgressIndicator()
-            } else {
+            } else if (mode == AdminConnectMode.OWNER) {
                 // 1) Scan the owner key QR with the camera.
                 Button(
                     onClick = {
@@ -640,25 +647,13 @@ fun AdminConnectScreen(
                 ) {
                     Text(strings.signInAction)
                 }
-
+            } else {
                 // ── Secondary Admin ──────────────────────────────────────────────
                 // A Secondary Admin joins with an invite QR from the Main Admin (not the owner
-                // key) and gains admin access once the Main Admin approves the request.
-                Spacer(modifier = Modifier.height(24.dp))
-                Divider()
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = strings.secondaryAdminHeading,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = strings.secondaryAdminJoinHelp,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                // key) and gains admin access once the Main Admin approves the request. This is
+                // now the ONLY section on the page when reached via "Log in as Secondary Admin" —
+                // it used to sit below the owner-key fields on a shared page, which read as an
+                // owner screen with an afterthought tacked on the bottom.
                 OutlinedButton(
                     onClick = {
                         if (!hasCameraPermission) {
@@ -670,6 +665,12 @@ fun AdminConnectScreen(
                 ) {
                     Text(strings.scanInviteQrAction)
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = strings.orEnterKeyManually,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = inviteInput,
@@ -680,7 +681,7 @@ fun AdminConnectScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
+                Button(
                     onClick = { handleCredential(inviteInput) },
                     enabled = inviteInput.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()

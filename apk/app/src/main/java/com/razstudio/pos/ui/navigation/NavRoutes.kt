@@ -13,7 +13,10 @@ object NavRoutes {
 
     /** Wireless AP Mode: the server device shows its pairing QR so staff phones can join. */
     const val LAN_PAIRING = "lan_pairing"
-    const val ADMIN_CONNECT = "admin_connect"
+    // mode = "owner" | "secondary" — which credential section AdminConnectScreen shows.
+    // Defaulted so every pre-existing caller that navigates to the bare route keeps working.
+    const val ADMIN_CONNECT = "admin_connect?mode={mode}"
+    fun adminConnect(mode: String) = "admin_connect?mode=$mode"
 
     const val ORDERING_CONNECT = "ordering_connect"
     const val PENDING_APPROVAL = "pending_approval"

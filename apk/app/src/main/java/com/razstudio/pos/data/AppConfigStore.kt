@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import com.razstudio.pos.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -135,7 +136,15 @@ class AppConfigStore @Inject constructor(
     }
 
     // --- Used by the running app ---
-    fun supabaseUrl(): String = read(KEY_SUPABASE_URL)
+    //
+    // Each getter below falls back to the café-specific BuildConfig value baked in at compile time
+    // (see local.properties' SUPABASE_URL/SUPABASE_ANON_KEY/WEBSITE_URL and build.gradle.kts'
+    // buildConfigField calls) when the encrypted store is empty. A per-café build that ships with
+    // these baked in needs no QR scan or Setup Wizard step to become "configured" — only actual
+    // credentials (the owner key, an invite) still require the operator to provide one. The
+    // template build ships every BuildConfig value blank, so this is a no-op there and behaves
+    // exactly as before.
+    fun supabaseUrl(): String = read(KEY_SUPABASE_URL).ifBlank { com.razstudio.pos.BuildConfig.SUPABASE_URL }
 
     /** The paired LAN Server's base URL, e.g. `http://192.168.43.1:8765`. Blank when unpaired. */
     fun lanServerUrl(): String = read(KEY_LAN_SERVER_URL)
@@ -174,7 +183,7 @@ class AppConfigStore @Inject constructor(
         write(KEY_LAST_BACKUP_AT, millis.toString())
     }
 
-    fun supabaseAnonKey(): String = read(KEY_SUPABASE_ANON_KEY)
+    fun supabaseAnonKey(): String = read(KEY_SUPABASE_ANON_KEY).ifBlank { com.razstudio.pos.BuildConfig.SUPABASE_ANON_KEY }
 
     /**
      * Point an **unconfigured** device at a café using the connection details carried in the Owner
@@ -244,8 +253,8 @@ class AppConfigStore @Inject constructor(
         write(KEY_LAST_BACKUP_AT, "")
     }
 
-    fun websiteUrl(): String = read(KEY_WEBSITE_URL)
-    fun cafeName(): String = read(KEY_CAFE_NAME)
+    fun websiteUrl(): String = read(KEY_WEBSITE_URL).ifBlank { com.razstudio.pos.BuildConfig.WEBSITE_URL }
+    fun cafeName(): String = read(KEY_CAFE_NAME).ifBlank { context.getString(R.string.app_name) }
 
     /**
      * Update ONLY the café name, leaving the Supabase connection and every other stored value

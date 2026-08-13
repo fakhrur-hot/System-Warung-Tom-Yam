@@ -459,6 +459,7 @@ data class UiStringsGroup6(
     val sessionPendingConfirmation: String,
     val addItemCd: String,
     val loginAsSecondaryAdmin: String,
+    val logInAsCafeOwner: String,
     // ── First-run permission gate (mandatory, before the app opens) ──
     val permissionsTitle: String,
     val permissionsIntro: String,
@@ -1373,6 +1374,7 @@ class UiStrings(
     val sessionPendingConfirmation: String get() = g6.sessionPendingConfirmation
     val addItemCd: String get() = g6.addItemCd
     val loginAsSecondaryAdmin: String get() = g6.loginAsSecondaryAdmin
+    val logInAsCafeOwner: String get() = g6.logInAsCafeOwner
     val permissionsTitle: String get() = g6.permissionsTitle
     val permissionsIntro: String get() = g6.permissionsIntro
     val permissionLocationLabel: String get() = g6.permissionLocationLabel
@@ -2242,6 +2244,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sessionPendingConfirmation = "Menunggu pengesahan",
             addItemCd = "Tambah barang",
             loginAsSecondaryAdmin = "Masuk sebagai Admin Kedua",
+            logInAsCafeOwner = "Log Masuk sebagai Pemilik Kafe",
             permissionsTitle = "Kebenaran diperlukan",
             permissionsIntro = "Aplikasi ini perlukan ketiga-tiganya untuk berfungsi. Benarkan sekali sahaja.",
             permissionLocationLabel = "Lokasi",
@@ -3119,6 +3122,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sessionPendingConfirmation = "Pending confirmation",
             addItemCd = "Add item",
             loginAsSecondaryAdmin = "Log in as Secondary Admin",
+            logInAsCafeOwner = "Log in as Cafe Owner",
             permissionsTitle = "Permissions needed",
             permissionsIntro = "This app needs all three to run. Grant them once and you will not be asked again.",
             permissionLocationLabel = "Location",
@@ -3996,6 +4000,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sessionPendingConfirmation = "待确认",
             addItemCd = "添加项目",
             loginAsSecondaryAdmin = "以副管理员登录",
+            logInAsCafeOwner = "以咖啡馆店主登录",
             permissionsTitle = "需要权限",
             permissionsIntro = "此应用需要全部三项权限才能运行。授权一次即可。",
             permissionLocationLabel = "位置",
@@ -4871,6 +4876,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sessionPendingConfirmation = "உறுதிப்படுத்தல் நிலுவையில்",
             addItemCd = "உருப்படியைச் சேர்",
             loginAsSecondaryAdmin = "இரண்டாம் நிர்வாகியாக உள்நுழை",
+            logInAsCafeOwner = "கஃபே உரிமையாளராக உள்நுழைக",
             permissionsTitle = "அனுமதிகள் தேவை",
             permissionsIntro = "இயங்க மூன்று அனுமதிகளும் தேவை. ஒரு முறை வழங்கினால் போதும்.",
             permissionLocationLabel = "இருப்பிடம்",
@@ -5748,6 +5754,7 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             sessionPendingConfirmation = "รอการยืนยัน",
             addItemCd = "เพิ่มรายการ",
             loginAsSecondaryAdmin = "เข้าสู่ระบบเป็นผู้ดูแลรอง",
+            logInAsCafeOwner = "เข้าสู่ระบบในฐานะเจ้าของร้าน",
             permissionsTitle = "ต้องการสิทธิ์",
             permissionsIntro = "แอปนี้ต้องใช้ทั้งสามอย่างเพื่อทำงาน อนุญาตครั้งเดียวพอ",
             permissionLocationLabel = "ตำแหน่ง",

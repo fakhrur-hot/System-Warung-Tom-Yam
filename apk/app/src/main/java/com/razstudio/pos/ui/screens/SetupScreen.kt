@@ -333,23 +333,16 @@ fun SetupScreen(
                     ) { v -> viewModel.update { it.copy(supabaseAnonKey = v) } }
                 }
 
-                // Optional, and placed ABOVE the check deliberately. `update()` clears `verified` on
-                // every keystroke — correct, since editing a field invalidates a check of the old
-                // value — but that makes any field below the check button a trap: check, get a green
-                // result, type one more thing, and Save silently disables again while the message
-                // still says to check the connection. Nothing on this tab needs the Wizard URL, so it
-                // goes before the gate rather than earning an exemption from it.
-                Field(
-                    strings.setupExistingWizardUrl,
-                    "https://…/api/provision/run",
-                    state.provisionerWorkerUrl,
-                    KeyboardType.Uri,
-                ) { v -> viewModel.update { it.copy(provisionerWorkerUrl = v) } }
-                HelpText(strings.setupExistingWizardHint)
-
-                // Rendered here rather than by the shared block below, for the same reason as the
-                // Wizard URL: everything editable has to sit above the check, or verifying and then
-                // naming the café silently undoes the verification.
+                // Nothing on this tab needs the Wizard URL — that field belongs to the separate
+                // "New café" provisioning flow (ProvisionerScreen) and only cluttered this one,
+                // asking an operator configuring an EXISTING café's device to fill in a value for
+                // provisioning a DIFFERENT, not-yet-created café. Removed rather than hidden; the
+                // Provisioner screen still has its own copy of the same field for when it's actually
+                // relevant.
+                //
+                // Rendered here rather than by the shared block below: everything editable has to
+                // sit above the check, or verifying and then naming the café silently undoes the
+                // verification.
                 Field(strings.setupCafeName, strings.setupCafeNamePlaceholder, state.cafeName,
                     KeyboardType.Text) { v -> viewModel.update { it.copy(cafeName = v) } }
 

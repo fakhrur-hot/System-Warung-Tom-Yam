@@ -85,7 +85,7 @@ fun AppNavGraph(
     LaunchedEffect(Unit) {
         authViewModel.authEventBus.events.collect { event ->
             if (event is AuthEventBus.AuthEvent.SessionExpired) {
-                navController.navigate(NavRoutes.ADMIN_CONNECT) {
+                navController.navigate(NavRoutes.adminConnect("owner")) {
                     popUpTo(0) { inclusive = true }
                 }
             }
@@ -209,8 +209,8 @@ fun AppNavGraph(
 
         composable(NavRoutes.ROLE_SELECT) {
             RoleSelectScreen(
-                onAdminConnect = {
-                    navController.navigate(NavRoutes.ADMIN_CONNECT)
+                onAdminConnect = { mode ->
+                    navController.navigate(NavRoutes.adminConnect(mode))
                 },
                 onOrderingConnect = {
                     navController.navigate(NavRoutes.ORDERING_CONNECT)
@@ -306,8 +306,19 @@ fun AppNavGraph(
             )
         }
 
-        composable(NavRoutes.ADMIN_CONNECT) {
+        composable(
+            route = NavRoutes.ADMIN_CONNECT,
+            arguments = listOf(
+                navArgument("mode") { type = NavType.StringType; defaultValue = "owner" }
+            )
+        ) { backStackEntry ->
+            val mode = if (backStackEntry.arguments?.getString("mode") == "secondary") {
+                com.razstudio.pos.ui.screens.AdminConnectMode.SECONDARY_ADMIN
+            } else {
+                com.razstudio.pos.ui.screens.AdminConnectMode.OWNER
+            }
             AdminConnectScreen(
+                mode = mode,
                 onConnected = {
                     // popUpTo(0), not popUpTo(ROLE_SELECT): role-select is only on the stack when
                     // the device came through it. Signing in from the lock screen — or from a
@@ -384,7 +395,7 @@ fun AppNavGraph(
                     // Expired/revoked token surfaced without an HTTP 401 (e.g. openSession
                     // finding no token). Mirror the global session-expiry handler: wipe the
                     // back stack and send the admin to re-handshake.
-                    navController.navigate(NavRoutes.ADMIN_CONNECT) {
+                    navController.navigate(NavRoutes.adminConnect("owner")) {
                         popUpTo(0) { inclusive = true }
                     }
                 },
@@ -442,7 +453,7 @@ fun AppNavGraph(
                     // Same owner-key screen a fresh device uses. The lock screen is popped so a
                     // cancelled scan cannot leave the till sitting behind a login it never
                     // completed — backing out returns to the lock, which is where it belongs.
-                    navController.navigate(NavRoutes.ADMIN_CONNECT) {
+                    navController.navigate(NavRoutes.adminConnect("owner")) {
                         popUpTo(0) { inclusive = true }
                     }
                 },

@@ -60,7 +60,7 @@ class StartupViewModel @Inject constructor(
             val dest = withContext(Dispatchers.IO) {
                 when {
                     deepLinkRecover != null && !secureStorage.isAuthenticated() ->
-                        NavRoutes.ADMIN_CONNECT
+                        NavRoutes.adminConnect("owner")
                     deepLinkInvite != null && !secureStorage.isAuthenticated() ->
                         NavRoutes.ORDERING_CONNECT
                     secureStorage.isAuthenticated() ->
