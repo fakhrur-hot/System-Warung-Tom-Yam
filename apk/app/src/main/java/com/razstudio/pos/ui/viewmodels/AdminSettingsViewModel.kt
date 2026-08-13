@@ -83,9 +83,14 @@ class AdminSettingsViewModel @Inject constructor(
         // Invite (staff / ordering)
         val invite: InviteResponse? = null,
         val inviteLoading: Boolean = false,
+        // Invites are hashed at rest (migration 0020): once regenerated, GET can never return the
+        // plaintext again — same as the owner key below. True routes the UI to a "regenerate to
+        // view" prompt instead of the generic error a stale invite row would otherwise show.
+        val inviteNotReadable: Boolean = false,
         // Invite for adding a SECONDARY ADMIN device (full management, no local printer)
         val adminInvite: InviteResponse? = null,
         val adminInviteLoading: Boolean = false,
+        val adminInviteNotReadable: Boolean = false,
         // Invite for adding an OPERATOR device (scoped access: menu, tables, branding, location)
         // Permanent owner-recovery key (restores Main Admin on a fresh device). Keep secret.
         val recoveryInvite: InviteResponse? = null,
@@ -379,7 +384,7 @@ class AdminSettingsViewModel @Inject constructor(
 
     fun loadInvite() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(inviteLoading = true)
+            _uiState.value = _uiState.value.copy(inviteLoading = true, inviteNotReadable = false)
             when (val result = apiClient.getInvite()) {
                 is ApiResult.Success -> {
                     _uiState.value = _uiState.value.copy(
@@ -388,10 +393,16 @@ class AdminSettingsViewModel @Inject constructor(
                     )
                 }
                 is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(
-                        inviteLoading = false,
-                        error = result.message
-                    )
+                    // INVITE_NOT_READABLE is not a failure: a hashed-at-rest invite *cannot* be
+                    // shown again, and the UI answers it by offering to regenerate.
+                    if (result.code == "INVITE_NOT_READABLE") {
+                        _uiState.value = _uiState.value.copy(inviteLoading = false, inviteNotReadable = true)
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            inviteLoading = false,
+                            error = result.message
+                        )
+                    }
                 }
                 is ApiResult.NetworkError -> {
                     _uiState.value = _uiState.value.copy(
@@ -405,7 +416,7 @@ class AdminSettingsViewModel @Inject constructor(
 
     fun regenerateInvite() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(inviteLoading = true)
+            _uiState.value = _uiState.value.copy(inviteLoading = true, inviteNotReadable = false)
             when (val result = apiClient.regenerateInvite()) {
                 is ApiResult.Success -> {
                     _uiState.value = _uiState.value.copy(
@@ -434,12 +445,16 @@ class AdminSettingsViewModel @Inject constructor(
 
     fun loadAdminInvite() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(adminInviteLoading = true)
+            _uiState.value = _uiState.value.copy(adminInviteLoading = true, adminInviteNotReadable = false)
             when (val result = apiClient.getInvite("admin")) {
                 is ApiResult.Success ->
                     _uiState.value = _uiState.value.copy(adminInvite = result.data, adminInviteLoading = false)
                 is ApiResult.Error ->
-                    _uiState.value = _uiState.value.copy(adminInviteLoading = false, error = result.message)
+                    if (result.code == "INVITE_NOT_READABLE") {
+                        _uiState.value = _uiState.value.copy(adminInviteLoading = false, adminInviteNotReadable = true)
+                    } else {
+                        _uiState.value = _uiState.value.copy(adminInviteLoading = false, error = result.message)
+                    }
                 is ApiResult.NetworkError ->
                     _uiState.value = _uiState.value.copy(adminInviteLoading = false, error = str().msgNetworkError.format(result.message))
             }
@@ -496,7 +511,7 @@ class AdminSettingsViewModel @Inject constructor(
 
     fun regenerateAdminInvite() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(adminInviteLoading = true)
+            _uiState.value = _uiState.value.copy(adminInviteLoading = true, adminInviteNotReadable = false)
             when (val result = apiClient.regenerateInvite("admin")) {
                 is ApiResult.Success ->
                     _uiState.value = _uiState.value.copy(adminInvite = result.data, adminInviteLoading = false, successMessage = str().invitationRegenerated)

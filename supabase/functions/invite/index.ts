@@ -5,24 +5,14 @@
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { handleCors, requireWebsiteOrigin } from "../_shared/cors.ts";
-import { verifyAdminToken, generateToken } from "../_shared/auth.ts";
+import { verifyAdminToken, generateToken, sha256 } from "../_shared/auth.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
 import { errorResponse, jsonResponse } from "../_shared/errors.ts";
 
-/**
- * How long a freshly-minted invite stays valid.
- *
- * An invite is scanned within a minute of being shown in practice — the admin holds one phone up and
- * the joining device photographs it. Fifteen minutes is generous for that and short enough that a
- * code found later (a photo, a printed slip in a drawer, a screenshot in a group chat) is already
- * dead. See migration 0013 for why the column is nullable.
- */
-const INVITE_TTL_MINUTES = 15;
-
-/** Expiry stamp for a token minted now. */
-function inviteExpiry(): string {
-  return new Date(Date.now() + INVITE_TTL_MINUTES * 60_000).toISOString();
-}
+// Invites no longer expire or auto-rotate (see migration 0020): a café's join code stays valid
+// until an admin explicitly hits Regenerate, exactly like the Main Admin owner key. `expires_at`
+// is left alone on existing rows (NULL already means "never expires" — see migration 0013) but is
+// never set on newly minted rows.
 
 serve(async (req) => {
   const corsResp = handleCors(req);
@@ -76,19 +66,21 @@ serve(async (req) => {
   }
 
   if (isRegenerate) {
-    // Generate a new invite token and replace the target role's row
+    // Mint a new invite token, store only its hash, and hand back the plaintext exactly once —
+    // the same shape as admin-recovery's owner-key regenerate. `token` is cleared so no plaintext
+    // copy of the new code is left behind.
     const newToken = generateToken(16);
-    const expiresAt = inviteExpiry();
 
     const { error } = await supabase
       .from("invites")
       .upsert(
         {
           id: inviteId,
-          token: newToken,
+          token: null,
+          token_hash: await sha256(newToken),
           role: inviteRole,
           rotated_at: new Date().toISOString(),
-          expires_at: expiresAt,
+          expires_at: null,
         },
         { onConflict: "id" }
       );
@@ -102,29 +94,32 @@ serve(async (req) => {
     // WEBSITE_ORIGIN secret (same one CORS uses).
     const inviteUrl = `${base}/join?invite=${newToken}`;
 
-    return jsonResponse({ token: newToken, url: inviteUrl, role: inviteRole, expiresAt });
+    return jsonResponse({ token: newToken, url: inviteUrl, role: inviteRole, expiresAt: null });
   }
 
-  // GET — return current invite token for the target role (seed one if none exists)
-  let { data: invite, error } = await supabase
+  // GET — return the current invite for the target role. A café that has never minted one for
+  // this role gets one seeded now (hash-only, shown once). A café that already has a hash-only
+  // row cannot get the plaintext back — same "cannot be shown again" rule as the owner key: the
+  // admin hits Regenerate for a fresh code instead of this silently minting a new one, which
+  // would be the rotation the café explicitly does not want happening on every page load.
+  const { data: invite } = await supabase
     .from("invites")
-    .select("token, expires_at")
+    .select("token, token_hash, expires_at")
     .eq("id", inviteId)
-    .single();
+    .maybeSingle();
 
-  if (!invite || error) {
-    // Seed an initial invite token
+  if (!invite) {
     const initialToken = generateToken(16);
-    const seededExpiry = inviteExpiry();
     const { error: insertError } = await supabase
       .from("invites")
       .upsert(
         {
           id: inviteId,
-          token: initialToken,
+          token: null,
+          token_hash: await sha256(initialToken),
           role: inviteRole,
           rotated_at: new Date().toISOString(),
-          expires_at: seededExpiry,
+          expires_at: null,
         },
         { onConflict: "id" }
       );
@@ -132,14 +127,33 @@ serve(async (req) => {
     if (insertError) {
       return errorResponse(500, "SERVER_ERROR", insertError.message);
     }
-    invite = { token: initialToken, expires_at: seededExpiry };
+
+    return jsonResponse({
+      token: initialToken,
+      url: `${base}/join?invite=${initialToken}`,
+      role: inviteRole,
+      expiresAt: null,
+    });
   }
 
-  const inviteUrl = `${base}/join?invite=${invite.token}`;
+  // Hash-first, same precedence `register` uses: a café can hold both a hash (from a rotation
+  // after this migration) and a leftover plaintext column from before it, and the hash always
+  // wins once it exists.
+  if (invite.token_hash) {
+    return errorResponse(
+      409,
+      "INVITE_NOT_READABLE",
+      "This invite code is stored as a hash and cannot be shown again. Regenerate to get a new one.",
+    );
+  }
+
+  if (!invite.token) {
+    return errorResponse(500, "SERVER_ERROR", "Invite row has neither a token nor a token hash");
+  }
 
   return jsonResponse({
     token: invite.token,
-    url: inviteUrl,
+    url: `${base}/join?invite=${invite.token}`,
     role: inviteRole,
     expiresAt: invite.expires_at ?? null,
   });

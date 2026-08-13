@@ -297,6 +297,21 @@ fun DevicesScreen(
                             Text(strings.regenerateButton)
                         }
                     }
+                } else if (settingsState.inviteNotReadable) {
+                    // Hashed at rest (migration 0020): the last-regenerated code cannot be shown
+                    // again, and re-showing the same QR is exactly the "no rotation" behaviour the
+                    // café wants — so this reads as "hit Regenerate", not as a failure.
+                    Text(
+                        text = "This invite code is stored securely and cannot be shown again. " +
+                            "Regenerate to get a new one — it will stay valid until you regenerate again.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(onClick = { settingsViewModel.regenerateInvite() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(strings.regenerateButton)
+                    }
                 } else {
                     Text(strings.noInvitationAvailable, style = MaterialTheme.typography.bodyMedium)
                 }
@@ -386,6 +401,18 @@ fun DevicesScreen(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(strings.regenerateButton)
                             }
+                        }
+                    } else if (settingsState.adminInviteNotReadable) {
+                        Text(
+                            text = "This invite code is stored securely and cannot be shown again. " +
+                                "Regenerate to get a new one — it will stay valid until you regenerate again.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(onClick = { settingsViewModel.regenerateAdminInvite() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(strings.regenerateButton)
                         }
                     }
 

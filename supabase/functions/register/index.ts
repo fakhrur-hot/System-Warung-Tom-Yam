@@ -9,6 +9,7 @@
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { handleCors } from "../_shared/cors.ts";
+import { sha256 } from "../_shared/auth.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
 import { errorResponse, jsonResponse } from "../_shared/errors.ts";
 
@@ -37,15 +38,30 @@ serve(async (req) => {
 
   if (inviteToken) {
     // Validate the invite token against ANY invite row and derive the role it grants.
-    // Row id=1 → ORDERING staff; row id=2 → ADMIN_SECONDARY. A device joins the exact
-    // role the scanned token belongs to.
-    const { data: invite } = await supabase
+    // Row id=1 → ORDERING staff; row id=2 → ADMIN_SECONDARY; row id=3 → OPERATOR. A device joins
+    // the exact role the scanned token belongs to.
+    //
+    // Hash-first, plaintext-fallback (migration 0020, same precedence admin-recovery already uses
+    // for the owner key): a row minted after 0020 carries only `token_hash`, so the presented
+    // token is hashed and compared against that. A row still carrying a plaintext `token` from
+    // before the migration keeps working via the fallback rather than locking out a café mid-service.
+    const presentedHash = await sha256(inviteToken);
+    let { data: invite } = await supabase
       .from("invites")
       .select("token, role, expires_at")
-      .eq("token", inviteToken)
+      .eq("token_hash", presentedHash)
       .maybeSingle();
 
-    if (!invite || invite.token !== inviteToken) {
+    if (!invite) {
+      const { data: legacy } = await supabase
+        .from("invites")
+        .select("token, role, expires_at")
+        .eq("token", inviteToken)
+        .maybeSingle();
+      invite = legacy;
+    }
+
+    if (!invite) {
       return errorResponse(403, "INVALID_INVITE", "Invite token is invalid or expired");
     }
 
@@ -53,12 +69,11 @@ serve(async (req) => {
     // skipped: a scanned link goes straight to this endpoint, and anything the app checks first is a
     // courtesy the app could get wrong or an attacker could bypass entirely.
     //
-    // A NULL expiry means "never expires" and belongs to rows created before migration 0013 — see
-    // that file for why those keep working rather than being invalidated under a running café.
-    //
-    // The message deliberately does not distinguish expired from invalid. Someone holding a code that
-    // is merely stale learns nothing useful from being told so, and the café's own staff will simply
-    // ask the admin to regenerate either way.
+    // A NULL expiry means "never expires" — every row minted after migration 0020 (invites no
+    // longer expire or auto-rotate) as well as every pre-0013 row. The message deliberately does
+    // not distinguish expired from invalid: someone holding a code that is merely stale learns
+    // nothing useful from being told so, and the café's own staff will simply ask the admin to
+    // regenerate either way.
     if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
       return errorResponse(403, "INVALID_INVITE", "Invite token is invalid or expired");
     }
