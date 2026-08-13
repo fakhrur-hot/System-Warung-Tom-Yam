@@ -164,12 +164,23 @@ class LocalBackend @Inject constructor(
      * staff phone that suddenly cannot take orders mid-service — gives no hint of the cause.
      */
     override suspend fun register(
-        inviteToken: String,
+        inviteToken: String?,
         deviceId: String,
         deviceModel: String,
         androidId: String,
         appVersion: String,
     ): ApiResult<RegisterResponse> {
+        // Staff self-register (no invite) is a Cloud-mode concept — it bootstraps a
+        // device's backend from the café's PUBLIC website URl, which has no meaning on
+        // a LAN Server that isn't hosted anywhere. LAN Mode keeps requiring its own
+        // local pairing code; there is no equivalent shortcut to remove here.
+        if (inviteToken == null) {
+            return ApiResult.Error(
+                "PAIRING_CODE_REQUIRED",
+                "LAN mode needs the pairing code shown on the admin device",
+            )
+        }
+
         val nowMs = System.currentTimeMillis()
 
         val existing = pairedDeviceDao.getById(deviceId)

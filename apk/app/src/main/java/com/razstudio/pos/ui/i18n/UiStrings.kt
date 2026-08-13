@@ -245,6 +245,10 @@ data class UiStringsGroup3(
     val tokenTooShortError: String,
     val invalidInviteError: String,
     val registerDeviceButton: String,
+    // ── Staff self-register (.kiro/specs/staff-self-register) ──
+    val selfRegisterToggleLabel: String,
+    val cafeWebsiteUrlFieldLabel: String,
+    val selfRegisterAlreadyConfiguredError: String,
 )
 
 data class UiStringsGroup4(
@@ -1180,6 +1184,9 @@ class UiStrings(
     val tokenTooShortError: String get() = g3.tokenTooShortError
     val invalidInviteError: String get() = g3.invalidInviteError
     val registerDeviceButton: String get() = g3.registerDeviceButton
+    val selfRegisterToggleLabel: String get() = g3.selfRegisterToggleLabel
+    val cafeWebsiteUrlFieldLabel: String get() = g3.cafeWebsiteUrlFieldLabel
+    val selfRegisterAlreadyConfiguredError: String get() = g3.selfRegisterAlreadyConfiguredError
     val connectingLabel: String get() = g4.connectingLabel
     val cafeClosedWaitingDesc: String get() = g4.cafeClosedWaitingDesc
     val readyToCheckInTitle: String get() = g4.readyToCheckInTitle
@@ -2038,6 +2045,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             tokenTooShortError = "Token terlalu pendek. Semak pautan jemputan daripada admin anda.",
             invalidInviteError = "Jemputan tidak sah atau telah tamat tempoh. Minta admin anda untuk pautan baharu.",
             registerDeviceButton = "Daftar Peranti",
+            selfRegisterToggleLabel = "Sertai tanpa jemputan",
+            cafeWebsiteUrlFieldLabel = "URL laman web kafe",
+            selfRegisterAlreadyConfiguredError = "Peranti ini sudah disambungkan ke sebuah kafe.",
         ),
         g4 = UiStringsGroup4(
             connectingLabel = "Menyambung...",
@@ -2912,6 +2922,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             tokenTooShortError = "Token too short. Check the invitation link from your admin.",
             invalidInviteError = "Invalid or expired invitation. Ask your admin for a new link.",
             registerDeviceButton = "Register Device",
+            selfRegisterToggleLabel = "Join without an invite",
+            cafeWebsiteUrlFieldLabel = "Café website URL",
+            selfRegisterAlreadyConfiguredError = "This device is already connected to a café.",
         ),
         g4 = UiStringsGroup4(
             connectingLabel = "Connecting...",
@@ -3786,6 +3799,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             tokenTooShortError = "代码太短。请查看您管理员提供的邀请链接。",
             invalidInviteError = "邀请无效或已过期。请向您的管理员索取新链接。",
             registerDeviceButton = "注册设备",
+            selfRegisterToggleLabel = "无需邀请加入",
+            cafeWebsiteUrlFieldLabel = "咖啡厅网站网址",
+            selfRegisterAlreadyConfiguredError = "此设备已连接到一家咖啡厅。",
         ),
         g4 = UiStringsGroup4(
             connectingLabel = "连接中...",
@@ -4658,6 +4674,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             tokenTooShortError = "டோக்கன் மிகக் குறுகியது. உங்கள் நிர்வாகியிடமிருந்து அழைப்பு இணைப்பைச் சரிபார்க்கவும்.",
             invalidInviteError = "தவறான அல்லது காலாவதியான அழைப்பு. புதிய இணைப்பிற்கு உங்கள் நிர்வாகியிடம் கேளுங்கள்.",
             registerDeviceButton = "சாதனத்தைப் பதிவு செய்",
+            selfRegisterToggleLabel = "அழைப்பு இல்லாமல் சேரவும்",
+            cafeWebsiteUrlFieldLabel = "கஃபே இணையதள URL",
+            selfRegisterAlreadyConfiguredError = "இந்தச் சாதனம் ஏற்கனவே ஒரு கஃபேயுடன் இணைக்கப்பட்டுள்ளது.",
         ),
         g4 = UiStringsGroup4(
             connectingLabel = "இணைக்கிறது...",
@@ -5532,6 +5551,9 @@ fun uiStrings(lang: AppLanguage): UiStrings = when (lang) {
             tokenTooShortError = "โทเค็นสั้นเกินไป ตรวจสอบลิงก์คำเชิญจากผู้ดูแลระบบของคุณ",
             invalidInviteError = "คำเชิญไม่ถูกต้องหรือหมดอายุ ขอลิงก์ใหม่จากผู้ดูแลระบบของคุณ",
             registerDeviceButton = "ลงทะเบียนอุปกรณ์",
+            selfRegisterToggleLabel = "เข้าร่วมโดยไม่ต้องมีคำเชิญ",
+            cafeWebsiteUrlFieldLabel = "URL เว็บไซต์ร้าน",
+            selfRegisterAlreadyConfiguredError = "อุปกรณ์นี้เชื่อมต่อกับร้านอยู่แล้ว",
         ),
         g4 = UiStringsGroup4(
             connectingLabel = "กำลังเชื่อมต่อ...",

@@ -1,7 +1,11 @@
 /**
- * POST /api/register — public (invite-gated).
- * Registers an ordering device using a valid invite token.
- * Broadcasts JOIN_REQUEST on admin-devices channel.
+ * POST /api/register — public.
+ * Registers an ordering device either via a valid invite token (Secondary Admin,
+ * Operator, or an invite-based staff join), or — for Ordering staff only — with NO
+ * invite at all (staff-self-register spec: an Ordering device is the lowest-privilege
+ * role and already needs an Admin's explicit approval before anything is granted, so
+ * the up-front invite step is removable for it the same way the sibling barber-queue
+ * app's device approval needs no invite either). Broadcasts JOIN_REQUEST either way.
  */
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { handleCors } from "../_shared/cors.ts";
@@ -17,11 +21,11 @@ serve(async (req) => {
   }
 
   const body = await req.json().catch(() => null);
-  if (!body || !body.inviteToken || !body.deviceId || !body.deviceModel) {
+  if (!body || !body.deviceId || !body.deviceModel) {
     return errorResponse(
       422,
       "VALIDATION",
-      "inviteToken, deviceId, and deviceModel are required"
+      "deviceId and deviceModel are required"
     );
   }
 
@@ -29,36 +33,45 @@ serve(async (req) => {
 
   const supabase = getSupabaseClient();
 
-  // Validate the invite token against ANY invite row and derive the role it grants.
-  // Row id=1 → ORDERING staff; row id=2 → ADMIN_SECONDARY. A device joins the exact
-  // role the scanned token belongs to.
-  const { data: invite } = await supabase
-    .from("invites")
-    .select("token, role, expires_at")
-    .eq("token", inviteToken)
-    .maybeSingle();
+  let grantedRole: string;
 
-  if (!invite || invite.token !== inviteToken) {
-    return errorResponse(403, "INVALID_INVITE", "Invite token is invalid or expired");
+  if (inviteToken) {
+    // Validate the invite token against ANY invite row and derive the role it grants.
+    // Row id=1 → ORDERING staff; row id=2 → ADMIN_SECONDARY. A device joins the exact
+    // role the scanned token belongs to.
+    const { data: invite } = await supabase
+      .from("invites")
+      .select("token, role, expires_at")
+      .eq("token", inviteToken)
+      .maybeSingle();
+
+    if (!invite || invite.token !== inviteToken) {
+      return errorResponse(403, "INVALID_INVITE", "Invite token is invalid or expired");
+    }
+
+    // Expiry is enforced here rather than at the QR, because this is the only place that cannot be
+    // skipped: a scanned link goes straight to this endpoint, and anything the app checks first is a
+    // courtesy the app could get wrong or an attacker could bypass entirely.
+    //
+    // A NULL expiry means "never expires" and belongs to rows created before migration 0013 — see
+    // that file for why those keep working rather than being invalidated under a running café.
+    //
+    // The message deliberately does not distinguish expired from invalid. Someone holding a code that
+    // is merely stale learns nothing useful from being told so, and the café's own staff will simply
+    // ask the admin to regenerate either way.
+    if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
+      return errorResponse(403, "INVALID_INVITE", "Invite token is invalid or expired");
+    }
+
+    grantedRole = invite.role === "ADMIN_SECONDARY" ? "ADMIN_SECONDARY"
+                : invite.role === "OPERATOR" ? "OPERATOR"
+                : "ORDERING";
+  } else {
+    // Staff self-register (.kiro/specs/staff-self-register): no invite table touched
+    // at all. Always ORDERING — a device can never self-declare an elevated role by
+    // simply omitting an invite token (that spec's Requirement 1.3).
+    grantedRole = "ORDERING";
   }
-
-  // Expiry is enforced here rather than at the QR, because this is the only place that cannot be
-  // skipped: a scanned link goes straight to this endpoint, and anything the app checks first is a
-  // courtesy the app could get wrong or an attacker could bypass entirely.
-  //
-  // A NULL expiry means "never expires" and belongs to rows created before migration 0013 — see
-  // that file for why those keep working rather than being invalidated under a running café.
-  //
-  // The message deliberately does not distinguish expired from invalid. Someone holding a code that
-  // is merely stale learns nothing useful from being told so, and the café's own staff will simply
-  // ask the admin to regenerate either way.
-  if (invite.expires_at && new Date(invite.expires_at) < new Date()) {
-    return errorResponse(403, "INVALID_INVITE", "Invite token is invalid or expired");
-  }
-
-  const grantedRole = invite.role === "ADMIN_SECONDARY" ? "ADMIN_SECONDARY"
-                    : invite.role === "OPERATOR" ? "OPERATOR"
-                    : "ORDERING";
 
   // Insert the device as PENDING in the granted role
   const { data: device, error } = await supabase

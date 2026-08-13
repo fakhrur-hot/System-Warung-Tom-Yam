@@ -419,7 +419,7 @@ class ApiClient @Inject constructor(
      * @return [ApiResult] with device status on success.
      */
     override suspend fun register(
-        inviteToken: String,
+        inviteToken: String?,
         deviceId: String,
         deviceModel: String,
         androidId: String,
@@ -427,7 +427,11 @@ class ApiClient @Inject constructor(
     ): ApiResult<RegisterResponse> = withContext(Dispatchers.IO) {
         try {
             val body = JSONObject().apply {
-                put("inviteToken", inviteToken)
+                // Omitted entirely (not even a JSON null) when absent — the server's
+                // `if (inviteToken)` branch (.kiro/specs/staff-self-register) treats
+                // "field not present" and "field is null" the same way, but omitting
+                // it is what the spec's request shape actually documents.
+                if (inviteToken != null) put("inviteToken", inviteToken)
                 put("deviceId", deviceId)
                 put("deviceModel", deviceModel)
                 put("androidId", androidId)

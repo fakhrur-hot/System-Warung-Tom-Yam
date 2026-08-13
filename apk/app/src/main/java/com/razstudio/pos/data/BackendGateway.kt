@@ -40,7 +40,10 @@ interface BackendGateway {
 
     // ── Onboarding, auth, and device registry ─────────────────────────────────────
     suspend fun adminHandshakeDebug(deviceId: String, cafeName: String): ApiResult<String>
-    suspend fun register(inviteToken: String, deviceId: String, deviceModel: String, androidId: String, appVersion: String): ApiResult<RegisterResponse>
+    // inviteToken is nullable — Ordering staff may self-register with no invite at all
+    // (.kiro/specs/staff-self-register); LAN mode's own implementation still requires
+    // its local pairing code and rejects a null one (see LocalBackend.register).
+    suspend fun register(inviteToken: String?, deviceId: String, deviceModel: String, androidId: String, appVersion: String): ApiResult<RegisterResponse>
     suspend fun pollDeviceStatus(deviceId: String): ApiResult<DeviceStatusResponse>
     suspend fun recoverAdmin(recoveryToken: String, deviceId: String, deviceModel: String): ApiResult<String>
     suspend fun getRecoveryToken(): ApiResult<InviteResponse>

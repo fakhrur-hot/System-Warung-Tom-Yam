@@ -39,6 +39,7 @@ import androidx.lifecycle.ViewModel
 import com.razstudio.pos.BuildConfig
 import com.razstudio.pos.data.ApiClient
 import com.razstudio.pos.data.ApiResult
+import com.razstudio.pos.data.RegisterResponse
 import com.razstudio.pos.data.SecureStorage
 import com.razstudio.pos.ui.i18n.LanguageViewModel
 import com.razstudio.pos.ui.i18n.UiStrings
@@ -52,6 +53,7 @@ class OrderingConnectViewModel @Inject constructor(
     private val apiClient: ApiClient,
     private val secureStorage: SecureStorage,
     private val appConfig: com.razstudio.pos.data.AppConfigStore,
+    private val appConfigFetcher: com.razstudio.pos.data.AppConfigFetcher,
 ) : ViewModel() {
 
     /**
@@ -95,6 +97,11 @@ class OrderingConnectViewModel @Inject constructor(
     var inviteInput by mutableStateOf("")
         private set
 
+    // Staff self-register (.kiro/specs/staff-self-register) — a separate input from
+    // the invite field above, since it carries a public café URL, not a secret token.
+    var cafeUrlInput by mutableStateOf("")
+        private set
+
     var isLoading by mutableStateOf(false)
         private set
 
@@ -109,6 +116,11 @@ class OrderingConnectViewModel @Inject constructor(
 
     fun onInputChanged(value: String) {
         inviteInput = value
+        errorMessage = null
+    }
+
+    fun onCafeUrlChanged(value: String) {
+        cafeUrlInput = value
         errorMessage = null
     }
 
@@ -183,7 +195,77 @@ class OrderingConnectViewModel @Inject constructor(
         )
 
         isLoading = false
+        return finishRegistration(result, strings)
+    }
 
+    /**
+     * Staff self-register (.kiro/specs/staff-self-register): no invite token at all.
+     * Bootstraps the device's backend from the café's PUBLIC website URL — the same
+     * `app-config.json` mechanism the Admin app's "Existing café" tab already uses —
+     * since there is no invite QR here to carry `api`/`key` params directly.
+     */
+    @Suppress("DEPRECATION")
+    suspend fun registerWithoutInvite(androidId: String, strings: UiStrings): Boolean {
+        val cafeUrl = cafeUrlInput.trim()
+        if (cafeUrl.isBlank()) {
+            errorMessage = strings.emptyInviteError
+            return false
+        }
+
+        // Requirement 1.6 — refuse to repoint an already-configured device, the same
+        // rule already enforced for the invite path (adoptBackendFrom is a no-op once
+        // AppConfigStore already holds a URL — see its own "already configured" guard).
+        if (appConfig.isConfigured()) {
+            errorMessage = strings.selfRegisterAlreadyConfiguredError
+            return false
+        }
+
+        isLoading = true
+        errorMessage = null
+
+        when (val fetchResult = appConfigFetcher.fetch(cafeUrl)) {
+            is com.razstudio.pos.data.AppConfigFetcher.FetchResult.Success -> {
+                appConfig.adoptBackendFromRecoveryQr(
+                    fetchResult.supabaseUrl,
+                    fetchResult.supabaseAnonKey,
+                    websiteUrl = cafeUrl,
+                )
+            }
+            is com.razstudio.pos.data.AppConfigFetcher.FetchResult.NetworkError -> {
+                errorMessage = fetchResult.message
+                isLoading = false
+                return false
+            }
+            is com.razstudio.pos.data.AppConfigFetcher.FetchResult.ParseError -> {
+                errorMessage = fetchResult.message
+                isLoading = false
+                return false
+            }
+            is com.razstudio.pos.data.AppConfigFetcher.FetchResult.IncompletePayload -> {
+                errorMessage = fetchResult.message
+                isLoading = false
+                return false
+            }
+        }
+
+        val deviceId = secureStorage.getDeviceId()
+        val deviceModel = "${Build.MANUFACTURER} ${Build.MODEL}"
+        val appVersion = BuildConfig.VERSION_NAME
+
+        val result = apiClient.register(
+            inviteToken = null,
+            deviceId = deviceId,
+            deviceModel = deviceModel,
+            androidId = androidId,
+            appVersion = appVersion,
+        )
+
+        isLoading = false
+        return finishRegistration(result, strings)
+    }
+
+    /** Shared success/error handling for both the invite path and Self_Register. */
+    private suspend fun finishRegistration(result: ApiResult<RegisterResponse>, strings: UiStrings): Boolean {
         return when (result) {
             is ApiResult.Success -> {
                 // `register` returns `devices.id` under the name `deviceId` — the server's row key,
@@ -264,6 +346,7 @@ fun OrderingConnectScreen(
     }
     var showManualAddress by remember { mutableStateOf(false) }
     var manualAddress by remember { mutableStateOf("") }
+    var showSelfRegister by remember { mutableStateOf(false) }
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -384,6 +467,42 @@ fun OrderingConnectScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+
+            // ── Staff self-register (.kiro/specs/staff-self-register) ─────────────────────────
+            // No invite QR at all: staff type the café's public website URL (already printed on
+            // customer table QR cards) and register directly, landing in the same PENDING queue
+            // Admin already reviews. Collapsed by default so it never competes with the primary,
+            // faster invite-QR path above.
+            Spacer(modifier = Modifier.height(8.dp))
+            TextButton(onClick = { showSelfRegister = !showSelfRegister }) {
+                Text(strings.selfRegisterToggleLabel)
+            }
+            if (showSelfRegister) {
+                OutlinedTextField(
+                    value = viewModel.cafeUrlInput,
+                    onValueChange = { viewModel.onCafeUrlChanged(it) },
+                    label = { Text(strings.cafeWebsiteUrlFieldLabel) },
+                    placeholder = { Text("https://your-cafe.pages.dev") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !viewModel.isLoading,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        scope.launch {
+                            if (viewModel.registerWithoutInvite(androidId, strings)) {
+                                onRegistered()
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !viewModel.isLoading && viewModel.cafeUrlInput.isNotBlank()
+                ) {
+                    Text(strings.registerDeviceButton)
+                }
             }
 
             if (viewModel.errorMessage != null) {
