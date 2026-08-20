@@ -135,6 +135,9 @@
     },
     "Cafe Kopi Bulan": {
       "subId": "kopibulan-menu"
+    },
+    "Demo Warung": {
+      "subId": "demowarung-menu"
     }
   }
 }
