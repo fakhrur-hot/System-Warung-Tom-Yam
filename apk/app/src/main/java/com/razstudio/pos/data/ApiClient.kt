@@ -1221,6 +1221,15 @@ class ApiClient @Inject constructor(
                     )
                 }
                 401 -> ApiResult.Error("UNAUTHORIZED", "Invalid or expired token")
+                // The invite is stored hashed and can never be read back once regenerated (see
+                // migration 0020) — not this call, not any other. The caller offers Regenerate
+                // instead of retrying. Missing this branch used to fall through to
+                // unexpectedStatus(409), which reported "REJECTED"/"server refused that request"
+                // instead of routing the UI to that offer.
+                409 -> ApiResult.Error(
+                    "INVITE_NOT_READABLE",
+                    "This invite code is stored securely and cannot be shown again."
+                )
                 else -> unexpectedStatus(response.code)
             }
         } catch (e: IOException) {
